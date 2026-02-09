@@ -43,4 +43,5 @@ RUN echo "source /workspace/cartographer_ws/install/setup.bash" >> /home/admin/.
 RUN pip3 install -U \
     pytransform3d \
     pyqtgraph \
-    matplotlib
+    matplotlib \
+    ultalitycs \
