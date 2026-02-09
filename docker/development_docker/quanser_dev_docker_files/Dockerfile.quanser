@@ -44,4 +44,4 @@ RUN pip3 install -U \
     pytransform3d \
     pyqtgraph \
     matplotlib \
-    ultralitycs \
+    ultralytics \
