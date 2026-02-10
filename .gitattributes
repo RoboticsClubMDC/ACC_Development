@@ -1,0 +1,2 @@
+ros2/src/qcar2_autonomy/autonomy/models/*.pt filter=lfs diff=lfs merge=lfs -text
+ros2/src/qcar2_autonomy/**/models/*.pt filter=lfs diff=lfs merge=lfs -text
