@@ -50,3 +50,8 @@ qtcreator-*
 # Catkin custom files
 CATKIN_IGNORE
 /.vscode
+Development/log/
+Development/build/
+Development/install/
+Development/**/__pycache__/
+*.pyc
