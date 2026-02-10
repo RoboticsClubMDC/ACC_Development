@@ -43,7 +43,7 @@ class tripPlanner(Node):
         self.taxi_node = list(self.get_parameter("taxi_node").get_parameter_value().integer_array_value)[0]
         
         # define new parameters for node to use 
-        self.declare_parameter('trip_nodes', [2,8])
+        self.declare_parameter('trip_nodes', [2,4,8,6,8])
         self.trip_nodes = list(self.get_parameter("trip_nodes").get_parameter_value().integer_array_value)
 
 
