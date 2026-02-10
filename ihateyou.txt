@@ -1,4 +1,0 @@
-cd ~/Documents/ACC_Development/isaac_ros_common
-ls -l scripts/run_dev.sh
-chmod +x scripts/run_dev.sh
-./scripts/run_dev.sh ~/Documents/ACC_Development/Development
