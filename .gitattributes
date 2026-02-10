@@ -3,3 +3,6 @@ ros2/src/qcar2_autonomy/**/models/*.pt filter=lfs diff=lfs merge=lfs -text
 Development/ros2/src/qcar2_autonomy/models/*.pt filter=lfs diff=lfs merge=lfs -text
 Development/ros2/src/qcar2_autonomy/models/lanenet.pt filter=lfs diff=lfs merge=lfs -text
 Development/ros2/src/qcar2_autonomy/autonomy/models/lanenet.pt filter=lfs diff=lfs merge=lfs -text
+Development/ros2/src/qcar2_autonomy/models/lanenet.ptgit filter=lfs diff=lfs merge=lfs -text
+lfs filter=lfs diff=lfs merge=lfs -text
+track filter=lfs diff=lfs merge=lfs -text
