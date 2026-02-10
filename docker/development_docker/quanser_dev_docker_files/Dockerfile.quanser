@@ -44,4 +44,12 @@ RUN pip3 install -U \
     pytransform3d \
     pyqtgraph \
     matplotlib \
-    ultralytics \
+    tqdm \
+    ultralytics
+    
+    
+RUN python3 -m pip install --no-cache-dir --upgrade pip && \
+    python3 -m pip install --no-cache-dir \
+      --extra-index-url https://pypi.nvidia.com \
+      tensorrt
+
