@@ -10,6 +10,15 @@ from sensor_msgs.msg import Image
 from qcar2_interfaces.msg import MotorCommands
 from std_srvs.srv import SetBool
 
+import os
+
+# Containers often have no controlling TTY, so os.getlogin() explodes.
+# Patch it BEFORE importing pit.* (they call it at import-time).
+try:
+    os.getlogin()
+except OSError:
+    os.getlogin = lambda: os.environ.get("LOGNAME", os.environ.get("USER", "virtual"))
+
 from pit.LaneNet.nets import LaneNet
 
 
@@ -58,7 +67,8 @@ class LaneDetector(Node):
         self.lanenet = LaneNet(
             imageWidth=640,
             imageHeight=480,
-            rowUpperBound=240
+            rowUpperBound=240,
+            modelPath="/tmp/lane.pt"
         )
 
         # ---------------- ROS IO ----------------
