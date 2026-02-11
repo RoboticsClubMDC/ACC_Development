@@ -195,6 +195,8 @@ class PathFollower(Node):
     def __init__(self):
       super().__init__('path_follower')
 
+
+
       # define new parameters for node to use
       self.declare_parameter('node_values', [0,8,10])
       self.waypoints = list(self.get_parameter("node_values").get_parameter_value().integer_array_value)
@@ -228,6 +230,21 @@ class PathFollower(Node):
 
       self.scale = 1.0
 
+      rm = SDCSRoadMap()
+     
+      self.origin_node = 0
+      self.taxi_hub_node = 10
+      # self.declare_parameter('taxi_hub_node', 10)
+      self.wp_to_hub = rm.generate_path([self.origin_node, self.taxi_hub_node]) * self.scale
+      self.wp_main = rm.generate_path(self.waypoints) * self.scale
+
+      self.stage = "Travelling to hub from origin...."
+      self.wp = self.wp_to_hub
+      self.N = self.wp.shape[1]
+      self.wpi = 0
+
+
+
       self.declare_parameter('rotation_offset', [90.0])
       self.rotation_offset = list(self.get_parameter("rotation_offset").get_parameter_value().double_array_value)
 
@@ -235,7 +252,7 @@ class PathFollower(Node):
       self.translation_offset = list(self.get_parameter("translation_offset").get_parameter_value().double_array_value)
 
 
-      self.declare_parameter('start_path', [False])
+      self.declare_parameter('start_path', [True])
       self.path_execute_flag = list(self.get_parameter("start_path").get_parameter_value().bool_array_value)[0]
 
       self.add_on_set_parameters_callback(self.parameter_update_callback)
@@ -543,12 +560,20 @@ class PathFollower(Node):
 
             self.wpi = np.clip(self.wpi,0,self.N-5)
 
-            if self.wpi >= self.N-5:
-              if dist <0.4:
-                speed_command = 0.0
-                steering = 0.0
-                self.wp_prior = self.wp
-                self.path_complete = True
+            if self.wpi >= self.N and dist < 0.4:
+              speed_command = 0.0
+              steering = 0.0
+
+              if self.stage == "Travelling to hub from origin....":
+                self.stage = "MAIN"
+                self.wp = self.wp_main
+                self.N = self.wp.shape[1]
+                self.wpi = 0
+                return
+              
+              else: 
+                 self.wp_prior = self.wp
+                 self.path_complete = True
 
             if self.wpi > self.N-100 :
                speed_command = 0.2
