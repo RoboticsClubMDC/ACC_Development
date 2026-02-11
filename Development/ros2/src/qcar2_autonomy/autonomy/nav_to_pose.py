@@ -196,7 +196,7 @@ class PathFollower(Node):
       super().__init__('path_follower')
 
       # define new parameters for node to use
-      self.declare_parameter('node_values', [10,2,4,8,6,8])
+      self.declare_parameter('node_values', [2, 4, 6, 8, 10])
       self.waypoints = list(self.get_parameter("node_values").get_parameter_value().integer_array_value)
 
       self.declare_parameter('desired_speed', [0.4])
@@ -206,31 +206,11 @@ class PathFollower(Node):
       self.declare_parameter('visualize_pose', [False])
       self.pose_visualize_flag = list(self.get_parameter("visualize_pose").get_parameter_value().bool_array_value)[0]
 
-      '''
-      ================= For future reference =================
-
-      If using the nav_to_pose on virtual qcar these are the values to use if the QCar starts close to node 10
-
-      Rotation for virtual
-      33.0
-      Translation for virtual
-      1.05,0.9
-
-      set self.scale to 0.975
-
-      If using the nav_to_pose on physical qcar but starting close to node 10
-      Rotation
-      44.0
-      Translation
-      1.15,0.55
-`
-      '''
-
       self.scale = 0.1
 
       # self.declare_parameter('rotation_offset', [90.0]) # Original
       # self.declare_parameter('rotation_offset', [33.0]) # According to Reference given
-      self.declare_parameter('rotation_offset', [-44.0]) # According to Setup_Competition_Map.py
+      self.declare_parameter('rotation_offset', [-44.7]) # According to Setup_Competition_Map.py
       self.rotation_offset = list(self.get_parameter("rotation_offset").get_parameter_value().double_array_value)
 
       # self.declare_parameter('translation_offset', [0.0, 0.0]) # Original
@@ -328,7 +308,7 @@ class PathFollower(Node):
           if param.name == 'node_values' and param.type_== param.Type.INTEGER_ARRAY:
               # Navigation specific variables
               self.waypoints = list(param.value)
-              # print(self.waypoints)
+              print(SDCSRoadMap().generate_path(self.waypoints))
               self.wp  = SDCSRoadMap().generate_path(self.waypoints)*self.scale
               self.N = len(self.wp[0, :])
               self.wpi = 0

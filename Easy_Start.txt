@@ -14,7 +14,10 @@ colcon buid:
 colcon build && . install/setup.bash && export ROS_DOMAIN_ID=7 && clear
 
 To start cartographer:
-clear && . install/setup.bash && export ROS_DOMAIN_ID=7 && clear && ros2 launch qcar2_nodes qcar2_cartographer_virtual_launch.py 
+clear && . install/setup.bash && export ROS_DOMAIN_ID=7 && clear && ros2 launch qcar2_nodes qcar2_cartographer_virtual_launch.py && clear
 
 Running autonomy planner:
-colcon build --packages-select qcar2_autonomy && . install/setup.bash && export ROS_DOMAIN_ID=7 && clear && ros2 launch qcar2_autonomy autonomy_planner_launch.py
+colcon build --packages-select qcar2_autonomy && . install/setup.bash && export ROS_DOMAIN_ID=7 && ros2 launch qcar2_autonomy autonomy_planner_launch.py && clear
+
+Run nav_to_pose
+colcon build --packages-select qcar2_autonomy && . install/setup.bash && export ROS_DOMAIN_ID=7 && ros2 run qcar2_autonomy path_follower && clear
