@@ -11,6 +11,7 @@ from qcar2_interfaces.msg import MotorCommands
 from std_srvs.srv import SetBool
 
 import os
+from ament_index_python.packages import get_package_share_directory
 
 # Containers often have no controlling TTY, so os.getlogin() explodes.
 # Patch it BEFORE importing pit.* (they call it at import-time).
@@ -48,6 +49,10 @@ class LaneDetector(Node):
         self.declare_parameter("bev_width", 640)
         self.declare_parameter("bev_height", 480)
 
+        # Allow overriding model path from params
+        # If empty, we will auto-resolve to: <qcar2_autonomy share>/models/lanenet.pt
+        self.declare_parameter("model_path", "")
+
         # ---------------- LOAD PARAMS ----------------
         self.image_topic = self.get_parameter("image_topic").value
         self.cmd_topic = self.get_parameter("cmd_topic").value
@@ -63,12 +68,32 @@ class LaneDetector(Node):
         self.bev_w = int(self.get_parameter("bev_width").value)
         self.bev_h = int(self.get_parameter("bev_height").value)
 
+        # ---------------- LaneNet model path ----------------
+        param_model_path = str(self.get_parameter("model_path").value).strip()
+
+        if param_model_path:
+            model_path = os.path.normpath(param_model_path)
+        else:
+            # This is the correct ROS2 way: use the package share directory.
+            # Your repo has qcar2_autonomy/models/lanenet.pt, so we look there.
+            pkg_share = get_package_share_directory("qcar2_autonomy")
+            model_path = os.path.join(pkg_share, "models", "lanenet.pt")
+            model_path = os.path.normpath(model_path)
+
+        if not os.path.exists(model_path):
+            self.get_logger().error(f"LaneNet model not found at: {model_path}")
+            self.get_logger().error(
+                "Put it at: qcar2_autonomy/models/lanenet.pt "
+                "or set ROS param `model_path`."
+            )
+            raise FileNotFoundError(model_path)
+
         # ---------------- LaneNet ----------------
         self.lanenet = LaneNet(
             imageWidth=640,
             imageHeight=480,
             rowUpperBound=240,
-            modelPath="/tmp/lane.pt"
+            modelPath=model_path
         )
 
         # ---------------- ROS IO ----------------
@@ -81,7 +106,7 @@ class LaneDetector(Node):
         self.prev_error = 0.0
         self.prev_time = None
 
-        self.get_logger().info("lane_detector READY (LaneNet + BEV + PD)")
+        self.get_logger().info(f"lane_detector READY (model={model_path})")
 
     # ---------------- ENABLE ----------------
     def enable_cb(self, req, resp):
@@ -186,3 +211,7 @@ def main(args=None):
     finally:
         node.destroy_node()
         rclpy.shutdown()
+
+
+if __name__ == "__main__":
+    main()
