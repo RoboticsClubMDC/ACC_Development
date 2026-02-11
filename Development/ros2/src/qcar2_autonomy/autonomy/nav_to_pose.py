@@ -229,7 +229,7 @@ class PathFollower(Node):
 
       # self.declare_parameter('rotation_offset', [90.0]) # Original
       # self.declare_parameter('rotation_offset', [33.0]) # According to Reference given
-      self.declare_parameter('rotation_offset', [`44.0]) # According to Setup_Competition_Map.py
+      self.declare_parameter('rotation_offset', [-44.7]) # According to Setup_Competition_Map.py
       self.rotation_offset = list(self.get_parameter("rotation_offset").get_parameter_value().double_array_value)
 
       # self.declare_parameter('translation_offset', [0.0, 0.0]) # Original
