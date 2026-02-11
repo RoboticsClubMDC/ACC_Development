@@ -199,7 +199,7 @@ class PathFollower(Node):
       self.declare_parameter('node_values', [10,2,4,8,6,8])
       self.waypoints = list(self.get_parameter("node_values").get_parameter_value().integer_array_value)
 
-      self.declare_parameter('desired_speed', [0.3])
+      self.declare_parameter('desired_speed', [0.4])
       self.desired_speed = list(self.get_parameter("desired_speed").get_parameter_value().double_array_value)
 
 
@@ -230,7 +230,7 @@ class PathFollower(Node):
 
       # self.declare_parameter('rotation_offset', [90.0]) # Original
       # self.declare_parameter('rotation_offset', [33.0]) # According to Reference given
-      self.declare_parameter('rotation_offset', [-44.7]) # According to Setup_Competition_Map.py
+      self.declare_parameter('rotation_offset', [-44.0]) # According to Setup_Competition_Map.py
       self.rotation_offset = list(self.get_parameter("rotation_offset").get_parameter_value().double_array_value)
 
       # self.declare_parameter('translation_offset', [0.0, 0.0]) # Original
@@ -239,7 +239,7 @@ class PathFollower(Node):
       self.translation_offset = list(self.get_parameter("translation_offset").get_parameter_value().double_array_value)
 
 
-      self.declare_parameter('start_path', [False])
+      self.declare_parameter('start_path', [True])
       self.path_execute_flag = list(self.get_parameter("start_path").get_parameter_value().bool_array_value)[0]
 
       self.add_on_set_parameters_callback(self.parameter_update_callback)
