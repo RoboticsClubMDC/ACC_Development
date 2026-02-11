@@ -9,10 +9,6 @@ def generate_launch_description():
         package='qcar2_autonomy',
         executable='path_follower',
         name='path_follower',
-        parameters=[{
-            'start_path': [False],          # IMPORTANT: don't move immediately
-            'node_values': [2, 4, 6, 8, 10],
-        }]
     )
 
     traffic_system_detector = Node(

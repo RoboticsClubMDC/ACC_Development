@@ -196,10 +196,10 @@ class PathFollower(Node):
       super().__init__('path_follower')
 
       # define new parameters for node to use
-      self.declare_parameter('node_values', [10,4])
+      self.declare_parameter('node_values', [0,10])
       self.waypoints = list(self.get_parameter("node_values").get_parameter_value().integer_array_value)
 
-      self.declare_parameter('desired_speed', [0.4])
+      self.declare_parameter('desired_speed', [0.2])
       self.desired_speed = list(self.get_parameter("desired_speed").get_parameter_value().double_array_value)
 
 
@@ -225,16 +225,16 @@ class PathFollower(Node):
       1.15,0.55
       '''
 
-      self.scale = 1.0
+      self.scale = 0.975
 
-      # self.declare_parameter('rotation_offset', [90.0]) # Original
+      self.declare_parameter('rotation_offset', [90.0]) # Original
       # self.declare_parameter('rotation_offset', [33.0]) # According to Reference given
-      self.declare_parameter('rotation_offset', [-44.7]) # According to Setup_Competition_Map.py
+      # self.declare_parameter('rotation_offset', [41.4]) # According to Setup_Competition_Map.py
       self.rotation_offset = list(self.get_parameter("rotation_offset").get_parameter_value().double_array_value)
 
-      # self.declare_parameter('translation_offset', [0.0, 0.0]) # Original
+      self.declare_parameter('translation_offset', [0.0, 0.0]) # Original
       # self.declare_parameter('translation_offset', [1.05,0.9]) # According to Reference given
-      self.declare_parameter('translation_offset', [-1.205, -0.83]) # According to Setup_Competition_Map.py
+      # self.declare_parameter('translation_offset', [-1.205, -0.83]) # According to Setup_Competition_Map.py
       self.translation_offset = list(self.get_parameter("translation_offset").get_parameter_value().double_array_value)
 
 
