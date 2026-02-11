@@ -196,7 +196,7 @@ class PathFollower(Node):
       super().__init__('path_follower')
 
       # define new parameters for node to use
-      self.declare_parameter('node_values', [10,2,8])
+      self.declare_parameter('node_values', [0, 10])
       self.waypoints = list(self.get_parameter("node_values").get_parameter_value().integer_array_value)
 
       self.declare_parameter('desired_speed', [0.4])
@@ -228,10 +228,10 @@ class PathFollower(Node):
 
       self.scale = 1.0
 
-      self.declare_parameter('rotation_offset', [-44.7])
+      self.declare_parameter('rotation_offset', [90.0])
       self.rotation_offset = list(self.get_parameter("rotation_offset").get_parameter_value().double_array_value)
 
-      self.declare_parameter('translation_offset', [-1.205, -0.83])
+      self.declare_parameter('translation_offset', [0.0, 0.0])
       self.translation_offset = list(self.get_parameter("translation_offset").get_parameter_value().double_array_value)
 
 
@@ -504,6 +504,7 @@ class PathFollower(Node):
                                     [np.sin(-angle_offset*np.pi/180),np.cos(-angle_offset*np.pi/180)]])
             t = np.array([self.translation_offset[0],self.translation_offset[1]])
             wp_1_mod = (wp_1+t)@R_QLabs_ROS
+            print (wp_1_mod)
 
             L= 0.256
 
