@@ -226,17 +226,20 @@ class PathFollower(Node):
 `
       '''
 
-      self.scale = 0.975
+      self.scale = 0.1
 
-      # self.declare_parameter('rotation_offset', [90.0])
-      self.declare_parameter('rotation_offset', [-44.7])
+      # self.declare_parameter('rotation_offset', [90.0]) # Original
+      # self.declare_parameter('rotation_offset', [33.0]) # According to Reference given
+      self.declare_parameter('rotation_offset', [-44.7]) # According to Setup_Competition_Map.py
       self.rotation_offset = list(self.get_parameter("rotation_offset").get_parameter_value().double_array_value)
 
-      self.declare_parameter('translation_offset', [-1.205, -0.83])
+      # self.declare_parameter('translation_offset', [0.0, 0.0]) # Original
+      # self.declare_parameter('translation_offset', [1.05,0.9]) # According to Reference given
+      self.declare_parameter('translation_offset', [-1.205, -0.83]) # According to Setup_Competition_Map.py
       self.translation_offset = list(self.get_parameter("translation_offset").get_parameter_value().double_array_value)
 
 
-      self.declare_parameter('start_path', [True])
+      self.declare_parameter('start_path', [False])
       self.path_execute_flag = list(self.get_parameter("start_path").get_parameter_value().bool_array_value)[0]
 
       self.add_on_set_parameters_callback(self.parameter_update_callback)

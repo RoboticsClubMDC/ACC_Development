@@ -11,7 +11,7 @@ def generate_launch_description():
         name='path_follower',
         parameters=[{
             'start_path': [False],          # IMPORTANT: don't move immediately
-            'node_values': [10, 2, 4, 8, 6, 8],
+            'node_values': [2, 4, 8, 6, 8],
         }]
     )
 
@@ -29,7 +29,7 @@ def generate_launch_description():
         'taxi_node': [10],
         'trip_nodes': [2, 4, 8, 6, 8],
         'initial_start_node': 10,
-        'initial_end_at_taxi': False,
+        'initial_end_at_taxi': True,
     }]
 )
 
@@ -40,7 +40,7 @@ def generate_launch_description():
 
     return LaunchDescription([
         path_follower,
-        traffic_system_detector,
+        # traffic_system_detector,
         trip_planner
         ]
     )

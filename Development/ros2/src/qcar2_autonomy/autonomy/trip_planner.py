@@ -179,56 +179,34 @@ class tripPlanner(Node):
         # At the start the QCar will need to generate a path from the starting origin to the taxihub
         # this path is different from every other path
         if self.trip_super_state == 1:
-            # Generate path
+
+            # 1) Build and send node_values ONCE
             if len(self.path_nodes) == 0 and self.current_path_status == False:
                 self.path_nodes.append(self.initial_start_node)
                 self.path_nodes.extend(self.trip_nodes)
                 if self.initial_end_at_taxi:
                     self.path_nodes.append(self.taxi_node)
 
-                
-                if self.super_state_1_flags[0] == False:
-                    self.super_state_1_flags[0] = self.send_request(param_name="node_values",
-                              param_value= self.path_nodes,
-                              param_type= ParameterType.PARAMETER_INTEGER_ARRAY,
-                              client= self.path_follower_client)
-                
-                if not self.super_state_1_flags[1]:
-                    if self._has_map_tf():
-                        self.super_state_1_flags[1] = self.send_request(
-                            param_name="start_path",
-                            param_value=[True],
-                            param_type=ParameterType.PARAMETER_BOOL_ARRAY,
-                            client=self.path_follower_client
-                        )
-                    else:
-                        return  # wait until TF exists; do not start moving yet
+                if not self.super_state_1_flags[0]:
+                    self.super_state_1_flags[0] = self.send_request(
+                        param_name="node_values",
+                        param_value=self.path_nodes,
+                        param_type=ParameterType.PARAMETER_INTEGER_ARRAY,
+                        client=self.path_follower_client
+                    )
 
+            # 2) Start path AFTER TF exists and after 2 seconds
+            if (not self.super_state_1_flags[1]
+                and self.super_state_1_flags[0]
+                and t_current > 2.0
+                and self._has_map_tf()):
+                self.super_state_1_flags[1] = self.send_request(
+                    param_name="start_path",
+                    param_value=[True],
+                    param_type=ParameterType.PARAMETER_BOOL_ARRAY,
+                    client=self.path_follower_client
+                )
 
-            # We have passed the first 10 seconds and are now waiting for new rides 
-            if self.current_path_status == True and t_current > 10:
-
-                # reset LED timer to ensure LEDs are only on for 3s
-                if not self.led_timer_reset:
-                    self.led_time_t0 = time.time()
-                    self.led_timer_reset = True                    
-                
-                if time.time()-self.led_time_t0 < self.led_time:
-                    # this will set the LED red for 3 seconds
-                    self.qcar_state = 1
-                elif time.time()-self.led_time_t0 > self.led_time: 
-                    #ready for another ride
-                    self.qcar_state = 4
-                
-                    # clear current nodes
-                    self.path_nodes = []
-
-                    # switch into full ride planning mode
-                    self.trip_super_state = 2
-                    
-                    # ready for a new trip!
-                    self.current_trip_status = True
-                    self.led_timer_reset = False
 
         # QCar has reached the taxihub area and is ready for a new trip!
         if  self.trip_super_state == 2:
