@@ -11,7 +11,6 @@ from qcar2_interfaces.msg import MotorCommands
 from std_srvs.srv import SetBool
 
 import os
-from ament_index_python.packages import get_package_share_directory
 
 # Containers often have no controlling TTY, so os.getlogin() explodes.
 # Patch it BEFORE importing pit.* (they call it at import-time).
@@ -49,9 +48,18 @@ class LaneDetector(Node):
         self.declare_parameter("bev_width", 640)
         self.declare_parameter("bev_height", 480)
 
-        # Allow overriding model path from params
-        # If empty, we will auto-resolve to: <qcar2_autonomy share>/models/lanenet.pt
-        self.declare_parameter("model_path", "")
+        # ---------------- MODEL PATH ----------------
+        # Default to a RELATIVE path inside the source tree:
+        # <qcar2_autonomy>/models/lanenet.pt
+        # This resolves correctly in your container at:
+        # /workspaces/isaac_ros-dev/ros2/src/qcar2_autonomy/models/lanenet.pt
+        # default_model_path = os.path.abspath(
+        #     os.path.join(os.path.dirname(__file__), "..", "models", "lanenet.pt")
+        # )
+
+        default_model_path = os.path("Development/ros2/src/qcar2_autonomy/models/lanenet.pt")
+        print(f"Default LaneNet model path: {default_model_path}")
+        self.declare_parameter("model_path", default_model_path)
 
         # ---------------- LOAD PARAMS ----------------
         self.image_topic = self.get_parameter("image_topic").value
@@ -69,22 +77,13 @@ class LaneDetector(Node):
         self.bev_h = int(self.get_parameter("bev_height").value)
 
         # ---------------- LaneNet model path ----------------
-        param_model_path = str(self.get_parameter("model_path").value).strip()
-
-        if param_model_path:
-            model_path = os.path.normpath(param_model_path)
-        else:
-            # This is the correct ROS2 way: use the package share directory.
-            # Your repo has qcar2_autonomy/models/lanenet.pt, so we look there.
-            pkg_share = get_package_share_directory("qcar2_autonomy")
-            model_path = os.path.join(pkg_share, "models", "lanenet.pt")
-            model_path = os.path.normpath(model_path)
+        model_path = os.path.normpath(str(self.get_parameter("model_path").value).strip())
 
         if not os.path.exists(model_path):
             self.get_logger().error(f"LaneNet model not found at: {model_path}")
             self.get_logger().error(
-                "Put it at: qcar2_autonomy/models/lanenet.pt "
-                "or set ROS param `model_path`."
+                "Fix: put it in qcar2_autonomy/models/lanenet.pt "
+                "or override param: -p model_path:=/absolute/path/to/lanenet.pt"
             )
             raise FileNotFoundError(model_path)
 
