@@ -223,14 +223,13 @@ class PathFollower(Node):
       44.0
       Translation
       1.15,0.55
-`
       '''
 
       self.scale = 1.0
 
       # self.declare_parameter('rotation_offset', [90.0]) # Original
       # self.declare_parameter('rotation_offset', [33.0]) # According to Reference given
-      self.declare_parameter('rotation_offset', [-44.0]) # According to Setup_Competition_Map.py
+      self.declare_parameter('rotation_offset', [`44.0]) # According to Setup_Competition_Map.py
       self.rotation_offset = list(self.get_parameter("rotation_offset").get_parameter_value().double_array_value)
 
       # self.declare_parameter('translation_offset', [0.0, 0.0]) # Original
@@ -322,97 +321,97 @@ class PathFollower(Node):
       self.scopeTimer = self.create_timer(0.1, self.scopeDataTimer)
 
 
-      def parameter_update_callback(self, params):
-        for param in params:
+    def parameter_update_callback(self, params):
+      for param in params:
 
-          if param.name == 'node_values' and param.type_== param.Type.INTEGER_ARRAY:
-              # Navigation specific variables
-              self.waypoints = list(param.value)
-              # print(self.waypoints)
-              self.wp  = SDCSRoadMap().generate_path(self.waypoints)*0.975
-              self.N = len(self.wp[0, :])
-              self.wpi = 0
-              self.previous_steering_value = 0
-              self.path_complete = False
-              self.get_logger().info('nodes updated!')
-              print(self.waypoints)
+        if param.name == 'node_values' and param.type_== param.Type.INTEGER_ARRAY:
+            # Navigation specific variables
+            self.waypoints = list(param.value)
+            # print(self.waypoints)
+            self.wp  = SDCSRoadMap().generate_path(self.waypoints)*0.975
+            self.N = len(self.wp[0, :])
+            self.wpi = 0
+            self.previous_steering_value = 0
+            self.path_complete = False
+            self.get_logger().info('nodes updated!')
+            print(self.waypoints)
 
-          elif param.name == 'desired_speed' and param.type_== param.Type.DOUBLE_ARRAY:
-              self.desired_speed = list(param.value)
-              self.get_logger().info('new desired speed...')
-              print(self.desired_speed)
+        elif param.name == 'desired_speed' and param.type_== param.Type.DOUBLE_ARRAY:
+            self.desired_speed = list(param.value)
+            self.get_logger().info('new desired speed...')
+            print(self.desired_speed)
 
-          elif param.name == 'rotation_offset' and param.type_== param.Type.DOUBLE_ARRAY:
-              self.rotation_offset = list(param.value)
+        elif param.name == 'rotation_offset' and param.type_== param.Type.DOUBLE_ARRAY:
+            self.rotation_offset = list(param.value)
 
-          elif param.name == 'translation_offset' and param.type_== param.Type.DOUBLE_ARRAY:
-              self.translation_offset = list(param.value)
-          elif param.name == 'start_path' and param.type_== param.Type.BOOL_ARRAY:
-              self.path_execute_flag = list(param.value)[0]
-              self.get_logger().info('path status changed!')
+        elif param.name == 'translation_offset' and param.type_== param.Type.DOUBLE_ARRAY:
+            self.translation_offset = list(param.value)
+        elif param.name == 'start_path' and param.type_== param.Type.BOOL_ARRAY:
+            self.path_execute_flag = list(param.value)[0]
+            self.get_logger().info('path status changed!')
 
-          elif param.name == 'visualize_pose' and param.type_== param.Type.BOOL_ARRAY:
-              self.pose_visualize_flag = list(param.value)[0]
-              if self.pose_visualize_flag and not self.plot_visualized:
-                self.get_logger().info('Pose performance to be displayed.. Note: visualizing pose will impact driving performance...')
+        elif param.name == 'visualize_pose' and param.type_== param.Type.BOOL_ARRAY:
+            self.pose_visualize_flag = list(param.value)[0]
+            if self.pose_visualize_flag and not self.plot_visualized:
+              self.get_logger().info('Pose performance to be displayed.. Note: visualizing pose will impact driving performance...')
 
-                tf = 200
+              tf = 200
 
-                self.steeringScope = MultiScope(
-                      rows=4,
-                      cols=1,
-                      title='Vehicle Steering Control',
-                      fps=10
-                  )
+              self.steeringScope = MultiScope(
+                    rows=4,
+                    cols=1,
+                    title='Vehicle Steering Control',
+                    fps=10
+                )
 
-                self.steeringScope.addAxis(
-                      row=0,
-                      col=0,
-                      timeWindow=tf,
-                      yLabel='x Position [m]',
-                      yLim=(-2.5, 2.5)
-                  )
-                self.steeringScope.axes[0].attachSignal(name='x_meas')
-                self.steeringScope.axes[0].attachSignal(name='x_ekf')
+              self.steeringScope.addAxis(
+                    row=0,
+                    col=0,
+                    timeWindow=tf,
+                    yLabel='x Position [m]',
+                    yLim=(-2.5, 2.5)
+                )
+              self.steeringScope.axes[0].attachSignal(name='x_meas')
+              self.steeringScope.axes[0].attachSignal(name='x_ekf')
 
-                self.steeringScope.addAxis(
-                      row=1,
-                      col=0,
-                      timeWindow=tf,
-                      yLabel='y Position [m]',
-                      yLim=(-1, 6)
-                  )
-                self.steeringScope.axes[1].attachSignal(name='y_meas')
-                self.steeringScope.axes[1].attachSignal(name='y_ekf')
+              self.steeringScope.addAxis(
+                    row=1,
+                    col=0,
+                    timeWindow=tf,
+                    yLabel='y Position [m]',
+                    yLim=(-1, 6)
+                )
+              self.steeringScope.axes[1].attachSignal(name='y_meas')
+              self.steeringScope.axes[1].attachSignal(name='y_ekf')
 
-                self.steeringScope.addAxis(
-                      row=2,
-                      col=0,
-                      timeWindow=tf,
-                      yLabel='steering cmd [rad]',
-                      yLim=(-0.6,0.6)
-                  )
-                self.steeringScope.axes[2].attachSignal(name='delta')
+              self.steeringScope.addAxis(
+                    row=2,
+                    col=0,
+                    timeWindow=tf,
+                    yLabel='steering cmd [rad]',
+                    yLim=(-0.6,0.6)
+                )
+              self.steeringScope.axes[2].attachSignal(name='delta')
 
-                self.steeringScope.addAxis(
-                      row=3,
-                      col=0,
-                      timeWindow=tf,
-                      yLabel='heading',
-                      yLim=(-np.pi,np.pi)
-                  )
-                self.steeringScope.axes[3].attachSignal(name='theta_meas')
-                self.steeringScope.axes[3].attachSignal(name='theta_EKF_sf')
+              self.steeringScope.addAxis(
+                    row=3,
+                    col=0,
+                    timeWindow=tf,
+                    yLabel='heading',
+                    yLim=(-np.pi,np.pi)
+                )
+              self.steeringScope.axes[3].attachSignal(name='theta_meas')
+              self.steeringScope.axes[3].attachSignal(name='theta_EKF_sf')
 
-                self.plot_visualized = True
-              
-              elif self.pose_visualize_flag and self.plot_visualized:
-                self.get_logger().info('visualization running...')
+              self.plot_visualized = True
+            
+            elif self.pose_visualize_flag and self.plot_visualized:
+              self.get_logger().info('visualization running...')
 
-              elif not self.pose_visualize_flag and self.plot_visualized:
-                self.plot_visualized = False
+            elif not self.pose_visualize_flag and self.plot_visualized:
+              self.plot_visualized = False
 
-          return SetParametersResult(successful=True)
+        return SetParametersResult(successful=True)
   
     def filter_coefficients(self, freq,dt):
       nyq_freq = 0.5*(1/dt)
@@ -452,8 +451,8 @@ class PathFollower(Node):
     def path_publisher(self):
         path_msg = Path()
         path_msg.header.stamp = self.get_clock().now().to_msg()
-        # path_msg.header.frame_id = "map"
-        path_msg.header.frame_id = "map_rotated"
+        path_msg.header.frame_id = "map"
+        # path_msg.header.frame_id = "map_rotated"
 
         for i in range(self.wpi):
         # for i in range(self.N):
@@ -468,7 +467,7 @@ class PathFollower(Node):
           t = np.array([self.translation_offset[0],self.translation_offset[1]])
           wp_1_mod = ([self.wp[0,i],self.wp[1,i]]+t)@R_QLabs_ROS
           pose.header.stamp = self.get_clock().now().to_msg()
-          pose.header.frame_id = "map_rotated"
+          pose.header.frame_id = "map"
           pose.pose.position.x =wp_1_mod[0]
           pose.pose.position.y =wp_1_mod[1]
 
@@ -598,7 +597,7 @@ class PathFollower(Node):
       self.path_status_publisher.publish(msg)
 
     def tf_timer(self):
-      from_frame_rel= "map_rotated"
+      from_frame_rel= "map"
       to_frame_rel = self.target_frame
 
       try:
