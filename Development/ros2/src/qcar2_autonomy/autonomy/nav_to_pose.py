@@ -329,7 +329,7 @@ class PathFollower(Node):
               # Navigation specific variables
               self.waypoints = list(param.value)
               # print(self.waypoints)
-              self.wp  = SDCSRoadMap().generate_path(self.waypoints)*0.975
+              self.wp  = SDCSRoadMap().generate_path(self.waypoints)*self.scale
               self.N = len(self.wp[0, :])
               self.wpi = 0
               self.previous_steering_value = 0
