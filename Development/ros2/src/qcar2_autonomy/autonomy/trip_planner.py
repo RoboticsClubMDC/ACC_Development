@@ -9,10 +9,19 @@ from std_msgs.msg import Bool
 
 import time
 
+from tf2_ros import TransformException
+from tf2_ros.buffer import Buffer
+from tf2_ros.transform_listener import TransformListener
+
 
 class tripPlanner(Node):
     def __init__(self):
         super().__init__('trip_planner')
+        
+        self._futures = []
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+
 
         # node names to set 
         self.path_follower_node = "path_follower"
@@ -22,6 +31,13 @@ class tripPlanner(Node):
         # start clients for node parameters
         self.path_follower_client = self.create_client(SetParameters, f'/{self.path_follower_node}/set_parameters')
         self.qcar_hardware_client = self.create_client(SetParameters, f'/{self.qcar_hardware_node}/set_parameters')
+        
+        self.declare_parameter('initial_start_node', 0)
+        self.initial_start_node = self.get_parameter('initial_start_node').value
+
+        self.declare_parameter('initial_end_at_taxi', True)
+        self.initial_end_at_taxi = self.get_parameter('initial_end_at_taxi').value
+
         
         #waiting for services to become availble...
         while not self.path_follower_client.wait_for_service(timeout_sec = 4.0):
@@ -76,7 +92,7 @@ class tripPlanner(Node):
         self.current_trip_state = 1.0 # once at taxi hub, hold red for 3s
         self.path_nodes = []
         self.super_state_1_flags = [False, False]
-        self.taxi_node = 10
+        # self.taxi_node = 10
         self.new_ride_requested = False
         self.trip_length = 0
         self.current_trip_status = False # True/False if trip complete/not complete
@@ -99,16 +115,23 @@ class tripPlanner(Node):
         self.trip_time = time.time()
         self.timer1 = self.create_timer(self.dt, self.trip_planner_controller)
 
-        
+    def _has_map_tf(self):
+        try:
+            self.tf_buffer.lookup_transform('map', 'base_link', rclpy.time.Time())
+            return True
+        except TransformException:
+            return False
+
     def parameter_update_callback(self, params):
         for param in params:
-            if param.name == 'taxi_node' and param.type_== param.Type.INTEGER_ARRAY:
-                # Navigation specific variables
-                self.taxi_node = list(param.value)
-                if len(self.taxi_node > 1):
+            if param.name == 'taxi_node' and param.type_ == param.Type.INTEGER_ARRAY:
+                values = list(param.value)
+                if len(values) != 1:
                     self.get_logger().info('Incorrect number of nodes given... setting default')
                     self.taxi_node = 10
-                          
+                else:
+                    self.taxi_node = values[0]
+
             elif param.name == 'trip_nodes' and param.type_== param.Type.INTEGER_ARRAY:
                 if self.trip_super_state ==1:
                         self.get_logger().info('Cant assign trip, not at the taxi hub!')
@@ -157,11 +180,12 @@ class tripPlanner(Node):
         # this path is different from every other path
         if self.trip_super_state == 1:
             # Generate path
-            if t_current < 10 and len(self.path_nodes) == 0 and self.current_path_status == False:
-                self.path_nodes.append(0)
-                for node in self.trip_nodes:
-                    self.path_nodes.append(node)
-                self.path_nodes.append(self.taxi_node)
+            if len(self.path_nodes) == 0 and self.current_path_status == False:
+                self.path_nodes.append(self.initial_start_node)
+                self.path_nodes.extend(self.trip_nodes)
+                if self.initial_end_at_taxi:
+                    self.path_nodes.append(self.taxi_node)
+
                 
                 if self.super_state_1_flags[0] == False:
                     self.super_state_1_flags[0] = self.send_request(param_name="node_values",
@@ -169,11 +193,17 @@ class tripPlanner(Node):
                               param_type= ParameterType.PARAMETER_INTEGER_ARRAY,
                               client= self.path_follower_client)
                 
-                if self.super_state_1_flags[1] == False:
-                    self.super_state_1_flags[1] = self.send_request(param_name="start_path",
-                              param_value= [True],
-                              param_type= ParameterType.PARAMETER_BOOL_ARRAY,
-                              client= self.path_follower_client)
+                if not self.super_state_1_flags[1]:
+                    if self._has_map_tf():
+                        self.super_state_1_flags[1] = self.send_request(
+                            param_name="start_path",
+                            param_value=[True],
+                            param_type=ParameterType.PARAMETER_BOOL_ARRAY,
+                            client=self.path_follower_client
+                        )
+                    else:
+                        return  # wait until TF exists; do not start moving yet
+
 
             # We have passed the first 10 seconds and are now waiting for new rides 
             if self.current_path_status == True and t_current > 10:
@@ -325,6 +355,9 @@ class tripPlanner(Node):
         request = SetParameters.Request()
         request.parameters = [param]
         future = client.call_async(request)
+        self._futures.append(future)
+        return True
+
 
  
         

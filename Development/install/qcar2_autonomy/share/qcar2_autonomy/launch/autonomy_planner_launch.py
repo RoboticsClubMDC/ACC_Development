@@ -5,10 +5,14 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
 
-    path_follower= Node(
-        package ='qcar2_autonomy',
-        executable ='path_follower',
-        name ='path_follower'
+    path_follower = Node(
+        package='qcar2_autonomy',
+        executable='path_follower',
+        name='path_follower',
+        parameters=[{
+            'start_path': [False],          # IMPORTANT: don't move immediately
+            'node_values': [10, 2, 4, 8, 6, 8],
+        }]
     )
 
     traffic_system_detector = Node(
@@ -16,11 +20,18 @@ def generate_launch_description():
         executable='yolo_detector',
         name = 'qcar2_yolo_detector'
     )
+    
     trip_planner = Node(
-        package ='qcar2_autonomy',
-        executable='trip_planner',
-        name = 'trip_planner'
-    )
+    package='qcar2_autonomy',
+    executable='trip_planner',
+    name='trip_planner',
+    parameters=[{
+        'taxi_node': [10],
+        'trip_nodes': [2, 4, 8, 6, 8],
+        'initial_start_node': 10,
+        'initial_end_at_taxi': False,
+    }]
+)
 
     ''' TODO: Once finished this launch file must also include
     - Lane detector to help smooth out tracking of lanes while driving
@@ -30,5 +41,6 @@ def generate_launch_description():
     return LaunchDescription([
         path_follower,
         traffic_system_detector,
-        trip_planner]
+        trip_planner
+        ]
     )
