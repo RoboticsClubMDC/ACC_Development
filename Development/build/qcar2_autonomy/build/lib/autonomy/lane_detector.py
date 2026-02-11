@@ -34,6 +34,11 @@ class LaneDetector(Node):
         self.declare_parameter('max_line_gap', 100)
         self.declare_parameter('slope_min', 0.5)
 
+        # Binary processing parameters (NEW - inspired by lab guide SECTION C)
+        self.declare_parameter('binary_threshold', 127)
+        self.declare_parameter('dilate_iterations', 2)
+        self.declare_parameter('morph_kernel_size', 5)
+
         # Just move the car (test)
         self.declare_parameter('enable_drive', False)
         self.declare_parameter('drive_throttle', 0.12)
@@ -54,6 +59,10 @@ class LaneDetector(Node):
         self.min_line_length = int(self.get_parameter('min_line_length').value)
         self.max_line_gap = int(self.get_parameter('max_line_gap').value)
         self.slope_min = float(self.get_parameter('slope_min').value)
+
+        self.binary_threshold = int(self.get_parameter('binary_threshold').value)
+        self.dilate_iterations = int(self.get_parameter('dilate_iterations').value)
+        self.morph_kernel_size = int(self.get_parameter('morph_kernel_size').value)
 
         self.enable_drive = bool(self.get_parameter('enable_drive').value)
         self.drive_throttle = float(self.get_parameter('drive_throttle').value)
@@ -81,6 +90,7 @@ class LaneDetector(Node):
 
         self.bev_pub = self.create_publisher(Image, '/lane_detector/BEV', 10)
         self.lane_marking_pub = self.create_publisher(Image, '/lane_detector/lane_marking', 10)
+        self.lane_marking_bev_pub = self.create_publisher(Image, '/lane_detector/lane_marking_BEV', 10)
 
         self.cmd_pub = self.create_publisher(MotorCommands, self.cmd_topic, 10)
 
@@ -130,11 +140,26 @@ class LaneDetector(Node):
             h, w = cv_image.shape[:2]
             self._ensure_perspective_transform(h, w)
 
-            # Detect lanes + debug marking image
-            left_lane, right_lane, marking_dbg = self.detect_lanes(cv_image)
+            # Detect lanes + BINARY marking image (IMPROVED)
+            left_lane, right_lane, marking_binary = self.detect_lanes(cv_image)
 
-            # Publish lane marking debug
-            self.lane_marking_pub.publish(self.bridge.cv2_to_imgmsg(marking_dbg, 'bgr8'))
+            # Publish BINARY lane marking (this is the key improvement!)
+            self.lane_marking_pub.publish(self.bridge.cv2_to_imgmsg(marking_binary, 'mono8'))
+
+            # Transform binary lane marking to BEV
+            bev_lane_marking = cv2.warpPerspective(
+                marking_binary, 
+                self.M, 
+                (self.bev_width, self.bev_height)
+            )
+
+            # Process BEV lane marking to ensure binary and clean (like lab SECTION C)
+            bev_lane_marking_processed = self.preprocess_lane_marking_bev(bev_lane_marking)
+
+            # Publish BINARY BEV lane marking
+            self.lane_marking_bev_pub.publish(
+                self.bridge.cv2_to_imgmsg(bev_lane_marking_processed, 'mono8')
+            )
 
             # Transform to BEV (visualization)
             bev_image = cv2.warpPerspective(cv_image, self.M, (self.bev_width, self.bev_height))
@@ -168,7 +193,10 @@ class LaneDetector(Node):
             self.get_logger().error(f'Error in callback: {e}')
 
     def detect_lanes(self, image):
-        """Detect lane lines using classical CV and return a debug image."""
+        """
+        Detect lane lines using classical CV and return BINARY image.
+        IMPROVED: Now follows lab guide approach with binary output.
+        """
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         blur = cv2.GaussianBlur(gray, (5, 5), 0)
         edges = cv2.Canny(blur, self.canny_low, self.canny_high)
@@ -191,6 +219,10 @@ class LaneDetector(Node):
             maxLineGap=self.max_line_gap
         )
 
+        # ==== KEY IMPROVEMENT: Create BINARY lane marking ====
+        # Initialize as black (0)
+        lane_marking = np.zeros((h, w), dtype=np.uint8)
+        
         left_lines, right_lines = [], []
         if lines is not None:
             for line in lines:
@@ -200,24 +232,39 @@ class LaneDetector(Node):
                     continue
                 slope = (y2 - y1) / dx
 
+                # Draw line on binary canvas as WHITE (255)
+                cv2.line(lane_marking, (x1, y1), (x2, y2), 255, 2)
+
                 if slope < -self.slope_min and x1 < w / 2:
                     left_lines.append(line[0])
                 elif slope > self.slope_min and x1 > w / 2:
                     right_lines.append(line[0])
 
+        # ==== CRITICAL: Ensure PURE BINARY (no gray pixels) ====
+        # Apply threshold to eliminate any gray values
+        _, lane_marking_binary = cv2.threshold(
+            lane_marking, 
+            self.binary_threshold, 
+            255, 
+            cv2.THRESH_BINARY
+        )
+
+        # ==== Apply morphological processing (like lab SECTION C) ====
+        # This merges the two edges of the same lane marking
+        kernel = cv2.getStructuringElement(
+            cv2.MORPH_RECT, 
+            (self.morph_kernel_size, self.morph_kernel_size)
+        )
+        
+        # Dilate to merge nearby edges
+        dilated = cv2.dilate(lane_marking_binary, kernel, iterations=self.dilate_iterations)
+        
+        # Erode slightly to restore approximately original thickness
+        lane_marking_processed = cv2.erode(dilated, kernel, iterations=1)
+
+        # ==== Fit lanes in IMAGE space (before BEV transform) ====
         left_lane = self.fit_lane(left_lines, h)
         right_lane = self.fit_lane(right_lines, h)
-
-        dbg = cv2.cvtColor(masked_edges, cv2.COLOR_GRAY2BGR)
-        if lines is not None:
-            for line in lines:
-                x1, y1, x2, y2 = line[0]
-                cv2.line(dbg, (x1, y1), (x2, y2), (0, 255, 255), 2)
-
-        if left_lane is not None:
-            cv2.polylines(dbg, [left_lane.astype(np.int32)], False, (0, 255, 0), 3)
-        if right_lane is not None:
-            cv2.polylines(dbg, [right_lane.astype(np.int32)], False, (0, 255, 0), 3)
 
         if left_lane is None or right_lane is None:
             self.get_logger().warn(
@@ -225,7 +272,8 @@ class LaneDetector(Node):
                 f"right={'OK' if right_lane is not None else 'None'}"
             )
 
-        return left_lane, right_lane, dbg
+        # Return the BINARY processed marking instead of debug image
+        return left_lane, right_lane, lane_marking_processed
 
     def fit_lane(self, lines, h):
         """Fit polynomial to lane lines in IMAGE space."""
@@ -282,6 +330,28 @@ class LaneDetector(Node):
                 heading_error = float(np.arctan2(dx, dy))
 
         return float(cte), float(heading_error)
+
+    def preprocess_lane_marking_bev(self, lane_marking_bev):
+        """
+        Clean up the Lane Marking BEV - similar to SECTION C in lab guide.
+        Convert to binary (no grey pixels) and merge edges of same lane marking.
+        """
+        # Ensure binary (no gray pixels) - important after perspective transform
+        _, binary = cv2.threshold(lane_marking_bev, 127, 255, cv2.THRESH_BINARY)
+        
+        # Morphological operations to merge edges and clean up
+        kernel = cv2.getStructuringElement(
+            cv2.MORPH_RECT, 
+            (self.morph_kernel_size, self.morph_kernel_size)
+        )
+        
+        # Dilate to merge nearby edges (edges of same lane marking)
+        dilated = cv2.dilate(binary, kernel, iterations=self.dilate_iterations)
+        
+        # Erode slightly to restore approximately original thickness
+        processed = cv2.erode(dilated, kernel, iterations=1)
+        
+        return processed
 
     def find_closest_point(self, points, x, y):
         distances = np.sqrt((points[:, 0] - x) ** 2 + (points[:, 1] - y) ** 2)
