@@ -10,6 +10,7 @@ import numpy as np
 import scipy.signal as signal
 from scipy.spatial.transform  import Rotation as R
 from pal.utilities.scope import MultiScope
+from enum import Enum
 
 # ROS specific packages
 from rclpy.duration import Duration # Handles time for ROS 2
@@ -30,8 +31,19 @@ from std_msgs.msg import Bool
 Description:
 
 Navigates a robot from an initial pose to a goal pose described by a series of
-given nodes based on Quanser's SDCSRoadMap class
+given nodes based on Quanser's SDCSRoadMap class.
+
+MODIFIED: Implements state machine to ensure car always goes to taxi hub (node 10)
+from origin (node 0) before accepting ride requests.
 '''
+
+# region: State Machine Definition
+class TaxiState(Enum):
+    """States for the taxi navigation state machine"""
+    GOING_TO_HUB = 1      # Traveling from origin (node 0) to taxi hub (node 10)
+    AT_HUB_READY = 2      # At taxi hub, ready to accept ride requests
+    ON_MISSION = 3        # Currently executing a ride (pickup/dropoff)
+#endregion
 
 # region: Helper classes for state estimation
 class QcarEKF:
@@ -195,8 +207,18 @@ class PathFollower(Node):
     def __init__(self):
       super().__init__('path_follower')
 
+      # ============= TAXI HUB STATE MACHINE INITIALIZATION =============
+      # Initialize state to GOING_TO_HUB
+      self.taxi_state = TaxiState.GOING_TO_HUB
+      self.TAXI_HUB_NODE = 10  # Taxi hub is at node 10
+      self.ORIGIN_NODE = 0     # Origin is at node 0
+      
+      # Start with initial path from origin to taxi hub
+      initial_waypoints = [self.ORIGIN_NODE, self.TAXI_HUB_NODE]
+      # =================================================================
+
       # define new parameters for node to use
-      self.declare_parameter('node_values', [0, 10])
+      self.declare_parameter('node_values', initial_waypoints)  # Modified to start with [0, 10]
       self.waypoints = list(self.get_parameter("node_values").get_parameter_value().integer_array_value)
 
       self.declare_parameter('desired_speed', [0.4])
@@ -231,11 +253,11 @@ class PathFollower(Node):
       self.declare_parameter('rotation_offset', [90.0])
       self.rotation_offset = list(self.get_parameter("rotation_offset").get_parameter_value().double_array_value)
 
-      self.declare_parameter('translation_offset', [1.05, 0.9])
+      self.declare_parameter('translation_offset', [0.0, 0.0])
       self.translation_offset = list(self.get_parameter("translation_offset").get_parameter_value().double_array_value)
 
 
-      self.declare_parameter('start_path', [False])
+      self.declare_parameter('start_path', [True])
       self.path_execute_flag = list(self.get_parameter("start_path").get_parameter_value().bool_array_value)[0]
 
       self.add_on_set_parameters_callback(self.parameter_update_callback)
@@ -317,25 +339,46 @@ class PathFollower(Node):
       self.plot_visualized = False
       self.scopeTimer = self.create_timer(0.1, self.scopeDataTimer)
 
+      # Log initial state
+      self.get_logger().info('==============================================')
+      self.get_logger().info('TAXI INITIALIZED: Going to hub (node 0 → 10)')
+      self.get_logger().info('State: GOING_TO_HUB')
+      self.get_logger().info('==============================================')
+
 
     def parameter_update_callback(self, params):
         for param in params:
 
           if param.name == 'node_values' and param.type_== param.Type.INTEGER_ARRAY:
+              new_waypoints = list(param.value)
+              
+              # ============= STATE MACHINE LOGIC =============
+              # Only accept new waypoints if we're at the hub or on a mission
+              if self.taxi_state == TaxiState.GOING_TO_HUB:
+                  self.get_logger().warn('⚠️  Cannot accept ride requests yet! Still traveling to taxi hub.')
+                  self.get_logger().warn(f'   Current state: {self.taxi_state.name}')
+                  return SetParametersResult(successful=False)
+              
+              # If we're at the hub and receiving new waypoints, we're starting a mission
+              if self.taxi_state == TaxiState.AT_HUB_READY:
+                  self.taxi_state = TaxiState.ON_MISSION
+                  self.get_logger().info('🚖 MISSION ACCEPTED: Starting ride')
+                  self.get_logger().info(f'   Route: {new_waypoints}')
+              # ==============================================
+              
               # Navigation specific variables
-              self.waypoints = list(param.value)
-              # print(self.waypoints)
-              self.wp  = SDCSRoadMap().generate_path(self.waypoints)*0.975
+              self.waypoints = new_waypoints
+              self.wp  = SDCSRoadMap().generate_path(self.waypoints)*self.scale
               self.N = len(self.wp[0, :])
               self.wpi = 0
               self.previous_steering_value = 0
               self.path_complete = False
-              self.get_logger().info('nodes updated!')
+              self.get_logger().info('✓ Nodes updated!')
               print(self.waypoints)
 
           elif param.name == 'desired_speed' and param.type_== param.Type.DOUBLE_ARRAY:
               self.desired_speed = list(param.value)
-              self.get_logger().info('new desired speed...')
+              self.get_logger().info('✓ New desired speed...')
               print(self.desired_speed)
 
           elif param.name == 'rotation_offset' and param.type_== param.Type.DOUBLE_ARRAY:
@@ -343,9 +386,10 @@ class PathFollower(Node):
 
           elif param.name == 'translation_offset' and param.type_== param.Type.DOUBLE_ARRAY:
               self.translation_offset = list(param.value)
+              
           elif param.name == 'start_path' and param.type_== param.Type.BOOL_ARRAY:
               self.path_execute_flag = list(param.value)[0]
-              self.get_logger().info('path status changed!')
+              self.get_logger().info('✓ Path status changed!')
 
           elif param.name == 'visualize_pose' and param.type_== param.Type.BOOL_ARRAY:
               self.pose_visualize_flag = list(param.value)[0]
@@ -408,7 +452,7 @@ class PathFollower(Node):
               elif not self.pose_visualize_flag and self.plot_visualized:
                 self.plot_visualized = False
 
-          return SetParametersResult(successful=True)
+        return SetParametersResult(successful=True)
   
     def filter_coefficients(self, freq,dt):
       nyq_freq = 0.5*(1/dt)
@@ -437,7 +481,6 @@ class PathFollower(Node):
 
     def object_detector_callback(self, msg):
       self.motion_flag = msg.data
-      # self.get_logger().info(f"motion Falg received was:{self.motion_flag}")
 
     def joint_state_callback(self, msg):
       self.qcar2_measurred_speed = (msg.velocity[0]/(720.0*4.0))*((13.0*19.0)/(70.0*30.0))*(2.0*np.pi)*0.033
@@ -449,10 +492,8 @@ class PathFollower(Node):
         path_msg = Path()
         path_msg.header.stamp = self.get_clock().now().to_msg()
         path_msg.header.frame_id = "map"
-        # path_msg.header.frame_id = "map_rotated"
 
         for i in range(self.wpi):
-        # for i in range(self.N):
           if i >= self.N:
              i = self.N-1
           pose = PoseStamped()
@@ -477,7 +518,6 @@ class PathFollower(Node):
         max_speed = 1.5
         enable = 1
         speed_command = self.desired_speed[0]
-        # self.max_rate = np.clip(0.01*(speed_command)/max_speed,0.001,0.1)
         skip_index = 0
 
         self.t_plot = time.time()-self.t0
@@ -504,7 +544,6 @@ class PathFollower(Node):
                                     [np.sin(-angle_offset*np.pi/180),np.cos(-angle_offset*np.pi/180)]])
             t = np.array([self.translation_offset[0],self.translation_offset[1]])
             wp_1_mod = (wp_1+t)@R_QLabs_ROS
-            print (wp_1_mod)
 
             L= 0.256
 
@@ -550,6 +589,25 @@ class PathFollower(Node):
                 steering = 0.0
                 self.wp_prior = self.wp
                 self.path_complete = True
+                
+                # ============= STATE MACHINE TRANSITION =============
+                # When path is complete, check state and transition
+                if self.taxi_state == TaxiState.GOING_TO_HUB:
+                    self.taxi_state = TaxiState.AT_HUB_READY
+                    self.get_logger().info('==============================================')
+                    self.get_logger().info('✓ ARRIVED AT TAXI HUB (Node 10)')
+                    self.get_logger().info('🟢 Ready to accept ride requests!')
+                    self.get_logger().info('State: AT_HUB_READY')
+                    self.get_logger().info('==============================================')
+                elif self.taxi_state == TaxiState.ON_MISSION:
+                    self.get_logger().info('==============================================')
+                    self.get_logger().info('✓ MISSION COMPLETE')
+                    self.get_logger().info('🟢 Ready for next ride!')
+                    self.get_logger().info('State: AT_HUB_READY (awaiting new waypoints)')
+                    self.get_logger().info('==============================================')
+                    # Stay in AT_HUB_READY state for next mission
+                    # Optionally: could auto-return to hub with self.waypoints = [current_node, 10]
+                # ====================================================
 
             if self.wpi > self.N-100 :
                speed_command = 0.2
@@ -571,6 +629,7 @@ class PathFollower(Node):
         except KeyboardInterrupt:
           speed_command = 0.0
           steering = 0.0
+          
         if self.path_execute_flag== True:
           if self.motion_flag == True:
               enable = 1.0
@@ -666,7 +725,6 @@ class PathFollower(Node):
             self.get_logger().info('previous scope closed...')
 
         except AttributeError:
-          # self.get_logger().info('no visualization running...')
           pass
 
 
