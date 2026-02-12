@@ -231,15 +231,22 @@ class QCar2DepthAligned():
             # self.depth = aligned_depth
 
             # NEW
-            self.camera.read_depth(dataMode='M')
-            self.depth = self.camera.imageBufferDepthM
-            aligned_depth = cv2.warpPerspective(self.depth, self.M, (640, 480))
-            aligned_depth = aligned_depth.astype(np.float32, copy=False)
-            self.depth = aligned_depth
+            self.camera.read_depth(dataMode='PX')
+            depth = (self.camera.imageBufferDepthPX / np.float32(self.depth_scale)).astype(np.float32)
+
+            aligned_depth = cv2.warpPerspective(
+                depth, self.M, (640, 480),
+                flags=cv2.INTER_LINEAR,
+                borderMode=cv2.BORDER_CONSTANT,
+                borderValue=0
+            ).astype(np.float32)
+
+            self.depth[:, :, 0] = aligned_depth  # keep shape (480,640,1) and dtype float32
 
             self.camera.read_RGB()
-            self.rgb = self.camera.imageBufferRGB
+            self.rgb[:, :, :] = self.camera.imageBufferRGB.astype(np.uint8)  # keep buffer
             new = True
+
         return new
     
     def read_reply(self,annotated_frame):
