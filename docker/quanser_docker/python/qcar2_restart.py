@@ -6,8 +6,8 @@ from qvl.free_camera import QLabsFreeCamera
 from qvl.real_time import QLabsRealTime
 
 def setup(
-        initialPosition=[0, 0, 0],
-        initialOrientation=[0, 0, 0],
+        initialPosition=[-1.205, -0.83, 0.005],
+        initialOrientation=[0, 0, -44.7],
     ):
 
     # Try to connect to Qlabs
@@ -22,7 +22,7 @@ def setup(
         quit()
 
     # Delete any previous QCar instances and stop any running spawn models
-    qlabs.destroy_all_spawned_actors()
+    # qlabs.destroy_all_spawned_actors()
     QLabsRealTime().terminate_all_real_time_models()
     #QLabsRealTime().terminate_all_real_time_models(RTModelHostName='host.docker.internal')
 
