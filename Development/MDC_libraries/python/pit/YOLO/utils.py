@@ -218,16 +218,25 @@ class QCar2DepthAligned():
             else:
                 self.status_check('Reconnected to Server')
         else:
-            self.camera.read_depth(dataMode='PX')
-            depth=self.camera.imageBufferDepthPX/self.depth_scale
-            aligned_depth = cv2.warpPerspective(depth,
-                                    self.M,
-                                    (640,480),
-                                    cv2.INTER_LINEAR,
-                                    borderMode=cv2.BORDER_CONSTANT,
-                                    borderValue=(0,0,0)
-                                    )
+            # OLD
+            # self.camera.read_depth(dataMode='PX')
+            # self.depth = self.camera.imageBufferDepthPX/self.depth_scale
+            # aligned_depth = cv2.warpPerspective(depth,
+            #                         self.M,
+            #                         (640,480),
+            #                         cv2.INTER_LINEAR,
+            #                         borderMode=cv2.BORDER_CONSTANT,
+            #                         borderValue=(0,0,0)
+            #                         )
+            # self.depth = aligned_depth
+
+            # NEW
+            self.camera.read_depth(dataMode='M')
+            self.depth = self.camera.imageBufferDepthM
+            aligned_depth = cv2.warpPerspective(self.depth, self.M, (640, 480))
+            aligned_depth = aligned_depth.astype(np.float32, copy=False)
             self.depth = aligned_depth
+
             self.camera.read_RGB()
             self.rgb = self.camera.imageBufferRGB
             new = True
