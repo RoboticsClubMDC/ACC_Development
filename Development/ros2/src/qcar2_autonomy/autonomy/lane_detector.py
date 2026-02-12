@@ -24,6 +24,9 @@ Subscribed Topics:
     /qcar2_joint                 - Motor encoder for measured speed
     /motion_enable               - Object detection flag (stop sign / traffic light)
 """
+#! /usr/bin/env python3
+import sys
+sys.path.insert(0, "/workspaces/isaac_ros-dev/MDC_libraries/python")
 
 import rclpy
 from rclpy.node import Node
