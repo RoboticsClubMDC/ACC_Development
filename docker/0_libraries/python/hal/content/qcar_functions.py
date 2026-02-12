@@ -754,8 +754,13 @@ class InversePerspectiveMapping:
 
         """
         # ==============  SECTION B.1 -  Camera Intrinsics  ====================
-        self.camera_intrinsics = np.zeros((4,4))
-        # ==============         END OF SECTION B.1         ====================
+        self.camera_intrinsics = np.array([
+            [615.5364990234375, 0.0, 324.2210388183594, 0.0],
+            [0.0, 615.708984375, 237.89791870117188, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0]
+        ])
+                # ==============         END OF SECTION B.1         ====================
         
         self.bevWorldDims=bevWorldDims
         self.bevShape=bevShape
@@ -770,7 +775,12 @@ class InversePerspectiveMapping:
 
         """
         # ==============  SECTION B.2 -  Camera Extrinsics  ====================
-        self.camera_extrinsics = np.zeros((4,4))
+        self.camera_extrinsics = np.array([
+            [0, 0, 1, 0.095],
+            [-1, 0, 0, 0.032],
+            [0, -1, 0, 0.172],
+            [0, 0, 0, 1]
+        ])
         # ==============         END OF SECTION B.2         ====================
 
     

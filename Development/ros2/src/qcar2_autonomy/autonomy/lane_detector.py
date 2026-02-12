@@ -1,412 +1,710 @@
 #!/usr/bin/env python3
+# -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+# region : File Description and Imports
+"""
+lane_detector.py
+
+ROS2 Lane Following Node for QCar2 (Physical) using Intel RealSense D435.
+Integrates with qcar2_autonomy package — publishes Twist on /cmd_vel_nav
+(same interface as nav_to_pose.py), compatible with nav2_qcar2_converter
+and the qcar2_hardware node.
+
+Pipeline (from Quanser Lane Keeping Lab Guide):
+  Camera → LaneNet → BEV (IPM) → Preprocess → Isolate → Targets → Pure Pursuit
+
+Published Topics:
+    /cmd_vel_nav                 - Twist (linear.x=speed, angular.z=steering)
+    /lane_keeping/binary_image   - Raw lane binary from LaneNet (mono8)
+    /lane_keeping/bev_rgb        - Bird's-eye view of camera feed (bgr8)
+    /lane_keeping/bev_binary     - BEV lane markings binary (mono8)
+    /lane_keeping/debug          - Debug overlay with targets and ld arc (bgr8)
+
+Subscribed Topics:
+    /camera/color_image          - Intel RealSense D435 RGB (sensor_msgs/Image)
+    /qcar2_joint                 - Motor encoder for measured speed
+    /motion_enable               - Object detection flag (stop sign / traffic light)
+"""
 
 import rclpy
 from rclpy.node import Node
-
-from sensor_msgs.msg import CompressedImage, Image
-from std_msgs.msg import Float32
+from sensor_msgs.msg import Image, JointState
+from geometry_msgs.msg import Twist
+from std_msgs.msg import Bool
 from cv_bridge import CvBridge
-
 import cv2
 import numpy as np
+import math
+import os
 
-from qcar2_interfaces.msg import MotorCommands
+# endregion
 
 
-class LaneDetector(Node):
+# -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+# region : Try importing LaneNet from Quanser PIT
+LANENET_AVAILABLE = False
+try:
+    from pit.LaneNet.nets import LaneNet
+    LANENET_AVAILABLE = True
+except ImportError:
+    pass
+# endregion
+
+
+# ============================================================================
+# region : Inverse Perspective Mapping (IPM)
+# ============================================================================
+class IPM:
+    """Inverse Perspective Mapping: creates a bird's-eye view (BEV) image
+    using the Intel RealSense D435 camera intrinsics and extrinsics on QCar2.
+
+    Coordinate frames (from QCar2 Hardware Manual):
+        Body {B}:   x → forward,  y → left,  z → up.
+                     Origin is between the front and rear axles on the ground.
+        Camera {C}: x → right,  y → down,  z → forward (depth).
+
+    The hardware manual provides  realsense_to_body  (camera → body).
+    For projection we need  body → camera, which is its inverse.
+    """
+
+    def __init__(self, bev_shape, bev_world_dims, fx, fy, cx, cy):
+        """
+        Args:
+            bev_shape:      [width, height] of BEV output image in pixels.
+            bev_world_dims: [x_min, x_max, y_min, y_max] in meters (body frame).
+                            x_min > 0.15 avoids showing camera/lens artefacts.
+            fx, fy, cx, cy: Intel RealSense D435 intrinsics (640×480 RGB).
+        """
+        self.bev_shape = bev_shape
+        self.bev_world_dims = bev_world_dims
+        self.m_per_pix = (bev_world_dims[1] - bev_world_dims[0]) / bev_shape[1]
+
+        # ── Camera Intrinsics (4×4 homogeneous) ──────────────────────────
+        self.K = np.array([
+            [fx,  0,  cx, 0],
+            [ 0, fy,  cy, 0],
+            [ 0,  0,   1, 0],
+            [ 0,  0,   0, 1]
+        ], dtype=np.float64)
+
+        # ── Camera Extrinsics: body → camera ─────────────────────────────
+        # From hardware manual, realsense_to_body (cam → body):
+        #   T_C^B = [ 0   0   1   0.095 ]
+        #           [-1   0   0   0.032 ]
+        #           [ 0  -1   0   0.172 ]
+        #           [ 0   0   0   1     ]
+        #
+        # Inverse (body → camera):
+        self.E = np.array([
+            [ 0, -1,  0,  0.032],
+            [ 0,  0, -1,  0.172],
+            [ 1,  0,  0, -0.095],
+            [ 0,  0,  0,  1.0  ]
+        ], dtype=np.float64)
+
+        self._compute_homography()
+
+    def v2img(self, XYZ):
+        """Project Nx3 points in body frame → Nx2 pixel coords (u, v)."""
+        N = XYZ.shape[0]
+        P_hom = np.hstack([XYZ, np.ones((N, 1))])
+        P_cam = (self.E @ P_hom.T).T
+        P_img = (self.K @ P_cam.T).T
+        uv = np.zeros((N, 2), dtype=np.float64)
+        uv[:, 0] = P_img[:, 0] / P_img[:, 2]
+        uv[:, 1] = P_img[:, 1] / P_img[:, 2]
+        return uv
+
+    def _compute_homography(self):
+        """Compute 3×3 perspective transform (camera image → BEV).
+
+        Pick 4 corners of the desired BEV region in body frame, project
+        them into camera-image pixels, compute corresponding BEV pixel
+        positions, then use cv2.getPerspectiveTransform for the homography.
+        """
+        xmin, xmax, ymin, ymax = self.bev_world_dims
+        w, h = self.bev_shape
+
+        # 4 corners in body frame (z=0, ground plane)
+        corners_body = np.array([
+            [xmin, ymax, 0.0],   # near-left
+            [xmin, ymin, 0.0],   # near-right
+            [xmax, ymin, 0.0],   # far-right
+            [xmax, ymax, 0.0],   # far-left
+        ])
+
+        img_pts = self.v2img(corners_body).astype(np.float32)
+
+        # BEV pixel positions:
+        #   column 0 = left (ymax), column w-1 = right (ymin)
+        #   row 0 = far (xmax), row h-1 = near (xmin)
+        bev_pts = np.float32([
+            [0,     h - 1],     # near-left  → bottom-left
+            [w - 1, h - 1],     # near-right → bottom-right
+            [w - 1, 0],         # far-right  → top-right
+            [0,     0],         # far-left   → top-left
+        ])
+
+        self.M = cv2.getPerspectiveTransform(img_pts, bev_pts)
+
+    def to_bev(self, img):
+        """Warp a camera image (or binary mask) into BEV."""
+        w, h = self.bev_shape
+        return cv2.warpPerspective(img, self.M, (w, h),
+                                   flags=cv2.INTER_LINEAR,
+                                   borderMode=cv2.BORDER_CONSTANT,
+                                   borderValue=0)
+
+# endregion
+
+
+# ============================================================================
+# region : Lane Processing Helpers (Sections C, D, E from Lab Guide)
+# ============================================================================
+class LaneMarking:
+    """Stores a single isolated lane marking blob and its look-ahead
+    intersection point."""
+
+    def __init__(self, bev_rear_wheel_pos, binary):
+        self.bev_rear_wheel_pos = bev_rear_wheel_pos
+        self.binary = binary
+        self.intersection = None
+
+    def find_intersection(self, ld_pix):
+        """Find the point on this blob at distance ld_pix from rear wheel."""
+        ys, xs = np.where(self.binary > 0)
+        if len(xs) == 0:
+            self.intersection = None
+            return
+
+        dx = xs.astype(np.float64) - self.bev_rear_wheel_pos[0]
+        dy = ys.astype(np.float64) - self.bev_rear_wheel_pos[1]
+        dists = np.sqrt(dx ** 2 + dy ** 2)
+
+        dist_err = np.abs(dists - ld_pix)
+        tolerance = max(10, ld_pix * 0.08)
+        mask = dist_err < tolerance
+
+        if np.any(mask):
+            self.intersection = np.array([
+                np.mean(xs[mask]),
+                np.mean(ys[mask])
+            ])
+        else:
+            self.intersection = None
+
+
+def preprocess_lane_marking(bev_lane):
+    """SECTION C — Threshold grey→white, morphological close to merge edges."""
+    if len(bev_lane.shape) == 3:
+        bev_lane = cv2.cvtColor(bev_lane, cv2.COLOR_BGR2GRAY)
+
+    _, binary = cv2.threshold(bev_lane, 50, 255, cv2.THRESH_BINARY)
+
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 7))
+    binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel, iterations=2)
+    return binary
+
+
+def isolate_lane_markings(binary, min_area=300):
+    """SECTION D — Connected-component analysis to split individual markings."""
+    n_labels, labels, stats, _ = cv2.connectedComponentsWithStats(
+        binary, connectivity=8
+    )
+    blobs = []
+    for i in range(1, n_labels):
+        if stats[i, cv2.CC_STAT_AREA] < min_area:
+            continue
+        blob = np.zeros_like(binary)
+        blob[labels == i] = 255
+        blobs.append(blob)
+    return blobs
+
+
+def find_rot_mat(lane):
+    """SECTION E.4 — Rotation matrix so that offset vector is ⊥ to the lane."""
+    ys, xs = np.where(lane.binary > 0)
+    if len(xs) < 5:
+        return np.eye(2)
+
+    inter = lane.intersection
+    dx = xs.astype(float) - inter[0]
+    dy = ys.astype(float) - inter[1]
+    dists = np.sqrt(dx ** 2 + dy ** 2)
+    near = dists < 40
+    if np.sum(near) < 5:
+        return np.eye(2)
+
+    pts = np.column_stack([xs[near], ys[near]]).astype(np.float32)
+    vx, vy, _, _ = cv2.fitLine(pts, cv2.DIST_L2, 0, 0.01, 0.01).flatten()
+    angle = math.atan2(vy, vx)
+
+    c, s = math.cos(angle), math.sin(angle)
+    return np.array([[c, -s],
+                     [s,  c]])
+
+
+def ccw_key(rear_center):
+    """Sort key for ordering lane markings in CCW order."""
+    cx, cy = rear_center
+
+    def _key(lane):
+        px, py = lane.intersection
+        return math.atan2(py - cy, px - cx)
+
+    return _key
+
+# endregion
+
+
+# ============================================================================
+# region : Pure Pursuit Controller (Section F from Lab Guide)
+# ============================================================================
+class PurePursuitController:
+    """Pure pursuit in BEV pixel space.
+
+    In BEV:
+        column increases → right  (body −y direction)
+        row    increases → closer (body −x direction)
+
+    δ = arctan(2 L sin(α) / ld)
+    """
+
+    def __init__(self, m_per_pix, bev_rear_wheel, max_steer, wheelbase=0.256):
+        self.m_per_pix = m_per_pix
+        self.bev_rear_wheel = bev_rear_wheel
+        self.max_steer = max_steer
+        self.L = wheelbase   # QCar2 wheelbase
+
+    def target2steer(self, point):
+        """Compute steering angle from a BEV target point."""
+        dx_pix = point[0] - self.bev_rear_wheel[0]
+        dy_pix = point[1] - self.bev_rear_wheel[1]
+
+        dx_m = dx_pix * self.m_per_pix
+        dy_m = dy_pix * self.m_per_pix
+
+        ld = math.sqrt(dx_m ** 2 + dy_m ** 2)
+        if ld < 1e-4:
+            return 0.0
+
+        # sin(alpha): positive when target is LEFT of heading
+        # Target left → dx_pix < 0 → positive steer → negate
+        sin_alpha = -dx_m / ld
+
+        steer = math.atan2(2.0 * self.L * sin_alpha, ld)
+        return float(np.clip(steer, -self.max_steer, self.max_steer))
+
+# endregion
+
+
+# ============================================================================
+# region : Main ROS 2 Node
+# ============================================================================
+class LaneDetectorNode(Node):
+
     def __init__(self):
         super().__init__('lane_detector')
 
-        # ---------------- Parameters ----------------
-        # NOTE: using your exact topic string
-        self.declare_parameter('image_topic', '/camera/color_image/compressed')
+        # ── Declare ROS parameters ────────────────────────────────────
+        # Camera intrinsics (640×480 RGB, Intel RealSense D435)
+        self.declare_parameter('fx', 615.0)
+        self.declare_parameter('fy', 615.0)
+        self.declare_parameter('cx', 320.0)
+        self.declare_parameter('cy', 240.0)
+        self.declare_parameter('image_width',  640)
+        self.declare_parameter('image_height', 480)
 
-        self.declare_parameter('bev_width', 400)
-        self.declare_parameter('bev_height', 600)
-        self.declare_parameter('lookahead_distance', 1.0)  # meters
-        self.declare_parameter('meters_per_pixel', 0.02)
+        # BEV dimensions (metres, body frame). x_min > 0.15 avoids lens.
+        self.declare_parameter('bev_width',  400)
+        self.declare_parameter('bev_height', 400)
+        self.declare_parameter('bev_xmin',  0.20)
+        self.declare_parameter('bev_xmax',  2.50)
+        self.declare_parameter('bev_ymin', -0.80)
+        self.declare_parameter('bev_ymax',  0.80)
 
-        # Hough tuning
-        self.declare_parameter('canny_low', 50)
-        self.declare_parameter('canny_high', 150)
-        self.declare_parameter('hough_threshold', 50)
-        self.declare_parameter('min_line_length', 50)
-        self.declare_parameter('max_line_gap', 100)
-        self.declare_parameter('slope_min', 0.5)
+        # Lane keeping / pure pursuit
+        self.declare_parameter('Kdd',       3.0)
+        self.declare_parameter('ld_min',    0.10)
+        self.declare_parameter('ld_max',    0.60)
+        self.declare_parameter('max_steer', 0.5)
 
-        # Binary processing parameters (NEW - inspired by lab guide SECTION C)
-        self.declare_parameter('binary_threshold', 127)
-        self.declare_parameter('dilate_iterations', 2)
-        self.declare_parameter('morph_kernel_size', 5)
+        # Speed
+        self.declare_parameter('v_desire', 0.5)
 
-        # Just move the car (test)
-        self.declare_parameter('enable_drive', False)
-        self.declare_parameter('drive_throttle', 0.12)
-        self.declare_parameter('drive_steering', 0.0)
-        self.declare_parameter('cmd_topic', '/qcar2_motor_speed_cmd')
+        # LaneNet model path
+        self.declare_parameter('lanenet_model',
+            '/home/quanser/Documents/ACC_Development/Development/'
+            'ros2/src/qcar2_autonomy/models/Lanenet.pt')
 
-        # ---------------- Load params ----------------
-        self.image_topic = str(self.get_parameter('image_topic').value)
+        # ── Read parameters ───────────────────────────────────────────
+        fx = self.get_parameter('fx').value
+        fy = self.get_parameter('fy').value
+        cx = self.get_parameter('cx').value
+        cy = self.get_parameter('cy').value
+        self.img_w = self.get_parameter('image_width').value
+        self.img_h = self.get_parameter('image_height').value
 
-        self.bev_width = int(self.get_parameter('bev_width').value)
-        self.bev_height = int(self.get_parameter('bev_height').value)
-        self.lookahead_distance = float(self.get_parameter('lookahead_distance').value)
-        self.meters_per_pixel = float(self.get_parameter('meters_per_pixel').value)
+        bev_w = self.get_parameter('bev_width').value
+        bev_h = self.get_parameter('bev_height').value
+        bev_xmin = self.get_parameter('bev_xmin').value
+        bev_xmax = self.get_parameter('bev_xmax').value
+        bev_ymin = self.get_parameter('bev_ymin').value
+        bev_ymax = self.get_parameter('bev_ymax').value
 
-        self.canny_low = int(self.get_parameter('canny_low').value)
-        self.canny_high = int(self.get_parameter('canny_high').value)
-        self.hough_threshold = int(self.get_parameter('hough_threshold').value)
-        self.min_line_length = int(self.get_parameter('min_line_length').value)
-        self.max_line_gap = int(self.get_parameter('max_line_gap').value)
-        self.slope_min = float(self.get_parameter('slope_min').value)
+        self.Kdd      = self.get_parameter('Kdd').value
+        self.ld_min   = self.get_parameter('ld_min').value
+        self.ld_max   = self.get_parameter('ld_max').value
+        max_steer     = self.get_parameter('max_steer').value
 
-        self.binary_threshold = int(self.get_parameter('binary_threshold').value)
-        self.dilate_iterations = int(self.get_parameter('dilate_iterations').value)
-        self.morph_kernel_size = int(self.get_parameter('morph_kernel_size').value)
+        self.v_desire = self.get_parameter('v_desire').value
+        self.max_steering_angle = max_steer
 
-        self.enable_drive = bool(self.get_parameter('enable_drive').value)
-        self.drive_throttle = float(self.get_parameter('drive_throttle').value)
-        self.drive_steering = float(self.get_parameter('drive_steering').value)
-        self.cmd_topic = str(self.get_parameter('cmd_topic').value)
+        model_path = self.get_parameter('lanenet_model').value
 
+        # ── Build IPM ─────────────────────────────────────────────────
+        self.bev_shape = [bev_w, bev_h]
+        self.bev_world_dims = [bev_xmin, bev_xmax, bev_ymin, bev_ymax]
+
+        self.ipm = IPM(self.bev_shape, self.bev_world_dims, fx, fy, cx, cy)
+        self.m_per_pix = self.ipm.m_per_pix
+
+        # ── Reference positions in BEV ────────────────────────────────
+        # Rear wheel is 0.128 m behind body origin (half of 0.256 m wheelbase)
+        self.bev_camera_pos = np.array([bev_w // 2, bev_h])
+        rear_offset_pix = int(0.128 / self.m_per_pix)
+        self.bev_rear_wheel_pos = np.array([bev_w // 2,
+                                            bev_h + rear_offset_pix])
+
+        # ── Pure Pursuit Controller ───────────────────────────────────
+        self.pp = PurePursuitController(
+            self.m_per_pix, self.bev_rear_wheel_pos, max_steer, wheelbase=0.256
+        )
+
+        # ── State ─────────────────────────────────────────────────────
+        self.current_v = 0.0
+        self.current_steering = 0.0
+        self.motion_flag = True
+
+        # ── LaneNet ───────────────────────────────────────────────────
+        self.lanenet = None
+        if LANENET_AVAILABLE and os.path.isfile(model_path):
+            try:
+                self.lanenet = LaneNet(
+                    rowUpperBound=self.img_h // 2,
+                    imageWidth=self.img_w,
+                    imageHeight=self.img_h,
+                )
+                self.get_logger().info(f'LaneNet loaded from {model_path}')
+            except Exception as e:
+                self.get_logger().warn(f'LaneNet init failed: {e}')
+                self.lanenet = None
+        else:
+            self.get_logger().warn(
+                'LaneNet NOT available — using Canny + HoughLinesP fallback.'
+            )
+
+        # ── CV Bridge ─────────────────────────────────────────────────
         self.bridge = CvBridge()
 
-        # Perspective transform (computed lazily once we know image size)
-        self.M = None
-        self.Minv = None
-        self._last_img_shape = None
-
-        # ---------------- Subscribers ----------------
-        self.image_sub = self.create_subscription(
-            CompressedImage,
-            self.image_topic,
-            self.image_callback,
-            10
+        # ── Subscribers ───────────────────────────────────────────────
+        self.create_subscription(
+            Image, '/camera/color_image', self._image_cb, 10
         )
 
-        # ---------------- Publishers ----------------
-        self.cte_pub = self.create_publisher(Float32, '/lane_detector/cte', 10)
-        self.heading_error_pub = self.create_publisher(Float32, '/lane_detector/heading_error', 10)
+        # Measured speed from motor encoder (same as nav_to_pose.py)
+        self.create_subscription(
+            JointState, '/qcar2_joint', self._joint_state_cb, 1
+        )
 
-        self.bev_pub = self.create_publisher(Image, '/lane_detector/BEV', 10)
-        self.lane_marking_pub = self.create_publisher(Image, '/lane_detector/lane_marking', 10)
-        self.lane_marking_bev_pub = self.create_publisher(Image, '/lane_detector/lane_marking_BEV', 10)
+        # Object detection flag (from yolo_detector or traffic_system_detector)
+        self.create_subscription(
+            Bool, '/motion_enable', self._motion_enable_cb, 1
+        )
 
-        self.cmd_pub = self.create_publisher(MotorCommands, self.cmd_topic, 10)
+        # ── Publishers — control (Twist on /cmd_vel_nav) ──────────────
+        # Same interface as nav_to_pose.py → nav2_qcar2_converter →
+        # qcar2_hardware. linear.x = desired speed, angular.z = steering.
+        self.cmd_publisher = self.create_publisher(
+            Twist, '/cmd_vel_nav', 1
+        )
 
-        self.get_logger().info(f'Lane Detector initialized. Subscribing to {self.image_topic}')
+        # ── Publishers — visualisation ────────────────────────────────
+        self.pub_binary  = self.create_publisher(Image, '/lane_keeping/binary_image', 10)
+        self.pub_bev_rgb = self.create_publisher(Image, '/lane_keeping/bev_rgb', 10)
+        self.pub_bev_bin = self.create_publisher(Image, '/lane_keeping/bev_binary', 10)
+        self.pub_debug   = self.create_publisher(Image, '/lane_keeping/debug', 10)
 
-    def _ensure_perspective_transform(self, img_h: int, img_w: int):
-        """Compute perspective transform for BEV based on the incoming image size."""
-        if self.M is not None and self._last_img_shape == (img_h, img_w):
+        # Timing
+        self._prev_time = self.get_clock().now()
+        self._ld_pix = 50   # initialise for debug drawing
+
+        self.get_logger().info(
+            f'Lane detector started  |  BEV {bev_w}x{bev_h}  '
+            f'world [{bev_xmin:.2f}..{bev_xmax:.2f}] x '
+            f'[{bev_ymin:.2f}..{bev_ymax:.2f}] m  |  '
+            f'm/pix={self.m_per_pix:.5f}'
+        )
+
+    # ================================================================== #
+    #  SUBSCRIBER CALLBACKS
+    # ================================================================== #
+    def _joint_state_cb(self, msg):
+        """Extract measured linear speed from motor encoder.
+        Formula from nav_to_pose.py:
+          v = (encoder_vel / (720*4)) * ((13*19)/(70*30)) * (2π) * 0.033
+        """
+        if msg.velocity:
+            self.current_v = (
+                (msg.velocity[0] / (720.0 * 4.0))
+                * ((13.0 * 19.0) / (70.0 * 30.0))
+                * (2.0 * np.pi) * 0.033
+            )
+
+    def _motion_enable_cb(self, msg):
+        """Stop sign / traffic light detection flag."""
+        self.motion_flag = msg.data
+
+    # ================================================================== #
+    #  IMAGE CALLBACK — full lane keeping pipeline
+    # ================================================================== #
+    def _image_cb(self, msg: Image):
+        try:
+            img = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+        except Exception as e:
+            self.get_logger().error(f'cv_bridge: {e}')
             return
 
-        self._last_img_shape = (img_h, img_w)
+        now = self.get_clock().now()
+        dt = (now - self._prev_time).nanoseconds * 1e-9
+        self._prev_time = now
+        if dt <= 0 or dt > 1.0:
+            dt = 0.1
 
-        src_points = np.float32([
-            [img_w * 0.45, img_h * 0.65],
-            [img_w * 0.55, img_h * 0.65],
-            [img_w * 0.90, img_h * 1.00],
-            [img_w * 0.10, img_h * 1.00]
-        ])
+        # ── 1. Lane marking extraction ────────────────────────────────
+        lane_binary = self._detect_lanes(img)
 
-        dst_points = np.float32([
-            [self.bev_width * 0.30, 0],
-            [self.bev_width * 0.70, 0],
-            [self.bev_width * 0.70, self.bev_height - 1],
-            [self.bev_width * 0.30, self.bev_height - 1]
-        ])
+        # ── 2. Bird's-eye views ───────────────────────────────────────
+        bev_rgb    = self.ipm.to_bev(img)
+        bev_binary = self.ipm.to_bev(lane_binary)
 
-        self.M = cv2.getPerspectiveTransform(src_points, dst_points)
-        self.Minv = cv2.getPerspectiveTransform(dst_points, src_points)
+        # ── 3. Preprocess BEV lane markings (Section C) ──────────────
+        processed = preprocess_lane_marking(bev_binary)
 
-        self.get_logger().info(f'Updated BEV homography for image size {img_w}x{img_h}')
+        # ── 4. Isolate individual lane markings (Section D) ──────────
+        blobs = isolate_lane_markings(processed, min_area=250)
 
-    def _decode_compressed(self, msg: CompressedImage):
-        """CompressedImage -> BGR OpenCV image."""
-        if not msg.data:
-            return None
-        np_arr = np.frombuffer(msg.data, dtype=np.uint8)
-        img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)  # BGR
-        return img
+        # ── 5. Find lane-center targets (Section E) ──────────────────
+        targets = self._find_targets(blobs, self.current_v)
 
-    def image_callback(self, msg: CompressedImage):
-        try:
-            cv_image = self._decode_compressed(msg)
-            if cv_image is None:
-                self.get_logger().warn("Compressed image decode returned None/empty.")
-                return
+        # ── 6. Select best target & compute steering (Section F) ─────
+        steer = 0.0
+        selected_target = None
+        if targets:
+            best_id = min(targets,
+                          key=lambda t: abs(targets[t][0] -
+                                            self.bev_rear_wheel_pos[0]))
+            selected_target = targets[best_id]
+            steer = self.pp.target2steer(selected_target)
 
-            h, w = cv_image.shape[:2]
-            self._ensure_perspective_transform(h, w)
+        self.current_steering = steer
 
-            # Detect lanes + BINARY marking image (IMPROVED)
-            left_lane, right_lane, marking_binary = self.detect_lanes(cv_image)
+        # ── 7. Publish control command (Twist on /cmd_vel_nav) ────────
+        # Follows nav_to_pose.py convention:
+        #   linear.x  = speed (scaled by cos²(steering) for turning slowdown)
+        #   angular.z = steering angle (radians)
+        cmd = Twist()
+        if self.motion_flag:
+            speed = self.v_desire * np.power(np.cos(steer), 2)
+            speed = np.clip(speed, 0.05, 0.7)
+            cmd.linear.x = float(speed)
+            cmd.angular.z = float(steer)
+        else:
+            # Object detector says stop
+            cmd.linear.x = 0.0
+            cmd.angular.z = 0.0
 
-            # Publish BINARY lane marking (this is the key improvement!)
-            self.lane_marking_pub.publish(self.bridge.cv2_to_imgmsg(marking_binary, 'mono8'))
+        self.cmd_publisher.publish(cmd)
 
-            # Transform binary lane marking to BEV
-            bev_lane_marking = cv2.warpPerspective(
-                marking_binary, 
-                self.M, 
-                (self.bev_width, self.bev_height)
-            )
+        # ── 8. Publish visualisation topics ───────────────────────────
+        self._publish_img(self.pub_binary,  lane_binary, 'mono8')
+        self._publish_img(self.pub_bev_rgb, bev_rgb,     'bgr8')
+        self._publish_img(self.pub_bev_bin, processed,   'mono8')
 
-            # Process BEV lane marking to ensure binary and clean (like lab SECTION C)
-            bev_lane_marking_processed = self.preprocess_lane_marking_bev(bev_lane_marking)
+        debug = self._draw_debug(bev_rgb, blobs, targets, selected_target)
+        self._publish_img(self.pub_debug, debug, 'bgr8')
 
-            # Publish BINARY BEV lane marking
-            self.lane_marking_bev_pub.publish(
-                self.bridge.cv2_to_imgmsg(bev_lane_marking_processed, 'mono8')
-            )
+    # ================================================================== #
+    #  LANE DETECTION (LaneNet or fallback)
+    # ================================================================== #
+    def _detect_lanes(self, img):
+        """Return a single-channel binary mask of lane markings."""
+        if self.lanenet is not None:
+            try:
+                processed = self.lanenet.pre_process(img)
+                self.lanenet.predict(processed)
+                return self.lanenet.binaryPred
+            except Exception as e:
+                self.get_logger().warn(f'LaneNet inference failed: {e}',
+                                       throttle_duration_sec=5.0)
 
-            # Transform to BEV (visualization)
-            bev_image = cv2.warpPerspective(cv_image, self.M, (self.bev_width, self.bev_height))
-
-            # Calculate errors
-            cte, heading_error = self.calculate_errors(left_lane, right_lane)
-
-            # Publish errors
-            cte_msg = Float32()
-            cte_msg.data = float(cte)
-            self.cte_pub.publish(cte_msg)
-
-            heading_msg = Float32()
-            heading_msg.data = float(heading_error)
-            self.heading_error_pub.publish(heading_msg)
-
-            # Draw BEV overlay and publish
-            display_img = self.draw_bev(bev_image, left_lane, right_lane, cte, heading_error)
-            self.bev_pub.publish(self.bridge.cv2_to_imgmsg(display_img, 'bgr8'))
-
-            self.get_logger().info(f'CTE: {cte:+.4f} m | Heading: {np.degrees(heading_error):+.2f} deg')
-
-            # Optional: just move forward for testing
-            if self.enable_drive:
-                cmd = MotorCommands()
-                cmd.motor_names = ["steering_angle", "motor_throttle"]
-                cmd.values = [float(self.drive_steering), float(self.drive_throttle)]
-                self.cmd_pub.publish(cmd)
-
-        except Exception as e:
-            self.get_logger().error(f'Error in callback: {e}')
-
-    def detect_lanes(self, image):
-        """
-        Detect lane lines using classical CV and return BINARY image.
-        IMPROVED: Now follows lab guide approach with binary output.
-        """
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        blur = cv2.GaussianBlur(gray, (5, 5), 0)
-        edges = cv2.Canny(blur, self.canny_low, self.canny_high)
-
-        h, w = edges.shape
-        mask = np.zeros_like(edges)
-        polygon = np.array([[
-            (w * 0.1, h),
-            (w * 0.45, h * 0.6),
-            (w * 0.55, h * 0.6),
-            (w * 0.9, h)
-        ]], np.int32)
-        cv2.fillPoly(mask, polygon, 255)
-        masked_edges = cv2.bitwise_and(edges, mask)
-
-        lines = cv2.HoughLinesP(
-            masked_edges, 2, np.pi / 180,
-            self.hough_threshold,
-            minLineLength=self.min_line_length,
-            maxLineGap=self.max_line_gap
-        )
-
-        # ==== KEY IMPROVEMENT: Create BINARY lane marking ====
-        # Initialize as black (0)
-        lane_marking = np.zeros((h, w), dtype=np.uint8)
-        
-        left_lines, right_lines = [], []
+        # ── Fallback: Canny + HoughLinesP ─────────────────────────────
+        grey = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        edges = cv2.Canny(grey, 100, 200)
+        lines = cv2.HoughLinesP(edges, 1, np.pi / 180,
+                                threshold=50, minLineLength=30,
+                                maxLineGap=80)
+        mask = np.zeros(grey.shape, dtype=np.uint8)
         if lines is not None:
             for line in lines:
                 x1, y1, x2, y2 = line[0]
-                dx = x2 - x1
-                if dx == 0:
-                    continue
-                slope = (y2 - y1) / dx
+                cv2.line(mask, (x1, y1), (x2, y2), 255, 2)
+        return mask
 
-                # Draw line on binary canvas as WHITE (255)
-                cv2.line(lane_marking, (x1, y1), (x2, y2), 255, 2)
+    # ================================================================== #
+    #  FIND TARGETS (Sections E.1 – E.6)
+    # ================================================================== #
+    def _find_targets(self, blobs, v):
+        """Return dict {id: np.array([x, y])} of lane-centre targets."""
+        targets_list = []
+        isolated_lanes = []
 
-                if slope < -self.slope_min and x1 < w / 2:
-                    left_lines.append(line[0])
-                elif slope > self.slope_min and x1 > w / 2:
-                    right_lines.append(line[0])
+        # E.1 — look-ahead distance
+        ld_m = np.clip(self.Kdd * abs(v), self.ld_min, self.ld_max)
+        self._ld_pix = int(ld_m / self.m_per_pix)
+        if self._ld_pix < 5:
+            self._ld_pix = int(self.ld_min / self.m_per_pix)
 
-        # ==== CRITICAL: Ensure PURE BINARY (no gray pixels) ====
-        # Apply threshold to eliminate any gray values
-        _, lane_marking_binary = cv2.threshold(
-            lane_marking, 
-            self.binary_threshold, 
-            255, 
-            cv2.THRESH_BINARY
-        )
+        # Build LaneMarking objects and find intersections (E.2)
+        for blob in blobs:
+            lm = LaneMarking(self.bev_rear_wheel_pos, blob)
+            lm.find_intersection(self._ld_pix)
+            if lm.intersection is not None:
+                isolated_lanes.append(lm)
 
-        # ==== Apply morphological processing (like lab SECTION C) ====
-        # This merges the two edges of the same lane marking
-        kernel = cv2.getStructuringElement(
-            cv2.MORPH_RECT, 
-            (self.morph_kernel_size, self.morph_kernel_size)
-        )
-        
-        # Dilate to merge nearby edges
-        dilated = cv2.dilate(lane_marking_binary, kernel, iterations=self.dilate_iterations)
-        
-        # Erode slightly to restore approximately original thickness
-        lane_marking_processed = cv2.erode(dilated, kernel, iterations=1)
+        if not isolated_lanes:
+            return {}
 
-        # ==== Fit lanes in IMAGE space (before BEV transform) ====
-        left_lane = self.fit_lane(left_lines, h)
-        right_lane = self.fit_lane(right_lines, h)
+        # Sort CCW (leftmost first in image → highest column)
+        center = (self.bev_shape[0] // 2, self.bev_shape[1])
+        isolated_lanes.sort(key=ccw_key(center))
 
-        if left_lane is None or right_lane is None:
-            self.get_logger().warn(
-                f"Lane missing: left={'OK' if left_lane is not None else 'None'} "
-                f"right={'OK' if right_lane is not None else 'None'}"
-            )
+        # ── Case I: single lane marking (E.3–E.4) ────────────────────
+        if len(isolated_lanes) == 1:
+            lane = isolated_lanes[0]
+            if lane.intersection[0] > self.bev_rear_wheel_pos[0]:
+                vec = np.array([-75.0, 0.0])   # lane is right → target left
+            else:
+                vec = np.array([ 75.0, 0.0])   # lane is left  → target right
 
-        # Return the BINARY processed marking instead of debug image
-        return left_lane, right_lane, lane_marking_processed
+            rot = find_rot_mat(lane)
+            target = lane.intersection + rot @ vec
+            targets_list.append(target)
 
-    def fit_lane(self, lines, h):
-        """Fit polynomial to lane lines in IMAGE space."""
-        if not lines:
-            return None
+        # ── Multiple lane markings (E.5–E.6) ─────────────────────────
+        else:
+            prev_lane = isolated_lanes[0]
+            for i in range(1, len(isolated_lanes)):
+                lane = isolated_lanes[i]
+                delta = lane.intersection - prev_lane.intersection
+                dist = np.linalg.norm(delta)
 
-        x_points, y_points = [], []
-        for x1, y1, x2, y2 in lines:
-            x_points.extend([x1, x2])
-            y_points.extend([y1, y2])
+                if 80 < dist < 300:
+                    # Case II: adjacent markings → midpoint
+                    target = (lane.intersection + prev_lane.intersection) / 2.0
+                    targets_list.append(target)
 
-        if len(x_points) < 6:
-            return None
+                elif dist >= 300:
+                    # Case III: two lanes far apart → two Case-I targets
+                    rot1 = find_rot_mat(lane)
+                    rot2 = find_rot_mat(prev_lane)
 
-        coeffs = np.polyfit(y_points, x_points, 2)
-        y_vals = np.linspace(h * 0.6, h - 1, 50)
-        x_vals = np.polyval(coeffs, y_vals)
+                    if lane.intersection[0] > prev_lane.intersection[0]:
+                        v1 = np.array([-75.0, 0.0])
+                        v2 = np.array([ 75.0, 0.0])
+                    else:
+                        v1 = np.array([ 75.0, 0.0])
+                        v2 = np.array([-75.0, 0.0])
 
-        return np.column_stack((x_vals, y_vals)).astype(np.float32)
+                    targets_list.append(lane.intersection      + rot1 @ v1)
+                    targets_list.append(prev_lane.intersection + rot2 @ v2)
 
-    def calculate_errors(self, left_lane, right_lane):
-        """Calculate CTE and heading error in BEV space."""
-        if self.M is None:
-            return 0.0, 0.0
+                prev_lane = lane
 
-        vehicle_x = self.bev_width / 2.0
-        vehicle_y = self.bev_height - 1.0
+            # Fallback to Case I if no targets found from multi-lane logic
+            if not targets_list and isolated_lanes:
+                lane = isolated_lanes[0]
+                if lane.intersection[0] > self.bev_rear_wheel_pos[0]:
+                    vec = np.array([-75.0, 0.0])
+                else:
+                    vec = np.array([ 75.0, 0.0])
+                rot = find_rot_mat(lane)
+                targets_list.append(lane.intersection + rot @ vec)
 
-        cte = 0.0
-        heading_error = 0.0
+        result = {}
+        for idx, pt in enumerate(targets_list):
+            result[10 + idx] = pt
+        return result
 
-        if left_lane is None or right_lane is None:
-            return cte, heading_error
+    # ================================================================== #
+    #  DEBUG DRAWING
+    # ================================================================== #
+    def _draw_debug(self, bev_rgb, blobs, targets, selected):
+        """Draw look-ahead arc, intersection points, and targets on BEV."""
+        debug = bev_rgb.copy()
+        if len(debug.shape) == 2:
+            debug = cv2.cvtColor(debug, cv2.COLOR_GRAY2BGR)
 
-        left_bev = cv2.perspectiveTransform(left_lane.reshape(-1, 1, 2), self.M).reshape(-1, 2)
-        right_bev = cv2.perspectiveTransform(right_lane.reshape(-1, 1, 2), self.M).reshape(-1, 2)
+        # Blue arc = look-ahead distance from rear wheel
+        ld = self._ld_pix
+        cv2.circle(debug, tuple(self.bev_rear_wheel_pos), ld, (255, 0, 0), 1)
 
-        left_closest = self.find_closest_point(left_bev, vehicle_x, vehicle_y)
-        right_closest = self.find_closest_point(right_bev, vehicle_x, vehicle_y)
+        # White: lane blobs overlaid
+        for blob in blobs:
+            b3 = cv2.cvtColor(blob, cv2.COLOR_GRAY2BGR) if len(blob.shape) == 2 else blob
+            debug = cv2.addWeighted(debug, 1.0, b3, 0.4, 0)
 
-        center_x = (left_closest[0] + right_closest[0]) / 2.0
-        cte = (vehicle_x - center_x) * self.meters_per_pixel
+        # Green circles = all targets
+        if targets:
+            for tid, pt in targets.items():
+                cv2.circle(debug, pt.astype(int), 6, (0, 255, 0), -1)
 
-        lookahead_pixels = self.lookahead_distance / self.meters_per_pixel
-        lookahead_y = vehicle_y - lookahead_pixels
+        # Red circle = selected target
+        if selected is not None:
+            cv2.circle(debug, selected.astype(int), 8, (0, 0, 255), -1)
 
-        if lookahead_y > 0:
-            left_ahead = self.interpolate_x_at_y(left_bev, lookahead_y)
-            right_ahead = self.interpolate_x_at_y(right_bev, lookahead_y)
-            if left_ahead is not None and right_ahead is not None:
-                center_ahead_x = (left_ahead + right_ahead) / 2.0
-                dx = center_ahead_x - vehicle_x
-                dy = vehicle_y - lookahead_y
-                heading_error = float(np.arctan2(dx, dy))
+        return debug
 
-        return float(cte), float(heading_error)
+    # ================================================================== #
+    #  UTILITY
+    # ================================================================== #
+    def _publish_img(self, pub, img, encoding):
+        try:
+            pub.publish(self.bridge.cv2_to_imgmsg(img, encoding=encoding))
+        except Exception:
+            pass
 
-    def preprocess_lane_marking_bev(self, lane_marking_bev):
-        """
-        Clean up the Lane Marking BEV - similar to SECTION C in lab guide.
-        Convert to binary (no grey pixels) and merge edges of same lane marking.
-        """
-        # Ensure binary (no gray pixels) - important after perspective transform
-        _, binary = cv2.threshold(lane_marking_bev, 127, 255, cv2.THRESH_BINARY)
-        
-        # Morphological operations to merge edges and clean up
-        kernel = cv2.getStructuringElement(
-            cv2.MORPH_RECT, 
-            (self.morph_kernel_size, self.morph_kernel_size)
-        )
-        
-        # Dilate to merge nearby edges (edges of same lane marking)
-        dilated = cv2.dilate(binary, kernel, iterations=self.dilate_iterations)
-        
-        # Erode slightly to restore approximately original thickness
-        processed = cv2.erode(dilated, kernel, iterations=1)
-        
-        return processed
-
-    def find_closest_point(self, points, x, y):
-        distances = np.sqrt((points[:, 0] - x) ** 2 + (points[:, 1] - y) ** 2)
-        return points[np.argmin(distances)]
-
-    def interpolate_x_at_y(self, points, y_target):
-        """Interpolate x at y_target (sorted by y)."""
-        if points is None or len(points) < 2:
-            return None
-
-        idx = np.argsort(points[:, 1])
-        y_sorted = points[idx, 1]
-        x_sorted = points[idx, 0]
-
-        if y_target < y_sorted[0] or y_target > y_sorted[-1]:
-            return None
-
-        return float(np.interp(y_target, y_sorted, x_sorted))
-
-    def draw_bev(self, bev_image, left_lane, right_lane, cte, heading_error):
-        display = bev_image.copy()
-
-        if self.M is not None:
-            if left_lane is not None:
-                left_bev = cv2.perspectiveTransform(left_lane.reshape(-1, 1, 2), self.M).reshape(-1, 2).astype(np.int32)
-                cv2.polylines(display, [left_bev], False, (0, 255, 0), 3)
-
-            if right_lane is not None:
-                right_bev = cv2.perspectiveTransform(right_lane.reshape(-1, 1, 2), self.M).reshape(-1, 2).astype(np.int32)
-                cv2.polylines(display, [right_bev], False, (0, 255, 0), 3)
-
-        vehicle_x = int(self.bev_width / 2)
-        vehicle_y = int(self.bev_height - 20)
-        cv2.circle(display, (vehicle_x, vehicle_y), 8, (0, 0, 255), -1)
-        cv2.line(display, (vehicle_x, 0), (vehicle_x, self.bev_height), (255, 0, 0), 2)
-
-        cv2.putText(display, f'CTE: {cte:+.4f} m', (10, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
-        cv2.putText(display, f'Heading: {np.degrees(heading_error):+.2f} deg', (10, 65),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
-        cv2.putText(display, f'DRIVE: {self.enable_drive}', (10, 100),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
-
-        return display
+# endregion
 
 
-def main():
-    rclpy.init()
-    node = LaneDetector()
+# ============================================================================
+# region : Entry Point
+# ============================================================================
+def main(args=None):
+    rclpy.init(args=args)
+    node = LaneDetectorNode()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
-        pass
-    rclpy.shutdown()
+        node.get_logger().info('Shutting down lane detector.')
+    finally:
+        # Send zero command on shutdown
+        cmd = Twist()
+        node.cmd_publisher.publish(cmd)
+        node.destroy_node()
+        rclpy.shutdown()
 
 
 if __name__ == '__main__':
     main()
+
+# endregion
