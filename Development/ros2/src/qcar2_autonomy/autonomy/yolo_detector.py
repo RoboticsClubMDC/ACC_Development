@@ -38,6 +38,7 @@ class ObjectDetector(Node):
                     modelPath = "./ros2/src/qcar2_autonomy/models/quanser_yolov8s-seg.pt",
                     imageHeight= imageHeight,
                     imageWidth = imageWidth,
+                    convert_tensorrt = False,
                 )
         # Call on_timer function every second to receive pose info
         self.dt = 1/30
@@ -66,10 +67,23 @@ class ObjectDetector(Node):
     def on_timer(self):
         # Get aligned RGB and Depth images and publish them
         self.QCarImg.read()
-        msg_rgb = self.bridge.cv2_to_imgmsg(self.QCarImg.rgb, "bgr8")
-        msg_depth = self.bridge.cv2_to_imgmsg(self.QCarImg.depth, "32FC1")
+
+        rgb = self.QCarImg.rgb
+        depth = self.QCarImg.depth
+
+        # --- fix: force depth to float32 for 32FC1 ---
+        if depth is not None:
+            depth = np.asarray(depth)
+            if depth.ndim == 3 and depth.shape[2] == 1:
+                depth = depth[:, :, 0]
+            depth = depth.astype(np.float32, copy=False)
+
+        msg_rgb = self.bridge.cv2_to_imgmsg(rgb, "bgr8")
+        msg_depth = self.bridge.cv2_to_imgmsg(depth, "32FC1")
+
         self.publish_rgb.publish(msg_rgb)
         self.publish_depth.publish(msg_depth)
+
 
         current_time = time.time()-self.t0
         delay = 0

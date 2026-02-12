@@ -50,6 +50,9 @@ qtcreator-*
 # Catkin custom files
 CATKIN_IGNORE
 /.vscode
+
+# Custom
+/Development/logs
+/Development/build
+/Development/install
 /Development/log
-/Development/log
-Development/log/latest_build
