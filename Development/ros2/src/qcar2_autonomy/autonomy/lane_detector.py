@@ -234,7 +234,7 @@ class LaneDetectorNode(Node):
             reliability=ReliabilityPolicy.RELIABLE,
             history=HistoryPolicy.KEEP_LAST, depth=1)
         self.create_subscription(
-            Image, '/camera/color_image', self._image_cb, img_qos)
+            Image, '/camera/csi_image', self._image_cb, img_qos)
         self.create_subscription(
             JointState, '/qcar2_joint', self._joint_state_cb, 1)
 
@@ -346,19 +346,15 @@ class LaneDetectorNode(Node):
         # ── LaneNet inference ─────────────────────────────────────────
         if self.lanenet is None:
             return
+        # Resize to 640x480 (LaneNet + IPM expect this)
+        if img.shape[:2] != (480, 640):
+            img = cv2.resize(img, (640, 480), interpolation=cv2.INTER_LINEAR)
         try:
             rgbProcessed = self.lanenet.pre_process(img)
             self.lanenet.predict(rgbProcessed)
             laneMarking = self.lanenet.binaryPred
         except Exception:
             return
-
-        # ── Yellow-only filter ────────────────────────────────────────
-        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-        yellow_mask = cv2.inRange(hsv, (15, 50, 100), (35, 255, 255))
-        yellow_mask = cv2.dilate(
-            yellow_mask, np.ones((15, 15), np.uint8), iterations=1)
-        laneMarking = cv2.bitwise_and(laneMarking, yellow_mask)
 
         # ── Camera image with lane overlay ────────────────────────────
         cam_overlay = img.copy()
