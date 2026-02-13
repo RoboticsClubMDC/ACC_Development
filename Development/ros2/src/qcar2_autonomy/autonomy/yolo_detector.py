@@ -144,6 +144,7 @@ class ObjectDetector(Node):
                                                 clippingDistance = 5)
         labelName = []
         labelConf = []
+        total_timer = 10
         for object in processedResults:
 
             labelName = object.__dict__["name"]
@@ -167,22 +168,22 @@ class ObjectDetector(Node):
             # elif labelName == 'car' and labelConf > 0.9 and objectDist < 0.45 :
             #     self.get_logger().info(f"Car found at {objectDist}!")
 
-            elif labelName == "stop sign" and labelConf > 0.89 and objectDist < 0.138:
+            elif labelName == "stop sign" and labelConf > 0.80 and objectDist < 0.138:
             # elif labelName == "stop sign" and labelConf > 0.9:
 
                 self.get_logger().info(f"Stop Sign Detected at {objectDist}!")
                 delay = 3.0
                 self.t0 = time.time()
                 detected = True
-                self.detection_cooldown =10.0
+                self.detection_cooldown = total_timer 
 
-            elif labelName == "yield sign" and labelConf > 0.89 and objectDist < 0.138:
+            elif labelName == "yield sign" and labelConf > 0.80 and objectDist < 0.138:
             # elif labelName == "yield sign" and labelConf > 0.9:
                 self.get_logger().info(f"Yield Sign Detected at {objectDist}!")
                 delay = 1.5
                 self.t0 = time.time()
                 detected = True
-                self.detection_cooldown =10.0
+                self.detection_cooldown = total_timer 
                 
             # print(object.__dict__)
         print("===============================")

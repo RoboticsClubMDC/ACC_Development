@@ -21,11 +21,13 @@ def generate_launch_description():
     package='qcar2_autonomy',
     executable='trip_planner',
     name='trip_planner',
-    # parameters=[{
-    #     'taxi_node': [10],
-    #     'trip_nodes': [2, 4, 6, 8, 10],
-    # }]
-)
+    )
+    
+    lane_detector = Node(
+    package='qcar2_autonomy',
+    executable='lane_detector',
+    name='lane_detector',
+    )
 
     ''' TODO: Once finished this launch file must also include
     - Lane detector to help smooth out tracking of lanes while driving
@@ -35,6 +37,7 @@ def generate_launch_description():
     return LaunchDescription([
         path_follower,
         traffic_system_detector,
-        trip_planner
+        trip_planner,
+        lane_detector
         ]
     )
