@@ -168,7 +168,7 @@ class PathFollower(Node):
       self.declare_parameter('node_values', initial_waypoints)
       self.waypoints = list(self.get_parameter("node_values").get_parameter_value().integer_array_value)
 
-      self.declare_parameter('desired_speed', [0.1])
+      self.declare_parameter('desired_speed', [0.4])
       self.desired_speed = list(self.get_parameter("desired_speed").get_parameter_value().double_array_value)
 
       self.declare_parameter('visualize_pose', [False])
@@ -493,8 +493,8 @@ class PathFollower(Node):
                speed_command = 0.2
 
             # ── Steering: waypoint PP + gyro damping + lane correction ──
-            Kp_steering = 1
-            kd_steering = 5
+            Kp_steering = 0.3
+            kd_steering = 0.5
 
             gyro_filtered = self.apply_filter(
                 'gyro', self.gyroscope[2], self.a1, self.b1)
@@ -509,7 +509,7 @@ class PathFollower(Node):
                 # heading_err is already a steering angle from BEV pure pursuit
                 # cte is lateral offset in metres (positive = right of centre)
                 lane_correction = (self.K_lane_heading * self.lane_heading_err
-                                   - self.K_lane_cte * self.lane_cte)
+                                   + self.K_lane_cte * self.lane_cte)
 
             steering = np.clip(
                 base_steering + lane_correction,
