@@ -56,8 +56,8 @@ class ObjectDetector(Node):
         self.tl_should_stop = False
         self.tl_last_seen = 0.0
         self.tl_timeout = 0.75          # seconds to trust last TL reading
-        self.tl_conf = 0.40             # TL confidence threshold
-        self.tl_stop_dist = 1.20        # meters (tune later)
+        self.tl_conf = 0.20             # TL confidence threshold
+        self.tl_stop_dist = 1.612       # meters (tune later)
         self.tl_color = "idle"
 
         self.sign_detected = False
@@ -133,7 +133,8 @@ class ObjectDetector(Node):
 
         rgbProcessed = self.myYolo.pre_process(self.QCarImg.rgb)
         predecion = self.myYolo.predict(inputImg = rgbProcessed,
-                                    classes = [2,9,11,33],
+                                    # classes = [2,9,11,33],
+                                    classes = [9,11,33],
                                     confidence = 0.3,
                                     half = True,
                                     verbose = False
@@ -144,45 +145,44 @@ class ObjectDetector(Node):
         labelName = []
         labelConf = []
         for object in processedResults:
-            print(object.__dict__)
 
             labelName = object.__dict__["name"]
             labelConf = object.__dict__["conf"]
             objectDist = object.__dict__["distance"]
-            
-            if labelName == 'car' and labelConf > 0.9 and objectDist < 0.45 :
-                self.get_logger().info(f"Car found at {objectDist}!")
+            self.get_logger().info(f"{labelName} @ {labelConf:.3f} @ {objectDist:.3f}")
                 
             # --- traffic light handling (PIT sets name "traffic light (red)" and also lightColor) ---
-            elif labelName.startswith("traffic light"):
+            if labelName.startswith("traffic light"):
                 color = str(object.__dict__.get("lightColor", "")).strip()  # "red", "yellow", "green", "idle"
                 self.tl_color = color if color else "idle"
                 self.tl_last_seen = time.time()
 
-                if (labelConf > self.tl_conf) and (objectDist > 0.0) and (objectDist < self.tl_stop_dist):
+                if (labelConf > self.tl_conf) and (objectDist > 1.0) and (objectDist < self.tl_stop_dist):
                     if ("red" in self.tl_color) or ("yellow" in self.tl_color):
                         self.tl_should_stop = True
                         self.get_logger().info(f"Traffic Light {self.tl_color.upper()} @ {objectDist:.2f}m")
-                    elif "green" in self.tl_color:
-                        self.tl_should_stop = False
+                else:
+                    self.tl_should_stop = False
 
+            # elif labelName == 'car' and labelConf > 0.9 and objectDist < 0.45 :
+            #     self.get_logger().info(f"Car found at {objectDist}!")
 
-            elif labelName == "stop sign" and labelConf > 0.9 and objectDist < 0.20:
+            elif labelName == "stop sign" and labelConf > 0.89 and objectDist < 0.138:
             # elif labelName == "stop sign" and labelConf > 0.9:
 
                 self.get_logger().info(f"Stop Sign Detected at {objectDist}!")
                 delay = 3.0
                 self.t0 = time.time()
                 detected = True
-                self.detection_cooldown =8.0
+                self.detection_cooldown =10.0
 
-            elif labelName == "yield sign" and labelConf > 0.9 and objectDist < 0.20:
+            elif labelName == "yield sign" and labelConf > 0.89 and objectDist < 0.138:
             # elif labelName == "yield sign" and labelConf > 0.9:
                 self.get_logger().info(f"Yield Sign Detected at {objectDist}!")
                 delay = 1.5
                 self.t0 = time.time()
                 detected = True
-                self.detection_cooldown =8.0
+                self.detection_cooldown =10.0
                 
             # print(object.__dict__)
         print("===============================")
