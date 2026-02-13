@@ -2,17 +2,23 @@
 """
 lane_detector.py
 
-ROS2 Lane Detection (Perception-Only) Node for QCar2.
-Publishes EMA-filtered cross-track error and heading error for nav_to_pose.
+ROS2 Lane Detection Node for QCar2 — single yellow lane mode.
+Bypasses SDK find_target (flaky with 1 lane) and computes CTE/heading
+directly from BEV lane mask using line fitting.
 
-Pipeline (from Quanser Lane Keeping Lab Guide):
-  Camera -> LaneNet -> BEV (IPM) -> Preprocess -> Isolate -> Targets -> Errors
+Case I from lab (1 lane marking):
+  - Fit a line through the detected lane pixels in BEV
+  - Offset perpendicular to the lane line (drive to right of yellow center line)
+  - CTE = lateral offset from desired position
+  - Heading = angle of lane line vs straight ahead
 
 Published Topics:
     /lane_keeping/cross_track_error  (Float64) filtered lateral offset [m]
     /lane_keeping/heading_error      (Float64) filtered heading offset [rad]
-    /lane_keeping/lane_detected      (Bool)    whether lanes are visible
-    /lane_keeping/debug              (Image)   debug overlay (optional viz)
+    /lane_keeping/lane_detected      (Bool)    whether lane line is visible
+    /lane_keeping/bev_binary         (Image)   BEV lane binary with CTE/heading text
+    /lane_keeping/debug              (Image)   BEV RGB with center line, lane line, target
+    /lane_keeping/camera_image       (Image)   raw camera with lane overlay
 
 Subscribed Topics:
     /camera/color_image              Intel RealSense D435 RGB
@@ -39,7 +45,7 @@ import torchvision.transforms as transforms
 
 
 # ============================================================================
-#  PureTorchLaneNet — drop-in for pit.LaneNet.nets.LaneNet (no TensorRT)
+#  PureTorchLaneNet
 # ============================================================================
 class PureTorchLaneNet:
 
@@ -78,11 +84,10 @@ class PureTorchLaneNet:
         binary_np = (outputs['binary_seg_pred']
                      .squeeze().cpu().numpy() * 255).astype(np.uint8)
 
-        # Minimal cleanup for FP32 speckles
         kernel = np.ones((5, 5), np.uint8)
         binary_np = cv2.morphologyEx(binary_np, cv2.MORPH_OPEN, kernel)
 
-        # Remove small blobs (non-lane noise)
+        # CCA to remove small blobs
         num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(
             binary_np, connectivity=8)
         for i in range(1, num_labels):
@@ -108,33 +113,42 @@ class LaneDetectorNode(Node):
     def __init__(self):
         super().__init__('lane_detector')
 
-        # ── Configuration (matches lab code) ──────────────────────────
-        bevShape = [800, 800]
+        # ── BEV Configuration ────────────────────────────────────────
+        self.bevShape = [800, 800]
         bevWorldDims = [0, 20, -10, 10]
-        Kdd = 2.0
-        ldMin = 10.0
-        ldMax = 20.0
-        maxSteer = 0.05
+        self.m_per_pix = (bevWorldDims[1] - bevWorldDims[0]) / self.bevShape[0]
 
-        model_path = ('/workspaces/isaac_ros-dev/'
-                      'ros2/src/qcar2_autonomy/models/lanenet.pt')
+        # ── Vehicle reference in BEV ─────────────────────────────────
+        # Rear wheel at vehicle origin (0,0) → BEV pixel:
+        #   col = (world_max_y - 0) / m_per_pix = 10 / 0.025 = 400 (center)
+        #   row = bevShape[0] - (0 - world_min_x) / m_per_pix = 800 (bottom)
+        self.car_center_col = self.bevShape[1] // 2  # 400
+        self.car_bottom_row = self.bevShape[0]       # 800
 
-        # ── EMA filter (anti-oscillation) ─────────────────────────────
-        # alpha = 0.0 → full smoothing; alpha = 1.0 → no filter
-        # 0.25 gives ~4-frame smoothing window — kills jitter,
-        # responds within ~0.5s at camera rate
-        self._ema_alpha = 0.25
+        # ── Single lane (Case I) offset ──────────────────────────────
+        # Yellow center line → drive to RIGHT of it
+        # 75px offset at 0.025 m/px = 1.875m (half lane width)
+        self.LANE_OFFSET_PX = 75  # pixels to the right of detected lane
+
+        # ── Look-ahead for CTE measurement ───────────────────────────
+        # Measure lane position at this row (lower = closer to car, more stable)
+        # Row 600 = ~5m ahead, Row 400 = ~10m ahead
+        self.LOOKAHEAD_ROW = 500  # ~7.5m ahead
+
+        # ── EMA filter ────────────────────────────────────────────────
+        self._ema_alpha = 0.3
         self._filtered_cte = 0.0
         self._filtered_heading = 0.0
         self._no_detect_count = 0
         self._no_detect_max = 5
 
-        # ── Build SDK objects ─────────────────────────────────────────
+        model_path = ('/workspaces/isaac_ros-dev/'
+                      'ros2/src/qcar2_autonomy/models/lanenet.pt')
+
+        # ── Build SDK (only for IPM — we skip find_target) ───────────
         self.lane_keeping = LaneKeeping(
-            Kdd=Kdd, ldMin=ldMin, ldMax=ldMax,
-            maxSteer=maxSteer, bevShape=bevShape,
-            bevWorldDims=bevWorldDims)
-        self.selector = LaneSelection()
+            Kdd=2, ldMin=10, ldMax=20, maxSteer=0.05,
+            bevShape=self.bevShape, bevWorldDims=bevWorldDims)
 
         # ── Patch IPM (stub has zero intrinsics) ─────────────────────
         ipm = self.lane_keeping.ipm
@@ -179,21 +193,24 @@ class LaneDetectorNode(Node):
             [(bevWorldDims[3] - world_max_y) / m,
              (bevWorldDims[1] - world_max_x) / m],
             [(bevWorldDims[3] - world_max_y) / m,
-             bevShape[0] - (world_min_x - bevWorldDims[0]) / m],
-            [bevShape[0] - (world_min_y - bevWorldDims[2]) / m,
+             self.bevShape[0] - (world_min_x - bevWorldDims[0]) / m],
+            [self.bevShape[0] - (world_min_y - bevWorldDims[2]) / m,
              (bevWorldDims[1] - world_max_x) / m],
-            [bevShape[0] - (world_min_y - bevWorldDims[2]) / m,
-             bevShape[0] - (world_min_x - bevWorldDims[0]) / m]])
+            [self.bevShape[0] - (world_min_y - bevWorldDims[2]) / m,
+             self.bevShape[0] - (world_min_x - bevWorldDims[0]) / m]])
 
         ipm.M = cv2.getPerspectiveTransform(
             rgb_corners.astype(np.float32),
             bev_corners.astype(np.float32))
-        ipm.bevShape = bevShape
+        ipm.bevShape = self.bevShape
         ipm.world_dims = bevWorldDims
         ipm.bevWorldDims = bevWorldDims
 
         self.get_logger().info(
-            f'IPM patched | m_per_pix={ipm.m_per_pix}')
+            f'IPM patched | m_per_pix={ipm.m_per_pix} | '
+            f'car_center_col={self.car_center_col} | '
+            f'lane_offset={self.LANE_OFFSET_PX}px = '
+            f'{self.LANE_OFFSET_PX * self.m_per_pix:.2f}m')
 
         # ── LaneNet ──────────────────────────────────────────────────
         self.lanenet = None
@@ -235,17 +252,87 @@ class LaneDetectorNode(Node):
         self.pub_camera = self.create_publisher(
             Image, '/lane_keeping/camera_image', 10)
 
-        self.get_logger().info(
-            f'Lane detector started | BEV {bevShape} '
-            f'world {bevWorldDims} | EMA alpha={self._ema_alpha}')
+        self.get_logger().info('Lane detector started (single yellow lane mode)')
 
-    # ================================================================ #
-    #  CALLBACKS
     # ================================================================ #
     def _joint_state_cb(self, msg):
         if msg.velocity:
             self.current_v = msg.velocity[0] * 10
 
+    # ================================================================ #
+    #  LINE FITTING — stable CTE/heading from BEV lane mask
+    # ================================================================ #
+    def _fit_lane_line(self, bev_binary):
+        """Fit a line through the lane pixels in BEV.
+        Returns (lane_vx, lane_vy, lane_x0, lane_y0, success)
+        where (vx,vy) is the direction vector and (x0,y0) is a point on the line.
+        """
+        # Find all white pixels (lane pixels)
+        pts = cv2.findNonZero(bev_binary)
+        if pts is None or len(pts) < 50:
+            return 0, 0, 0, 0, False
+
+        # cv2.fitLine returns [vx, vy, x0, y0]
+        # vx,vy = normalized direction vector
+        # x0,y0 = a point on the fitted line
+        line = cv2.fitLine(pts, cv2.DIST_L2, 0, 0.01, 0.01)
+        vx = float(line[0])
+        vy = float(line[1])
+        x0 = float(line[2])
+        y0 = float(line[3])
+
+        return vx, vy, x0, y0, True
+
+    def _compute_errors(self, bev_binary):
+        """Compute CTE and heading error from BEV lane mask.
+
+        Case I (single lane):
+        1. Fit line through lane pixels
+        2. Find lane x-position at look-ahead row
+        3. Target = lane_x + LANE_OFFSET_PX (offset to right of center line)
+        4. CTE = (target_x - car_center_x) * m_per_pix
+        5. Heading = angle of lane line vs vertical (straight ahead)
+        """
+        vx, vy, x0, y0, success = self._fit_lane_line(bev_binary)
+        if not success:
+            return 0.0, 0.0, False, None
+
+        # Lane x-position at the look-ahead row
+        # Parametric: x = x0 + t*vx, y = y0 + t*vy
+        # At row = LOOKAHEAD_ROW: t = (LOOKAHEAD_ROW - y0) / vy
+        if abs(vy) < 1e-6:
+            # Lane is perfectly horizontal — shouldn't happen in BEV
+            return 0.0, 0.0, False, None
+
+        t_la = (self.LOOKAHEAD_ROW - y0) / vy
+        lane_x_at_la = x0 + t_la * vx
+
+        # Case I: single lane — offset to RIGHT of yellow center line
+        target_x = lane_x_at_la + self.LANE_OFFSET_PX
+
+        # CTE: positive = target is right of car center → steer right
+        cte = (target_x - self.car_center_col) * self.m_per_pix
+
+        # Heading error: angle of lane line vs vertical (straight ahead)
+        # In BEV, straight ahead = negative y direction (up the image)
+        # Lane direction: (vx, vy). Straight ahead: (0, -1)
+        # Ensure direction vector points "forward" (upward in BEV = negative y)
+        if vy > 0:
+            vx, vy = -vx, -vy
+        heading = math.atan2(vx, -vy)  # angle from straight-ahead
+
+        # Line info for visualization
+        line_info = {
+            'vx': vx, 'vy': vy, 'x0': x0, 'y0': y0,
+            'lane_x_at_la': lane_x_at_la,
+            'target_x': target_x,
+        }
+
+        return cte, heading, True, line_info
+
+    # ================================================================ #
+    #  IMAGE CALLBACK
+    # ================================================================ #
     def _image_cb(self, msg: Image):
         if msg.width == 0 or msg.height == 0:
             return
@@ -256,83 +343,59 @@ class LaneDetectorNode(Node):
         if img is None or img.size == 0:
             return
 
-        v = self.current_v
-
-        # ── LaneNet ───────────────────────────────────────────────────
+        # ── LaneNet inference ─────────────────────────────────────────
         if self.lanenet is None:
             return
         try:
             rgbProcessed = self.lanenet.pre_process(img)
             self.lanenet.predict(rgbProcessed)
             laneMarking = self.lanenet.binaryPred
-
-            # ── Yellow-only filter ────────────────────────────────────
-            # Keep only lane pixels that are yellow in the original image
-            hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-            yellow_mask = cv2.inRange(
-                hsv,
-                (15, 50, 100),   # lower HSV bound (tune if needed)
-                (35, 255, 255))  # upper HSV bound
-            # Dilate the yellow mask so it covers the full lane width
-            yellow_mask = cv2.dilate(
-                yellow_mask, np.ones((15, 15), np.uint8), iterations=1)
-            laneMarking = cv2.bitwise_and(laneMarking, yellow_mask)
         except Exception:
             return
 
-        # ── BEV ───────────────────────────────────────────────────────
-        # Publish camera image with lane markings overlaid
+        # ── Yellow-only filter ────────────────────────────────────────
+        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        yellow_mask = cv2.inRange(hsv, (15, 50, 100), (35, 255, 255))
+        yellow_mask = cv2.dilate(
+            yellow_mask, np.ones((15, 15), np.uint8), iterations=1)
+        laneMarking = cv2.bitwise_and(laneMarking, yellow_mask)
+
+        # ── Camera image with lane overlay ────────────────────────────
         cam_overlay = img.copy()
-        cam_overlay[laneMarking > 0] = [0, 255, 0]  # green overlay
+        cam_overlay[laneMarking > 0] = [0, 255, 0]
         try:
             self.pub_camera.publish(
                 self.bridge.cv2_to_imgmsg(cam_overlay, encoding='bgr8'))
         except Exception:
             pass
 
+        # ── BEV transform ─────────────────────────────────────────────
         bev = self.lane_keeping.ipm.create_bird_eye_view(img)
         bevLM = self.lane_keeping.ipm.create_bird_eye_view(laneMarking)
 
-        # ── SDK pipeline ──────────────────────────────────────────────
+        # ── Preprocess BEV lane mask (SDK cleanup) ────────────────────
         if len(bevLM.shape) == 3:
             bevLM = cv2.cvtColor(bevLM, cv2.COLOR_BGR2GRAY)
         processedLM = self.lane_keeping.preprocess(bevLM)
-        isolated = self.lane_keeping.isolate_lane_markings(processedLM)
-        try:
-            targets = self.lane_keeping.find_target(isolated, v)
-        except (IndexError, ValueError):
-            targets = {}
 
-        # ── Raw errors ────────────────────────────────────────────────
-        lane_detected = len(targets) > 0
-        raw_cte = 0.0
-        raw_heading = 0.0
-        selected = None
-
-        if lane_detected:
-            self._no_detect_count = 0
-            bev_cx = bev.shape[1] // 2
-            best_id = min(targets,
-                          key=lambda t: abs(targets[t][0] - bev_cx))
-            selected = targets[best_id]
-            raw_heading = self.lane_keeping.pp.target2steer(selected)
-            raw_cte = (selected[0] - bev_cx) * self.lane_keeping.ipm.m_per_pix
-        else:
-            self._no_detect_count += 1
+        # ── Compute errors via line fitting (bypasses SDK find_target) ─
+        raw_cte, raw_heading, detected, line_info = \
+            self._compute_errors(processedLM)
 
         # ── EMA filter ────────────────────────────────────────────────
-        if lane_detected:
+        if detected:
+            self._no_detect_count = 0
             a = self._ema_alpha
-            self._filtered_cte = (a * raw_cte
-                                  + (1 - a) * self._filtered_cte)
+            self._filtered_cte = a * raw_cte + (1 - a) * self._filtered_cte
             self._filtered_heading = (a * raw_heading
                                       + (1 - a) * self._filtered_heading)
-        elif self._no_detect_count > self._no_detect_max:
-            # Decay to zero when lanes gone for several frames
-            self._filtered_cte *= 0.9
-            self._filtered_heading *= 0.9
+        else:
+            self._no_detect_count += 1
+            if self._no_detect_count > self._no_detect_max:
+                self._filtered_cte *= 0.9
+                self._filtered_heading *= 0.9
 
-        # ── Publish ───────────────────────────────────────────────────
+        # ── Publish errors ────────────────────────────────────────────
         cte_msg = Float64()
         cte_msg.data = float(self._filtered_cte)
         self.pub_cte.publish(cte_msg)
@@ -342,41 +405,83 @@ class LaneDetectorNode(Node):
         self.pub_heading.publish(heading_msg)
 
         detected_msg = Bool()
-        detected_msg.data = lane_detected
+        detected_msg.data = detected
         self.pub_detected.publish(detected_msg)
 
-        # ── Debug overlay ─────────────────────────────────────────────
-        # Publish BEV binary lane markings
+        # ── BEV binary with text overlay ──────────────────────────────
+        bev_bin_vis = cv2.cvtColor(processedLM, cv2.COLOR_GRAY2BGR) \
+            if len(processedLM.shape) == 2 else processedLM.copy()
+        self._draw_text_overlay(bev_bin_vis)
         try:
-            if processedLM is not None and processedLM.size > 0:
-                pub_lm = processedLM
-                if len(pub_lm.shape) == 3:
-                    pub_lm = cv2.cvtColor(pub_lm, cv2.COLOR_BGR2GRAY)
-                self.pub_bev_bin.publish(
-                    self.bridge.cv2_to_imgmsg(pub_lm, encoding='mono8'))
+            self.pub_bev_bin.publish(
+                self.bridge.cv2_to_imgmsg(bev_bin_vis, encoding='bgr8'))
         except Exception:
             pass
 
+        # ── Debug overlay ─────────────────────────────────────────────
         debug = bev.copy() if bev is not None else \
             np.zeros((800, 800, 3), dtype=np.uint8)
         if len(debug.shape) == 2:
             debug = cv2.cvtColor(debug, cv2.COLOR_GRAY2BGR)
-        for tid in targets:
-            cv2.circle(debug, targets[tid].astype(int), 10, (0, 255, 0), -1)
-        if selected is not None:
-            cv2.circle(debug, selected.astype(int), 10, (0, 0, 255), -1)
-        cv2.putText(debug, f'CTE: {self._filtered_cte:+.3f}m',
-                    (10, 25), cv2.FONT_HERSHEY_SIMPLEX,
-                    0.6, (0, 255, 255), 1)
-        cv2.putText(debug,
-                    f'Hdg: {math.degrees(self._filtered_heading):+.1f}deg',
-                    (10, 50), cv2.FONT_HERSHEY_SIMPLEX,
-                    0.6, (0, 255, 255), 1)
+
+        # RED vertical center line (vehicle heading direction)
+        cv2.line(debug,
+                 (self.car_center_col, self.bevShape[0]),  # bottom center
+                 (self.car_center_col, 0),                  # top center
+                 (0, 0, 255), 2)
+
+        # Fitted lane line + target (if detected)
+        if detected and line_info is not None:
+            vx = line_info['vx']
+            vy = line_info['vy']
+            x0 = line_info['x0']
+            y0 = line_info['y0']
+            lane_x = line_info['lane_x_at_la']
+            target_x = line_info['target_x']
+
+            # YELLOW fitted lane line (extend across full BEV height)
+            t_top = (0 - y0) / vy if abs(vy) > 1e-6 else 0
+            t_bot = (self.bevShape[0] - y0) / vy if abs(vy) > 1e-6 else 0
+            pt_top = (int(x0 + t_top * vx), 0)
+            pt_bot = (int(x0 + t_bot * vx), self.bevShape[0])
+            cv2.line(debug, pt_top, pt_bot, (0, 255, 255), 2)
+
+            # GREEN circle = lane intersection at look-ahead
+            cv2.circle(debug,
+                       (int(lane_x), self.LOOKAHEAD_ROW),
+                       8, (0, 255, 0), -1)
+
+            # BLUE circle = target (lane center = lane + offset)
+            cv2.circle(debug,
+                       (int(target_x), self.LOOKAHEAD_ROW),
+                       10, (255, 100, 0), -1)
+
+            # Look-ahead horizontal line
+            cv2.line(debug,
+                     (0, self.LOOKAHEAD_ROW),
+                     (self.bevShape[1], self.LOOKAHEAD_ROW),
+                     (100, 100, 100), 1)
+
+        # Text overlay
+        self._draw_text_overlay(debug)
+
         try:
             self.pub_debug.publish(
                 self.bridge.cv2_to_imgmsg(debug, encoding='bgr8'))
         except Exception:
             pass
+
+    # ================================================================ #
+    def _draw_text_overlay(self, img):
+        """Draw CTE/heading text on an image."""
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        color = (0, 0, 255)  # red text
+        cv2.putText(img,
+                    f'CTE: {self._filtered_cte:+.3f} m',
+                    (10, 30), font, 0.8, color, 2)
+        cv2.putText(img,
+                    f'Heading: {math.degrees(self._filtered_heading):+.1f} deg',
+                    (10, 65), font, 0.8, color, 2)
 
 
 # ============================================================================
