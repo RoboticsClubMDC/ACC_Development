@@ -56,3 +56,4 @@ CATKIN_IGNORE
 /Development/build
 /Development/install
 /Development/log
+Development/ros2/src/qcar2_autonomy/models/lanenet.pt

@@ -110,31 +110,81 @@ class PureTorchLaneNet:
 
 
 def ensure_lanenet_model(logger, filename="lanenet.pt"):
-    # 1) Prefer qcar2_autonomy/models next to the python package
-    pkg_root = Path(__file__).resolve().parents[1]  # .../qcar2_autonomy
-    preferred = pkg_root / "models" / filename
+    """
+    Prefer storing the model in the *source workspace* so it persists across rebuilds,
+    even if this node is executed from the installed entry point.
+    Fallback to ~/.ros cache if needed.
+    """
+    here = Path(__file__).resolve()
 
-    # 2) Fallback cache that should always be writable in docker
-    fallback = Path.home() / ".ros" / "qcar2_autonomy" / "models" / filename
+    # Build candidate paths in priority order (use + download targets)
+    use_candidates = []
+    dl_candidates = []
 
-    candidates = [preferred, fallback]
+    # A) If this file is somewhere inside a workspace, walk upwards and look for:
+    #    <something>/ros2/src/qcar2_autonomy/models/lanenet.pt
+    for p in here.parents:
+        cand = p / "ros2" / "src" / "qcar2_autonomy" / "models" / filename
+        if cand.parent.is_dir():
+            use_candidates.append(cand)
+            dl_candidates.append(cand)
+            break
 
-    # If it already exists and looks non empty, use it
-    for p in candidates:
-        if p.is_file() and p.stat().st_size > 1_000_000:
-            return str(p)
+    # B) Docker default workspace fallback (your environment)
+    ws_fallback = Path("/workspaces/isaac_ros-dev/ros2/src/qcar2_autonomy/models") / filename
+    if ws_fallback.parent.is_dir():
+        use_candidates.append(ws_fallback)
+        dl_candidates.append(ws_fallback)
 
-    # Otherwise download (try preferred first, then fallback)
-    for p in candidates:
+    # C) Installed share dir (ROS-style place). Might or might not exist / be writable.
+    try:
+        from ament_index_python.packages import get_package_share_directory
+        share_dir = Path(get_package_share_directory("qcar2_autonomy"))
+        share_cand = share_dir / "models" / filename
+        use_candidates.append(share_cand)
+        dl_candidates.append(share_cand)
+    except Exception:
+        pass
+
+    # D) Always-writable cache
+    cache = Path.home() / ".ros" / "qcar2_autonomy" / "models" / filename
+    use_candidates.append(cache)
+    dl_candidates.append(cache)
+
+    # Deduplicate while preserving order
+    def uniq(paths):
+        out, seen = [], set()
+        for x in paths:
+            if x is None:
+                continue
+            sx = str(x)
+            if sx not in seen:
+                out.append(x)
+                seen.add(sx)
+        return out
+
+    use_candidates = uniq(use_candidates)
+    dl_candidates = uniq(dl_candidates)
+
+    # 1) If any candidate exists and is non-trivial, use it
+    for p in use_candidates:
+        try:
+            if p.is_file() and p.stat().st_size > 1_000_000:
+                return str(p)
+        except Exception:
+            pass
+
+    # 2) Otherwise download to the first location that works
+    for p in dl_candidates:
         tmp = p.with_suffix(p.suffix + ".part")
         try:
             p.parent.mkdir(parents=True, exist_ok=True)
             logger.info(f"LaneNet model missing, downloading to: {p}")
 
-            with urllib.request.urlopen(LANENET_URL, timeout=120) as r, open(tmp, "wb") as f:
+            with urllib.request.urlopen(LANENET_URL, timeout=300) as r, open(tmp, "wb") as f:
                 shutil.copyfileobj(r, f)
 
-            tmp.replace(p)  # atomic rename
+            tmp.replace(p)
             try:
                 os.chmod(p, 0o644)
             except Exception:
@@ -144,7 +194,7 @@ def ensure_lanenet_model(logger, filename="lanenet.pt"):
             return str(p)
 
         except PermissionError:
-            logger.warn(f"No write permission for {p.parent}. Trying fallback location.")
+            logger.warn(f"No write permission for {p.parent}. Trying next location.")
             try:
                 if tmp.exists():
                     tmp.unlink()
@@ -160,7 +210,6 @@ def ensure_lanenet_model(logger, filename="lanenet.pt"):
                 pass
 
     return None
-
 
 # ============================================================================
 #  LaneDetectorNode
