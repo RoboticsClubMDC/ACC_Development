@@ -493,7 +493,7 @@ class PathFollower(Node):
                speed_command = 0.2
 
             # ── Steering: waypoint PP + gyro damping + lane correction ──
-            Kp_steering = 0.3
+            Kp_steering = 0.45
             kd_steering = 0.5
 
             gyro_filtered = self.apply_filter(
