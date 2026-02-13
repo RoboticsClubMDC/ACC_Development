@@ -79,8 +79,15 @@ class PureTorchLaneNet:
                      .squeeze().cpu().numpy() * 255).astype(np.uint8)
 
         # Minimal cleanup for FP32 speckles
-        kernel = np.ones((3, 3), np.uint8)
+        kernel = np.ones((5, 5), np.uint8)
         binary_np = cv2.morphologyEx(binary_np, cv2.MORPH_OPEN, kernel)
+
+        # Remove small blobs (non-lane noise)
+        num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(
+            binary_np, connectivity=8)
+        for i in range(1, num_labels):
+            if stats[i, cv2.CC_STAT_AREA] < 200:
+                binary_np[labels == i] = 0
 
         self.binaryPred = np.zeros(
             (self.imageHeight, self.imageWidth), dtype=np.uint8)
@@ -223,6 +230,10 @@ class LaneDetectorNode(Node):
             Bool, '/lane_keeping/lane_detected', 1)
         self.pub_debug = self.create_publisher(
             Image, '/lane_keeping/debug', 10)
+        self.pub_bev_bin = self.create_publisher(
+            Image, '/lane_keeping/bev_binary', 10)
+        self.pub_camera = self.create_publisher(
+            Image, '/lane_keeping/camera_image', 10)
 
         self.get_logger().info(
             f'Lane detector started | BEV {bevShape} '
@@ -254,10 +265,31 @@ class LaneDetectorNode(Node):
             rgbProcessed = self.lanenet.pre_process(img)
             self.lanenet.predict(rgbProcessed)
             laneMarking = self.lanenet.binaryPred
+
+            # ── Yellow-only filter ────────────────────────────────────
+            # Keep only lane pixels that are yellow in the original image
+            hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+            yellow_mask = cv2.inRange(
+                hsv,
+                (15, 50, 100),   # lower HSV bound (tune if needed)
+                (35, 255, 255))  # upper HSV bound
+            # Dilate the yellow mask so it covers the full lane width
+            yellow_mask = cv2.dilate(
+                yellow_mask, np.ones((15, 15), np.uint8), iterations=1)
+            laneMarking = cv2.bitwise_and(laneMarking, yellow_mask)
         except Exception:
             return
 
         # ── BEV ───────────────────────────────────────────────────────
+        # Publish camera image with lane markings overlaid
+        cam_overlay = img.copy()
+        cam_overlay[laneMarking > 0] = [0, 255, 0]  # green overlay
+        try:
+            self.pub_camera.publish(
+                self.bridge.cv2_to_imgmsg(cam_overlay, encoding='bgr8'))
+        except Exception:
+            pass
+
         bev = self.lane_keeping.ipm.create_bird_eye_view(img)
         bevLM = self.lane_keeping.ipm.create_bird_eye_view(laneMarking)
 
@@ -314,6 +346,17 @@ class LaneDetectorNode(Node):
         self.pub_detected.publish(detected_msg)
 
         # ── Debug overlay ─────────────────────────────────────────────
+        # Publish BEV binary lane markings
+        try:
+            if processedLM is not None and processedLM.size > 0:
+                pub_lm = processedLM
+                if len(pub_lm.shape) == 3:
+                    pub_lm = cv2.cvtColor(pub_lm, cv2.COLOR_BGR2GRAY)
+                self.pub_bev_bin.publish(
+                    self.bridge.cv2_to_imgmsg(pub_lm, encoding='mono8'))
+        except Exception:
+            pass
+
         debug = bev.copy() if bev is not None else \
             np.zeros((800, 800, 3), dtype=np.uint8)
         if len(debug.shape) == 2:
