@@ -55,3 +55,21 @@ CATKIN_IGNORE
 /Development/log
 /Development/build
 /Development/install
+<<<<<<< HEAD
+=======
+
+# Custom
+/.vscode
+/Development/log
+/Development/build
+/Development/install
+
+# Ignore downloaded pretrained model (specific file)
+/Development/ros2/src/qcar2_autonomy/models/lanenet.engine
+/Development/ros2/src/qcar2_autonomy/models/lanenet.onnx
+/Development/ros2/src/qcar2_autonomy/models/lanenet.pt
+
+/Development/MDC_libraries/resources/pretrained_models/lanenet.onnx
+
+
+>>>>>>> Arturo
