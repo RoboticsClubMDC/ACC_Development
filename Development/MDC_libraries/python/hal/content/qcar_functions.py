@@ -911,8 +911,8 @@ class InversePerspectiveMapping:
 
         """
         # ==============  SECTION B.1 -  Camera Intrinsics  ====================
-        self.camera_intrinsics = np.array([[483.671 ,       0,    321.188 , 0],
-                                           [0       ,483.579 ,    238.462 , 0],
+        self.camera_intrinsics = np.array([[318.86 ,       0,    401.34 , 0],
+                                           [0       ,312.14 ,    201.50 , 0],
                                            [0       ,       0,           1, 0],
                                            [0       ,       0,           0, 1]])
         # ==============         END OF SECTION B.1         ====================

@@ -260,6 +260,36 @@ class LaneDetectorNode(Node):
             self.current_v = msg.velocity[0] * 10
 
     # ================================================================ #
+    #  YELLOW COLOR FILTER — reject white lanes / sidewalks
+    # ================================================================ #
+    def _filter_yellow(self, bgr_img, binary_mask):
+        """AND LaneNet binary with HSV yellow mask. Keeps only largest blob."""
+        hsv = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2HSV)
+
+        # Wide yellow range for QLabs sim
+        yellow_mask = cv2.inRange(
+            hsv,
+            np.array([5, 20, 60], dtype=np.uint8),
+            np.array([55, 255, 255], dtype=np.uint8))
+
+        # Generous dilate so lane edges aren't clipped
+        yellow_mask = cv2.dilate(
+            yellow_mask, np.ones((11, 11), np.uint8), iterations=2)
+
+        # AND: only lane pixels that are also yellow
+        filtered = cv2.bitwise_and(binary_mask, yellow_mask)
+
+        # Keep only the single largest blob (one lane at a time)
+        num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(
+            filtered, connectivity=8)
+        if num_labels <= 1:
+            return filtered
+        largest = 1 + np.argmax(stats[1:, cv2.CC_STAT_AREA])
+        result = np.zeros_like(filtered)
+        result[labels == largest] = 255
+        return result
+
+    # ================================================================ #
     #  LINE FITTING — stable CTE/heading from BEV lane mask
     # ================================================================ #
     def _fit_lane_line(self, bev_binary):
@@ -355,6 +385,9 @@ class LaneDetectorNode(Node):
             laneMarking = self.lanenet.binaryPred
         except Exception:
             return
+
+        # ── Yellow-only filter (keeps largest blob only) ──────────────
+        laneMarking = self._filter_yellow(img, laneMarking)
 
         # ── Camera image with lane overlay ────────────────────────────
         cam_overlay = img.copy()
