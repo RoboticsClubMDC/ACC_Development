@@ -152,6 +152,11 @@ class PathFollower(Node):
       self.K_lane_heading = 0.3   # blend factor for lane heading
       self.K_lane_cte = 0.05      # proportional correction for CTE
 
+      # NEW: allow runtime flipping of lane correction sign (no assumptions)
+      # If your steering convention is opposite, set lane_sign = -1.0
+      self.declare_parameter('lane_sign', 1.0)
+      self.lane_sign = float(self.get_parameter('lane_sign').value)
+
       # Subscribe to lane detector topics
       self.create_subscription(
           Float64, '/lane_keeping/heading_error',
@@ -182,7 +187,7 @@ class PathFollower(Node):
       self.declare_parameter('translation_offset', [0.0, 0.0])
       self.translation_offset = list(self.get_parameter("translation_offset").get_parameter_value().double_array_value)
 
-      self.declare_parameter('start_path', [True])
+      self.declare_parameter('start_path', [False])
       self.path_execute_flag = list(self.get_parameter("start_path").get_parameter_value().bool_array_value)[0]
 
       self.add_on_set_parameters_callback(self.parameter_update_callback)
@@ -255,6 +260,7 @@ class PathFollower(Node):
       self.get_logger().info('==============================================')
       self.get_logger().info('TAXI INITIALIZED: Going to hub (node 0 -> 10)')
       self.get_logger().info(f'Lane correction gains: K_heading={self.K_lane_heading}, K_cte={self.K_lane_cte}')
+      self.get_logger().info(f'Lane correction sign (lane_sign) = {self.lane_sign:+.1f}')
       self.get_logger().info('==============================================')
 
 
@@ -271,6 +277,13 @@ class PathFollower(Node):
 
     def parameter_update_callback(self, params):
         for param in params:
+
+          if param.name == 'lane_sign':
+              try:
+                  self.lane_sign = float(param.value)
+                  self.get_logger().info(f'Updated lane_sign to {self.lane_sign:+.1f}')
+              except Exception:
+                  pass
 
           if param.name == 'node_values' and param.type_ == param.Type.INTEGER_ARRAY:
               new_waypoints = list(param.value)
@@ -505,11 +518,21 @@ class PathFollower(Node):
 
             # Lane keeping correction (only when lanes visible)
             lane_correction = 0.0
-            if self.lane_detected:
-                # heading_err is already a steering angle from BEV pure pursuit
-                # cte is lateral offset in metres (positive = right of centre)
-                lane_correction = (self.K_lane_heading * self.lane_heading_err
-                                   - self.K_lane_cte * self.lane_cte)
+            if self.lane_detected and abs(self.lane_heading_err) < np.deg2rad(25):
+                lane_correction = self.lane_sign * (
+                    (self.K_lane_heading * self.lane_heading_err)
+                    - (self.K_lane_cte * self.lane_cte)
+                )
+            else:
+                lane_correction = 0.0
+
+                # Throttled debug (once per ~1s)
+                if int(self.t_plot) != int(self.t_plot - self.dt):
+                    self.get_logger().info(
+                        f"lane: detected={self.lane_detected} "
+                        f"cte={self.lane_cte:+.3f}m heading={self.lane_heading_err:+.3f}rad "
+                        f"lane_corr={lane_correction:+.3f} sign={self.lane_sign:+.1f}"
+                    )
 
             steering = np.clip(
                 base_steering + lane_correction,
