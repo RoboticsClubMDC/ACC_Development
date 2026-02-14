@@ -168,7 +168,7 @@ class PathFollower(Node):
       self.declare_parameter('node_values', initial_waypoints)
       self.waypoints = list(self.get_parameter("node_values").get_parameter_value().integer_array_value)
 
-      self.declare_parameter('desired_speed', [0.1])
+      self.declare_parameter('desired_speed', [0.5])
       self.desired_speed = list(self.get_parameter("desired_speed").get_parameter_value().double_array_value)
 
       self.declare_parameter('visualize_pose', [False])
@@ -182,7 +182,7 @@ class PathFollower(Node):
       self.declare_parameter('translation_offset', [0.0, 0.0])
       self.translation_offset = list(self.get_parameter("translation_offset").get_parameter_value().double_array_value)
 
-      self.declare_parameter('start_path', [True])
+      self.declare_parameter('start_path', [False])
       self.path_execute_flag = list(self.get_parameter("start_path").get_parameter_value().bool_array_value)[0]
 
       self.add_on_set_parameters_callback(self.parameter_update_callback)
