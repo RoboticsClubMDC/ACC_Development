@@ -21,16 +21,12 @@ def generate_launch_description():
     package='qcar2_autonomy',
     executable='trip_planner',
     name='trip_planner',
-    # parameters=[{
-    #     'taxi_node': [10],
-    #     'trip_nodes': [2, 4, 6, 8, 10],
-    # }]
-)
+    )
     
     lane_detector = Node(
-        package='qcar2_autonomy',
-        executable='lane_detector',
-        name='lane_detector',
+    package='qcar2_autonomy',
+    executable='lane_detector',
+    name='lane_detector',
     )
 
     ''' TODO: Once finished this launch file must also include

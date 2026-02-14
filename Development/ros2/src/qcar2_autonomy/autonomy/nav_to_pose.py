@@ -22,12 +22,9 @@ from tf2_ros import TransformException
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 from geometry_msgs.msg import Twist, PoseStamped
-from sensor_msgs.msg import Imu, JointState, Image                     # VO CHANGE: added Image
+from sensor_msgs.msg import Imu, JointState
 from rcl_interfaces.msg import SetParametersResult
-from std_msgs.msg import Bool, Float64, String                          # VO CHANGE: added String
-
-from cv_bridge import CvBridge                                          # VO CHANGE
-from autonomy.visual_odometry import VisualOdometry                     # VO CHANGE
+from std_msgs.msg import Bool, Float64
 
 
 '''
@@ -40,9 +37,6 @@ MODIFIED:
  - State machine to ensure car always goes to taxi hub (node 10) first.
  - Lane keeping correction: subscribes to /lane_keeping/* topics from
    lane_detector and blends filtered CTE/heading into steering.
- - VO CHANGE: Visual Odometry redundancy — runs VO pipeline on RealSense,
-   compares with Cartographer odom, fuses with configurable weights, flags faults.
-   (Lane detector uses CSI camera separately — no conflict.)
 '''
 
 # region: State Machine Definition
@@ -68,20 +62,6 @@ class QcarEKF:
             [0, 0, 1]
         ])
 
-        # VO CHANGE: separate R matrices for odom vs VO (the "weights")
-        # Smaller R = higher trust. Default: trust odom more than VO initially.
-        self.R_odom = np.array(R, dtype=np.float64)
-        self.R_vo = np.diagflat([0.05, 0.05, 0.02])
-        self.R_odom_base = self.R_odom.copy()
-        self.R_vo_base = self.R_vo.copy()
-
-        # VO CHANGE: fault detection state
-        self.fault_flag = 'none'
-        self.residual_vo_odom = np.zeros(3)
-        self.vo_confidence = 0.0
-        self.residual_threshold = 0.3
-        self.weight_inflation = 10.0
-
     def f(self, X, u, dt):
         return X + dt * u[0] * np.array([
             [np.cos(X[2,0])],
@@ -104,25 +84,9 @@ class QcarEKF:
         return
 
     def correction(self, y):
-        """Original correction — uses odom R matrix."""
-        self._correct_with_R(y, self.R_odom)                           # VO CHANGE: delegates to shared method
-
-    # VO CHANGE: new method — VO correction with separate R + confidence scaling
-    def correction_vo(self, y_vo, confidence=1.0):
-        """Correct state using Visual Odometry measurement.
-        Low confidence -> inflated R_vo -> less trust in VO.
-        """
-        self.vo_confidence = confidence
-        conf_scale = 1.0 / max(confidence, 0.1)
-        R_effective = self.R_vo * conf_scale
-        self._correct_with_R(y_vo, R_effective)
-
-    # VO CHANGE: factored out core correction so both odom and VO reuse it
-    def _correct_with_R(self, y, R_matrix):
-        """Core EKF correction with a given R matrix."""
         H = self.C
         P_times_HTransposed = self.P @ np.transpose(H)
-        S = H @ P_times_HTransposed + R_matrix
+        S = H @ P_times_HTransposed + self.R
         K = P_times_HTransposed @ np.linalg.inv(S)
         z = (y - H@self.xHat)
         if len(y) > 1:
@@ -132,45 +96,7 @@ class QcarEKF:
         self.xHat += K @ z
         self.xHat[2] = wrap_to_pi(self.xHat[2])
         self.P = (self.I - K@H) @ self.P
-
-    # VO CHANGE: redundancy check — compare two sources, flag faults, adjust weights
-    def check_redundancy(self, z_odom, z_vo):
-        """Compare Cartographer odom vs VO. Returns dict with fault info."""
-        residual = z_vo - z_odom
-        if residual.shape == (3, 1):
-            residual[2, 0] = wrap_to_pi(residual[2, 0])
-            self.residual_vo_odom = residual.flatten()
-            pos_norm = np.linalg.norm(residual[:2, 0])
-            ang_norm = abs(residual[2, 0])
-        else:
-            self.residual_vo_odom = residual.flatten()
-            pos_norm = np.linalg.norm(residual[:2])
-            ang_norm = abs(wrap_to_pi(residual[2]))
-
-        combined_norm = pos_norm + 0.5 * ang_norm
-
-        if combined_norm < self.residual_threshold:
-            self.R_odom = self.R_odom_base.copy()
-            self.R_vo = self.R_vo_base.copy()
-            self.fault_flag = 'none'
-            action = 'sources agree, nominal weights'
-        elif self.vo_confidence < 0.3:
-            self.fault_flag = 'vo_suspect'
-            self.R_vo = self.R_vo_base * self.weight_inflation
-            self.R_odom = self.R_odom_base.copy()
-            action = f'VO suspect (conf={self.vo_confidence:.2f}), inflating R_vo'
-        else:
-            self.fault_flag = 'odom_suspect'
-            self.R_odom = self.R_odom_base * self.weight_inflation
-            self.R_vo = self.R_vo_base.copy()
-            action = f'Odom suspect (residual={combined_norm:.3f}), inflating R_odom'
-
-        return {
-            'residual': self.residual_vo_odom,
-            'residual_norm': combined_norm,
-            'fault_flag': self.fault_flag,
-            'action': action
-        }
+        return
 
 class GyroKF:
 
@@ -226,6 +152,11 @@ class PathFollower(Node):
       self.K_lane_heading = 0.3   # blend factor for lane heading
       self.K_lane_cte = 0.05      # proportional correction for CTE
 
+      # NEW: allow runtime flipping of lane correction sign (no assumptions)
+      # If your steering convention is opposite, set lane_sign = -1.0
+      self.declare_parameter('lane_sign', 1.0)
+      self.lane_sign = float(self.get_parameter('lane_sign').value)
+
       # Subscribe to lane detector topics
       self.create_subscription(
           Float64, '/lane_keeping/heading_error',
@@ -237,34 +168,6 @@ class PathFollower(Node):
           Bool, '/lane_keeping/lane_detected',
           self._lane_detected_cb, 1)
       # ===================================================
-
-      # ============= VO CHANGE: VISUAL ODOMETRY SETUP =============
-      # VO uses RealSense (/camera/color_image + /camera/depth_image)
-      # Lane detector uses CSI (/camera/csi_image) — separate cameras, no conflict
-      self.bridge = CvBridge()
-
-      self.vo = VisualOdometry(
-          img_width=640, img_height=480,   # matches qcar2_virtual_launch.py RealSense config
-          use_depth=True,
-          n_features=500,
-          match_ratio=0.75,
-          ransac_threshold=0.05,
-          min_inliers=8
-      )
-
-      self.create_subscription(
-          Image, '/camera/color_image', self._rgb_callback, 1)
-      self.create_subscription(
-          Image, '/camera/depth_image', self._depth_callback, 1)
-
-      self.vo_fault_publisher = self.create_publisher(
-          String, '/vo/fault_status', 1)
-
-      self.latest_depth = None
-      self.vo_pose = np.zeros((3, 1))
-      self.vo_valid = False
-      self.vo_confidence = 0.0
-      # ============= END VO CHANGE =============
 
       # define new parameters for node to use
       self.declare_parameter('node_values', initial_waypoints)
@@ -357,7 +260,7 @@ class PathFollower(Node):
       self.get_logger().info('==============================================')
       self.get_logger().info('TAXI INITIALIZED: Going to hub (node 0 -> 10)')
       self.get_logger().info(f'Lane correction gains: K_heading={self.K_lane_heading}, K_cte={self.K_lane_cte}')
-      self.get_logger().info('VO REDUNDANCY: Active (RealSense 640x480, use_depth=True)')  # VO CHANGE
+      self.get_logger().info(f'Lane correction sign (lane_sign) = {self.lane_sign:+.1f}')
       self.get_logger().info('==============================================')
 
 
@@ -372,44 +275,15 @@ class PathFollower(Node):
         self.lane_detected = msg.data
     # ==================================================
 
-    # ============= VO CHANGE: REALSENSE CAMERA CALLBACKS =============
-    def _depth_callback(self, msg):
-        """Cache latest depth frame from RealSense."""
-        try:
-            self.latest_depth = self.bridge.imgmsg_to_cv2(
-                msg, desired_encoding='mono16')
-        except Exception as e:
-            self.get_logger().warn(f'Depth conversion failed: {e}',
-                                    throttle_duration_sec=5.0)
-
-    def _rgb_callback(self, msg):
-        """Run VO pipeline on each RealSense RGB frame."""
-        try:
-            image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-        except Exception as e:
-            self.get_logger().warn(f'RGB conversion failed: {e}',
-                                    throttle_duration_sec=5.0)
-            return
-
-        timestamp = self.get_clock().now().nanoseconds * 1e-9
-
-        vo_result = self.vo.update(
-            image=image,
-            timestamp=timestamp,
-            depth_image=self.latest_depth
-        )
-
-        self.vo_valid = vo_result['valid']
-        self.vo_confidence = vo_result['confidence']
-        self.vo_pose = vo_result['pose'].reshape(3, 1)
-
-        # Correct EKF with VO if confident enough
-        if self.vo_valid and self.vo_confidence > 0.15:
-            self.qcar2_ekf.correction_vo(self.vo_pose, self.vo_confidence)
-    # ============= END VO CHANGE =============
-
     def parameter_update_callback(self, params):
         for param in params:
+
+          if param.name == 'lane_sign':
+              try:
+                  self.lane_sign = float(param.value)
+                  self.get_logger().info(f'Updated lane_sign to {self.lane_sign:+.1f}')
+              except Exception:
+                  pass
 
           if param.name == 'node_values' and param.type_ == param.Type.INTEGER_ARRAY:
               new_waypoints = list(param.value)
@@ -644,11 +518,21 @@ class PathFollower(Node):
 
             # Lane keeping correction (only when lanes visible)
             lane_correction = 0.0
-            if self.lane_detected:
-                # heading_err is already a steering angle from BEV pure pursuit
-                # cte is lateral offset in metres (positive = right of centre)
-                lane_correction = (self.K_lane_heading * self.lane_heading_err
-                                   - self.K_lane_cte * self.lane_cte)
+            if self.lane_detected and abs(self.lane_heading_err) < np.deg2rad(25):
+                lane_correction = self.lane_sign * (
+                    (self.K_lane_heading * self.lane_heading_err)
+                    - (self.K_lane_cte * self.lane_cte)
+                )
+            else:
+                lane_correction = 0.0
+
+                # Throttled debug (once per ~1s)
+                if int(self.t_plot) != int(self.t_plot - self.dt):
+                    self.get_logger().info(
+                        f"lane: detected={self.lane_detected} "
+                        f"cte={self.lane_cte:+.3f}m heading={self.lane_heading_err:+.3f}rad "
+                        f"lane_corr={lane_correction:+.3f} sign={self.lane_sign:+.1f}"
+                    )
 
             steering = np.clip(
                 base_steering + lane_correction,
@@ -697,27 +581,12 @@ class PathFollower(Node):
         roll, pitch, self.yaw = R.from_quat(rotation).as_euler('xyz')
 
         self.gyro_kf.correction(self.yaw)
-        y_odom = np.array([
+        y = np.array([
                   [self.translation.x],
                   [self.translation.y],
                   [self.gyro_kf.xHat[0,0]]
               ])
-        self.qcar2_ekf.correction(y_odom)
-
-        # VO CHANGE: redundancy check — compare Cartographer vs VO
-        if self.vo_valid:
-            redundancy = self.qcar2_ekf.check_redundancy(y_odom, self.vo_pose)
-            fault_msg = String()
-            fault_msg.data = (
-                f"flag={redundancy['fault_flag']} "
-                f"norm={redundancy['residual_norm']:.4f} "
-                f"vo_conf={self.vo_confidence:.2f} "
-                f"inliers={self.vo.inlier_count} "
-                f"action={redundancy['action']}"
-            )
-            self.vo_fault_publisher.publish(fault_msg)
-        # END VO CHANGE
-
+        self.qcar2_ekf.correction(y)
       except TransformException as ex:
           self.get_logger().info(
               f'Could not transform {to_frame_rel} to {from_frame_rel}: {ex}')
