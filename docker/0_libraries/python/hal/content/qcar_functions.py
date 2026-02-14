@@ -249,9 +249,12 @@ class ObjectDetection:
 
         """
         # =================  SECTION A.1 - Thresholding Mask  =================
-        mask = np.zeros(img.shape[:2],np.uint8)
-        return mask
+        mask=np.zeros(img.shape[:2],np.uint8)
+        mask = cv2.inRange(img, lower, upper)
+        imask = mask>0
+        mask[imask]=1
         # =================        End of SECTION A.1         =================
+        return mask
 
     def mask_img (self,img,mask):
         """Display color thresholded image.
@@ -262,9 +265,9 @@ class ObjectDetection:
 
         """
         # =================    SECTION A.2 - Mask Image     =================
-        img_thresh = np.zeros(img.shape,dtype=np.uint8)
-        return img_thresh
+        img_thresh = cv2.bitwise_and(img,img,mask = mask)
         # =================       End of SECTION A.2        =================
+        return img_thresh
     
     def obj_detect(self,img,task,mode):
         """Detect objects in an RGB image and return name, binary mask, and
@@ -290,44 +293,133 @@ class ObjectDetection:
 
         if task=='detect':
         # =================    SECTION B.1 - Object Detection     =================
-            traffic_bounds=[(0, 0, 0), (255, 255, 255)]
-            stop_sign_bounds=[(0, 0, 0), (255, 255, 255)]
-            detectedMask.append(np.zeros(img.shape[:2],np.uint8))
-            detectedName.append('')
-            detectedBbox.append((0, 0, 0, 0))
+            yellow_bounds=[(5, 70, 70), (30, 255, 255)]
+            red_bounds=[(148, 70, 70), (180, 255, 255)]
+            for index,bounds in enumerate([yellow_bounds,red_bounds]):
+                
+                hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+                object_mask=self.color_thresholding(hsv,bounds[0],bounds[1])
+                
+                CCA_ret = cv2.connectedComponentsWithStats(object_mask, 
+                                                        connectivity=8, 
+                                                        ltype=cv2.CV_32S)
+                CCA_stats = CCA_ret[2]
+                for i, stat in enumerate(CCA_stats):  
+                    blob_binary=np.zeros_like(object_mask,dtype=np.uint8)
+                    if i>0 and stat[4]>200:
+                        idx=np.where(CCA_ret[1]==i)
+                        blob_binary[idx]=1
+                        detectedMask.append(blob_binary)
+                        x,y,w,h = cv2.boundingRect(blob_binary)
+                        detectedBbox.append((int(x),int(y),int(w),int(h)))
+                        if index ==0:
+                            detectedName.append('traffic')
+                        else:
+                            detectedName.append('stop sign')
             return detectedMask,detectedName,detectedBbox
-
         # =================         End of SECTION B.1          =================
 
         if task == 'classify':
             if mode=='shape':
         # ============   SECTION B.2 - Geometry-based Classification   ============
-                yellow_bounds=[(0, 0, 0), (255, 255, 255)]
-                red_bounds=[(0, 0, 0), (255, 255, 255)]
-                detectedMask.append(np.zeros(img.shape[:2],np.uint8))
-                detectedName.append('')
-                detectedBbox.append((0, 0, 0, 0))
+                yellow_bounds=[(5, 125, 70), (20, 255, 255)]
+                red_bounds=[(170, 125, 70), (180, 255, 255)]
+                for index,bounds in enumerate([yellow_bounds,red_bounds]):
+                    
+                    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+                    object_mask=self.color_thresholding(hsv,bounds[0],bounds[1])
+                    
+                    CCA_ret = cv2.connectedComponentsWithStats(object_mask, 
+                                                            connectivity=8, 
+                                                            ltype=cv2.CV_32S)
+                    CCA_stats = CCA_ret[2]
+                    for i, stat in enumerate(CCA_stats):  
+                        blob_binary=np.zeros_like(object_mask,dtype=np.uint8)
+                        if i>0 and stat[4]>2000:
+                            idx=np.where(CCA_ret[1]==i)
+                            blob_binary[idx]=1
+                            detectedMask.append(blob_binary)
+                            x,y,w,h = cv2.boundingRect(blob_binary)
+                            detectedBbox.append((int(x),int(y),int(w),int(h)))
+
+                            if index ==0:
+                                detectedName.append('traffic')
+                            else:
+                                contours, hierarchy = cv2.findContours(blob_binary,  
+                                                                    cv2.RETR_EXTERNAL,
+                                                                    cv2.CHAIN_APPROX_NONE) 
+                                perimeter = cv2.arcLength(contours[0], True)
+                                con_area = cv2.contourArea(contours[0])
+                                circularity = 4*math.pi*(con_area/(perimeter*perimeter))
+                                if circularity>0.6:
+                                    detectedName.append('stop sign')
+                                else:
+                                    detectedName.append('yeild sign')
+
                 return detectedMask,detectedName,detectedBbox
         # ============               End of SECTION B.2                ============
 
             elif mode =='template':
         # ==============   SECTION B.3 - Template-based Detection   ==============
-                stop_path = 'path/to/your/stop.png'
-                yield_path = 'path/to/your/yield.png'
-                detectedMask.append(np.zeros(img.shape[:2],np.uint8))
-                detectedName.append('')
-                detectedBbox.append((0, 0, 0, 0))
-                return detectedMask,detectedName,detectedBbox
+                img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) 
 
+                stop_path = 'template/stop_sign.png'
+                yield_path = 'template/yield_sign.png'
+                template_paths=[stop_path,yield_path]
+
+                for t_path in template_paths:
+                    template = cv2.imread(t_path,0)
+                    name = splitext(basename(t_path))[0]
+
+                    h_template,w_template = template.shape
+                    h_img,w_img = img_gray.shape
+                    scale = max(math.ceil(h_template/h_img),math.ceil(w_template/w_img))
+                    scales=[scale,2*scale,4*scale]
+                    best_match = None
+                    for s in scales:
+                        resize_stop = cv2.resize(template,(w_template//s,h_template//s))
+                        res_stop = cv2.matchTemplate(img_gray,resize_stop,cv2.TM_CCOEFF_NORMED)
+                        (_, maxVal, _, maxLoc) = cv2.minMaxLoc(res_stop)
+                        if best_match is None or maxVal > best_match[0]:
+                            best_match = (maxVal, maxLoc, w_template//s,h_template//s)
+                    (_, maxLoc, w, h) = best_match
+
+                    detectedBbox.append((int(maxLoc[0]), int(maxLoc[1]),w,h))
+                    detectedName.append(name)
+
+                    mask=np.zeros(img.shape[:2],np.uint8)
+                    mask = cv2.rectangle(mask, 
+                                        (int(maxLoc[0]), int(maxLoc[1])), 
+                                        (int(maxLoc[0])+w, int(maxLoc[1])+h),
+                                        (1), -1)
+                    detectedMask.append(mask)
+
+                return detectedMask,detectedName,detectedBbox
         # =================          End of SECTION B.3          =================
 
             elif mode =='yolo':
         # ===============   SECTION B.4 - YOLO segmentation model   ===============
                 imgProcessed = self.yolo.pre_process(img)
                 results = self.yolo.predict(imgProcessed)
-                detectedMask.append(np.zeros(img.shape[:2],np.uint8))
-                detectedName.append('')
-                detectedBbox.append((0, 0, 0, 0))
+                if results.masks is None:
+                    return detectedMask,detectedName,detectedBbox
+                
+                boxes=results.boxes.xywh.cpu().numpy().astype(int)
+                for b in boxes:
+                    w=b[2]
+                    h=b[3]
+                    x=b[0]-w//2
+                    y=b[1]-h//2
+                    detectedBbox.append((x,y,w,h))
+                
+                masks=results.masks.data.cpu().numpy()
+                for m in masks:
+                    detectedMask.append(m)
+                
+                ids = results.boxes.cls.cpu().numpy()
+                for i in ids:
+                    detectedName.append(results.names[i])
+
                 return detectedMask,detectedName,detectedBbox
         # =================          End of SECTION B.4           =================
 
@@ -342,8 +434,12 @@ class ObjectDetection:
             list: Distance to detected objects.
 
         """
+        detectedDist = []
         # ================   SECTION C.1 - Distance Estimation   ================
-        detectedDist = [0 for i in detectedMask]
+        for mask in detectedMask:
+            isolated_depth = mask*depth.squeeze()
+            distance = np.median(isolated_depth[isolated_depth.nonzero()])
+            detectedDist.append(distance)
         return detectedDist
         # ================          End of SECTION C.1           =================
 
@@ -399,7 +495,7 @@ class ObjectDetection:
             v_h = cv2.getTrackbarPos('R high','Image')
         return (h_l,s_l,v_l),(h_h,s_h,v_h)
     
-    def annotate(self,img,detectedName,detectedBbox,detectedDist):
+    def annotate(sefl,img,detectedName,detectedBbox,detectedDist):
         """Add names and bounding boxes of detected objects to the input image.
 
         Args:
@@ -489,7 +585,12 @@ class LaneKeeping:
 
         """
         # ==============   SECTION C - Preprocess Lane Marking   ====================
-        return np.zeros_like(lane_marking)
+        lane_binary = cv2.GaussianBlur(lane_marking,(5,5),0)
+        ret,lane_binary = cv2.threshold(lane_marking,1,255,cv2.THRESH_BINARY)
+        kernel = np.ones((5, 5), np.uint8) 
+        lane_binary = cv2.dilate(lane_binary,kernel,iterations=1)
+        lane_marking_processed = cv2.erode(lane_binary,kernel,iterations=1)
+        return lane_marking_processed
         # ==============             END OF SECTION C            ====================
 
     def isolate_lane_markings(self,lane_marking):
@@ -503,7 +604,21 @@ class LaneKeeping:
 
         """
         # ==============  SECTION D - Isolate Lane Marking ====================
+        # each blob should be a binary image with the same shape as lane_binary 
+        # containing only one blob
         isolated_binary_blobs=[]
+        min_area=50
+        CCA_ret = cv2.connectedComponentsWithStats(lane_marking, 
+                                                    connectivity=8, 
+                                                    ltype=cv2.CV_32S)
+        CCA_stats = CCA_ret[2]
+        for index, stat in enumerate(CCA_stats):
+            
+            lane_binary=np.zeros_like(lane_marking,dtype=np.uint8)
+            if index>0 and stat[4]>min_area:
+                idx=np.where(CCA_ret[1]==index)
+                lane_binary[idx]=255
+                isolated_binary_blobs.append(lane_binary)
         return isolated_binary_blobs
         # ==============          END OF SECTION D        ====================
     
@@ -525,9 +640,10 @@ class LaneKeeping:
         self.isolated_lanes = []
 
         # ==============  SECTION E.1 - Calculate Look-ahead Distance ====================
-        self.ld_pix = 1 #look-ahead distance in number of pixels
-        # ==============               END OF SECTION E.1             ====================
-
+        ld = np.clip(self.Kdd * v, self.ldMin, self.ldMax)
+        self.ld_pix = int(ld/self.ipm.m_per_pix) #look-ahead distance in number of pixels
+        # ==============          END OF SECTION E.1        ====================
+        
         # create isolated lane objects, only lanes that contains an intersection is recorded
         for blob in isolated_binary_blobs:
             lane=LaneMarking(self.bev_rear_wheel_pos,blob)
@@ -548,8 +664,9 @@ class LaneKeeping:
             lane=self.isolated_lanes[0]
     
             # ==============  SECTION E.3 - Determine Side (Case I) ====================
-            vec=np.array((75,0)) 
-            # ==============            END OF SECTION E.3          ====================
+            sign=np.sign((299.1-lane.intersection[0]))
+            vec=np.array((sign*75,0)) 
+            # ==============           END OF SECTION E.3           ====================
 
             rot_mat=self.find_rot_mat(lane)
             # re-orient the vector such that the new vector is perpendicular to the lane marking 
@@ -570,21 +687,29 @@ class LaneKeeping:
                 if dist>100 and dist<300:
                     # ==============  SECTION E.5 - Find Target (Case II) ====================
                     # distance between lane markings is within the ranges of lane width
-                    target = np.array((0,0))
+                    midpoint=(lane.intersection+prev_lane.intersection)/2
+                    self.targets.append(midpoint)
                     # ==============           END OF SECTION E.5         ====================
-                    self.targets.append(target)
-                    
+
                 elif dist>300:
                     # ==============  SECTION E.6 - Find Target (Case III) ====================
-                    # distance between lane markings is too large
-                    target1 = np.array((0,0))
-                    target2 = np.array((0,0))
+                    right_vector = np.array((75,0))
+                    left_vector = np.array((-75,0))
+
+                    # find the slope at the intersection
+                    rot_mat1=self.find_rot_mat(lane)
+                    new_right_vec=rot_mat1@right_vector
+                    target_point1 = lane.intersection+ new_right_vec
+                    self.targets.append(target_point1)
+                    self._debug_angles.append((lane.intersection,target_point1))
+
+                    rot_mat2=self.find_rot_mat(prev_lane)
+                    new_left_vec=rot_mat2@left_vector
+                    target_point2 = prev_lane.intersection+ new_left_vec
+                    self.targets.append(target_point2)
+                    self._debug_angles.append((prev_lane.intersection,target_point2))
                     # ==============             END OF SECTION E.6        ====================
 
-                    self.targets.append(target1)
-                    self.targets.append(target2)
-                    self._debug_angles.append((lane.intersection,target1))
-                    self._debug_angles.append((prev_lane.intersection,target2))
                 
                 else:
                     # isolated lane markings are too close, most likely the two edges of the 
@@ -607,11 +732,43 @@ class LaneKeeping:
                      this vector will be perpendicular to the lane marking.
 
         """
-        # ==============  SECTION E.4 - Find Rotation Matrix  ====================
-        rot_mat = np.eye(2)
-        return rot_mat
-        # ==============         END OF SECTION E.4        ====================
 
+        point = lane.intersection
+        fit_square_size=40
+        iteration=5
+        for i in range(iteration):
+            fit_square_size=fit_square_size+i*10
+            start_point=(point-(fit_square_size,fit_square_size)).astype(int)
+            end_point=(point+(fit_square_size,fit_square_size)).astype(int)
+            fit_square=np.zeros_like(lane.binary)
+            cv2.rectangle(fit_square,start_point,end_point,(255),-1)
+            tangent_points=cv2.bitwise_and(lane.binary,fit_square)
+            lines = cv2.HoughLinesP(
+                tangent_points,
+                rho=6,
+                theta=np.pi / 90,
+                threshold=20,
+                lines=np.array([]),
+                minLineLength=40,
+                maxLineGap=20
+                )
+            slopes=[]
+            if lines is not None:
+                for line in lines:
+                    for x1, y1, x2, y2 in line:
+                        slopes.append((y2-y1)/(x2-x1))
+                break
+        if len(slopes)==0:
+            return np.eye(2)
+        slope=sum(slopes) / len(slopes)
+        theta_s=math.atan(slope)
+        theta=theta_s+math.pi/2
+        if theta>math.pi/2:
+            theta=theta-math.pi
+        rot_mat = np.array([[math.cos(theta),-math.sin(theta)],
+                        [math.sin(theta), math.cos(theta)]])
+        return rot_mat
+    
     def show_debug(self):
         """Render debug visualization and display via cv2
 
@@ -754,10 +911,13 @@ class InversePerspectiveMapping:
 
         """
         # ==============  SECTION B.1 -  Camera Intrinsics  ====================
-        self.camera_intrinsics = np.zeros((4,4))
+        self.camera_intrinsics = np.array([[483.671 ,       0,    321.188 , 0],
+                                           [0       ,483.579 ,    238.462 , 0],
+                                           [0       ,       0,           1, 0],
+                                           [0       ,       0,           0, 1]])
         # ==============         END OF SECTION B.1         ====================
-        
-        self.bevWorldDims=bevWorldDims
+
+        self.world_dims=bevWorldDims
         self.bevShape=bevShape
         self.m_per_pix=(bevWorldDims[1]-bevWorldDims[0])/self.bevShape[0]
 
@@ -770,10 +930,30 @@ class InversePerspectiveMapping:
 
         """
         # ==============  SECTION B.2 -  Camera Extrinsics  ====================
-        self.camera_extrinsics = np.zeros((4,4))
+        phi = np.pi/2
+        theta = 0
+        psi = np.pi/2
+        height = 1.72
+
+        cx, sx = np.cos(phi), np.sin(phi)
+        cy, sy = np.cos(theta), np.sin(theta)
+        cz, sz = np.cos(psi), np.sin(psi)
+        Rx=np.array([[1  ,0  ,0  ],
+                     [0  ,cx ,-sx],
+                     [0  ,sx ,cx ]])
+        Ry=np.array([[cy ,0  ,sy ],
+                     [0  ,1  ,0  ],
+                     [-sy,0  ,cy ]])
+        Rz=np.array([[cz ,-sz,0  ],
+                     [sz ,cz ,0  ],
+                     [0  ,0  ,1  ]])
+        
+        self.R_v2cam= Rx@Ry@Rz
+        self.t_v2cam = np.array([[0,height,0]]).T
+        self.T_v2cam = np.vstack((np.hstack((self.R_v2cam,self.t_v2cam)),
+                                     np.array([[0,0,0,1]])))
         # ==============         END OF SECTION B.2         ====================
 
-    
     def v2img(self,XYZ):
         '''Converts input locations XYZ in vehicle frame to pixel coordinates uv
            in image frame.
@@ -788,12 +968,16 @@ class InversePerspectiveMapping:
 
         '''
         # ==============  SECTION B.3 -  Vehicle to Image  ====================
-        uv = np.zeros((XYZ.shape[0],2),dtype=np.uint8)
-        return uv
+        XYZ1 = np.hstack((XYZ,np.ones((XYZ.shape[0],1))))
+        img_coords = self.camera_intrinsics@self.T_v2cam@XYZ1.T
+        img_coords /= img_coords[2]
+        uv = img_coords[:2,:].astype(int)
+        uv = uv.T
         # ==============         END OF SECTION B.3        ====================
-
+        return uv
+    
     def get_homography (self):
-        """This method creates the homography matrix (self.M) which converts. 
+        """This method creates the homography matrix (self.M) which converts 
            RGB camera feed to BEV in desired dimensions. This is done by:
               1.Specifying four arbitrary points in vehicle frame (four corners).
               2.Converting them to image coordinates in RGB image frame.
@@ -802,7 +986,37 @@ class InversePerspectiveMapping:
 
         """
         # ==============  SECTION B.4 -  Image to Vehicle  ====================
-        self.M = np.eye(3)
+        # four points of interest in vehicle frame
+        # will be used to get homography matrix
+        world_max_x=15
+        world_max_y=3
+        world_min_x=3
+        world_min_y=-3
+        corners=np.array([
+                        [world_max_x,world_max_y,0],
+                        [world_min_x,world_max_y,0],
+                        [world_max_x,world_min_y,0],
+                        [world_min_x,world_min_y,0],
+                        ])    
+        
+        rgb_corners=self.v2img(corners) # same four points in image frame
+
+        # convert the same four points to bev frame
+        # make sure the aspect ratio of the out world coordinates 
+        # are the same as the out dimesions
+        bev_world_min_x=self.world_dims[0]
+        bev_world_max_x=self.world_dims[1]
+        bev_world_min_y=self.world_dims[2]
+        bev_world_max_y=self.world_dims[3]
+        bev_corners=np.array([
+                    [(bev_world_max_y-world_max_y)/self.m_per_pix,(bev_world_max_x-world_max_x)/self.m_per_pix],
+                    [(bev_world_max_y-world_max_y)/self.m_per_pix,self.bevShape[0]-(world_min_x-bev_world_min_x)/self.m_per_pix],
+                    [self.bevShape[0]-(world_min_y-bev_world_min_y)/self.m_per_pix,(bev_world_max_x-world_max_x)/self.m_per_pix],
+                    [self.bevShape[0]-(world_min_y-bev_world_min_y)/self.m_per_pix,self.bevShape[0]-(world_min_x-bev_world_min_x)/self.m_per_pix]
+                    ])
+        
+        self.M = cv2.getPerspectiveTransform(rgb_corners.astype(np.float32),
+                                             bev_corners.astype(np.float32))
         # ==============         END OF SECTION B.4        ====================
 
     def create_bird_eye_view(self,img):
@@ -816,7 +1030,13 @@ class InversePerspectiveMapping:
 
         """
         # ==============  SECTION B.5 -  Create BEV  ====================
-        dst = np.zeros(self.bevShape,dtype=np.uint8)
+        dst = cv2.warpPerspective(img,
+                                  self.M,
+                                  self.bevShape,
+                                  cv2.INTER_LINEAR,
+                                  borderMode=cv2.BORDER_CONSTANT,
+                                  borderValue=(0,0,0)
+                                  )
         return dst
         # ==============      END OF SECTION B.5     ====================
 
@@ -855,10 +1075,11 @@ class PurePursuitController:
             float: Steering angle in radian
 
         """
-        # ==============  SECTION F - Compute Steering Angle ====================
-        steer = 0
-        return steer
-        # ==============         END OF SECTION F            ====================
+        L=0.256*10
+        P=np.linalg.norm(point-self.bev_rear_wheel)*self.m_per_pix
+        psi = math.atan((self.bev_rear_wheel[0]-point[0])/(self.bev_rear_wheel[1]-point[1]))
+        delta= math.atan((2*L*math.sin(psi))/P)
+        return np.clip(delta,-self.maxSteer,self.maxSteer)
 
 class LaneMarking:
     """This class stores relevant information for individual isolated lane marking.
@@ -890,7 +1111,22 @@ class LaneMarking:
 
         '''
         # ==============  SECTION E.2 -  Find Intersection  ====================
+        circle_bi=cv2.circle(np.zeros(self.binary.shape,dtype=np.uint8),
+                             self.bev_rear_wheel_pos,ld,(255),1)
+        intersection =cv2.bitwise_and(circle_bi,self.binary)
+        CCA_ret = cv2.connectedComponentsWithStats(intersection, 
+                                                    connectivity=8, 
+                                                    ltype=cv2.CV_32S)
+        CCA_stats = CCA_ret[2]
+        CCA_centroid = CCA_ret[3]
         self.intersection = None
+        temp=[]
+        for index, stat in enumerate(CCA_stats):
+            if index>0:
+                temp.append(CCA_centroid[index].astype(int))
+        if len(temp)==0:
+            return
+        self.intersection = temp[0]
         # ==============          END OF SECTION E.2        ====================
       
 class TargetsTracker:

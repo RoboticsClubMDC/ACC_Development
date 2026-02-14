@@ -11,6 +11,7 @@ cd /home/$USER/Documents/ACC_Development/isaac_ros_common
 ./scripts/run_dev.sh  /home/$USER/Documents/ACC_Development/Development
 
 colcon buid:
+<<<<<<< HEAD
 colcon build && . install/setup.bash && export ROS_DOMAIN_ID=67 && clear
 
 To start cartographer:
@@ -21,3 +22,18 @@ colcon build --packages-select qcar2_autonomy && . install/setup.bash && export 
 
 Run nav_to_pose
 colcon build --packages-select qcar2_autonomy && . install/setup.bash && export ROS_DOMAIN_ID=67 && ros2 run qcar2_autonomy path_follower && clearsudo apt update && sudo apt install github-desktop
+=======
+colcon build && . install/setup.bash && export ROS_DOMAIN_ID=67 && clear
+
+To start cartographer:
+clear && . install/setup.bash && export ROS_DOMAIN_ID=67 && clear && ros2 launch qcar2_nodes qcar2_cartographer_virtual_launch.py && clear
+
+Running autonomy planner:
+colcon build --packages-select qcar2_autonomy && . install/setup.bash && export ROS_DOMAIN_ID=67 && ros2 launch qcar2_autonomy autonomy_planner_launch.py && clear
+
+Run nav_to_pose
+colcon build --packages-select qcar2_autonomy && . install/setup.bash && export ROS_DOMAIN_ID=67 && ros2 run qcar2_autonomy path_follower && clear
+
+Run YOLO
+colcon build --packages-select qcar2_autonomy && . install/setup.bash && export ROS_DOMAIN_ID=67 && ros2 run qcar2_autonomy yolo_detector && clear
+>>>>>>> Arturo
