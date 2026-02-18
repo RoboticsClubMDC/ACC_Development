@@ -23,7 +23,7 @@ def generate_launch_description():
     name='trip_planner',
     # parameters=[{
     #     'taxi_node': [10],
-    #     'trip_nodes': [2, 4, 6, 8, 10],
+    #     'trip_nodes': [2, 4, 14, 20, 22, 10],
     # }]
 )
     
