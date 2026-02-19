@@ -28,7 +28,8 @@ setup(
             'lane_detector=autonomy.lane_detector:main',
             'yolo_detector=autonomy.yolo_detector:main',
             'trip_planner=autonomy.trip_planner:main',
-            'dataset_collector=autonomy.dataset_collector:main'
+            'dataset_collector=autonomy.dataset_collector:main',
+            'Planner_server=autonomy.Planner_server:main'
         ],
     },
 )

@@ -36,8 +36,8 @@ def generate_launch_description():
             executable='csi',
             name='csi_camera',
             parameters=[{"device_type":"virtual"},
-                        {"frame_width":410},
-                        {"frame_height":205},
+                        {"frame_width":820},
+                        {"frame_height":410},
                         {"frame_rate":15.0},
                         {"camera_num":3}]
         )

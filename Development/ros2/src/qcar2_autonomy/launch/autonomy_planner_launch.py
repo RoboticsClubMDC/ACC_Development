@@ -33,6 +33,13 @@ def generate_launch_description():
         name='lane_detector',
     )
 
+    Planner_server = Node(
+        package='qcar2_autonomy',
+        executable='Planner_server',
+        name='Planner_server',
+        
+    )
+
     ''' TODO: Once finished this launch file must also include
     - Lane detector to help smooth out tracking of lanes while driving
     - Planner server to coordinate which LEDs on the QCar should be on based on trip logic
@@ -42,6 +49,8 @@ def generate_launch_description():
         path_follower,
         traffic_system_detector,
         trip_planner,
-        lane_detector
+        lane_detector,
+        Planner_server
+
         ]
     )
