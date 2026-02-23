@@ -300,7 +300,7 @@ private:
 
         // color ID selection
         if (led_color_id == 0)
-            {color_value = { 255, 0, 0 };}
+            {color_value = { 255, 0, 0};}
         if (led_color_id == 1)
             {color_value = { 0, 255, 0 }; }
         if (led_color_id == 2)
