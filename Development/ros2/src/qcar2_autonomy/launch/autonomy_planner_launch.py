@@ -64,7 +64,7 @@ def generate_launch_description():
         trip_planner,
         #lane_detector,
         Planner_server,
-        lane_seg_node,
-        avoid_sidewalks
+        #lane_seg_node,
+        #avoid_sidewalks
         ]
     )
