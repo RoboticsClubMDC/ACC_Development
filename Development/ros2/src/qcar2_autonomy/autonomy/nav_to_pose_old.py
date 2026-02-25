@@ -35,21 +35,16 @@ given nodes based on Quanser's SDCSRoadMap class.
 
 UPGRADE:
 - You can provide pickup/dropoff as XY coordinates in meters (QLabs map meters)
-- It will snap current pose -> closest node
+- It will snap current pose -> closest node (FIXED: ROS->QLabs conversion)
 - Snap goal XY -> closest node
 - A* shortest path between nodes
 - Append exact goal XY as final waypoint so you actually end at that coordinate
 
-MISSION FIX (what you asked):
+MISSION:
 - Provide TWO coordinates: pickup_xy and dropoff_xy
 - Go to pickup, STOP 3s
 - Go to dropoff, STOP 3s
-- Go back to taxi hub, DONE
-
-CRITICAL FIX (what we're testing now):
-- Roadmap nodes are in QLabs coordinates
-- TF pose is in ROS "map" coordinates
-- When snapping current pose -> closest node for replanning, convert ROS pose back to QLabs first.
+- Go back to Taxi Hub (FIXED to node 10), DONE
 '''
 
 # region: Helper classes for state estimation
@@ -198,6 +193,7 @@ class PathFollower(Node):
         self.declare_parameter('mission_enable', [False])
         self.mission_enable = list(self.get_parameter("mission_enable").get_parameter_value().bool_array_value)[0]
 
+        # This code assumes XY mission (pickup/dropoff in QLabs meters)
         self.declare_parameter('mission_use_xy', [True])
         self.mission_use_xy = list(self.get_parameter("mission_use_xy").get_parameter_value().bool_array_value)[0]
 
@@ -207,20 +203,9 @@ class PathFollower(Node):
         self.declare_parameter('mission_dropoff_xy', [0.0, 0.0])
         self.dropoff_xy = list(self.get_parameter("mission_dropoff_xy").get_parameter_value().double_array_value)
 
-        # TAXI HUB (return here at end)
-        self.declare_parameter('mission_hub_xy', [0.0, 0.0])
-        self.hub_xy = list(self.get_parameter("mission_hub_xy").get_parameter_value().double_array_value)
-
         # stop duration at pickup / dropoff
         self.declare_parameter('mission_stop_seconds', [3.0])
         self.stop_seconds = float(list(self.get_parameter("mission_stop_seconds").get_parameter_value().double_array_value)[0])
-
-        # (Still available if you want node missions later)
-        self.declare_parameter('mission_pickup_node', [21])
-        self.pickup_node = int(list(self.get_parameter("mission_pickup_node").get_parameter_value().integer_array_value)[0])
-
-        self.declare_parameter('mission_dropoff_node', [22])
-        self.dropoff_node = int(list(self.get_parameter("mission_dropoff_node").get_parameter_value().integer_array_value)[0])
 
         # mission state
         self.mission_stage = MissionStage.IDLE
@@ -301,6 +286,13 @@ class PathFollower(Node):
         self.path_publisher_topic = self.create_publisher(Path, '/planned_path', 1)
         self.path_status_publisher = self.create_publisher(Bool, '/path_status', 1)
 
+        # ---------------- TAXI HUB FIX ----------------
+        # Taxi hub is node 10 (right-hand, big map). We always return here after dropoff.
+        # This is in QLabs coordinates (same coordinate system as roadmap node poses).
+        self.hub_xy = list(self._get_node_xy(10))
+        self.get_logger().info(f"Taxi hub locked to node 10 => hub_xy={self.hub_xy}")
+        # ------------------------------------------------
+
         # Multiscope info
         self.t0 = time.time()
         self.t_plot = 0
@@ -309,10 +301,6 @@ class PathFollower(Node):
 
     # --------------------- FRAME FIX HELPERS ---------------------
     def _R_qlabs_to_ros_2d(self):
-        """
-        Builds the SAME rotation you use when publishing/tracking waypoints:
-          wp_ros = (wp_qlabs + t) @ R_QLabs_ROS
-        """
         angle_offset = float(self.rotation_offset[0])
         return np.array([
             [np.cos(-angle_offset*np.pi/180.0), -np.sin(-angle_offset*np.pi/180.0)],
@@ -320,15 +308,6 @@ class PathFollower(Node):
         ])
 
     def _ros_to_qlabs_xy(self, x_ros, y_ros):
-        """
-        CRITICAL FIX:
-        Roadmap nodes live in QLabs coordinates.
-        TF pose is ROS map coordinates.
-        We must convert current ROS pose back to QLabs before snapping to closest node.
-
-        You do:  wp_ros = (wp_qlabs + t) @ R
-        Inverse: wp_qlabs = (wp_ros @ R.T) - t
-        """
         Rq = self._R_qlabs_to_ros_2d()
         t = np.array([float(self.translation_offset[0]), float(self.translation_offset[1])])
         p_ros = np.array([float(x_ros), float(y_ros)])
@@ -421,9 +400,6 @@ class PathFollower(Node):
         return np.hstack([wp, goal_col])
 
     def _plan_leg_to_xy(self, goal_xy, stage_name=""):
-        """
-        FIXED: Convert ROS TF pose -> QLabs pose before snapping to closest roadmap node.
-        """
         try:
             px_ros = float(self.translation.x)
             py_ros = float(self.translation.y)
@@ -431,11 +407,10 @@ class PathFollower(Node):
             self.get_logger().warn("No TF pose yet; cannot plan leg.")
             return False
 
-        # ---- CRITICAL FIX HERE ----
+        # CRITICAL FIX: Convert ROS pose -> QLabs pose before snapping to closest node
         px_qlabs, py_qlabs = self._ros_to_qlabs_xy(px_ros, py_ros)
-        start_node = self._closest_node_to_xy(px_qlabs, py_qlabs)
-        # ---------------------------
 
+        start_node = self._closest_node_to_xy(px_qlabs, py_qlabs)
         goal_node = self._closest_node_to_xy(float(goal_xy[0]), float(goal_xy[1]))
 
         base_path = self._plan_shortest_path_nodes(start_node, goal_node)
@@ -505,12 +480,6 @@ class PathFollower(Node):
             elif param.name == 'mission_dropoff_xy' and param.type_ == param.Type.DOUBLE_ARRAY:
                 self.dropoff_xy = list(param.value)
                 self.get_logger().info(f"dropoff_xy set to {self.dropoff_xy}")
-                self.mission_initialized = False
-                self.mission_stage = MissionStage.IDLE
-
-            elif param.name == 'mission_hub_xy' and param.type_ == param.Type.DOUBLE_ARRAY:
-                self.hub_xy = list(param.value)
-                self.get_logger().info(f"hub_xy set to {self.hub_xy}")
                 self.mission_initialized = False
                 self.mission_stage = MissionStage.IDLE
 
@@ -644,8 +613,9 @@ class PathFollower(Node):
                         self._start_pause(self.stop_seconds, reason="at DROPOFF")
 
                     elif self.mission_stage == MissionStage.WAIT_AT_DROPOFF:
-                        self.get_logger().info("Leaving DROPOFF. Planning back to HUB...")
-                        ok = self._plan_leg_to_xy(self.hub_xy, stage_name="TO_HUB") if self.mission_use_xy else False
+                        # FIXED HUB RETURN: always plan back to node 10 hub after dropoff wait
+                        self.get_logger().info(f"Leaving DROPOFF. Planning back to HUB (node 10) hub_xy={self.hub_xy}...")
+                        ok = self._plan_leg_to_xy(self.hub_xy, stage_name="TO_HUB")
                         if ok:
                             self.mission_stage = MissionStage.TO_HUB
                             self.path_complete = False
