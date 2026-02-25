@@ -40,6 +40,19 @@ def generate_launch_description():
         
     )
 
+    lane_seg_node = Node(
+        package='qcar2_autonomy',
+        executable='lane_seg_node',
+        name='lane_seg_node',
+    )
+
+    avoid_sidewalks = Node(
+        package='qcar2_autonomy',
+        executable='avoid_sidewalks',
+        name='avoid_sidewalks',
+    )
+
+
     ''' TODO: Once finished this launch file must also include
     - Lane detector to help smooth out tracking of lanes while driving
     - Planner server to coordinate which LEDs on the QCar should be on based on trip logic
@@ -50,7 +63,8 @@ def generate_launch_description():
         traffic_system_detector,
         trip_planner,
         #lane_detector,
-        Planner_server
-
+        Planner_server,
+        lane_seg_node,
+        avoid_sidewalks
         ]
     )
