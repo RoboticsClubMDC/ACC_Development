@@ -1,0 +1,373 @@
+[1.452s] DEBUG:colcon:Command line arguments: ['/usr/bin/colcon', 'build']
+[1.452s] DEBUG:colcon:Parsed command line arguments: Namespace(allow_overriding=[], ament_cmake_args=None, base_paths=['.'], build_base='build', catkin_cmake_args=None, catkin_skip_building_tests=False, cmake_args=None, cmake_clean_cache=False, cmake_clean_first=False, cmake_force_configure=False, cmake_target=None, cmake_target_skip_unavailable=False, continue_on_error=False, event_handlers=None, executor='parallel', ignore_user_meta=False, install_base='install', log_base=None, log_level=None, main=<bound method BuildVerb.main of <colcon_core.verb.build.BuildVerb object at 0x792351f4c790>>, merge_install=False, metas=['./colcon.meta'], packages_above=None, packages_above_and_dependencies=None, packages_above_depth=None, packages_end=None, packages_ignore=None, packages_ignore_regex=None, packages_select=None, packages_select_build_failed=False, packages_select_by_dep=None, packages_select_regex=None, packages_select_test_failures=False, packages_skip=None, packages_skip_build_finished=False, packages_skip_by_dep=None, packages_skip_regex=None, packages_skip_test_passed=False, packages_skip_up_to=None, packages_start=None, packages_up_to=None, packages_up_to_regex=None, parallel_workers=20, paths=None, symlink_install=False, test_result_base=None, verb_extension=<colcon_core.verb.build.BuildVerb object at 0x792351f4c790>, verb_name='build', verb_parser=<colcon_defaults.argument_parser.defaults.DefaultArgumentsDecorator object at 0x79235195d880>)
+[1.520s] Level 1:colcon.colcon_core.package_discovery:discover_packages(colcon_meta) check parameters
+[1.520s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) check parameters
+[1.520s] Level 1:colcon.colcon_core.package_discovery:discover_packages(ignore) check parameters
+[1.520s] Level 1:colcon.colcon_core.package_discovery:discover_packages(path) check parameters
+[1.520s] Level 1:colcon.colcon_core.package_discovery:discover_packages(colcon_meta) discover
+[1.520s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) discover
+[1.520s] INFO:colcon.colcon_core.package_discovery:Crawling recursively for packages in '/workspaces/isaac_ros-dev/python_resources/qcar2'
+[1.520s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['ignore', 'ignore_ament_install']
+[1.520s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'ignore'
+[1.520s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'ignore_ament_install'
+[1.520s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['colcon_pkg']
+[1.520s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'colcon_pkg'
+[1.520s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['colcon_meta']
+[1.520s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'colcon_meta'
+[1.520s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['ros']
+[1.520s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'ros'
+[1.528s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['cmake', 'python']
+[1.528s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'cmake'
+[1.528s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'python'
+[1.528s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['python_setup_py']
+[1.528s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'python_setup_py'
+[1.528s] Level 1:colcon.colcon_core.package_identification:_identify(build) by extensions ['ignore', 'ignore_ament_install']
+[1.528s] Level 1:colcon.colcon_core.package_identification:_identify(build) by extension 'ignore'
+[1.528s] Level 1:colcon.colcon_core.package_identification:_identify(build) ignored
+[1.528s] Level 1:colcon.colcon_core.package_identification:_identify(hardware) by extensions ['ignore', 'ignore_ament_install']
+[1.528s] Level 1:colcon.colcon_core.package_identification:_identify(hardware) by extension 'ignore'
+[1.528s] Level 1:colcon.colcon_core.package_identification:_identify(hardware) by extension 'ignore_ament_install'
+[1.528s] Level 1:colcon.colcon_core.package_identification:_identify(hardware) by extensions ['colcon_pkg']
+[1.528s] Level 1:colcon.colcon_core.package_identification:_identify(hardware) by extension 'colcon_pkg'
+[1.528s] Level 1:colcon.colcon_core.package_identification:_identify(hardware) by extensions ['colcon_meta']
+[1.528s] Level 1:colcon.colcon_core.package_identification:_identify(hardware) by extension 'colcon_meta'
+[1.528s] Level 1:colcon.colcon_core.package_identification:_identify(hardware) by extensions ['ros']
+[1.528s] Level 1:colcon.colcon_core.package_identification:_identify(hardware) by extension 'ros'
+[1.528s] Level 1:colcon.colcon_core.package_identification:_identify(hardware) by extensions ['cmake', 'python']
+[1.528s] Level 1:colcon.colcon_core.package_identification:_identify(hardware) by extension 'cmake'
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware) by extension 'python'
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware) by extensions ['python_setup_py']
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware) by extension 'python_setup_py'
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications) by extensions ['ignore', 'ignore_ament_install']
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications) by extension 'ignore'
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications) by extension 'ignore_ament_install'
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications) by extensions ['colcon_pkg']
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications) by extension 'colcon_pkg'
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications) by extensions ['colcon_meta']
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications) by extension 'colcon_meta'
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications) by extensions ['ros']
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications) by extension 'ros'
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications) by extensions ['cmake', 'python']
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications) by extension 'cmake'
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications) by extension 'python'
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications) by extensions ['python_setup_py']
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications) by extension 'python_setup_py'
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/360_vision) by extensions ['ignore', 'ignore_ament_install']
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/360_vision) by extension 'ignore'
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/360_vision) by extension 'ignore_ament_install'
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/360_vision) by extensions ['colcon_pkg']
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/360_vision) by extension 'colcon_pkg'
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/360_vision) by extensions ['colcon_meta']
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/360_vision) by extension 'colcon_meta'
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/360_vision) by extensions ['ros']
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/360_vision) by extension 'ros'
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/360_vision) by extensions ['cmake', 'python']
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/360_vision) by extension 'cmake'
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/360_vision) by extension 'python'
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/360_vision) by extensions ['python_setup_py']
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/360_vision) by extension 'python_setup_py'
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/lane_following) by extensions ['ignore', 'ignore_ament_install']
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/lane_following) by extension 'ignore'
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/lane_following) by extension 'ignore_ament_install'
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/lane_following) by extensions ['colcon_pkg']
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/lane_following) by extension 'colcon_pkg'
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/lane_following) by extensions ['colcon_meta']
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/lane_following) by extension 'colcon_meta'
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/lane_following) by extensions ['ros']
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/lane_following) by extension 'ros'
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/lane_following) by extensions ['cmake', 'python']
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/lane_following) by extension 'cmake'
+[1.529s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/lane_following) by extension 'python'
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/lane_following) by extensions ['python_setup_py']
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/lane_following) by extension 'python_setup_py'
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/lanenet) by extensions ['ignore', 'ignore_ament_install']
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/lanenet) by extension 'ignore'
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/lanenet) by extension 'ignore_ament_install'
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/lanenet) by extensions ['colcon_pkg']
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/lanenet) by extension 'colcon_pkg'
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/lanenet) by extensions ['colcon_meta']
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/lanenet) by extension 'colcon_meta'
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/lanenet) by extensions ['ros']
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/lanenet) by extension 'ros'
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/lanenet) by extensions ['cmake', 'python']
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/lanenet) by extension 'cmake'
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/lanenet) by extension 'python'
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/lanenet) by extensions ['python_setup_py']
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/lanenet) by extension 'python_setup_py'
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/manual_drive) by extensions ['ignore', 'ignore_ament_install']
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/manual_drive) by extension 'ignore'
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/manual_drive) by extension 'ignore_ament_install'
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/manual_drive) by extensions ['colcon_pkg']
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/manual_drive) by extension 'colcon_pkg'
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/manual_drive) by extensions ['colcon_meta']
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/manual_drive) by extension 'colcon_meta'
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/manual_drive) by extensions ['ros']
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/manual_drive) by extension 'ros'
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/manual_drive) by extensions ['cmake', 'python']
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/manual_drive) by extension 'cmake'
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/manual_drive) by extension 'python'
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/manual_drive) by extensions ['python_setup_py']
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/manual_drive) by extension 'python_setup_py'
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving) by extensions ['ignore', 'ignore_ament_install']
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving) by extension 'ignore'
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving) by extension 'ignore_ament_install'
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving) by extensions ['colcon_pkg']
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving) by extension 'colcon_pkg'
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving) by extensions ['colcon_meta']
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving) by extension 'colcon_meta'
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving) by extensions ['ros']
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving) by extension 'ros'
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving) by extensions ['cmake', 'python']
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving) by extension 'cmake'
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving) by extension 'python'
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving) by extensions ['python_setup_py']
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving) by extension 'python_setup_py'
+[1.530s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/python) by extensions ['ignore', 'ignore_ament_install']
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/python) by extension 'ignore'
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/python) by extension 'ignore_ament_install'
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/python) by extensions ['colcon_pkg']
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/python) by extension 'colcon_pkg'
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/python) by extensions ['colcon_meta']
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/python) by extension 'colcon_meta'
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/python) by extensions ['ros']
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/python) by extension 'ros'
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/python) by extensions ['cmake', 'python']
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/python) by extension 'cmake'
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/python) by extension 'python'
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/python) by extensions ['python_setup_py']
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/python) by extension 'python_setup_py'
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/qcar) by extensions ['ignore', 'ignore_ament_install']
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/qcar) by extension 'ignore'
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/qcar) by extension 'ignore_ament_install'
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/qcar) by extensions ['colcon_pkg']
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/qcar) by extension 'colcon_pkg'
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/qcar) by extensions ['colcon_meta']
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/qcar) by extension 'colcon_meta'
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/qcar) by extensions ['ros']
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/qcar) by extension 'ros'
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/qcar) by extensions ['cmake', 'python']
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/qcar) by extension 'cmake'
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/qcar) by extension 'python'
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/qcar) by extensions ['python_setup_py']
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/qcar) by extension 'python_setup_py'
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/reference_scan) by extensions ['ignore', 'ignore_ament_install']
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/reference_scan) by extension 'ignore'
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/reference_scan) by extension 'ignore_ament_install'
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/reference_scan) by extensions ['colcon_pkg']
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/reference_scan) by extension 'colcon_pkg'
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/reference_scan) by extensions ['colcon_meta']
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/reference_scan) by extension 'colcon_meta'
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/reference_scan) by extensions ['ros']
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/reference_scan) by extension 'ros'
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/reference_scan) by extensions ['cmake', 'python']
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/reference_scan) by extension 'cmake'
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/reference_scan) by extension 'python'
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/reference_scan) by extensions ['python_setup_py']
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/multi_vehicle_self_driving/reference_scan) by extension 'python_setup_py'
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/point_cloud_generation) by extensions ['ignore', 'ignore_ament_install']
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/point_cloud_generation) by extension 'ignore'
+[1.531s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/point_cloud_generation) by extension 'ignore_ament_install'
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/point_cloud_generation) by extensions ['colcon_pkg']
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/point_cloud_generation) by extension 'colcon_pkg'
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/point_cloud_generation) by extensions ['colcon_meta']
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/point_cloud_generation) by extension 'colcon_meta'
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/point_cloud_generation) by extensions ['ros']
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/point_cloud_generation) by extension 'ros'
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/point_cloud_generation) by extensions ['cmake', 'python']
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/point_cloud_generation) by extension 'cmake'
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/point_cloud_generation) by extension 'python'
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/point_cloud_generation) by extensions ['python_setup_py']
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/point_cloud_generation) by extension 'python_setup_py'
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/rgbd_imaging) by extensions ['ignore', 'ignore_ament_install']
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/rgbd_imaging) by extension 'ignore'
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/rgbd_imaging) by extension 'ignore_ament_install'
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/rgbd_imaging) by extensions ['colcon_pkg']
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/rgbd_imaging) by extension 'colcon_pkg'
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/rgbd_imaging) by extensions ['colcon_meta']
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/rgbd_imaging) by extension 'colcon_meta'
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/rgbd_imaging) by extensions ['ros']
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/rgbd_imaging) by extension 'ros'
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/rgbd_imaging) by extensions ['cmake', 'python']
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/rgbd_imaging) by extension 'cmake'
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/rgbd_imaging) by extension 'python'
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/rgbd_imaging) by extensions ['python_setup_py']
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/rgbd_imaging) by extension 'python_setup_py'
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/yolo) by extensions ['ignore', 'ignore_ament_install']
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/yolo) by extension 'ignore'
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/yolo) by extension 'ignore_ament_install'
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/yolo) by extensions ['colcon_pkg']
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/yolo) by extension 'colcon_pkg'
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/yolo) by extensions ['colcon_meta']
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/yolo) by extension 'colcon_meta'
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/yolo) by extensions ['ros']
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/yolo) by extension 'ros'
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/yolo) by extensions ['cmake', 'python']
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/yolo) by extension 'cmake'
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/yolo) by extension 'python'
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/yolo) by extensions ['python_setup_py']
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/applications/yolo) by extension 'python_setup_py'
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/hardware_tests) by extensions ['ignore', 'ignore_ament_install']
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/hardware_tests) by extension 'ignore'
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/hardware_tests) by extension 'ignore_ament_install'
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/hardware_tests) by extensions ['colcon_pkg']
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/hardware_tests) by extension 'colcon_pkg'
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/hardware_tests) by extensions ['colcon_meta']
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/hardware_tests) by extension 'colcon_meta'
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/hardware_tests) by extensions ['ros']
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/hardware_tests) by extension 'ros'
+[1.532s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/hardware_tests) by extensions ['cmake', 'python']
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/hardware_tests) by extension 'cmake'
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/hardware_tests) by extension 'python'
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/hardware_tests) by extensions ['python_setup_py']
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(hardware/hardware_tests) by extension 'python_setup_py'
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(install) by extensions ['ignore', 'ignore_ament_install']
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(install) by extension 'ignore'
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(install) ignored
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(log) by extensions ['ignore', 'ignore_ament_install']
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(log) by extension 'ignore'
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(log) ignored
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual) by extensions ['ignore', 'ignore_ament_install']
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual) by extension 'ignore'
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual) by extension 'ignore_ament_install'
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual) by extensions ['colcon_pkg']
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual) by extension 'colcon_pkg'
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual) by extensions ['colcon_meta']
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual) by extension 'colcon_meta'
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual) by extensions ['ros']
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual) by extension 'ros'
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual) by extensions ['cmake', 'python']
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual) by extension 'cmake'
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual) by extension 'python'
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual) by extensions ['python_setup_py']
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual) by extension 'python_setup_py'
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications) by extensions ['ignore', 'ignore_ament_install']
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications) by extension 'ignore'
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications) by extension 'ignore_ament_install'
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications) by extensions ['colcon_pkg']
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications) by extension 'colcon_pkg'
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications) by extensions ['colcon_meta']
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications) by extension 'colcon_meta'
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications) by extensions ['ros']
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications) by extension 'ros'
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications) by extensions ['cmake', 'python']
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications) by extension 'cmake'
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications) by extension 'python'
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications) by extensions ['python_setup_py']
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications) by extension 'python_setup_py'
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/360_vision) by extensions ['ignore', 'ignore_ament_install']
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/360_vision) by extension 'ignore'
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/360_vision) by extension 'ignore_ament_install'
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/360_vision) by extensions ['colcon_pkg']
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/360_vision) by extension 'colcon_pkg'
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/360_vision) by extensions ['colcon_meta']
+[1.533s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/360_vision) by extension 'colcon_meta'
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/360_vision) by extensions ['ros']
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/360_vision) by extension 'ros'
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/360_vision) by extensions ['cmake', 'python']
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/360_vision) by extension 'cmake'
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/360_vision) by extension 'python'
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/360_vision) by extensions ['python_setup_py']
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/360_vision) by extension 'python_setup_py'
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/lane_following) by extensions ['ignore', 'ignore_ament_install']
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/lane_following) by extension 'ignore'
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/lane_following) by extension 'ignore_ament_install'
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/lane_following) by extensions ['colcon_pkg']
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/lane_following) by extension 'colcon_pkg'
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/lane_following) by extensions ['colcon_meta']
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/lane_following) by extension 'colcon_meta'
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/lane_following) by extensions ['ros']
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/lane_following) by extension 'ros'
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/lane_following) by extensions ['cmake', 'python']
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/lane_following) by extension 'cmake'
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/lane_following) by extension 'python'
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/lane_following) by extensions ['python_setup_py']
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/lane_following) by extension 'python_setup_py'
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/manual_drive) by extensions ['ignore', 'ignore_ament_install']
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/manual_drive) by extension 'ignore'
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/manual_drive) by extension 'ignore_ament_install'
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/manual_drive) by extensions ['colcon_pkg']
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/manual_drive) by extension 'colcon_pkg'
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/manual_drive) by extensions ['colcon_meta']
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/manual_drive) by extension 'colcon_meta'
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/manual_drive) by extensions ['ros']
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/manual_drive) by extension 'ros'
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/manual_drive) by extensions ['cmake', 'python']
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/manual_drive) by extension 'cmake'
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/manual_drive) by extension 'python'
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/manual_drive) by extensions ['python_setup_py']
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/manual_drive) by extension 'python_setup_py'
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/point_cloud_generation) by extensions ['ignore', 'ignore_ament_install']
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/point_cloud_generation) by extension 'ignore'
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/point_cloud_generation) by extension 'ignore_ament_install'
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/point_cloud_generation) by extensions ['colcon_pkg']
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/point_cloud_generation) by extension 'colcon_pkg'
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/point_cloud_generation) by extensions ['colcon_meta']
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/point_cloud_generation) by extension 'colcon_meta'
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/point_cloud_generation) by extensions ['ros']
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/point_cloud_generation) by extension 'ros'
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/point_cloud_generation) by extensions ['cmake', 'python']
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/point_cloud_generation) by extension 'cmake'
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/point_cloud_generation) by extension 'python'
+[1.534s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/point_cloud_generation) by extensions ['python_setup_py']
+[1.535s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/point_cloud_generation) by extension 'python_setup_py'
+[1.535s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/rgbd_imaging) by extensions ['ignore', 'ignore_ament_install']
+[1.535s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/rgbd_imaging) by extension 'ignore'
+[1.535s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/rgbd_imaging) by extension 'ignore_ament_install'
+[1.535s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/rgbd_imaging) by extensions ['colcon_pkg']
+[1.535s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/rgbd_imaging) by extension 'colcon_pkg'
+[1.535s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/rgbd_imaging) by extensions ['colcon_meta']
+[1.535s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/rgbd_imaging) by extension 'colcon_meta'
+[1.535s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/rgbd_imaging) by extensions ['ros']
+[1.535s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/rgbd_imaging) by extension 'ros'
+[1.535s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/rgbd_imaging) by extensions ['cmake', 'python']
+[1.535s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/rgbd_imaging) by extension 'cmake'
+[1.535s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/rgbd_imaging) by extension 'python'
+[1.535s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/rgbd_imaging) by extensions ['python_setup_py']
+[1.535s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/applications/rgbd_imaging) by extension 'python_setup_py'
+[1.535s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/hardware_tests) by extensions ['ignore', 'ignore_ament_install']
+[1.535s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/hardware_tests) by extension 'ignore'
+[1.535s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/hardware_tests) by extension 'ignore_ament_install'
+[1.535s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/hardware_tests) by extensions ['colcon_pkg']
+[1.535s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/hardware_tests) by extension 'colcon_pkg'
+[1.535s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/hardware_tests) by extensions ['colcon_meta']
+[1.535s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/hardware_tests) by extension 'colcon_meta'
+[1.535s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/hardware_tests) by extensions ['ros']
+[1.535s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/hardware_tests) by extension 'ros'
+[1.535s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/hardware_tests) by extensions ['cmake', 'python']
+[1.535s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/hardware_tests) by extension 'cmake'
+[1.535s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/hardware_tests) by extension 'python'
+[1.535s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/hardware_tests) by extensions ['python_setup_py']
+[1.535s] Level 1:colcon.colcon_core.package_identification:_identify(virtual/hardware_tests) by extension 'python_setup_py'
+[1.535s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) using defaults
+[1.535s] Level 1:colcon.colcon_core.package_discovery:discover_packages(ignore) discover
+[1.535s] Level 1:colcon.colcon_core.package_discovery:discover_packages(ignore) using defaults
+[1.535s] Level 1:colcon.colcon_core.package_discovery:discover_packages(path) discover
+[1.535s] Level 1:colcon.colcon_core.package_discovery:discover_packages(path) using defaults
+[1.577s] Level 1:colcon.colcon_core.package_discovery:discover_packages(prefix_path) check parameters
+[1.577s] Level 1:colcon.colcon_core.package_discovery:discover_packages(prefix_path) discover
+[1.590s] DEBUG:colcon.colcon_installed_package_information.package_discovery:Found 18 installed packages in /workspace/cartographer_ws/install
+[1.596s] DEBUG:colcon.colcon_installed_package_information.package_discovery:Found 289 installed packages in /opt/ros/humble
+[1.596s] Level 1:colcon.colcon_core.package_discovery:discover_packages(prefix_path) using defaults
+[1.660s] INFO:colcon.colcon_core.executor:Executing jobs using 'parallel' executor
+[1.666s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:run_until_complete
+[1.666s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:closing loop
+[1.666s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:loop closed
+[1.666s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:run_until_complete finished with '0'
+[1.666s] DEBUG:colcon.colcon_core.event_reactor:joining thread
+[1.678s] INFO:colcon.colcon_core.plugin_system:Skipping extension 'colcon_notification.desktop_notification.notify_send': Could not find 'notify-send'
+[1.678s] INFO:colcon.colcon_core.plugin_system:Skipping extension 'colcon_notification.desktop_notification.terminal_notifier': Not used on non-Darwin systems
+[1.678s] INFO:colcon.colcon_core.plugin_system:Skipping extension 'colcon_notification.desktop_notification.win32': Not used on non-Windows systems
+[1.678s] INFO:colcon.colcon_notification.desktop_notification:Sending desktop notification using 'notify2'
+[1.680s] DEBUG:colcon.colcon_notification.desktop_notification.notify2:Failed to initialize notify2: org.freedesktop.DBus.Error.Spawn.ExecFailed: /usr/bin/dbus-launch terminated abnormally without any error message
+[1.680s] DEBUG:colcon.colcon_core.event_reactor:joined thread
+[1.689s] INFO:colcon.colcon_core.plugin_system:Skipping extension 'colcon_core.shell.bat': Not used on non-Windows systems
+[1.689s] INFO:colcon.colcon_core.shell:Creating prefix script '/workspaces/isaac_ros-dev/python_resources/qcar2/install/local_setup.ps1'
+[1.690s] INFO:colcon.colcon_core.shell:Creating prefix util module '/workspaces/isaac_ros-dev/python_resources/qcar2/install/_local_setup_util_ps1.py'
+[1.690s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/workspaces/isaac_ros-dev/python_resources/qcar2/install/setup.ps1'
+[1.697s] INFO:colcon.colcon_core.shell:Creating prefix script '/workspaces/isaac_ros-dev/python_resources/qcar2/install/local_setup.sh'
+[1.697s] INFO:colcon.colcon_core.shell:Creating prefix util module '/workspaces/isaac_ros-dev/python_resources/qcar2/install/_local_setup_util_sh.py'
+[1.697s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/workspaces/isaac_ros-dev/python_resources/qcar2/install/setup.sh'
+[1.704s] INFO:colcon.colcon_core.shell:Creating prefix script '/workspaces/isaac_ros-dev/python_resources/qcar2/install/local_setup.bash'
+[1.704s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/workspaces/isaac_ros-dev/python_resources/qcar2/install/setup.bash'
+[1.710s] INFO:colcon.colcon_core.shell:Creating prefix script '/workspaces/isaac_ros-dev/python_resources/qcar2/install/local_setup.zsh'
+[1.711s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/workspaces/isaac_ros-dev/python_resources/qcar2/install/setup.zsh'
