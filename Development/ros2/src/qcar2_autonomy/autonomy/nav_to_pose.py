@@ -39,6 +39,17 @@ UPGRADE:
 - Snap goal XY -> closest node
 - A* shortest path between nodes
 - Append exact goal XY as final waypoint so you actually end at that coordinate
+
+MISSION FIX (what you asked):
+- Provide TWO coordinates: pickup_xy and dropoff_xy
+- Go to pickup, STOP 3s
+- Go to dropoff, STOP 3s
+- Go back to taxi hub, DONE
+
+CRITICAL FIX (what we're testing now):
+- Roadmap nodes are in QLabs coordinates
+- TF pose is in ROS "map" coordinates
+- When snapping current pose -> closest node for replanning, convert ROS pose back to QLabs first.
 '''
 
 # region: Helper classes for state estimation
@@ -147,8 +158,11 @@ class GyroKF:
 class MissionStage(Enum):
     IDLE = 0
     TO_PICKUP = 1
-    TO_DROPOFF = 2
-    DONE = 3
+    WAIT_AT_PICKUP = 2
+    TO_DROPOFF = 3
+    WAIT_AT_DROPOFF = 4
+    TO_HUB = 5
+    DONE = 6
 
 
 class PathFollower(Node):
@@ -181,20 +195,25 @@ class PathFollower(Node):
         self.path_execute_flag = list(self.get_parameter("start_path").get_parameter_value().bool_array_value)[0]
 
         # ---------------- NEW mission params ----------------
-        # mission_enable is bool_array so you can set it like "[true]" consistent with your code
         self.declare_parameter('mission_enable', [False])
         self.mission_enable = list(self.get_parameter("mission_enable").get_parameter_value().bool_array_value)[0]
 
-        # If True: use pickup/dropoff XY coordinates instead of node IDs
         self.declare_parameter('mission_use_xy', [True])
         self.mission_use_xy = list(self.get_parameter("mission_use_xy").get_parameter_value().bool_array_value)[0]
 
-        # XY in meters in the same "map" coordinate system you see in QLabs
         self.declare_parameter('mission_pickup_xy', [0.0, 0.0])
         self.pickup_xy = list(self.get_parameter("mission_pickup_xy").get_parameter_value().double_array_value)
 
         self.declare_parameter('mission_dropoff_xy', [0.0, 0.0])
         self.dropoff_xy = list(self.get_parameter("mission_dropoff_xy").get_parameter_value().double_array_value)
+
+        # TAXI HUB (return here at end)
+        self.declare_parameter('mission_hub_xy', [0.0, 0.0])
+        self.hub_xy = list(self.get_parameter("mission_hub_xy").get_parameter_value().double_array_value)
+
+        # stop duration at pickup / dropoff
+        self.declare_parameter('mission_stop_seconds', [3.0])
+        self.stop_seconds = float(list(self.get_parameter("mission_stop_seconds").get_parameter_value().double_array_value)[0])
 
         # (Still available if you want node missions later)
         self.declare_parameter('mission_pickup_node', [21])
@@ -207,6 +226,9 @@ class PathFollower(Node):
         self.mission_stage = MissionStage.IDLE
         self.mission_initialized = False
         self.current_goal_desc = "none"
+
+        # Prevent “path_complete -> instant plan -> instant complete -> spam”
+        self.mission_pause_until = 0.0
 
         self.add_on_set_parameters_callback(self.parameter_update_callback)
 
@@ -285,6 +307,34 @@ class PathFollower(Node):
         self.plot_visualized = False
         self.scopeTimer = self.create_timer(0.1, self.scopeDataTimer)
 
+    # --------------------- FRAME FIX HELPERS ---------------------
+    def _R_qlabs_to_ros_2d(self):
+        """
+        Builds the SAME rotation you use when publishing/tracking waypoints:
+          wp_ros = (wp_qlabs + t) @ R_QLabs_ROS
+        """
+        angle_offset = float(self.rotation_offset[0])
+        return np.array([
+            [np.cos(-angle_offset*np.pi/180.0), -np.sin(-angle_offset*np.pi/180.0)],
+            [np.sin(-angle_offset*np.pi/180.0),  np.cos(-angle_offset*np.pi/180.0)]
+        ])
+
+    def _ros_to_qlabs_xy(self, x_ros, y_ros):
+        """
+        CRITICAL FIX:
+        Roadmap nodes live in QLabs coordinates.
+        TF pose is ROS map coordinates.
+        We must convert current ROS pose back to QLabs before snapping to closest node.
+
+        You do:  wp_ros = (wp_qlabs + t) @ R
+        Inverse: wp_qlabs = (wp_ros @ R.T) - t
+        """
+        Rq = self._R_qlabs_to_ros_2d()
+        t = np.array([float(self.translation_offset[0]), float(self.translation_offset[1])])
+        p_ros = np.array([float(x_ros), float(y_ros)])
+        p_qlabs = (p_ros @ Rq.T) - t
+        return float(p_qlabs[0]), float(p_qlabs[1])
+
     # --------------------- Roadmap helpers ---------------------
     def _roadmap_node_count(self):
         if hasattr(self.roadmap, "nodes"):
@@ -333,10 +383,8 @@ class PathFollower(Node):
         return best_i
 
     def _plan_shortest_path_nodes(self, start_node, goal_node):
-        # Prefer A* if available
         if hasattr(self.roadmap, "find_shortest_path"):
             return self.roadmap.find_shortest_path(start_node, goal_node)
-        # Fallback: direct connect
         return self.roadmap.generate_path([start_node, goal_node])
 
     def _set_new_waypoint_path(self, path_2xn, info=""):
@@ -365,9 +413,6 @@ class PathFollower(Node):
         self.get_logger().info(f"New path set. N={self.N}. {info}")
 
     def _append_goal_xy(self, path_2xn, goal_xy):
-        """
-        Add the exact (x,y) as the final waypoint so you end at the coordinate you sent.
-        """
         wp = np.array(path_2xn)
         goal_xy = np.array(goal_xy).reshape(2,)
         if wp.ndim != 2 or wp.shape[0] != 2:
@@ -377,22 +422,20 @@ class PathFollower(Node):
 
     def _plan_leg_to_xy(self, goal_xy, stage_name=""):
         """
-        YOUR requested workflow, coordinate version:
-        current_pose(x,y) -> closest start node
-        goal_xy(x,y) -> closest goal node
-        A* shortest path between nodes
-        append exact goal_xy as final waypoint
+        FIXED: Convert ROS TF pose -> QLabs pose before snapping to closest roadmap node.
         """
-        # Need current TF pose (map frame meters)
         try:
-            px = float(self.translation.x)
-            py = float(self.translation.y)
+            px_ros = float(self.translation.x)
+            py_ros = float(self.translation.y)
         except Exception:
             self.get_logger().warn("No TF pose yet; cannot plan leg.")
             return False
 
-        # Snap start and goal
-        start_node = self._closest_node_to_xy(px, py)
+        # ---- CRITICAL FIX HERE ----
+        px_qlabs, py_qlabs = self._ros_to_qlabs_xy(px_ros, py_ros)
+        start_node = self._closest_node_to_xy(px_qlabs, py_qlabs)
+        # ---------------------------
+
         goal_node = self._closest_node_to_xy(float(goal_xy[0]), float(goal_xy[1]))
 
         base_path = self._plan_shortest_path_nodes(start_node, goal_node)
@@ -402,26 +445,12 @@ class PathFollower(Node):
 
         full_path = self._append_goal_xy(base_path, goal_xy)
 
-        self.current_goal_desc = f"{stage_name} goal_xy=({goal_xy[0]:.2f},{goal_xy[1]:.2f}) start_node={start_node} goal_node={goal_node}"
+        self.current_goal_desc = (
+            f"{stage_name} goal_xy=({goal_xy[0]:.2f},{goal_xy[1]:.2f}) "
+            f"start_node={start_node} goal_node={goal_node} "
+            f"start_pose_qlabs=({px_qlabs:.2f},{py_qlabs:.2f})"
+        )
         self._set_new_waypoint_path(full_path, info=self.current_goal_desc)
-        return True
-
-    def _plan_leg_to_node(self, goal_node, stage_name=""):
-        try:
-            px = float(self.translation.x)
-            py = float(self.translation.y)
-        except Exception:
-            self.get_logger().warn("No TF pose yet; cannot plan leg.")
-            return False
-
-        start_node = self._closest_node_to_xy(px, py)
-        base_path = self._plan_shortest_path_nodes(start_node, goal_node)
-        if base_path is None or np.size(base_path) == 0:
-            self.get_logger().error(f"A* returned empty path. [{stage_name}]")
-            return False
-
-        self.current_goal_desc = f"{stage_name} goal_node={goal_node} start_node={start_node}"
-        self._set_new_waypoint_path(base_path, info=self.current_goal_desc)
         return True
 
     # --------------------- Parameter callback ---------------------
@@ -457,6 +486,7 @@ class PathFollower(Node):
                 self.mission_initialized = False
                 self.mission_stage = MissionStage.IDLE
                 self.path_complete = False
+                self.mission_pause_until = 0.0
 
             elif param.name == 'mission_use_xy' and param.type_ == param.Type.BOOL_ARRAY:
                 self.mission_use_xy = list(param.value)[0]
@@ -464,6 +494,7 @@ class PathFollower(Node):
                 self.mission_initialized = False
                 self.mission_stage = MissionStage.IDLE
                 self.path_complete = False
+                self.mission_pause_until = 0.0
 
             elif param.name == 'mission_pickup_xy' and param.type_ == param.Type.DOUBLE_ARRAY:
                 self.pickup_xy = list(param.value)
@@ -476,6 +507,16 @@ class PathFollower(Node):
                 self.get_logger().info(f"dropoff_xy set to {self.dropoff_xy}")
                 self.mission_initialized = False
                 self.mission_stage = MissionStage.IDLE
+
+            elif param.name == 'mission_hub_xy' and param.type_ == param.Type.DOUBLE_ARRAY:
+                self.hub_xy = list(param.value)
+                self.get_logger().info(f"hub_xy set to {self.hub_xy}")
+                self.mission_initialized = False
+                self.mission_stage = MissionStage.IDLE
+
+            elif param.name == 'mission_stop_seconds' and param.type_ == param.Type.DOUBLE_ARRAY:
+                self.stop_seconds = float(list(param.value)[0])
+                self.get_logger().info(f"mission_stop_seconds set to {self.stop_seconds}")
 
             return SetParametersResult(successful=True)
 
@@ -540,14 +581,20 @@ class PathFollower(Node):
 
         self.path_publisher_topic.publish(path_msg)
 
+    # --------------------- Mission helpers ---------------------
+    def _mission_in_pause(self):
+        return time.time() < self.mission_pause_until
+
+    def _start_pause(self, seconds, reason=""):
+        self.mission_pause_until = time.time() + float(seconds)
+        if reason:
+            self.get_logger().info(f"MISSION PAUSE: {reason} for {seconds:.1f}s")
+
     # --------------------- Main control loop ---------------------
     def path_planner(self):
 
-        max_speed = 1.5
         enable = 1.0
         speed_command = self.desired_speed[0]
-        skip_index = 1
-
         self.t_plot = time.time() - self.t0
 
         # update ekf filters
@@ -562,137 +609,149 @@ class PathFollower(Node):
         # =======================
         if self.mission_enable:
 
-            # init once pose exists
-            if not self.mission_initialized:
-                if self.mission_use_xy:
-                    ok = self._plan_leg_to_xy(self.pickup_xy, stage_name="TO_PICKUP")
-                else:
-                    ok = self._plan_leg_to_node(self.pickup_node, stage_name="TO_PICKUP")
+            # If we're in a timed stop, force stop and DO NOT replan
+            if self._mission_in_pause():
+                speed_command = 0.0
+                self.current_steering = 0.0
+                self.path_complete = True
 
-                if ok:
-                    self.mission_initialized = True
-                    self.mission_stage = MissionStage.TO_PICKUP
-
-            # if a leg completes, plan next leg
-            if self.path_complete and self.mission_initialized:
-                if self.mission_stage == MissionStage.TO_PICKUP:
-                    self.get_logger().info("Arrived at PICKUP. Planning to DROPOFF...")
-
-                    if self.mission_use_xy:
-                        ok = self._plan_leg_to_xy(self.dropoff_xy, stage_name="TO_DROPOFF")
-                    else:
-                        ok = self._plan_leg_to_node(self.dropoff_node, stage_name="TO_DROPOFF")
-
+            else:
+                # init once pose exists
+                if not self.mission_initialized:
+                    ok = self._plan_leg_to_xy(self.pickup_xy, stage_name="TO_PICKUP") if self.mission_use_xy else False
                     if ok:
-                        self.mission_stage = MissionStage.TO_DROPOFF
-                        self.path_complete = False
+                        self.mission_initialized = True
+                        self.mission_stage = MissionStage.TO_PICKUP
 
-                elif self.mission_stage == MissionStage.TO_DROPOFF:
-                    self.get_logger().info("Arrived at DROPOFF. Mission DONE.")
-                    self.mission_stage = MissionStage.DONE
+                # stage transitions ONLY when not paused
+                if self.path_complete and self.mission_initialized:
+
+                    if self.mission_stage == MissionStage.TO_PICKUP:
+                        self.get_logger().info("Arrived at PICKUP. Stopping 3s...")
+                        self.mission_stage = MissionStage.WAIT_AT_PICKUP
+                        self._start_pause(self.stop_seconds, reason="at PICKUP")
+
+                    elif self.mission_stage == MissionStage.WAIT_AT_PICKUP:
+                        self.get_logger().info("Leaving PICKUP. Planning to DROPOFF...")
+                        ok = self._plan_leg_to_xy(self.dropoff_xy, stage_name="TO_DROPOFF") if self.mission_use_xy else False
+                        if ok:
+                            self.mission_stage = MissionStage.TO_DROPOFF
+                            self.path_complete = False
+
+                    elif self.mission_stage == MissionStage.TO_DROPOFF:
+                        self.get_logger().info("Arrived at DROPOFF. Stopping 3s...")
+                        self.mission_stage = MissionStage.WAIT_AT_DROPOFF
+                        self._start_pause(self.stop_seconds, reason="at DROPOFF")
+
+                    elif self.mission_stage == MissionStage.WAIT_AT_DROPOFF:
+                        self.get_logger().info("Leaving DROPOFF. Planning back to HUB...")
+                        ok = self._plan_leg_to_xy(self.hub_xy, stage_name="TO_HUB") if self.mission_use_xy else False
+                        if ok:
+                            self.mission_stage = MissionStage.TO_HUB
+                            self.path_complete = False
+
+                    elif self.mission_stage == MissionStage.TO_HUB:
+                        self.get_logger().info("Arrived at HUB. Mission DONE.")
+                        self.mission_stage = MissionStage.DONE
+                        self.path_complete = True
 
         # =======================
         #   Track current path
         # =======================
         try:
-            # mission done => stop
             if self.mission_enable and self.mission_stage == MissionStage.DONE:
                 speed_command = 0.0
                 self.current_steering = 0.0
                 self.path_complete = True
 
-            # basic sanity
-            if self.wp is None or self.wp.shape[1] < 2:
+            if self.mission_enable and self._mission_in_pause():
                 speed_command = 0.0
                 self.current_steering = 0.0
                 self.path_complete = True
+
             else:
-                self.N = self.wp.shape[1]
-                self.wpi = int(np.clip(self.wpi, 0, max(self.N - 2, 0)))
-
-                wp_1 = np.array(self.wp[:, self.wpi])
-                wp_2_idx = min(self.wpi + 1, self.N - 1)
-                wp_2 = np.array(self.wp[:, wp_2_idx])
-
-                # waypoint transform
-                angle_offset = self.rotation_offset[0]
-                R_QLabs_ROS = np.array([[np.cos(-angle_offset*np.pi/180), -np.sin(-angle_offset*np.pi/180)],
-                                        [np.sin(-angle_offset*np.pi/180),  np.cos(-angle_offset*np.pi/180)]])
-                t = np.array([self.translation_offset[0], self.translation_offset[1]])
-                wp_1_mod = (wp_1 + t) @ R_QLabs_ROS
-
-                L = 0.256
-
-                # TF pose/yaw
-                try:
-                    p = [self.translation.x, self.translation.y]
-                    th = self.yaw
-                except AttributeError:
-                    p = [0, 0]
-                    th = 0
-
-                # car-frame vector
-                v = [wp_1_mod[0] - p[0], wp_1_mod[1] - p[1]]
-                Rot = np.array([[np.cos(th), -np.sin(th)],
-                                [np.sin(th),  np.cos(th)]])
-                v_car = v @ Rot
-
-                WaypointDist = np.linalg.norm(v_car)
-                WaypointDist = max(WaypointDist, 0.05)
-                psi = np.arctan2(v_car[1], v_car[0])
-
-                # pure pursuit
-                delta = np.arctan2(2 * L * np.sin(psi), WaypointDist)
-                dist = np.linalg.norm([p[0] - wp_1_mod[0], p[1] - wp_1_mod[1]])
-
-                # lookahead
-                v_eff = max(self.qcar2_measurred_speed, 0.05)
-                lookahead_dist = max(0.30, v_eff * 1.7)
-                skip_index = 1
-
-                # advance
-                if dist < lookahead_dist:
-                    if self.wpi < self.N - 2:
-                        self.wpi += skip_index
-
-                # completion near end
-                if self.wpi >= self.N - 2 and dist < 0.4:
+                if self.wp is None or self.wp.shape[1] < 2:
                     speed_command = 0.0
                     self.current_steering = 0.0
                     self.path_complete = True
+                else:
+                    self.N = self.wp.shape[1]
+                    self.wpi = int(np.clip(self.wpi, 0, max(self.N - 2, 0)))
 
-                # slow near end
-                if self.wpi > max(self.N - 100, 0):
-                    speed_command = min(speed_command, 0.2)
+                    wp_1 = np.array(self.wp[:, self.wpi])
 
-                # steering damping
-                Kp_steering = 1.1
-                kd_steering = 5
+                    angle_offset = self.rotation_offset[0]
+                    R_QLabs_ROS = np.array([[np.cos(-angle_offset*np.pi/180), -np.sin(-angle_offset*np.pi/180)],
+                                            [np.sin(-angle_offset*np.pi/180),  np.cos(-angle_offset*np.pi/180)]])
+                    t_off = np.array([self.translation_offset[0], self.translation_offset[1]])
+                    wp_1_mod = (wp_1 + t_off) @ R_QLabs_ROS
 
-                gyro_filtered = self.apply_filter('gyro', self.gyroscope[2], self.a1, self.b1)
+                    L = 0.256
 
-                steering = np.clip(
-                    Kp_steering * delta - gyro_filtered * np.pi/180 * kd_steering,
-                    -self.max_steering_angle,
-                    self.max_steering_angle)
+                    try:
+                        p_map = np.array([float(self.translation.x), float(self.translation.y)])
+                        th = float(self.yaw)
+                    except Exception:
+                        p_map = np.array([0.0, 0.0])
+                        th = 0.0
 
-                self.current_steering = steering
+                    v_map = (wp_1_mod - p_map).reshape(2, 1)
 
-                # debug at ~5 Hz
-                if int(self.t_plot * 5) != int((self.t_plot - self.dt) * 5):
-                    stage = self.mission_stage.name if self.mission_enable else "MANUAL"
-                    self.get_logger().info(
-                        f"stage={stage} wpi={self.wpi}/{self.N} "
-                        f"Ld={lookahead_dist:.2f} dist={dist:.2f} delta={delta:.2f} "
-                        f"gyro={gyro_filtered:.3f} steer={steering:.3f} v={speed_command:.2f} "
-                        f"{self.current_goal_desc}"
-                    )
+                    Rot = np.array([[np.cos(th), -np.sin(th)],
+                                    [np.sin(th),  np.cos(th)]])
+                    v_car = (Rot.T @ v_map).reshape(2,)
+
+                    WaypointDist = float(np.linalg.norm(v_car))
+                    WaypointDist = max(WaypointDist, 0.05)
+                    psi = float(np.arctan2(v_car[1], v_car[0]))
+
+                    delta = float(np.arctan2(2 * L * np.sin(psi), WaypointDist))
+
+                    dist_to_target = float(np.linalg.norm(p_map - wp_1_mod))
+
+                    wp_final = np.array(self.wp[:, -1])
+                    wp_final_mod = (wp_final + t_off) @ R_QLabs_ROS
+                    dist_to_final = float(np.linalg.norm(p_map - wp_final_mod))
+
+                    v_eff = max(self.qcar2_measurred_speed, 0.05)
+                    lookahead_dist = max(0.30, v_eff * 1.7)
+
+                    if dist_to_target < lookahead_dist and self.wpi < self.N - 2:
+                        self.wpi += 1
+
+                    if dist_to_final < 0.35:
+                        speed_command = 0.0
+                        self.current_steering = 0.0
+                        self.path_complete = True
+
+                    if self.wpi > max(self.N - 100, 0):
+                        speed_command = min(speed_command, 0.2)
+
+                    Kp_steering = 1.1
+                    kd_steering = 5
+
+                    gyro_filtered = self.apply_filter('gyro', self.gyroscope[2], self.a1, self.b1)
+
+                    steering = np.clip(
+                        Kp_steering * delta - gyro_filtered * np.pi/180 * kd_steering,
+                        -self.max_steering_angle,
+                        self.max_steering_angle)
+
+                    self.current_steering = steering
+
+                    if int(self.t_plot * 5) != int((self.t_plot - self.dt) * 5):
+                        stage = self.mission_stage.name if self.mission_enable else "MANUAL"
+                        self.get_logger().info(
+                            f"stage={stage} wpi={self.wpi}/{self.N} "
+                            f"Ld={lookahead_dist:.2f} distT={dist_to_target:.2f} distF={dist_to_final:.2f} "
+                            f"delta={delta:.2f} gyro={gyro_filtered:.3f} steer={steering:.3f} v={speed_command:.2f} "
+                            f"{self.current_goal_desc}"
+                        )
 
         except KeyboardInterrupt:
             speed_command = 0.0
             self.current_steering = 0.0
 
-        # enable logic
         if self.path_execute_flag and self.motion_flag and not self.path_complete:
             enable = 1.0
         else:
