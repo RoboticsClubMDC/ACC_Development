@@ -140,12 +140,12 @@ class tripPlanner(Node):
                         self.trip_time = time.time()
 
                         # We travel slowly to pickup station and speed up during actual rides
-                        self.send_request(
-                            param_name="desired_speed",
-                            param_value=[1.0],
-                            param_type=ParameterType.PARAMETER_DOUBLE_ARRAY,
-                            client=self.path_follower_client
-                        )
+                        # self.send_request(
+                        #     param_name="desired_speed",
+                        #     param_value=[1.0],
+                        #     param_type=ParameterType.PARAMETER_DOUBLE_ARRAY,
+                        #     client=self.path_follower_client
+                        # )
 
                 if self.current_trip_status is False and self.trip_super_state == 2:
                     self.get_logger().info('Cant assign trip, current trip in progress!')
