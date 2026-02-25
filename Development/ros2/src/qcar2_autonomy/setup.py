@@ -23,11 +23,12 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'lane_detector = autonomy.lane_detector:main',
+            'lane_seg_node = qcar2_autonomy.autonomy.lane_seg_node:main',
             'path_follower = autonomy.nav_to_pose:main',
-            'traffic_system_detector=autonomy.traffic_system_detector:main',
-            'lane_detector=autonomy.lane_detector:main',
-            'yolo_detector=autonomy.yolo_detector:main',
-            'trip_planner=autonomy.trip_planner:main'
+            'traffic_system_detector = autonomy.traffic_system_detector:main',
+            'trip_planner = autonomy.trip_planner:main',
+            'yolo_detector = autonomy.yolo_detector:main',
         ],
     },
 )

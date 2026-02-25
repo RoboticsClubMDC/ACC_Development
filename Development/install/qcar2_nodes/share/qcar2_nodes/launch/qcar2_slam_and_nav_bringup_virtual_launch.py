@@ -1,1 +1,0 @@
-/workspaces/isaac_ros-dev/ros2/src/qcar2_nodes/launch/qcar2_slam_and_nav_bringup_virtual_launch.py

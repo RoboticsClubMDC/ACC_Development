@@ -1,1 +1,0 @@
-/workspaces/isaac_ros-dev/build/qcar2_interfaces/ament_cmake_environment_hooks/pythonpath.sh
