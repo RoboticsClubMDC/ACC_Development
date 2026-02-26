@@ -27,6 +27,7 @@ COLORS_BGR = {
 
 ALPHA = 0.45  # overlay transparency
 
+NO_GO_MARGIN_PX = 10  # safety buffer in pixels
 
 def overlay_mask(img_bgr: np.ndarray, mask_bool: np.ndarray, color_bgr, alpha: float) -> np.ndarray:
     """Overlay a boolean mask onto an image with alpha blending."""
@@ -79,7 +80,8 @@ class LaneSegNode(Node):
 
         self.pub_overlay = self.create_publisher(Image, "/lane_seg/overlay", qos_profile_sensor_data)
         self.pub_no_go   = self.create_publisher(Image, "/lane_seg/no_go_mask", qos_profile_sensor_data)
-
+        self.pub_no_go_mgn = self.create_publisher(Image, "/lane_seg/no_go_margin", qos_profile_sensor_data)  # NEW
+        
         self.sub = self.create_subscription(
             Image,
             image_topic,
@@ -136,6 +138,18 @@ class LaneSegNode(Node):
         mask_msg = self.bridge.cv2_to_imgmsg(no_go_u8, encoding="mono8")
         mask_msg.header = msg.header
         self.pub_no_go.publish(mask_msg)
+
+        # NEW: publish dilated "no_go margin" mask (mono8 0/255)
+        # (10 px means a kernel of size (2*10+1) = 21, centered; ellipse is usually the cleanest buffer.)
+        kernel = cv2.getStructuringElement(
+            cv2.MORPH_ELLIPSE,
+            (2 * NO_GO_MARGIN_PX + 1, 2 * NO_GO_MARGIN_PX + 1)
+        )
+        no_go_margin_u8 = cv2.dilate(no_go_u8, kernel, iterations=1)
+
+        margin_msg = self.bridge.cv2_to_imgmsg(no_go_margin_u8, encoding="mono8")
+        margin_msg.header = msg.header
+        self.pub_no_go_mgn.publish(margin_msg)
 
 
 def main():
