@@ -8,6 +8,7 @@ from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 
 from sensor_msgs.msg import Image
+from std_msgs.msg import String
 from cv_bridge import CvBridge
 
 from ultralytics import YOLO
@@ -18,16 +19,16 @@ MUST_DRIVE = 0
 CAN_DRIVE  = 1
 NO_GO      = 2
 
-# BGR colors for overlay
+# Overlay colors (BGR)
 COLORS_BGR = {
     MUST_DRIVE: (0, 255, 0),     # green
-    CAN_DRIVE:  (0, 255, 255),   # yellow (unused for now)
+    CAN_DRIVE:  (0, 255, 255),   # yellow
     NO_GO:      (0, 0, 255),     # red
 }
 
-ALPHA = 0.45  # overlay transparency
+ALPHA = 0.45
+NO_GO_MARGIN_PX = 10
 
-NO_GO_MARGIN_PX = 10  # safety buffer in pixels
 
 def overlay_mask(img_bgr: np.ndarray, mask_bool: np.ndarray, color_bgr, alpha: float) -> np.ndarray:
     """Overlay a boolean mask onto an image with alpha blending."""
@@ -42,52 +43,56 @@ class LaneSegNode(Node):
     def __init__(self):
         super().__init__("lane_seg_node")
 
-        # Parameters (can be set from launch)
+        # ROS params
         self.declare_parameter("image_topic", "/camera/color_image")
         self.declare_parameter("model_path", "ros2/src/qcar2_autonomy/models/lane_seg_yolo.pt")
         self.declare_parameter("imgsz", 640)
+        self.declare_parameter("device", 0)
 
         image_topic = self.get_parameter("image_topic").get_parameter_value().string_value
         model_path_param = self.get_parameter("model_path").get_parameter_value().string_value
-        self.imgsz = int(self.get_parameter("imgsz").get_parameter_value().integer_value)
+        imgsz = int(self.get_parameter("imgsz").get_parameter_value().integer_value)
+        device = int(self.get_parameter("device").get_parameter_value().integer_value)
 
-        # Resolve model path:
-        # - if absolute, use it
-        # - else resolve relative to package install share directory via AMENT_PREFIX_PATH
-        model_path = model_path_param
-        if not os.path.isabs(model_path):
-            # Try to find installed package share folder
-            # Typical install: <prefix>/share/qcar2_autonomy/models/...
-            prefix_paths = os.environ.get("AMENT_PREFIX_PATH", "").split(":")
-            found = None
-            for p in prefix_paths:
-                cand = os.path.join(p, "share", model_path)
-                if os.path.exists(cand):
-                    found = cand
-                    break
-            if found:
-                model_path = found
-            else:
-                # fallback: relative to current working dir
-                model_path = os.path.abspath(model_path)
+        model_path = self._resolve_model_path(model_path_param)
 
         self.get_logger().info(f"Subscribing to: {image_topic}")
         self.get_logger().info(f"Using model: {model_path}")
-        self.get_logger().info(f"imgsz: {self.imgsz}")
+        self.get_logger().info(f"imgsz: {imgsz}, device: {device}")
 
         self.bridge = CvBridge()
         self.model = YOLO(model_path)
 
-        self.pub_overlay = self.create_publisher(Image, "/lane_seg/overlay", qos_profile_sensor_data)
-        self.pub_no_go   = self.create_publisher(Image, "/lane_seg/no_go_mask", qos_profile_sensor_data)
-        self.pub_no_go_mgn = self.create_publisher(Image, "/lane_seg/no_go_margin", qos_profile_sensor_data)  # NEW
-        
-        self.sub = self.create_subscription(
-            Image,
-            image_topic,
-            self.image_cb,
-            qos_profile_sensor_data
-        )
+        # Publishers
+        self.pub_overlay     = self.create_publisher(Image,  "/lane_seg/overlay",      qos_profile_sensor_data)
+        self.pub_no_go       = self.create_publisher(Image,  "/lane_seg/no_go_mask",   qos_profile_sensor_data)
+        self.pub_no_go_mgn   = self.create_publisher(Image,  "/lane_seg/no_go_margin", qos_profile_sensor_data)
+        self.pub_debug       = self.create_publisher(String, "/lane_seg/debug_detections", 10)
+
+        self.imgsz = imgsz
+        self.device = device
+
+        # Precompute dilation kernel
+        k = 2 * NO_GO_MARGIN_PX + 1
+        self.no_go_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k))
+
+        # Subscriber
+        self.sub = self.create_subscription(Image, image_topic, self.image_cb, qos_profile_sensor_data)
+
+    def _resolve_model_path(self, model_path_param: str) -> str:
+        """Resolve model path for both source-tree and installed layouts."""
+        if os.path.isabs(model_path_param):
+            return model_path_param
+
+        # Try install space: <prefix>/share/<relative>
+        prefix_paths = os.environ.get("AMENT_PREFIX_PATH", "").split(":")
+        for p in prefix_paths:
+            cand = os.path.join(p, "share", model_path_param)
+            if os.path.exists(cand):
+                return cand
+
+        # Fallback: relative to CWD
+        return os.path.abspath(model_path_param)
 
     def image_cb(self, msg: Image):
         # ROS Image -> OpenCV BGR
@@ -98,55 +103,67 @@ class LaneSegNode(Node):
             return
 
         if img_bgr is None:
-            self.get_logger().warn(f"Received empty image (encoding={msg.encoding}), skipping frame")
             return
 
         h, w = img_bgr.shape[:2]
 
-        # Run segmentation (single frame)
-        res = self.model.predict(img_bgr, imgsz=self.imgsz, device=0, verbose=False)[0]
+        # Run YOLO segmentation
+        res = self.model.predict(
+            img_bgr,
+            imgsz=self.imgsz,
+            device=self.device,
+            verbose=False
+        )[0]
 
-        # Build union masks per class in ORIGINAL image size
+        # Union masks per class
         union = {
             MUST_DRIVE: np.zeros((h, w), dtype=bool),
             CAN_DRIVE:  np.zeros((h, w), dtype=bool),
             NO_GO:      np.zeros((h, w), dtype=bool),
         }
 
+        dbg_lines = []
+
         if res.masks is not None and res.boxes is not None and len(res.boxes) == len(res.masks.data):
-            masks = res.masks.data.cpu().numpy()            # (N, mh, mw)
+            masks = res.masks.data.cpu().numpy()            # (N, mh, mw) float-ish
             clss  = res.boxes.cls.cpu().numpy().astype(int) # (N,)
-            for m, c in zip(masks, clss):
+            confs = res.boxes.conf.cpu().numpy()            # (N,)
+
+            for i, (m, c) in enumerate(zip(masks, clss)):
                 if c not in union:
                     continue
-                # Resize inference mask -> original frame size
+
                 m_resized = cv2.resize(m, (w, h), interpolation=cv2.INTER_NEAREST).astype(bool)
                 union[c] |= m_resized
 
-        # Create overlay (no_go drawn last so it's always visible)
+                area_px = int(m_resized.sum())
+                conf = float(confs[i])
+                dbg_lines.append(f"i={i} class={c} conf={conf:.3f} area_px={area_px}")
+
+        if not dbg_lines:
+            dbg_lines = ["no detections"]
+
+        dbg = String()
+        dbg.data = " | ".join(dbg_lines)
+        self.pub_debug.publish(dbg)
+
+        # Overlay (NO_GO last so it dominates visually)
         out = img_bgr.copy()
         for c in [CAN_DRIVE, MUST_DRIVE, NO_GO]:
             out = overlay_mask(out, union[c], COLORS_BGR[c], ALPHA)
 
-        # Publish overlay
         overlay_msg = self.bridge.cv2_to_imgmsg(out, encoding="bgr8")
         overlay_msg.header = msg.header
         self.pub_overlay.publish(overlay_msg)
 
-        # Publish no_go mask (mono8 0/255)
+        # no_go mask (mono8)
         no_go_u8 = (union[NO_GO].astype(np.uint8) * 255)
         mask_msg = self.bridge.cv2_to_imgmsg(no_go_u8, encoding="mono8")
         mask_msg.header = msg.header
         self.pub_no_go.publish(mask_msg)
 
-        # NEW: publish dilated "no_go margin" mask (mono8 0/255)
-        # (10 px means a kernel of size (2*10+1) = 21, centered; ellipse is usually the cleanest buffer.)
-        kernel = cv2.getStructuringElement(
-            cv2.MORPH_ELLIPSE,
-            (2 * NO_GO_MARGIN_PX + 1, 2 * NO_GO_MARGIN_PX + 1)
-        )
-        no_go_margin_u8 = cv2.dilate(no_go_u8, kernel, iterations=1)
-
+        # no_go margin (dilated)
+        no_go_margin_u8 = cv2.dilate(no_go_u8, self.no_go_kernel, iterations=1)
         margin_msg = self.bridge.cv2_to_imgmsg(no_go_margin_u8, encoding="mono8")
         margin_msg.header = msg.header
         self.pub_no_go_mgn.publish(margin_msg)
