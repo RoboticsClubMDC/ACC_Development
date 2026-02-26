@@ -235,7 +235,7 @@ class PathFollower(Node):
       self.translation_offset = list(self.get_parameter("translation_offset").get_parameter_value().double_array_value)
 
 
-      self.declare_parameter('start_path', [True])
+      self.declare_parameter('start_path', [False])
       self.path_execute_flag = list(self.get_parameter("start_path").get_parameter_value().bool_array_value)[0]
 
       self.add_on_set_parameters_callback(self.parameter_update_callback)
@@ -293,7 +293,7 @@ class PathFollower(Node):
       self.wp_prior = []
       self.current_steering =0
 
-      self.publisher = self.create_publisher(Twist,'/cmd_vel_nav', 1)
+      self.publisher = self.create_publisher(Twist,'/cmd_vel_raw', 1)
       self.cyclic = False
       self.max_steering_angle = 0.6
 
