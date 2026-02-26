@@ -293,9 +293,12 @@ class PathFollower(Node):
       self.wp_prior = []
       self.current_steering =0
 
-      self.publisher = self.create_publisher(Twist,'/cmd_vel_raw', 1)
+      self.publisher = self.create_publisher(Twist,'/cmd_vel_nav', 1)
       self.cyclic = False
       self.max_steering_angle = 0.6
+      
+      self.prev_steer_cmd = 0.0
+      self.max_steer_rate = 1.5  # rad/s (limits oscillation)
 
       self.joint_state_subscriber = self.create_subscription(JointState, '/qcar2_joint',self.joint_state_callback, 1)
       self.qcar2_measurred_speed = 0
@@ -504,7 +507,7 @@ class PathFollower(Node):
                                     [np.sin(-angle_offset*np.pi/180),np.cos(-angle_offset*np.pi/180)]])
             t = np.array([self.translation_offset[0],self.translation_offset[1]])
             wp_1_mod = (wp_1+t)@R_QLabs_ROS
-            print (wp_1_mod)
+            # print (wp_1_mod)
 
             L= 0.256
 
@@ -585,7 +588,12 @@ class PathFollower(Node):
     def nav_command(self,enable, speed_command):
       QCarCommands = Twist()
       QCarCommands.linear.x = enable*np.clip(speed_command*np.power(np.cos(self.current_steering),2),0.05,0.7)
-      QCarCommands.angular.z = enable*self.current_steering
+      desired = enable * self.current_steering
+      max_step = self.max_steer_rate * self.dt
+      steer_cmd = np.clip(desired, self.prev_steer_cmd - max_step, self.prev_steer_cmd + max_step)
+      steer_cmd = float(np.clip(steer_cmd, -0.5, 0.5))
+      self.prev_steer_cmd = steer_cmd
+      QCarCommands.angular.z = steer_cmd
       self.publisher.publish(QCarCommands)
 
     def path_status(self):
