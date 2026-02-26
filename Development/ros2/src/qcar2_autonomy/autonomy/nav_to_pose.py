@@ -528,6 +528,8 @@ class PathFollower(Node):
 
             WaypointDist = np.linalg.norm(v_car)
             psi = np.arctan2(v_car[1],v_car[0])
+            # Prevent twitching when waypoint gets too close (pure pursuit becomes hypersensitive)
+            WaypointDist = float(np.clip(WaypointDist, 0.35, 10.0))  # meters
 
 
             # pure pursuit algorithm
