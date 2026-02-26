@@ -43,7 +43,7 @@ class LaneSegNode(Node):
 
         # Parameters (can be set from launch)
         self.declare_parameter("image_topic", "/camera/color_image")
-        self.declare_parameter("model_path", "models/lane_seg_yolo.pt")
+        self.declare_parameter("model_path", "ros2/src/qcar2_autonomy/models/lane_seg_yolo.pt")
         self.declare_parameter("imgsz", 640)
 
         image_topic = self.get_parameter("image_topic").get_parameter_value().string_value
@@ -60,7 +60,7 @@ class LaneSegNode(Node):
             prefix_paths = os.environ.get("AMENT_PREFIX_PATH", "").split(":")
             found = None
             for p in prefix_paths:
-                cand = os.path.join(p, "share", "qcar2_autonomy", model_path)
+                cand = os.path.join(p, "share", model_path)
                 if os.path.exists(cand):
                     found = cand
                     break
@@ -89,7 +89,16 @@ class LaneSegNode(Node):
 
     def image_cb(self, msg: Image):
         # ROS Image -> OpenCV BGR
-        img_bgr = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
+        try:
+            img_bgr = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
+        except Exception as e:
+            self.get_logger().error(f"cv_bridge failed: encoding={msg.encoding} error={e}")
+            return
+
+        if img_bgr is None:
+            self.get_logger().warn(f"Received empty image (encoding={msg.encoding}), skipping frame")
+            return
+
         h, w = img_bgr.shape[:2]
 
         # Run segmentation (single frame)

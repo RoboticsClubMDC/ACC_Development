@@ -24,3 +24,6 @@ colcon build --packages-select qcar2_autonomy && . install/setup.bash && export 
 
 Run YOLO
 colcon build --packages-select qcar2_autonomy && . install/setup.bash && export ROS_DOMAIN_ID=7 && ros2 run qcar2_autonomy yolo_detector && clear
+
+Run YOLO_Lane
+colcon build --packages-select qcar2_autonomy && . install/setup.bash && export ROS_DOMAIN_ID=7 && ros2 run qcar2_autonomy lane_seg_node && clear
