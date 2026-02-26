@@ -9,35 +9,50 @@ def generate_launch_description():
         package='qcar2_autonomy',
         executable='path_follower',
         name='path_follower',
+        output='screen'
     )
 
-    traffic_system_detector = Node(
-        package ='qcar2_autonomy',
-        executable='yolo_detector',
-        name = 'qcar2_yolo_detector'
-    )
-    
-    trip_planner = Node(
-    package='qcar2_autonomy',
-    executable='trip_planner',
-    name='trip_planner',
-    )
-    
-    lane_detector = Node(
-    package='qcar2_autonomy',
-    executable='lane_detector',
-    name='lane_detector',
+    lane_detection = Node(
+        package='qcar2_autonomy',
+        executable='lane_detection',
+        name='lane_detection',
+        output='screen'
     )
 
-    ''' TODO: Once finished this launch file must also include
-    - Lane detector to help smooth out tracking of lanes while driving
-    - Planner server to coordinate which LEDs on the QCar should be on based on trip logic
-    '''
+    sidewalk_detection = Node(
+        package='qcar2_autonomy',
+        executable='sidewalk_detection',
+        name='sidewalk_detection',
+        output='screen'
+    )
+
+    lane_keeping = Node(
+        package='qcar2_autonomy',
+        executable='lane_keeping',
+        name='lane_keeping',
+        output='screen'
+    )
+    
+    # traffic_system_detector = Node(
+    #     package ='qcar2_autonomy',
+    #     executable='yolo_detector',
+    #     name = 'qcar2_yolo_detector'
+    # )
+    
+    # trip_planner = Node(
+    # package='qcar2_autonomy',
+    # executable='trip_planner',
+    # name='trip_planner',
+    # )
+    
+
 
     return LaunchDescription([
         path_follower,
-        traffic_system_detector,
-        trip_planner,
-        lane_detector
+        lane_detection,
+        sidewalk_detection,
+        lane_keeping,
+        # traffic_system_detector,
+        # trip_planner,
         ]
     )
