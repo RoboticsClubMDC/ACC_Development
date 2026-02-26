@@ -62,7 +62,7 @@ def generate_launch_description():
         path_follower,
         traffic_system_detector,
         trip_planner,
-        #lane_detector,
+        lane_detector,
         Planner_server,
         #lane_seg_node,
         #avoid_sidewalks

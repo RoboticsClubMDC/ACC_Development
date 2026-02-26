@@ -270,7 +270,7 @@ class PathFollower(Node):
         self.wp_prior = []
         self.current_steering = 0
 
-        self.publisher = self.create_publisher(Twist,'/cmd_vel_raw', 1)
+        self.publisher = self.create_publisher(Twist,'/cmd_vel_nav', 1)
         self.max_steering_angle = 0.6
 
         self.joint_state_subscriber = self.create_subscription(JointState, '/qcar2_joint', self.joint_state_callback, 1)
