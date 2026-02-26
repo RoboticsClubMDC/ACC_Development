@@ -23,6 +23,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'avoid_sidewalks = autonomy.avoid_sidewalks:main',
             'lane_detector = autonomy.lane_detector:main',
             'lane_seg_node = autonomy.lane_seg_node:main',
             'path_follower = autonomy.nav_to_pose:main',
