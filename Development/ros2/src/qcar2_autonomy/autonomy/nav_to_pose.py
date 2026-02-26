@@ -504,7 +504,6 @@ class PathFollower(Node):
                                     [np.sin(-angle_offset*np.pi/180),np.cos(-angle_offset*np.pi/180)]])
             t = np.array([self.translation_offset[0],self.translation_offset[1]])
             wp_1_mod = (wp_1+t)@R_QLabs_ROS
-            # print (wp_1_mod)
 
             L= 0.256
 
