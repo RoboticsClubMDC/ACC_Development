@@ -11,7 +11,7 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 
 
-class RedAvoidNode(Node):
+class AvoidSidewalks(Node):
     """
     Subscribes:
       - /cmd_vel_raw (Twist): raw command from path_follower
@@ -29,7 +29,7 @@ class RedAvoidNode(Node):
     """
 
     def __init__(self):
-        super().__init__("red_avoid_node")
+        super().__init__("avoid_sidewalks")
 
         # ---- Parameters (all adjustable; defaults are just starting points) ----
         self.declare_parameter("input_cmd_topic", "/cmd_vel_raw")
@@ -48,10 +48,10 @@ class RedAvoidNode(Node):
         self.declare_parameter("roi_half_width_frac", 0.22)
 
         # Control gains / limits
-        self.declare_parameter("steer_gain", 1.2)           # steering away from red centroid
-        self.declare_parameter("max_steer_adjust", 0.25)    # max rad to add/subtract from incoming cmd
-        self.declare_parameter("min_speed_scale", 0.15)     # never scale speed below this (unless you later want full stop)
-        self.declare_parameter("red_occupancy_for_max_brake", 0.08)  # ROI red fraction that triggers strongest slowdown
+        self.declare_parameter("steer_gain", 2.0)           # steering away from red centroid
+        self.declare_parameter("max_steer_adjust", 0.40)    # max rad to add/subtract from incoming cmd
+        self.declare_parameter("min_speed_scale", 0.60)     # never scale speed below this (unless you later want full stop)
+        self.declare_parameter("red_occupancy_for_max_brake", 0.20)  # ROI red fraction that triggers strongest slowdown
 
         # Internal
         self.bridge = CvBridge()
@@ -96,6 +96,10 @@ class RedAvoidNode(Node):
             return
 
         cmd_in = self.last_cmd
+        # If we're not moving, pass-through exactly (prevents steering chatter at standstill)
+        if abs(cmd_in.linear.x) < 0.02:
+            self.pub.publish(cmd_in)
+            return
         mask_u8 = self.last_mask_u8
         h, w = mask_u8.shape[:2]
 
@@ -148,13 +152,15 @@ class RedAvoidNode(Node):
             scale = (1.0 - t) * 1.0 + t * min_scale
 
             safe.linear.x = float(cmd_in.linear.x * scale)
+            
+            safe.angular.z = float(np.clip(safe.angular.z, -0.5, 0.5))
 
         self.pub.publish(safe)
 
 
 def main():
     rclpy.init()
-    node = RedAvoidNode()
+    node = AvoidSidewalks()
     try:
         rclpy.spin(node)
     finally:
