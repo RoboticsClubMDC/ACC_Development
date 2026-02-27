@@ -1,23 +1,32 @@
 #!/usr/bin/env python3
 """
-Lane Detector (CSI)
-- Subscribes: /camera/csi_image  (sensor_msgs/Image)
-- Detects ONLY the specific yellow lane color (HSV threshold tuned to your screenshot)
-- Publishes:
-    /vision/lanes/binary        sensor_msgs/Image (mono8)
-    /vision/lanes/bev_binary    sensor_msgs/Image (mono8)
-    /vision/lanes/cte           std_msgs/Float64  (meters)
-    /vision/lanes/heading_error std_msgs/Float64  (radians)
+Lane Detector (CSI) - Yellow-only + Drift CTE Reference
 
-Pipeline:
-  BGR -> HSV yellow mask -> morph clean -> BEV warp -> sliding windows -> poly fit -> CTE + heading
+Subscribes:
+  /camera/csi_image   (sensor_msgs/Image)
+
+Publishes:
+  /vision/yellow_mask     (sensor_msgs/Image, mono8)
+  /vision/lanes/cte       (std_msgs/Float64)   # meters, ZEROED to first valid frame
+  /vision/yellow_debug    (sensor_msgs/Image, bgr8) overlay with dots + text
+
+Logic:
+  - Threshold "any yellow" in HSV (loose)
+  - Compute centroid of the yellow mask
+  - Dot A (red): camera center
+  - Dot B (green): lane centroid
+  - Compute raw CTE (meters) from centroid x-offset
+  - On first valid frame: lock cte_ref
+  - Publish cte_out = cte_raw - cte_ref  (drift-only CTE)
 """
 
 import rclpy
 from rclpy.node import Node
 
-import numpy as np
 import cv2
+import numpy as np
+import time
+import math
 
 from sensor_msgs.msg import Image
 from std_msgs.msg import Float64
@@ -28,216 +37,132 @@ class LaneDetector(Node):
     def __init__(self):
         super().__init__('lane_detector')
 
-        # ===================== Params =====================
+        # -------------------- ROS Params --------------------
         self.declare_parameter('image_topic', '/camera/csi_image')
-        self.declare_parameter('frame_width', 820)
-        self.declare_parameter('frame_height', 410)
 
-        # ROI points in IMAGE PIXELS (820x410)
-        # Order: top-left, bottom-left, bottom-right, top-right
-        # Tune these if BEV looks off.
-        self.declare_parameter('roi_src', [
-            270.0, 240.0,   # TL
-            60.0,  400.0,   # BL
-            760.0, 400.0,   # BR
-            560.0, 240.0    # TR
-        ])
+        # Yellow HSV (loose)
+        self.declare_parameter('h_low', 15)
+        self.declare_parameter('h_high', 50)
+        self.declare_parameter('s_low', 40)
+        self.declare_parameter('s_high', 255)
+        self.declare_parameter('v_low', 40)
+        self.declare_parameter('v_high', 255)
 
-        self.declare_parameter('bev_margin', 120.0)
+        # Morph cleanup (helps gaps + anti-aliasing)
+        self.declare_parameter('use_morph', True)
+        self.declare_parameter('kernel_size', 5)
+        self.declare_parameter('close_iters', 2)
+        self.declare_parameter('open_iters', 1)
+        self.declare_parameter('dilate_iters', 1)
 
-        # Sliding window
-        self.declare_parameter('n_windows', 9)
-        self.declare_parameter('margin', 70)
-        self.declare_parameter('minpix', 60)
+        # Centroid validity (avoid locking reference on noise)
+        self.declare_parameter('min_mask_pixels', 300)
 
-        # Yellow-only HSV thresholds (OpenCV HSV: H 0-179)
-        # Tuned from your screenshot: Hue ~31, high V, decent S
-        self.declare_parameter('yellow_h_low', 26)
-        self.declare_parameter('yellow_h_high', 36)
-        self.declare_parameter('yellow_s_low', 110)
-        self.declare_parameter('yellow_s_high', 255)
-        self.declare_parameter('yellow_v_low', 200)
-        self.declare_parameter('yellow_v_high', 255)
-
-        # CTE/heading scaling (tune for real meters)
+        # Convert pixels -> meters (CTE in meters)
+        # Keep this consistent with your earlier scaling; tune later if needed.
         self.declare_parameter('xm_per_pix', 3.7 / 700.0)
-        self.declare_parameter('ym_per_pix', 10.0 / 410.0)
 
-        # Lookahead row fraction (0 top -> 1 bottom)
-        self.declare_parameter('lookahead_y_frac', 0.90)
+        # Reference behavior
+        self.declare_parameter('auto_zero_reference', True)   # lock first valid frame as reference
+        self.declare_parameter('ref_reset_seconds', 0.0)      # 0 = never reset; >0 = periodic reset
 
         # Output topics
-        self.declare_parameter('binary_topic', '/vision/lanes/binary')
-        self.declare_parameter('bev_binary_topic', '/vision/lanes/bev_binary')
+        self.declare_parameter('mask_topic', '/vision/yellow_mask')
         self.declare_parameter('cte_topic', '/vision/lanes/cte')
-        self.declare_parameter('heading_topic', '/vision/lanes/heading_error')
+        self.declare_parameter('debug_topic', '/vision/yellow_debug')
 
-        # ===================== Read Params =====================
-        self.image_topic = self.get_parameter('image_topic').value
-        self.W = int(self.get_parameter('frame_width').value)
-        self.H = int(self.get_parameter('frame_height').value)
-
-        roi_src = self.get_parameter('roi_src').value
-        if len(roi_src) != 8:
-            raise RuntimeError("roi_src must have 8 values: tlx,tly, blx,bly, brx,bry, trx,try")
-
-        self.roi_src = np.float32([
-            (roi_src[0], roi_src[1]),
-            (roi_src[2], roi_src[3]),
-            (roi_src[4], roi_src[5]),
-            (roi_src[6], roi_src[7]),
-        ])
-
-        bev_margin = float(self.get_parameter('bev_margin').value)
-        self.roi_dst = np.float32([
-            (bev_margin, 0.0),
-            (bev_margin, float(self.H)),
-            (float(self.W) - bev_margin, float(self.H)),
-            (float(self.W) - bev_margin, 0.0),
-        ])
-
-        self.M = cv2.getPerspectiveTransform(self.roi_src, self.roi_dst)
-
-        # Sliding window params
-        self.n_windows = int(self.get_parameter('n_windows').value)
-        self.win_margin = int(self.get_parameter('margin').value)
-        self.minpix = int(self.get_parameter('minpix').value)
-
-        # Yellow HSV thresholds
-        self.h_lo = int(self.get_parameter('yellow_h_low').value)
-        self.h_hi = int(self.get_parameter('yellow_h_high').value)
-        self.s_lo = int(self.get_parameter('yellow_s_low').value)
-        self.s_hi = int(self.get_parameter('yellow_s_high').value)
-        self.v_lo = int(self.get_parameter('yellow_v_low').value)
-        self.v_hi = int(self.get_parameter('yellow_v_high').value)
-
-        # Meters/pixel for CTE
-        self.xm_per_pix = float(self.get_parameter('xm_per_pix').value)
-        self.ym_per_pix = float(self.get_parameter('ym_per_pix').value)
-
-        self.lookahead_y_frac = float(self.get_parameter('lookahead_y_frac').value)
-
-        # ===================== ROS IO =====================
+        # -------------------- Internal State --------------------
         self.bridge = CvBridge()
 
-        self.sub = self.create_subscription(Image, self.image_topic, self.on_image, 10)
+        self._ref_set = False
+        self._cte_ref_m = 0.0
+        self._last_ref_time_s = 0.0
 
-        self.pub_bin = self.create_publisher(Image, self.get_parameter('binary_topic').value, 1)
-        self.pub_bev = self.create_publisher(Image, self.get_parameter('bev_binary_topic').value, 1)
-        self.pub_cte = self.create_publisher(Float64, self.get_parameter('cte_topic').value, 1)
-        self.pub_head = self.create_publisher(Float64, self.get_parameter('heading_topic').value, 1)
-
-        self._last_info_ns = 0
-
-        self.get_logger().info(
-            f"lane_detector up. Sub={self.image_topic} "
-            f"H/S/V=[{self.h_lo}-{self.h_hi}, {self.s_lo}-{self.s_hi}, {self.v_lo}-{self.v_hi}] "
-            f"WxH={self.W}x{self.H}"
+        # -------------------- ROS IO --------------------
+        self.sub = self.create_subscription(
+            Image,
+            self.get_parameter('image_topic').value,
+            self.on_image,
+            10
         )
 
-    # ============================================================
-    # Yellow-only binary mask
-    # ============================================================
-    def make_binary(self, bgr: np.ndarray) -> np.ndarray:
+        self.pub_mask = self.create_publisher(Image, self.get_parameter('mask_topic').value, 1)
+        self.pub_cte = self.create_publisher(Float64, self.get_parameter('cte_topic').value, 1)
+        self.pub_dbg = self.create_publisher(Image, self.get_parameter('debug_topic').value, 1)
+
+        self.get_logger().info(
+            f"lane_detector up. sub={self.get_parameter('image_topic').value} "
+            f"pub_cte={self.get_parameter('cte_topic').value} pub_dbg={self.get_parameter('debug_topic').value}"
+        )
+
+    # ------------------------------------------------------------
+    # Yellow threshold
+    # ------------------------------------------------------------
+    def yellow_mask(self, bgr: np.ndarray) -> np.ndarray:
         hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
 
-        lower = np.array([self.h_lo, self.s_lo, self.v_lo], dtype=np.uint8)
-        upper = np.array([self.h_hi, self.s_hi, self.v_hi], dtype=np.uint8)
+        lower = np.array([
+            int(self.get_parameter('h_low').value),
+            int(self.get_parameter('s_low').value),
+            int(self.get_parameter('v_low').value)
+        ], dtype=np.uint8)
 
-        mask = cv2.inRange(hsv, lower, upper)  # 0/255 mono
+        upper = np.array([
+            int(self.get_parameter('h_high').value),
+            int(self.get_parameter('s_high').value),
+            int(self.get_parameter('v_high').value)
+        ], dtype=np.uint8)
 
-        # Clean noise / fill small gaps
-        kernel = np.ones((3, 3), np.uint8)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=1)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=2)
+        mask = cv2.inRange(hsv, lower, upper)
+
+        if bool(self.get_parameter('use_morph').value):
+            k = int(self.get_parameter('kernel_size').value)
+            if k < 1:
+                k = 1
+            if k % 2 == 0:
+                k += 1
+            kernel = np.ones((k, k), np.uint8)
+
+            close_iters = int(self.get_parameter('close_iters').value)
+            open_iters = int(self.get_parameter('open_iters').value)
+            dil_iters = int(self.get_parameter('dilate_iters').value)
+
+            # Close gaps -> open noise -> optional thicken
+            if close_iters > 0:
+                mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=close_iters)
+            if open_iters > 0:
+                mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=open_iters)
+            if dil_iters > 0:
+                mask = cv2.dilate(mask, kernel, iterations=dil_iters)
 
         return mask
 
-    # ============================================================
-    # BEV warp
-    # ============================================================
-    def warp_bev(self, binary: np.ndarray) -> np.ndarray:
-        return cv2.warpPerspective(binary, self.M, (self.W, self.H), flags=cv2.INTER_NEAREST)
+    # ------------------------------------------------------------
+    # Centroid + CTE
+    # ------------------------------------------------------------
+    def centroid_cte_m(self, mask: np.ndarray, W: int, H: int):
+        # Require enough yellow pixels so centroid is meaningful
+        if int(np.count_nonzero(mask)) < int(self.get_parameter('min_mask_pixels').value):
+            return None, None, None
 
-    # ============================================================
-    # Sliding window fit (single lane or both lanes)
-    # If only one yellow lane exists, we still fit that lane and treat it as "reference".
-    # ============================================================
-    def sliding_window_fit(self, bev_bin: np.ndarray):
-        bin01 = (bev_bin > 0).astype(np.uint8)
+        M = cv2.moments(mask, binaryImage=True)
+        if M["m00"] <= 1e-6:
+            return None, None, None
 
-        nonzero = bin01.nonzero()
-        nonzeroy = np.array(nonzero[0])
-        nonzerox = np.array(nonzero[1])
+        cx = int(M["m10"] / M["m00"])
+        cy = int(M["m01"] / M["m00"])
 
-        if nonzerox.size < 200:
-            return None
+        x_center = W // 2
+        cte_pix = float(cx - x_center)
+        xm_per_pix = float(self.get_parameter('xm_per_pix').value)
+        cte_m = cte_pix * xm_per_pix
 
-        # Histogram base search in bottom half
-        histogram = np.sum(bin01[self.H // 2:, :], axis=0)
+        return cx, cy, cte_m
 
-        # Since you only want the yellow lane, just find the single strongest peak.
-        x_current = int(np.argmax(histogram))
-
-        window_height = int(self.H / self.n_windows)
-        lane_inds = []
-
-        for window in range(self.n_windows):
-            win_y_low = self.H - (window + 1) * window_height
-            win_y_high = self.H - window * window_height
-
-            win_x_low = x_current - self.win_margin
-            win_x_high = x_current + self.win_margin
-
-            good_inds = ((nonzeroy >= win_y_low) & (nonzeroy < win_y_high) &
-                         (nonzerox >= win_x_low) & (nonzerox < win_x_high)).nonzero()[0]
-            lane_inds.append(good_inds)
-
-            if len(good_inds) > self.minpix:
-                x_current = int(np.mean(nonzerox[good_inds]))
-
-        lane_inds = np.concatenate(lane_inds) if len(lane_inds) else np.array([], dtype=int)
-
-        if lane_inds.size < 200:
-            return None
-
-        x = nonzerox[lane_inds]
-        y = nonzeroy[lane_inds]
-
-        # Fit x = f(y)
-        fit = np.polyfit(y, x, 2)
-        return fit
-
-    # ============================================================
-    # CTE + heading error from x=f(y) in BEV
-    # ============================================================
-    def compute_cte_heading(self, fit):
-        if fit is None:
-            return None, None
-
-        y_la = int(np.clip(self.lookahead_y_frac * self.H, 0, self.H - 1))
-
-        a, b, c = fit
-        x_lane = a * (y_la ** 2) + b * y_la + c
-
-        # Vehicle reference pixel x at BEV center
-        x_vehicle = self.W / 2.0
-
-        # NOTE: With only ONE lane line, this is CTE to that line, not to lane center.
-        # If this is the left lane boundary, lane center would be (x_lane + lane_width_px/2).
-        cte_pix = x_lane - x_vehicle
-        cte_m = float(cte_pix * self.xm_per_pix)
-
-        dx_dy = 2.0 * a * y_la + b
-        heading_err = float(np.arctan(dx_dy))  # radians
-
-        return cte_m, heading_err
-
-    # ============================================================
-    # Callback
-    # ============================================================
+    # ------------------------------------------------------------
+    # Main callback
+    # ------------------------------------------------------------
     def on_image(self, msg: Image):
-        # Decode
         try:
             bgr = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         except Exception as e:
@@ -245,46 +170,79 @@ class LaneDetector(Node):
             return
 
         if bgr is None:
-            self.get_logger().warn(
-                f"cv_bridge returned None frame. encoding={getattr(msg,'encoding','?')} "
-                f"data_len={len(msg.data) if hasattr(msg,'data') else 'NA'}"
-            )
             return
 
-        # Throttled info print (every ~2s)
-        now = self.get_clock().now().nanoseconds
-        if now - self._last_info_ns > int(2e9):
-            self._last_info_ns = now
-            self.get_logger().info(f"Image OK: shape={bgr.shape} msg.encoding={msg.encoding}")
+        H, W = bgr.shape[:2]
 
-        # Resize to expected size so BEV matrix stays consistent
-        if bgr.shape[1] != self.W or bgr.shape[0] != self.H:
-            bgr = cv2.resize(bgr, (self.W, self.H), interpolation=cv2.INTER_LINEAR)
+        mask = self.yellow_mask(bgr)
 
-        # Binary + BEV
-        binary = self.make_binary(bgr)
-        bev = self.warp_bev(binary)
+        # Publish mask (mono8)
+        mask_msg = self.bridge.cv2_to_imgmsg(mask, encoding='mono8')
+        mask_msg.header = msg.header
+        self.pub_mask.publish(mask_msg)
 
-        # Fit + CTE/heading
-        fit = self.sliding_window_fit(bev)
-        cte_m, heading_err = self.compute_cte_heading(fit)
+        # Compute centroid + raw CTE
+        cx, cy, cte_raw_m = self.centroid_cte_m(mask, W, H)
 
-        # Publish images
-        bin_msg = self.bridge.cv2_to_imgmsg(binary, encoding='mono8')
-        bin_msg.header = msg.header
-        self.pub_bin.publish(bin_msg)
+        # Reference logic: lock first valid frame
+        cte_out = float('nan')
+        now_s = time.time()
 
-        bev_msg = self.bridge.cv2_to_imgmsg(bev, encoding='mono8')
-        bev_msg.header = msg.header
-        self.pub_bev.publish(bev_msg)
+        # Optional periodic reset
+        reset_period = float(self.get_parameter('ref_reset_seconds').value)
+        if reset_period > 0.0 and self._ref_set and ((now_s - self._last_ref_time_s) > reset_period):
+            self._ref_set = False
 
-        # Publish CTE + heading (NaN if invalid)
-        m_cte = Float64()
-        m_head = Float64()
-        m_cte.data = float(cte_m) if cte_m is not None else float('nan')
-        m_head.data = float(heading_err) if heading_err is not None else float('nan')
-        self.pub_cte.publish(m_cte)
-        self.pub_head.publish(m_head)
+        if cte_raw_m is not None:
+            auto_zero = bool(self.get_parameter('auto_zero_reference').value)
+
+            if auto_zero and not self._ref_set:
+                self._cte_ref_m = float(cte_raw_m)
+                self._ref_set = True
+                self._last_ref_time_s = now_s
+                self.get_logger().info(f"[lane] Reference locked: cte_ref_m={self._cte_ref_m:+.4f} m")
+
+            if auto_zero and self._ref_set:
+                # ✅ drift-only CTE (goal is zero)
+                cte_out = float(cte_raw_m - self._cte_ref_m)
+            else:
+                # raw CTE if auto_zero_reference disabled
+                cte_out = float(cte_raw_m)
+
+        # Publish CTE
+        cte_msg = Float64()
+        cte_msg.data = float(cte_out)
+        self.pub_cte.publish(cte_msg)
+
+        # Debug overlay (dots + info)
+        overlay = bgr.copy()
+
+        # Dot A: camera center (red)
+        cv2.circle(overlay, (W // 2, H // 2), 6, (0, 0, 255), -1)
+
+        # Dot B: lane centroid (green)
+        if cx is not None:
+            cv2.circle(overlay, (cx, cy), 6, (0, 255, 0), -1)
+            cv2.line(overlay, (W // 2, H // 2), (cx, cy), (255, 255, 255), 2)
+
+        # Text
+        if cte_raw_m is None:
+            txt = "cte_raw=nan  cte_zeroed=nan  (no centroid)"
+        else:
+            txt = f"cte_raw={cte_raw_m:+.3f}m  ref={self._cte_ref_m:+.3f}m  cte_zeroed={cte_out:+.3f}m"
+
+        cv2.putText(
+            overlay, txt,
+            (20, 30),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            (255, 255, 255),
+            2
+        )
+
+        dbg_msg = self.bridge.cv2_to_imgmsg(overlay, encoding='bgr8')
+        dbg_msg.header = msg.header
+        self.pub_dbg.publish(dbg_msg)
 
 
 def main():

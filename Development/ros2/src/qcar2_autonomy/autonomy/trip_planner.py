@@ -46,33 +46,29 @@ class tripPlanner(Node):
         self.LED_MAGENTA = 5
         self.LED_ORANGE = 6
 
-        # ---------------- MissionStage values from PathFollower ----------------
-        self.STAGE_DISABLED = 0
-        self.STAGE_TO_PICKUP = 1
-        self.STAGE_WAIT_AT_PICKUP = 2
-        self.STAGE_TO_DROPOFF = 3
-        self.STAGE_WAIT_AT_DROPOFF = 4
-        self.STAGE_TO_HUB = 5
-        self.STAGE_DONE = 6
-
         # ---------------- internal state ----------------
         self.current_path_status = False
-        self.mission_stage = 0
 
         self.startup_sent = False
         self.ready_for_rides = False
         self.mission_running = False
         self.new_ride_requested = False
 
-        # hub flash control (THIS fixes “it never becomes ready”)
+        # hub flash control
         self.hub_flash_active = False
         self.hold_until = 0.0
 
         self._last_led = None
 
+        # follower published qcar_state (2/4/5/6)
+        self.follower_qcar_state = 0
+
         # subscribe
         self.create_subscription(Bool, '/path_status', self.path_status_callback, 10)
-        self.create_subscription(UInt8, '/path_follower/mission_state', self.mission_state_callback, 10)
+
+        # ✅ THIS IS THE IMPORTANT FIX:
+        # Trip planner subscribes to the state that PathFollower publishes.
+        self.create_subscription(UInt8, '/path_follower/qcar_state', self.follower_state_callback, 10)
 
         # loop
         self.timer = self.create_timer(0.1, self.loop)
@@ -81,8 +77,25 @@ class tripPlanner(Node):
     def path_status_callback(self, msg):
         self.current_path_status = bool(msg.data)
 
-    def mission_state_callback(self, msg):
-        self.mission_stage = int(msg.data)
+    def follower_state_callback(self, msg):
+        """
+        PathFollower publishes qcar_state:
+          2 = BLUE pickup
+          4 = GREEN driving
+          5 = MAGENTA ready/hub
+          6 = ORANGE dropoff
+        We immediately set the LED here so it reacts instantly.
+        """
+        self.follower_qcar_state = int(msg.data)
+
+        if self.follower_qcar_state == 4:
+            self._set_led(self.LED_GREEN)
+        elif self.follower_qcar_state == 2:
+            self._set_led(self.LED_BLUE)
+        elif self.follower_qcar_state == 6:
+            self._set_led(self.LED_ORANGE)
+        elif self.follower_qcar_state == 5:
+            self._set_led(self.LED_MAGENTA)
 
     def parameter_update_callback(self, params):
         # Update stored pickup/dropoff
@@ -142,13 +155,16 @@ class tripPlanner(Node):
 
     # ---------------- main loop ----------------
     def loop(self):
+        # NOTE:
+        # LEDs are now driven by PathFollower via /path_follower/qcar_state callback.
+        # This loop just handles startup-to-hub + starting the mission when requested.
+
         # ---------------- STARTUP: go to hub ----------------
         if not self.ready_for_rides and not self.mission_running:
-            # Driving to hub => GREEN
+            # Driving to hub => GREEN (fallback in case follower hasn't published yet)
             self._set_led(self.LED_GREEN)
 
             if not self.startup_sent and not self.current_path_status:
-                # node-based startup to taxi hub
                 self._set_param(self.path_follower_client, "node_values",
                                 [0, self.taxi_node], ParameterType.PARAMETER_INTEGER_ARRAY)
                 self._set_param(self.path_follower_client, "start_path",
@@ -193,40 +209,22 @@ class tripPlanner(Node):
             self.mission_running = True
             self.ready_for_rides = False
             self.new_ride_requested = False
+
+            # PathFollower should immediately publish GREEN once mission starts,
+            # but we also force green here as fallback.
             self._set_led(self.LED_GREEN)
             return
 
-        # ---------------- MISSION RUNNING: LED from mission_stage ----------------
+        # When mission is running, we don't do LED logic here anymore.
+        # The follower_state_callback will change LEDs.
         if self.mission_running:
-            if self.mission_stage in (self.STAGE_TO_PICKUP, self.STAGE_TO_DROPOFF, self.STAGE_TO_HUB):
-                self._set_led(self.LED_GREEN)
-
-            elif self.mission_stage == self.STAGE_WAIT_AT_PICKUP:
-                self._set_led(self.LED_BLUE)
-
-            elif self.mission_stage == self.STAGE_WAIT_AT_DROPOFF:
-                self._set_led(self.LED_ORANGE)
-
-            elif self.mission_stage == self.STAGE_DONE:
-                # DONE => magenta 3s then ready
-                if not self.hub_flash_active:
-                    self.hub_flash_active = True
-                    self._start_hold(3.0)
-                    self._set_led(self.LED_MAGENTA)
-
-                if self.hub_flash_active and not self._in_hold():
-                    self.hub_flash_active = False
-                    # disable mission so next ride can re-trigger cleanly
-                    self._set_param(self.path_follower_client, "mission_enable",
-                                    [False], ParameterType.PARAMETER_BOOL_ARRAY)
-
-                    self.mission_running = False
-                    self.ready_for_rides = True
-                    self._set_led(self.LED_MAGENTA)
-
-            else:
-                # fallback
-                self._set_led(self.LED_MAGENTA)
+            # When PathFollower publishes MAGENTA (5) at hub, we can consider mission done.
+            if self.follower_qcar_state == 5:
+                # disable mission so next ride can re-trigger cleanly
+                self._set_param(self.path_follower_client, "mission_enable",
+                                [False], ParameterType.PARAMETER_BOOL_ARRAY)
+                self.mission_running = False
+                self.ready_for_rides = True
 
 
 def main():

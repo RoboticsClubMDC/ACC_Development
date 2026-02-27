@@ -1,6 +1,3 @@
-# =========================
-# OVERALL: path_follower.py
-# =========================
 #! /usr/bin/env python3
 
 # Quanser specific packages
@@ -27,7 +24,7 @@ from tf2_ros.transform_listener import TransformListener
 from geometry_msgs.msg import Twist, PoseStamped
 from sensor_msgs.msg import Imu, JointState
 from rcl_interfaces.msg import SetParametersResult
-from std_msgs.msg import Bool, UInt8   # <-- UInt8 added
+from std_msgs.msg import Bool
 
 
 '''
@@ -183,7 +180,7 @@ class PathFollower(Node):
 
         self.scale = 1.0
 
-        self.declare_parameter('rotation_offset', [85.0])
+        self.declare_parameter('rotation_offset', [86.5])
         self.rotation_offset = list(self.get_parameter("rotation_offset").get_parameter_value().double_array_value)
 
         self.declare_parameter('translation_offset', [0.0, 0.0])
@@ -289,17 +286,9 @@ class PathFollower(Node):
         self.path_publisher_topic = self.create_publisher(Path, '/planned_path', 1)
         self.path_status_publisher = self.create_publisher(Bool, '/path_status', 1)
 
-        # ---------------- NEW: publish the *LED state* directly ----------------
-        # qcar_state mapping (what trip_planner should use):
-        # 2 = BLUE pickup
-        # 4 = GREEN driving
-        # 5 = MAGENTA ready/at hub
-        # 6 = ORANGE dropoff
-        self.qcar_state_pub = self.create_publisher(UInt8, '/path_follower/qcar_state', 10)
-        self._last_qcar_state = -1
-        # ----------------------------------------------------------------------
-
         # ---------------- TAXI HUB FIX ----------------
+        # Taxi hub is node 10 (right-hand, big map). We always return here after dropoff.
+        # This is in QLabs coordinates (same coordinate system as roadmap node poses).
         self.hub_xy = list(self._get_node_xy(10))
         self.get_logger().info(f"Taxi hub locked to node 10 => hub_xy={self.hub_xy}")
         # ------------------------------------------------
@@ -309,16 +298,6 @@ class PathFollower(Node):
         self.t_plot = 0
         self.plot_visualized = False
         self.scopeTimer = self.create_timer(0.1, self.scopeDataTimer)
-
-    # ---------------- NEW: publish qcar_state (LED state) ----------------
-    def _pub_qcar_state(self, state, force=False):
-        state = int(state)
-        if force or state != self._last_qcar_state:
-            msg = UInt8()
-            msg.data = state
-            self.qcar_state_pub.publish(msg)
-            self._last_qcar_state = state
-    # --------------------------------------------------------------------
 
     # --------------------- FRAME FIX HELPERS ---------------------
     def _R_qlabs_to_ros_2d(self):
@@ -473,10 +452,6 @@ class PathFollower(Node):
 
             elif param.name == 'start_path' and param.type_ == param.Type.BOOL_ARRAY:
                 self.path_execute_flag = list(param.value)[0]
-                # helps external supervisor avoid "instant complete"
-                if self.path_execute_flag:
-                    self.path_complete = False
-                    self.wpi = 0
                 self.get_logger().info('path status changed!')
 
             # --- mission params ---
@@ -487,10 +462,6 @@ class PathFollower(Node):
                 self.mission_stage = MissionStage.IDLE
                 self.path_complete = False
                 self.mission_pause_until = 0.0
-
-                # When mission is enabled, default to GREEN (driving) immediately
-                if self.mission_enable:
-                    self._pub_qcar_state(4, force=True)
 
             elif param.name == 'mission_use_xy' and param.type_ == param.Type.BOOL_ARRAY:
                 self.mission_use_xy = list(param.value)[0]
@@ -613,12 +584,6 @@ class PathFollower(Node):
                 self.current_steering = 0.0
                 self.path_complete = True
 
-                # Keep the correct "stopped" color while pausing
-                if self.mission_stage == MissionStage.WAIT_AT_PICKUP:
-                    self._pub_qcar_state(2)  # BLUE
-                elif self.mission_stage == MissionStage.WAIT_AT_DROPOFF:
-                    self._pub_qcar_state(6)  # ORANGE
-
             else:
                 # init once pose exists
                 if not self.mission_initialized:
@@ -626,7 +591,6 @@ class PathFollower(Node):
                     if ok:
                         self.mission_initialized = True
                         self.mission_stage = MissionStage.TO_PICKUP
-                        self._pub_qcar_state(4, force=True)  # GREEN driving to pickup
 
                 # stage transitions ONLY when not paused
                 if self.path_complete and self.mission_initialized:
@@ -634,7 +598,6 @@ class PathFollower(Node):
                     if self.mission_stage == MissionStage.TO_PICKUP:
                         self.get_logger().info("Arrived at PICKUP. Stopping 3s...")
                         self.mission_stage = MissionStage.WAIT_AT_PICKUP
-                        self._pub_qcar_state(2, force=True)  # BLUE pickup
                         self._start_pause(self.stop_seconds, reason="at PICKUP")
 
                     elif self.mission_stage == MissionStage.WAIT_AT_PICKUP:
@@ -642,27 +605,24 @@ class PathFollower(Node):
                         ok = self._plan_leg_to_xy(self.dropoff_xy, stage_name="TO_DROPOFF") if self.mission_use_xy else False
                         if ok:
                             self.mission_stage = MissionStage.TO_DROPOFF
-                            self._pub_qcar_state(4, force=True)  # GREEN driving to dropoff
                             self.path_complete = False
 
                     elif self.mission_stage == MissionStage.TO_DROPOFF:
                         self.get_logger().info("Arrived at DROPOFF. Stopping 3s...")
                         self.mission_stage = MissionStage.WAIT_AT_DROPOFF
-                        self._pub_qcar_state(6, force=True)  # ORANGE dropoff
                         self._start_pause(self.stop_seconds, reason="at DROPOFF")
 
                     elif self.mission_stage == MissionStage.WAIT_AT_DROPOFF:
+                        # FIXED HUB RETURN: always plan back to node 10 hub after dropoff wait
                         self.get_logger().info(f"Leaving DROPOFF. Planning back to HUB (node 10) hub_xy={self.hub_xy}...")
                         ok = self._plan_leg_to_xy(self.hub_xy, stage_name="TO_HUB")
                         if ok:
                             self.mission_stage = MissionStage.TO_HUB
-                            self._pub_qcar_state(4, force=True)  # GREEN driving to hub
                             self.path_complete = False
 
                     elif self.mission_stage == MissionStage.TO_HUB:
                         self.get_logger().info("Arrived at HUB. Mission DONE.")
                         self.mission_stage = MissionStage.DONE
-                        self._pub_qcar_state(5, force=True)  # MAGENTA ready at hub
                         self.path_complete = True
 
         # =======================
@@ -733,6 +693,9 @@ class PathFollower(Node):
                         speed_command = 0.0
                         self.current_steering = 0.0
                         self.path_complete = True
+
+                    # if self.wpi > max(self.N - 100, 0):
+                    #     speed_command = min(speed_command, self.desired_speed)
 
                     Kp_steering = 1.1
                     kd_steering = 5
