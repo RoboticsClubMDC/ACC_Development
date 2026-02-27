@@ -156,7 +156,7 @@ class PathFollower(Node):
 
         self.scale = 1.0
 
-        self.declare_parameter('rotation_offset', [90.0])
+        self.declare_parameter('rotation_offset', [82.0])
         self.rotation_offset = list(self.get_parameter("rotation_offset").get_parameter_value().double_array_value)
 
         self.declare_parameter('translation_offset', [0.0, -0.125])
