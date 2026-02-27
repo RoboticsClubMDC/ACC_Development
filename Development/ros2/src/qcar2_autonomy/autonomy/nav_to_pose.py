@@ -142,7 +142,7 @@ class PathFollower(Node):
         super().__init__('path_follower')
 
         # ------------------- Parameters -------------------
-        self.declare_parameter('node_values', [0, 8, 10])
+        self.declare_parameter('node_values', [0, 4, 14, 20, 10])
         self.waypoints = list(self.get_parameter("node_values").get_parameter_value().integer_array_value)
 
         self.declare_parameter('desired_speed', [0.2])
@@ -165,9 +165,9 @@ class PathFollower(Node):
         self.path_execute_flag = list(self.get_parameter("start_path").get_parameter_value().bool_array_value)[0]
 
         # --- New: Lookahead + waypoint tracking (fixes jumpy steering) ---
-        self.declare_parameter('lookahead_base', 0.45)
+        self.declare_parameter('lookahead_base', 0.40)
         self.declare_parameter('lookahead_speed_gain', 0.60)
-        self.declare_parameter('lookahead_min', 0.45)
+        self.declare_parameter('lookahead_min', 0.38)
         self.declare_parameter('lookahead_max', 0.90)
 
         self.declare_parameter('wpi_search_back', 15)
@@ -189,7 +189,22 @@ class PathFollower(Node):
         self.declare_parameter('k_st', 0.95)                # old 1.1
         self.declare_parameter('v_soft', 0.50)              # old 0.3 (higher = less aggressive at low speed)
         self.declare_parameter('w_st', 0.20)                # old 0.25
-        self.declare_parameter('kd_steering', 0.35)         # old 0.4
+        self.declare_parameter('kd_steering', 0.10)         # old 0.4
+        
+        # --- Adaptive turning (general fix: strong in turns, calm on straights) ---
+        self.declare_parameter('turn_heading_ref', 0.55)        # rad: ~31 deg
+        self.declare_parameter('lookahead_turn_gain', 0.45)     # meters removed at full turn
+        self.declare_parameter('w_st_turn_gain', 0.45)          # extra Stanley weight at full turn
+        self.declare_parameter('k_st_turn_gain', 1.10)          # extra Stanley gain at full turn
+        self.declare_parameter('steer_rate_turn_gain', 1.8)     # extra rad/s at full turn
+        self.declare_parameter('steer_alpha_turn_gain', 0.25)   # extra LPF alpha at full turn (less smoothing)
+        
+        self.declare_parameter('yaw_switch_dist', 0.25)  # meters: when closer than this, use lookahead yaw
+        self.declare_parameter('yaw_switch_turn_gain', 0.55)  # extra meters of switch distance at full turn
+
+        # optional: slightly stronger max steer for turns if your car can handle it
+        # (keep default same as before unless you want it)
+        # self.declare_parameter('steer_limit', 0.55)
 
         self.add_on_set_parameters_callback(self.parameter_update_callback)
 
@@ -543,7 +558,7 @@ class PathFollower(Node):
         try:
             if not self.path_complete:
 
-                # Pose source (TF preferred)
+                # ----------------- Pose source (TF preferred) -----------------
                 th = float(self.qcar2_ekf.xHat[2, 0])
                 p = [float(self.qcar2_ekf.xHat[0, 0]), float(self.qcar2_ekf.xHat[1, 0])]
 
@@ -553,20 +568,21 @@ class PathFollower(Node):
                 except AttributeError:
                     pass
 
+                # ----------------- Ensure path cache exists -----------------
                 if self.wp_map_xy is None:
                     self._cache_path_transformed()
 
                 if self.wp_map_xy is None or self.N < 5:
                     raise RuntimeError("Path not ready")
 
-                # Initialize wpi once
+                # ----------------- Initialize wpi once -----------------
                 if not self._wpi_initialized:
                     self._init_wpi_once(p, th)
 
-                # Track closest index smoothly (no skipping)
+                # ----------------- Track closest index smoothly (no skipping) -----------------
                 self._update_wpi_closest_in_window(p, th)
 
-                # Stop condition near end
+                # ----------------- Stop condition near end -----------------
                 end_xy = self.wp_map_xy[self.N - 1]
                 dist_to_end = float(np.hypot(p[0] - end_xy[0], p[1] - end_xy[1]))
                 if (self.wpi >= self.N - 3) or (dist_to_end < 0.35 and self.wpi > self.N - 40):
@@ -574,7 +590,7 @@ class PathFollower(Node):
                     steering_cmd = 0.0
                     self.path_complete = True
                 else:
-                    # Lookahead selection
+                    # ----------------- Lookahead selection (compute i_ref FIRST) -----------------
                     lookahead_base = float(self.get_parameter('lookahead_base').value)
                     lookahead_k = float(self.get_parameter('lookahead_speed_gain').value)
                     lookahead_min = float(self.get_parameter('lookahead_min').value)
@@ -583,72 +599,133 @@ class PathFollower(Node):
                     lookahead_dist = lookahead_base + lookahead_k * abs(speed_command)
                     lookahead_dist = float(np.clip(lookahead_dist, lookahead_min, lookahead_max))
 
+                    # Initial reference index using base lookahead
                     i_ref = self._lookahead_index(p, self.wpi, lookahead_dist)
 
-                    # Segment for local path direction (Stanley uses nearest segment)
+                    # ----------------- Nearest segment for CTE (stable lateral error) -----------------
                     i_seg = int(np.clip(self.wpi, 0, self.N - 2))
                     p1 = self.wp_map_xy[i_seg]
                     p2 = self.wp_map_xy[i_seg + 1]
-                    seg = p2 - p1
-                    if float(np.linalg.norm(seg)) < 1e-6:
-                        path_yaw = th
-                    else:
-                        path_yaw = float(np.arctan2(seg[1], seg[0]))
+                    seg_near = p2 - p1
 
+                    # ----------------- Initial heading estimate (use near yaw first) -----------------
+                    if float(np.linalg.norm(seg_near)) < 1e-6:
+                        yaw_near = th
+                    else:
+                        yaw_near = float(np.arctan2(seg_near[1], seg_near[0]))
+
+                    # Lookahead yaw
+                    i_yaw = int(np.clip(i_ref, 0, self.N - 2))
+                    q1 = self.wp_map_xy[i_yaw]
+                    q2 = self.wp_map_xy[i_yaw + 1]
+                    seg_yaw = q2 - q1
+                    if float(np.linalg.norm(seg_yaw)) < 1e-6:
+                        yaw_ahead = yaw_near
+                    else:
+                        yaw_ahead = float(np.arctan2(seg_yaw[1], seg_yaw[0]))
+
+                    # Start with near yaw; compute heading_error + turn factor
+                    path_yaw = yaw_near
                     heading_error = float(wrap_to_pi(path_yaw - th))
 
+                    turn_ref = float(self.get_parameter('turn_heading_ref').value)
+                    t_turn = float(np.clip(abs(heading_error) / max(1e-6, turn_ref), 0.0, 1.0))
+
+                    # ---------------- Turn-based lookahead shortening ----------------
+                    la_turn_gain = float(self.get_parameter('lookahead_turn_gain').value)
+                    lookahead_dist2 = lookahead_dist - la_turn_gain * t_turn
+                    lookahead_dist2 = float(np.clip(lookahead_dist2, lookahead_min, lookahead_max))
+
+                    # Recompute i_ref with turn-shortened lookahead (usually matters on turns)
+                    if abs(lookahead_dist2 - lookahead_dist) > 1e-6:
+                        i_ref = self._lookahead_index(p, self.wpi, lookahead_dist2)
+
+                        # Recompute lookahead yaw using updated i_ref
+                        i_yaw = int(np.clip(i_ref, 0, self.N - 2))
+                        q1 = self.wp_map_xy[i_yaw]
+                        q2 = self.wp_map_xy[i_yaw + 1]
+                        seg_yaw = q2 - q1
+                        if float(np.linalg.norm(seg_yaw)) < 1e-6:
+                            yaw_ahead = yaw_near
+                        else:
+                            yaw_ahead = float(np.arctan2(seg_yaw[1], seg_yaw[0]))
+
+                    # ---------------- Adaptive yaw switch distance ----------------
+                    # Base switch distance (straights) + extra during turns
+                    yaw_switch_base = float(self.get_parameter('yaw_switch_dist').value)
+                    yaw_switch_turn_gain = float(self.get_parameter('yaw_switch_turn_gain').value)
+                    yaw_switch_dist = yaw_switch_base + yaw_switch_turn_gain * t_turn
+
+                    # Decide yaw using distance-to-lookahead
+                    target = self.wp_map_xy[i_ref]
+                    dist_to_ref = float(np.hypot(target[0] - p[0], target[1] - p[1]))
+                    path_yaw = yaw_ahead if dist_to_ref <= yaw_switch_dist else yaw_near
+
+                    # Final heading_error with chosen yaw
+                    heading_error = float(wrap_to_pi(path_yaw - th))
+
+                    # Lateral error using chosen yaw normal, referenced to nearest segment anchor p1
                     left_n = np.array([-np.sin(path_yaw), np.cos(path_yaw)], dtype=float)
                     cte = float(np.dot(np.array([p[0] - p1[0], p[1] - p1[1]], dtype=float), left_n))
 
-                    # Pure pursuit target
+                    # Update turn factor from final heading error
+                    t_turn = float(np.clip(abs(heading_error) / max(1e-6, turn_ref), 0.0, 1.0))
+
+                    # ---------------- Pure pursuit target ----------------
                     target = self.wp_map_xy[i_ref]
                     v = np.array([target[0] - p[0], target[1] - p[1]], dtype=float)
 
-                    # world->car (row vector trick)
                     Rmat = np.array([[np.cos(th), -np.sin(th)],
-                                     [np.sin(th),  np.cos(th)]], dtype=float)
+                                    [np.sin(th),  np.cos(th)]], dtype=float)
                     v_car = v @ Rmat
 
                     WaypointDist = float(np.linalg.norm(v_car))
-                    WaypointDist = max(0.15, WaypointDist)  # prevent blow-up
+                    WaypointDist = max(0.15, WaypointDist)
 
                     psi = float(np.arctan2(v_car[1], v_car[0]))
                     L = 0.256
                     delta_pp = float(np.arctan2(2.0 * L * np.sin(psi), WaypointDist))
 
-                    # Stanley (parameters)
+                    # ---------------- Stanley (turn-adaptive gains) ----------------
                     v_meas = max(0.05, float(self.qcar2_measurred_speed))
-                    k_st = float(self.get_parameter('k_st').value)
+
+                    k_st_base = float(self.get_parameter('k_st').value)
+                    k_st_turn = float(self.get_parameter('k_st_turn_gain').value)
+                    k_st = k_st_base + k_st_turn * t_turn
+
                     v_soft = float(self.get_parameter('v_soft').value)
                     delta_st = float(heading_error + np.arctan2(k_st * cte, v_meas + v_soft))
 
-                    # Blend
-                    w_st = float(self.get_parameter('w_st').value)
+                    w_st_base = float(self.get_parameter('w_st').value)
+                    w_st_turn = float(self.get_parameter('w_st_turn_gain').value)
+                    w_st = float(np.clip(w_st_base + w_st_turn * t_turn, 0.0, 1.0))
+
                     delta_blend = (1.0 - w_st) * delta_pp + w_st * delta_st
 
-                    # Gyro damping (filtered)
+                    # ---------------- Gyro damping ----------------
                     kd_steering = float(self.get_parameter('kd_steering').value)
                     gyro_filtered = float(self.apply_filter('gyro', float(self.gyroscope[2]), self.a1, self.b1))
                     delta_blend = float(delta_blend - kd_steering * gyro_filtered)
 
-                    # Clamp
+                    # ---------------- Clamp ----------------
                     steer_limit = float(self.get_parameter('steer_limit').value)
                     steer_raw = float(np.clip(delta_blend, -steer_limit, steer_limit))
 
-                    # --- NEW: steering smoothing (LPF + rate limit) ---
-                    alpha = float(self.get_parameter('steer_lpf_alpha').value)
-                    alpha = float(np.clip(alpha, 0.01, 1.0))
+                    # ---------------- Turn-adaptive steering smoothing ----------------
+                    alpha_base = float(self.get_parameter('steer_lpf_alpha').value)
+                    alpha_turn = float(self.get_parameter('steer_alpha_turn_gain').value)
+                    alpha = float(np.clip(alpha_base + alpha_turn * t_turn, 0.01, 1.0))
 
                     self._steer_lpf_state = alpha * steer_raw + (1.0 - alpha) * self._steer_lpf_state
 
-                    rate = float(self.get_parameter('steer_rate_limit').value)
-                    rate = max(0.1, rate)
+                    rate_base = float(self.get_parameter('steer_rate_limit').value)
+                    rate_turn = float(self.get_parameter('steer_rate_turn_gain').value)
+                    rate = float(max(0.1, rate_base + rate_turn * t_turn))
+
                     max_step = rate * self.dt
-
-                    delta = float(self._steer_lpf_state - self.current_steering)
-                    delta = float(np.clip(delta, -max_step, +max_step))
-                    steering_cmd = float(self.current_steering + delta)
-
+                    d = float(self._steer_lpf_state - self.current_steering)
+                    d = float(np.clip(d, -max_step, +max_step))
+                    steering_cmd = float(self.current_steering + d)
                     steering_cmd = float(np.clip(steering_cmd, -steer_limit, steer_limit))
 
         except KeyboardInterrupt:
