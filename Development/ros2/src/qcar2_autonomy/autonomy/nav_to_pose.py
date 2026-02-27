@@ -5,25 +5,25 @@ from hal.products.mats import SDCSRoadMap
 from pal.utilities.math import wrap_to_pi
 
 # Generic python packages
-import time  # Time library
+import time
 import numpy as np
 import scipy.signal as signal
-from scipy.spatial.transform  import Rotation as R
+from scipy.spatial.transform import Rotation as R
 from pal.utilities.scope import MultiScope
 
 # ROS specific packages
-from rclpy.duration import Duration # Handles time for ROS 2
-import rclpy # Python client library for ROS 2
-from geometry_msgs.msg import PoseStamped # Pose with ref frame and timestamp
+from rclpy.duration import Duration
+import rclpy
+from geometry_msgs.msg import PoseStamped
 from rclpy.node import Node
 from nav_msgs.msg import Path
 from tf2_ros import TransformException
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
-from geometry_msgs.msg import Twist, PoseStamped
+from geometry_msgs.msg import Twist
 from sensor_msgs.msg import Imu, JointState
 from rcl_interfaces.msg import SetParametersResult
-from std_msgs.msg import Bool, String
+from std_msgs.msg import Bool
 
 
 '''
@@ -37,18 +37,7 @@ given nodes based on Quanser's SDCSRoadMap class
 class QcarEKF:
 
     def __init__(self, x0, P0, Q, R):
-        # Nomenclature:
-        # - x0: initial estimate
-        # - P0: initial covariance matrix estimate
-        # - Q: process noise covariance matrix
-        # - R: observation noise covariance matrix
-        # - xHat: state estimate
-        # - P: state covariance matrix
-        # - L: wheel base of the QCar
-        # - C: output matrix
-
         self.L = 0.257
-
         self.I = np.eye(3)
         self.xHat = x0
         self.P = P0
@@ -61,90 +50,57 @@ class QcarEKF:
             [0, 0, 1]
         ])
 
-    # ==============  SECTION A -  Motion Model ====================
     def f(self, X, u, dt):
-        # Kinematic Bicycle Model:
-        # - X = [x, y, theta]
-        # - u[0] = v (speed in [m/s])
-        # - u[1] = delta (steering Angle in [rad])
-        # - dt: change in time since last update
-
         return X + dt * u[0] * np.array([
-            [np.cos(X[2,0])],
-            [np.sin(X[2,0])],
+            [np.cos(X[2, 0])],
+            [np.sin(X[2, 0])],
             [np.tan(u[1]) / self.L]
         ])
 
-    # ==============  SECTION B -  Motion Model Jacobian ====================
     def Jf(self, X, u, dt):
-        # Jacobian for the kinematic bicycle model (see self.f)
-
         return np.array([
-                [1, 0, -dt*u[0]*np.sin(X[2,0])],
-                [0, 1, dt*u[0]*np.cos(X[2,0])],
-                [0, 0, 1]
+            [1, 0, -dt * u[0] * np.sin(X[2, 0])],
+            [0, 1,  dt * u[0] * np.cos(X[2, 0])],
+            [0, 0, 1]
         ])
 
-    # ==============  SECTION C -  Motion Model Prediction ====================
     def prediction(self, dt, u):
-
-        # Update Covariance Estimate
         F = self.Jf(self.xHat, u, dt)
-        self.P = F@self.P@np.transpose(F) + self.Q
+        self.P = F @ self.P @ np.transpose(F) + self.Q
 
-        # Update State Estimate
         self.xHat = self.f(self.xHat, u, dt)
-        # Wrap th to be in the range of +/- pi
         self.xHat[2] = wrap_to_pi(self.xHat[2])
-
         return
 
-    # ==============  SECTION D -  Measurement correction ====================
     def correction(self, y):
-
-        # Precompute terms that will be used multiple times
         H = self.C
         P_times_HTransposed = self.P @ np.transpose(H)
 
         S = H @ P_times_HTransposed + self.R
         K = P_times_HTransposed @ np.linalg.inv(S)
 
-        # Wrap z for th to be in the range of +/- pi
-        z = (y - H@self.xHat)
+        z = (y - H @ self.xHat)
         if len(y) > 1:
             z[2] = wrap_to_pi(z[2])
         else:
             z = wrap_to_pi(z)
 
         self.xHat += K @ z
-        # Wrap th to be in the range of +/- pi
         self.xHat[2] = wrap_to_pi(self.xHat[2])
 
-        self.P = (self.I - K@H) @ self.P
-
+        self.P = (self.I - K @ H) @ self.P
         return
+
 
 class GyroKF:
 
     def __init__(self, x0, P0, Q, R):
-        # Nomenclature:
-        # - x0: initial estimate
-        # - P0: initial covariance matrix estimate
-        # - Q: process noise covariance matrix
-        # - R: observation noise covariance matrix
-        # - xHat: state estimate
-        # - P: state covariance matrix
-        # - A: state matrix
-        # - B: input matrix
-        # - C: output matrix
-
         self.I = np.eye(2)
         self.xHat = x0
         self.P = P0
         self.Q = Q
         self.R = R
 
-        # State Space Representation Matrices
         self.A = np.array([
             [0, -1],
             [0, 0]
@@ -157,570 +113,655 @@ class GyroKF:
             [1, 0]
         ])
 
-    # ==========  SECTION F -  Gyro Heading Prediction  ================
     def prediction(self, dt, u):
-        # - dt: change in time since last prediction
-        # - u: most recent gyroscope measurement
+        Ad = self.I + self.A * dt
+        self.xHat = Ad @ self.xHat + dt * self.B * u
+        self.P = Ad @ self.P @ np.transpose(Ad) + self.Q
 
-        # Discretize A:
-        Ad = self.I + self.A*dt
-
-        self.xHat = Ad@self.xHat + dt*self.B*u
-        self.P = Ad@self.P@np.transpose(Ad) + self.Q
-
-    # ==========  SECTION G -  GPS Heading Correction  ================
     def correction(self, y):
-        # - y: heading measurement from GPS
-
         P_times_CTransposed = self.P @ np.transpose(self.C)
 
         S = self.C @ P_times_CTransposed + self.R
         K = P_times_CTransposed @ np.linalg.inv(S)
 
-        z = y - self.C@self.xHat
-        # Wrap z to be in the range of +/- pi
+        z = y - self.C @ self.xHat
         z = wrap_to_pi(z)
 
         self.xHat += K @ z
-        # Wrap th to be in the range of +/- pi
         self.xHat[0] = wrap_to_pi(self.xHat[0])
 
-        self.P = (self.I - K@self.C) @ self.P
+        self.P = (self.I - K @ self.C) @ self.P
         return
 
-#endregion
+# endregion
+
 
 class PathFollower(Node):
 
     def __init__(self):
-      super().__init__('path_follower')
+        super().__init__('path_follower')
 
-      # define new parameters for node to use
-      self.declare_parameter('node_values', [0,8,10])
-      self.waypoints = list(self.get_parameter("node_values").get_parameter_value().integer_array_value)
+        # ------------------- Parameters -------------------
+        self.declare_parameter('node_values', [0, 8, 10])
+        self.waypoints = list(self.get_parameter("node_values").get_parameter_value().integer_array_value)
 
-      self.declare_parameter('desired_speed', [0.4])
-      self.desired_speed = list(self.get_parameter("desired_speed").get_parameter_value().double_array_value)
+        self.declare_parameter('desired_speed', [0.2])
+        self.desired_speed = list(self.get_parameter("desired_speed").get_parameter_value().double_array_value)
 
+        self.declare_parameter('visualize_pose', [False])
+        self.pose_visualize_flag = list(self.get_parameter("visualize_pose").get_parameter_value().bool_array_value)[0]
 
-      self.declare_parameter('visualize_pose', [False])
-      self.pose_visualize_flag = list(self.get_parameter("visualize_pose").get_parameter_value().bool_array_value)[0]
+        # Scale (keep default consistent with your existing behavior)
+        self.declare_parameter('scale', 1.0)
+        self.scale = float(self.get_parameter("scale").get_parameter_value().double_value)
 
-      '''
-      ================= For future reference =================
+        self.declare_parameter('rotation_offset', [90.0])
+        self.rotation_offset = list(self.get_parameter("rotation_offset").get_parameter_value().double_array_value)
 
-      If using the nav_to_pose on virtual qcar these are the values to use if the QCar starts close to node 10
+        self.declare_parameter('translation_offset', [0.0, 0.0])
+        self.translation_offset = list(self.get_parameter("translation_offset").get_parameter_value().double_array_value)
 
-      Rotation for virtual
-      33.0
-      Translation for virtual
-      1.05,0.9
+        self.declare_parameter('start_path', [True])
+        self.path_execute_flag = list(self.get_parameter("start_path").get_parameter_value().bool_array_value)[0]
 
-      set self.scale to 0.975
+        # --- New: Lookahead + waypoint tracking (fixes jumpy steering) ---
+        self.declare_parameter('lookahead_base', 0.45)
+        self.declare_parameter('lookahead_speed_gain', 0.60)
+        self.declare_parameter('lookahead_min', 0.45)
+        self.declare_parameter('lookahead_max', 0.90)
 
-      If using the nav_to_pose on physical qcar but starting close to node 10
-      Rotation
-      44.0
-      Translation
-      1.15,0.55
-`
-      '''
+        self.declare_parameter('wpi_search_back', 15)
+        self.declare_parameter('wpi_search_forward', 220)
+        self.declare_parameter('wpi_index_cost', 0.0005)  # penalize large index jumps
+        self.declare_parameter('wpi_behind_penalty', 1.0e4)
+        self.declare_parameter('wpi_max_backtrack', 3)
 
-      self.scale = 1.0
+        self.declare_parameter('init_candidates', 80)
+        self.declare_parameter('init_heading_weight', 5.0)
+        self.declare_parameter('init_behind_penalty', 1.0e6)
 
-      self.declare_parameter('rotation_offset', [90.0])
-      self.rotation_offset = list(self.get_parameter("rotation_offset").get_parameter_value().double_array_value)
+        # --- New: steering smoothing (kills oscillation) ---
+        self.declare_parameter('steer_lpf_alpha', 0.25)     # 0..1 (higher = less smoothing)
+        self.declare_parameter('steer_rate_limit', 2.0)     # rad/s
+        self.declare_parameter('steer_limit', 0.5)          # matches your old clamp
 
-      self.declare_parameter('translation_offset', [0.0,0.0])
-      self.translation_offset = list(self.get_parameter("translation_offset").get_parameter_value().double_array_value)
+        # --- Controller gains (kept similar, slightly calmer defaults) ---
+        self.declare_parameter('k_st', 0.95)                # old 1.1
+        self.declare_parameter('v_soft', 0.50)              # old 0.3 (higher = less aggressive at low speed)
+        self.declare_parameter('w_st', 0.20)                # old 0.25
+        self.declare_parameter('kd_steering', 0.35)         # old 0.4
 
+        self.add_on_set_parameters_callback(self.parameter_update_callback)
 
-      self.declare_parameter('start_path', [False])
-      self.path_execute_flag = list(self.get_parameter("start_path").get_parameter_value().bool_array_value)[0]
+        # target frame
+        self.target_frame = self.declare_parameter('target_frame', 'base_link').get_parameter_value().string_value
 
-      self.add_on_set_parameters_callback(self.parameter_update_callback)
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
 
-      # Declare and acquire `target_frame` parameter
-      self.target_frame = self.declare_parameter(
-        'target_frame', 'base_link').get_parameter_value().string_value
+        # timing
+        self.dt = 1 / 80
 
-      self.tf_buffer = Buffer()
-      self.tf_listener = TransformListener(self.tf_buffer, self)
+        # EKF init
+        x0 = np.zeros((3, 1))
+        P0 = np.eye(3)
+        R_combined = np.diagflat([0.1, 0.1, 0.01])
 
-      # parameters common to all methods
-      self.dt = 1/80
+        self.qcar2_ekf = QcarEKF(
+            x0=x0,
+            P0=P0,
+            Q=np.diagflat([0.0001, 0.0001, 0.001]),
+            R=R_combined
+        )
+        self.pose_ekf = np.zeros((3, 1))
 
-      # Initial estimates for QCar state and covarience matrix (P)
-      x0 = np.zeros((3,1))
-      P0 = np.eye(3)
+        self.gyro_kf = GyroKF(
+            x0=np.zeros((2, 1)),
+            P0=np.eye(2),
+            Q=np.diagflat([0.01, 0.01]),
+            R=np.diagflat([.1])
+        )
 
+        # gyro filter
+        self.yaw = 0.0
+        self.cutoff_frequency_filter = 15.0
+        self.a1, self.b1 = self.filter_coefficients(self.cutoff_frequency_filter, self.dt)
 
-      # For pose estimation
-      R_combined = np.diagflat([0.1, 0.1, 0.01])
+        # timers
+        self.path_control_timer = self.create_timer(self.dt, self.path_planner)
+        self.timer = self.create_timer(self.dt, self.tf_timer)
 
-      self.qcar2_ekf = QcarEKF(
-        x0=x0,
-        P0=P0,
-        Q=np.diagflat([0.0001, 0.0001, 0.001]),
-        R=R_combined)
-      self.pose_ekf = np.zeros((3,1))
+        # path setup
+        self.translation = [0, 0, 0]
+        self.rotation = [0, 0, 0]
+        self.wp = SDCSRoadMap().generate_path(self.waypoints) * self.scale
+        self.N = len(self.wp[0, :])
+        self.wpi = 0
 
-      # for updating heading based on pose and gyro
-      self.gyro_kf = GyroKF(
-        x0=np.zeros((2,1)),
-        P0=np.eye(2),
-        Q=np.diagflat([0.01, 0.01]),
-        R=np.diagflat([.1])
-      )
+        # cached transformed path (map frame)
+        self.wp_map_xy = None  # shape (N,2)
+        self._cache_path_transformed()
 
+        # init logic
+        self._wpi_initialized = False
 
-      # timer for both pose and gyro EKF
-      self.yaw = 0
-      # butterworth filter parameters
-      self.cutoff_frequency_filter = 15.0
-      self.a1, self.b1 = self.filter_coefficients(self.cutoff_frequency_filter,self.dt)
+        # steering state (for smoothing)
+        self.current_steering = 0.0
+        self._steer_lpf_state = 0.0
 
-      self.path_control_timer = self.create_timer(self.dt, self.path_planner)
+        # ROS I/O
+        self.publisher = self.create_publisher(Twist, '/cmd_vel_nav', 1)
+        self.path_publisher_topic = self.create_publisher(Path, '/planned_path', 1)
+        self.path_status_publisher = self.create_publisher(Bool, '/path_status', 1)
 
-      # Waypoint and path specific settings
+        self.joint_state_subscriber = self.create_subscription(JointState, '/qcar2_joint', self.joint_state_callback, 1)
+        self.qcar2_measurred_speed = 0.0
 
-      self.timer = self.create_timer(self.dt, self.tf_timer)
-      self.translation = [0,0,0]
-      self.rotation =[0,0,0]
-      self.wp  = SDCSRoadMap().generate_path(self.waypoints)*self.scale
-      self.N = len(self.wp[0, :])
-      self.wpi = 0
-      self.wp_prior = []
-      self.current_steering =0
+        self.object_detection_flag = self.create_subscription(Bool, '/motion_enable', self.object_detector_callback, 1)
+        self.motion_flag = True
+        self.path_complete = False
 
-      self.publisher = self.create_publisher(Twist,'/cmd_vel_raw', 1)
-      self.cyclic = False
-      self.max_steering_angle = 0.6
+        self.imu_subscrition = self.create_subscription(Imu, '/qcar2_imu', self.imu_callback, 10)
+        self.gyroscope = [0.0, 0.0, 0.0]
 
-      self.joint_state_subscriber = self.create_subscription(JointState, '/qcar2_joint',self.joint_state_callback, 1)
-      self.qcar2_measurred_speed = 0
+        # multiscope
+        self.t0 = time.time()
+        self.t_plot = 0
+        self.plot_visualized = False
+        self.scopeTimer = self.create_timer(0.1, self.scopeDataTimer)
 
-      self.object_detection_flag = self.create_subscription(Bool, '/motion_enable',self.object_detector_callback, 1)
-      self.motion_flag = True
-      self.path_complete = False
+        # path publisher throttle
+        self._last_path_pub_sec = -999
 
-      self.imu_subscrition = self.create_subscription(Imu, '/qcar2_imu',self.imu_callback, 10)
-      self.gyroscope = [0,0,0]
-
-      self.path_publisher_topic = self.create_publisher(Path, '/planned_path',1)
-
-      self.path_status_publisher = self.create_publisher(Bool, '/path_status',1)
-
-      # Multiscope info
-      self.t0 = time.time()
-      self.t_plot = 0
-      self.plot_visualized = False
-      self.scopeTimer = self.create_timer(0.1, self.scopeDataTimer)
-
-
+    # ---------------- Parameter updates ----------------
     def parameter_update_callback(self, params):
         for param in params:
+            if param.name == 'node_values' and param.type_ == param.Type.INTEGER_ARRAY:
+                self.waypoints = list(param.value)
+                self.wp = SDCSRoadMap().generate_path(self.waypoints) * self.scale
+                self.N = len(self.wp[0, :])
+                self.wpi = 0
+                self._wpi_initialized = False
+                self.path_complete = False
+                self._cache_path_transformed()
+                self.get_logger().info('nodes updated!')
+                print(self.waypoints)
 
-          if param.name == 'node_values' and param.type_== param.Type.INTEGER_ARRAY:
-              # Navigation specific variables
-              self.waypoints = list(param.value)
-              # print(self.waypoints)
-              self.wp  = SDCSRoadMap().generate_path(self.waypoints)*0.975
-              self.N = len(self.wp[0, :])
-              self.wpi = 0
-              self.previous_steering_value = 0
-              self.path_complete = False
-              self.get_logger().info('nodes updated!')
-              print(self.waypoints)
+            elif param.name == 'desired_speed' and param.type_ == param.Type.DOUBLE_ARRAY:
+                self.desired_speed = list(param.value)
+                self.get_logger().info('new desired speed...')
+                print(self.desired_speed)
 
-          elif param.name == 'desired_speed' and param.type_== param.Type.DOUBLE_ARRAY:
-              self.desired_speed = list(param.value)
-              self.get_logger().info('new desired speed...')
-              print(self.desired_speed)
+            elif param.name == 'rotation_offset' and param.type_ == param.Type.DOUBLE_ARRAY:
+                self.rotation_offset = list(param.value)
+                self._cache_path_transformed()
 
-          elif param.name == 'rotation_offset' and param.type_== param.Type.DOUBLE_ARRAY:
-              self.rotation_offset = list(param.value)
+            elif param.name == 'translation_offset' and param.type_ == param.Type.DOUBLE_ARRAY:
+                self.translation_offset = list(param.value)
+                self._cache_path_transformed()
 
-          elif param.name == 'translation_offset' and param.type_== param.Type.DOUBLE_ARRAY:
-              self.translation_offset = list(param.value)
-          elif param.name == 'start_path' and param.type_== param.Type.BOOL_ARRAY:
-              self.path_execute_flag = list(param.value)[0]
-              self.get_logger().info('path status changed!')
+            elif param.name == 'scale' and param.type_ == param.Type.DOUBLE:
+                self.scale = float(param.value)
+                self.wp = SDCSRoadMap().generate_path(self.waypoints) * self.scale
+                self.N = len(self.wp[0, :])
+                self.wpi = 0
+                self._wpi_initialized = False
+                self.path_complete = False
+                self._cache_path_transformed()
 
-          elif param.name == 'visualize_pose' and param.type_== param.Type.BOOL_ARRAY:
-              self.pose_visualize_flag = list(param.value)[0]
-              if self.pose_visualize_flag and not self.plot_visualized:
-                self.get_logger().info('Pose performance to be displayed.. Note: visualizing pose will impact driving performance...')
+            elif param.name == 'start_path' and param.type_ == param.Type.BOOL_ARRAY:
+                self.path_execute_flag = list(param.value)[0]
+                self.get_logger().info('path status changed!')
 
-                tf = 200
+            elif param.name == 'visualize_pose' and param.type_ == param.Type.BOOL_ARRAY:
+                self.pose_visualize_flag = list(param.value)[0]
+                if self.pose_visualize_flag and not self.plot_visualized:
+                    self.get_logger().info(
+                        'Pose performance to be displayed.. Note: visualizing pose will impact driving performance...'
+                    )
 
-                self.steeringScope = MultiScope(
-                      rows=4,
-                      cols=1,
-                      title='Vehicle Steering Control',
-                      fps=10
-                  )
+                    tf = 200
+                    self.steeringScope = MultiScope(rows=4, cols=1, title='Vehicle Steering Control', fps=10)
 
-                self.steeringScope.addAxis(
-                      row=0,
-                      col=0,
-                      timeWindow=tf,
-                      yLabel='x Position [m]',
-                      yLim=(-2.5, 2.5)
-                  )
-                self.steeringScope.axes[0].attachSignal(name='x_meas')
-                self.steeringScope.axes[0].attachSignal(name='x_ekf')
+                    self.steeringScope.addAxis(row=0, col=0, timeWindow=tf, yLabel='x Position [m]', yLim=(-2.5, 2.5))
+                    self.steeringScope.axes[0].attachSignal(name='x_meas')
+                    self.steeringScope.axes[0].attachSignal(name='x_ekf')
 
-                self.steeringScope.addAxis(
-                      row=1,
-                      col=0,
-                      timeWindow=tf,
-                      yLabel='y Position [m]',
-                      yLim=(-1, 6)
-                  )
-                self.steeringScope.axes[1].attachSignal(name='y_meas')
-                self.steeringScope.axes[1].attachSignal(name='y_ekf')
+                    self.steeringScope.addAxis(row=1, col=0, timeWindow=tf, yLabel='y Position [m]', yLim=(-1, 6))
+                    self.steeringScope.axes[1].attachSignal(name='y_meas')
+                    self.steeringScope.axes[1].attachSignal(name='y_ekf')
 
-                self.steeringScope.addAxis(
-                      row=2,
-                      col=0,
-                      timeWindow=tf,
-                      yLabel='steering cmd [rad]',
-                      yLim=(-0.6,0.6)
-                  )
-                self.steeringScope.axes[2].attachSignal(name='delta')
+                    self.steeringScope.addAxis(row=2, col=0, timeWindow=tf, yLabel='steering cmd [rad]', yLim=(-0.6, 0.6))
+                    self.steeringScope.axes[2].attachSignal(name='delta')
 
-                self.steeringScope.addAxis(
-                      row=3,
-                      col=0,
-                      timeWindow=tf,
-                      yLabel='heading',
-                      yLim=(-np.pi,np.pi)
-                  )
-                self.steeringScope.axes[3].attachSignal(name='theta_meas')
-                self.steeringScope.axes[3].attachSignal(name='theta_EKF_sf')
+                    self.steeringScope.addAxis(row=3, col=0, timeWindow=tf, yLabel='heading', yLim=(-np.pi, np.pi))
+                    self.steeringScope.axes[3].attachSignal(name='theta_meas')
+                    self.steeringScope.axes[3].attachSignal(name='theta_EKF_sf')
 
-                self.plot_visualized = True
-              
-              elif self.pose_visualize_flag and self.plot_visualized:
-                self.get_logger().info('visualization running...')
+                    self.plot_visualized = True
 
-              elif not self.pose_visualize_flag and self.plot_visualized:
-                self.plot_visualized = False
+                elif self.pose_visualize_flag and self.plot_visualized:
+                    self.get_logger().info('visualization running...')
 
-          return SetParametersResult(successful=True)
-  
-    def filter_coefficients(self, freq,dt):
-      nyq_freq = 0.5*(1/dt)
-      norm_cut = freq/nyq_freq
+                elif not self.pose_visualize_flag and self.plot_visualized:
+                    self.plot_visualized = False
 
+        return SetParametersResult(successful=True)
 
-      b, a = signal.butter(2,norm_cut)
-      self.hist = {
-          'gyro': {'in': [0.0]*3, 'out': [0.0]*3},
-          }
+    # ---------------- Filters ----------------
+    def filter_coefficients(self, freq, dt):
+        nyq_freq = 0.5 * (1 / dt)
+        norm_cut = freq / nyq_freq
 
-      return a,b
-   
-    def apply_filter(self, key, new_input, a,b):
+        b, a = signal.butter(2, norm_cut)
+        self.hist = {'gyro': {'in': [0.0] * 3, 'out': [0.0] * 3}}
+        return a, b
+
+    def apply_filter(self, key, new_input, a, b):
         h = self.hist[key]
         h['in'] = [new_input] + h['in'][:2]
         y = (
-            b[0]*h['in'][0] +
-            b[1]*h['in'][1] +
-            b[2]*h['in'][2] -
-            a[1]*h['out'][0] -
-            a[2]*h['out'][1]
+            b[0] * h['in'][0] +
+            b[1] * h['in'][1] +
+            b[2] * h['in'][2] -
+            a[1] * h['out'][0] -
+            a[2] * h['out'][1]
         )
         h['out'] = [y] + h['out'][:2]
         return y
 
+    # ---------------- Subscribers ----------------
     def object_detector_callback(self, msg):
-      self.motion_flag = msg.data
-      # self.get_logger().info(f"motion Falg received was:{self.motion_flag}")
+        self.motion_flag = msg.data
 
     def joint_state_callback(self, msg):
-      self.qcar2_measurred_speed = (msg.velocity[0]/(720.0*4.0))*((13.0*19.0)/(70.0*30.0))*(2.0*np.pi)*0.033
+        self.qcar2_measurred_speed = (msg.velocity[0] / (720.0 * 4.0)) * ((13.0 * 19.0) / (70.0 * 30.0)) * (2.0 * np.pi) * 0.033
 
-    def imu_callback(self,msg):
-       self.gyroscope = [msg.angular_velocity.x,msg.angular_velocity.y,msg.angular_velocity.z]
+    def imu_callback(self, msg):
+        self.gyroscope = [msg.angular_velocity.x, msg.angular_velocity.y, msg.angular_velocity.z]
+
+    # ---------------- Path utilities ----------------
+    def _cache_path_transformed(self):
+        """Precompute transformed path points in map frame for stable indexing."""
+        if self.wp is None:
+            self.wp_map_xy = None
+            return
+
+        angle_offset = float(self.rotation_offset[0])
+        R_QLabs_ROS = np.array([
+            [np.cos(-angle_offset * np.pi / 180), -np.sin(-angle_offset * np.pi / 180)],
+            [np.sin(-angle_offset * np.pi / 180),  np.cos(-angle_offset * np.pi / 180)]
+        ], dtype=float)
+        t = np.array([float(self.translation_offset[0]), float(self.translation_offset[1])], dtype=float)
+
+        wp_all = self.wp.T  # (N,2)
+        wp_map = (wp_all + t[None, :]) @ R_QLabs_ROS  # (N,2)
+        self.wp_map_xy = wp_map
+
+    def _init_wpi_once(self, p, th):
+        """Initialize wpi robustly: nearest + heading aligned + not behind."""
+        if self.wp_map_xy is None or self.N < 3:
+            return
+
+        p_np = np.array([float(p[0]), float(p[1])], dtype=float)
+        d2 = np.sum((self.wp_map_xy - p_np[None, :]) ** 2, axis=1)
+
+        K = int(self.get_parameter('init_candidates').value)
+        K = int(np.clip(K, 10, min(self.N, 300)))
+        cand = np.argsort(d2)[:K]
+
+        forward = np.array([np.cos(th), np.sin(th)], dtype=float)
+
+        heading_w = float(self.get_parameter('init_heading_weight').value)
+        behind_pen = float(self.get_parameter('init_behind_penalty').value)
+
+        best = int(cand[0])
+        best_score = 1e18
+
+        for idx in cand:
+            idx = int(idx)
+            rel = self.wp_map_xy[idx] - p_np
+            fwd = float(np.dot(rel, forward))
+
+            score = float(d2[idx])
+
+            # hard reject behind
+            if fwd < -0.20:
+                score += behind_pen
+
+            # heading alignment penalty (prefer path segment aligned with vehicle heading)
+            j = min(idx + 1, self.N - 1)
+            vec = self.wp_map_xy[j] - self.wp_map_xy[idx]
+            if float(np.linalg.norm(vec)) > 1e-6:
+                path_yaw = float(np.arctan2(vec[1], vec[0]))
+                h_err = float(wrap_to_pi(path_yaw - th))
+                score += heading_w * (h_err ** 2)
+
+            if score < best_score:
+                best_score = score
+                best = idx
+
+        self.wpi = int(np.clip(best, 0, self.N - 2))
+        self._wpi_initialized = True
+
+    def _update_wpi_closest_in_window(self, p, th):
+        """Track the closest path index but only within a local window (prevents lane switching)."""
+        if self.wp_map_xy is None or self.N < 3:
+            return
+
+        back = int(self.get_parameter('wpi_search_back').value)
+        fwd = int(self.get_parameter('wpi_search_forward').value)
+        max_backtrack = int(self.get_parameter('wpi_max_backtrack').value)
+
+        i0 = max(0, int(self.wpi) - back)
+        i1 = min(self.N - 1, int(self.wpi) + fwd)
+
+        idxs = np.arange(i0, i1, dtype=int)
+        pts = self.wp_map_xy[idxs]
+
+        px, py = float(p[0]), float(p[1])
+        dx = pts[:, 0] - px
+        dy = pts[:, 1] - py
+        d2 = dx * dx + dy * dy
+
+        # Penalize large index jumps (stays on the same branch/lane)
+        w_idx = float(self.get_parameter('wpi_index_cost').value)
+        di = (idxs - int(self.wpi)).astype(float)
+        cost = d2 + w_idx * (di * di)
+
+        # Penalize points behind vehicle
+        forward = np.array([np.cos(th), np.sin(th)], dtype=float)
+        fwd_comp = dx * forward[0] + dy * forward[1]
+        behind_pen = float(self.get_parameter('wpi_behind_penalty').value)
+        cost = np.where(fwd_comp < -0.25, cost + behind_pen, cost)
+
+        best_local = int(idxs[int(np.argmin(cost))])
+
+        # limit backtracking
+        if best_local < int(self.wpi) - max_backtrack:
+            best_local = int(self.wpi) - max_backtrack
+
+        self.wpi = int(np.clip(best_local, 0, self.N - 2))
+
+    def _lookahead_index(self, p, start_idx, lookahead_dist):
+        """Return first index >= start_idx whose distance to p >= lookahead_dist."""
+        if self.wp_map_xy is None or self.N < 3:
+            return int(np.clip(start_idx, 0, self.N - 2))
+
+        px, py = float(p[0]), float(p[1])
+        i = int(np.clip(start_idx, 0, self.N - 2))
+        Ld = float(max(0.05, lookahead_dist))
+
+        while i < (self.N - 2):
+            dx = self.wp_map_xy[i, 0] - px
+            dy = self.wp_map_xy[i, 1] - py
+            if (dx * dx + dy * dy) >= (Ld * Ld):
+                break
+            i += 1
+        return int(np.clip(i, 0, self.N - 2))
 
     def path_publisher(self):
+        if self.wp_map_xy is None:
+            self._cache_path_transformed()
+        if self.wp_map_xy is None:
+            return
+
         path_msg = Path()
         path_msg.header.stamp = self.get_clock().now().to_msg()
         path_msg.header.frame_id = "map"
-        # path_msg.header.frame_id = "map_rotated"
 
-        for i in range(self.wpi):
-        # for i in range(self.N):
-          if i >= self.N:
-             i = self.N-1
-          pose = PoseStamped()
-          wp_1_mod = [0,0]
-
-          angle_offset= self.rotation_offset[0]
-          R_QLabs_ROS = np.array([[np.cos(-angle_offset*np.pi/180), -np.sin(-angle_offset*np.pi/180)],
-                                  [np.sin(-angle_offset*np.pi/180),np.cos(-angle_offset*np.pi/180)]])
-          t = np.array([self.translation_offset[0],self.translation_offset[1]])
-          wp_1_mod = ([self.wp[0,i],self.wp[1,i]]+t)@R_QLabs_ROS
-          pose.header.stamp = self.get_clock().now().to_msg()
-          pose.header.frame_id = "map"
-          pose.pose.position.x =wp_1_mod[0]
-          pose.pose.position.y =wp_1_mod[1]
-
-          path_msg.poses.append(pose)
+        upto = int(np.clip(self.wpi, 0, self.N - 1))
+        for i in range(upto):
+            pose = PoseStamped()
+            pose.header.stamp = self.get_clock().now().to_msg()
+            pose.header.frame_id = "map"
+            pose.pose.position.x = float(self.wp_map_xy[i, 0])
+            pose.pose.position.y = float(self.wp_map_xy[i, 1])
+            path_msg.poses.append(pose)
 
         self.path_publisher_topic.publish(path_msg)
 
+    # ---------------- Core loop ----------------
     def path_planner(self):
-
         max_speed = 1.5
-        enable = 1
-        speed_command = self.desired_speed[0]
-        skip_index = 0
+        enable = 1.0
+        speed_command = float(self.desired_speed[0])
 
         self.t_plot = time.time() - self.t0
 
-        # update ekf_filter
+        # update filters
         self.ekf_filter_timer()
 
-        # publish latest path value based on current waypoint every 2 seconds
-        if round(self.t_plot) % 2 == 0:
+        # publish path at ~1 Hz (not spammy)
+        sec = int(self.t_plot)
+        if sec != self._last_path_pub_sec and (sec % 2 == 0):
+            self._last_path_pub_sec = sec
             self.path_publisher()
+
+        steering_cmd = self.current_steering
 
         try:
             if not self.path_complete:
 
-                # ----------------- Pose source (TF preferred, EKF fallback) -----------------
-                th = self.qcar2_ekf.xHat[2, 0]
-                p = [self.qcar2_ekf.xHat[0, 0], self.qcar2_ekf.xHat[1, 0]]
+                # Pose source (TF preferred)
+                th = float(self.qcar2_ekf.xHat[2, 0])
+                p = [float(self.qcar2_ekf.xHat[0, 0]), float(self.qcar2_ekf.xHat[1, 0])]
 
                 try:
-                    p = [self.translation.x, self.translation.y]
-                    th = self.yaw
+                    p = [float(self.translation.x), float(self.translation.y)]
+                    th = float(self.yaw)
                 except AttributeError:
-                    p = [0, 0]
-                    th = 0
+                    pass
 
-                # ----------------- Precompute transform (used everywhere) -----------------
-                angle_offset = self.rotation_offset[0]
-                R_QLabs_ROS = np.array([
-                    [np.cos(-angle_offset*np.pi/180), -np.sin(-angle_offset*np.pi/180)],
-                    [np.sin(-angle_offset*np.pi/180),  np.cos(-angle_offset*np.pi/180)]
-                ])
-                t = np.array([self.translation_offset[0], self.translation_offset[1]])
+                if self.wp_map_xy is None:
+                    self._cache_path_transformed()
 
-                # ----------------- ONE-TIME SNAP (MUST happen BEFORE wp_1/wp_2 are read) -----------------
-                if self.wpi == 0:
-                    wp_all = self.wp.T
-                    wp_all_m = (wp_all + t) @ R_QLabs_ROS
-                    p_np = np.array([p[0], p[1]], dtype=float)
+                if self.wp_map_xy is None or self.N < 5:
+                    raise RuntimeError("Path not ready")
 
-                    d2 = np.sum((wp_all_m - p_np[None, :])**2, axis=1)
-                    K = 60
-                    cand = np.argsort(d2)[:K]
+                # Initialize wpi once
+                if not self._wpi_initialized:
+                    self._init_wpi_once(p, th)
 
-                    # Vehicle right normal in map frame (right = [sin(th), -cos(th)])
-                    right_n = np.array([np.sin(th), -np.cos(th)], dtype=float)
+                # Track closest index smoothly (no skipping)
+                self._update_wpi_closest_in_window(p, th)
 
-                    best = int(cand[0])
-                    best_score = 1e18
+                # Stop condition near end
+                end_xy = self.wp_map_xy[self.N - 1]
+                dist_to_end = float(np.hypot(p[0] - end_xy[0], p[1] - end_xy[1]))
+                if (self.wpi >= self.N - 3) or (dist_to_end < 0.35 and self.wpi > self.N - 40):
+                    speed_command = 0.0
+                    steering_cmd = 0.0
+                    self.path_complete = True
+                else:
+                    # Lookahead selection
+                    lookahead_base = float(self.get_parameter('lookahead_base').value)
+                    lookahead_k = float(self.get_parameter('lookahead_speed_gain').value)
+                    lookahead_min = float(self.get_parameter('lookahead_min').value)
+                    lookahead_max = float(self.get_parameter('lookahead_max').value)
 
-                    for idx in cand:
-                        rel = wp_all_m[idx] - p_np
-                        side = float(np.dot(rel, right_n))  # >0 means waypoint is to the RIGHT of vehicle
+                    lookahead_dist = lookahead_base + lookahead_k * abs(speed_command)
+                    lookahead_dist = float(np.clip(lookahead_dist, lookahead_min, lookahead_max))
 
-                        # Prefer right side; penalize left side heavily
-                        side_penalty = 0.0 if side > 0.0 else 1e6
+                    i_ref = self._lookahead_index(p, self.wpi, lookahead_dist)
 
-                        score = float(d2[idx]) + side_penalty
-                        if score < best_score:
-                            best_score = score
-                            best = int(idx)
+                    # Segment for local path direction (Stanley uses nearest segment)
+                    i_seg = int(np.clip(self.wpi, 0, self.N - 2))
+                    p1 = self.wp_map_xy[i_seg]
+                    p2 = self.wp_map_xy[i_seg + 1]
+                    seg = p2 - p1
+                    if float(np.linalg.norm(seg)) < 1e-6:
+                        path_yaw = th
+                    else:
+                        path_yaw = float(np.arctan2(seg[1], seg[0]))
 
-                    self.wpi = best
+                    heading_error = float(wrap_to_pi(path_yaw - th))
 
-                # ----------------- NOW extract waypoints using the (possibly snapped) wpi -----------------
-                wp_1 = np.array(self.wp[:, self.wpi])
-                wp_2 = np.array(self.wp[:, self.wpi + 1])
+                    left_n = np.array([-np.sin(path_yaw), np.cos(path_yaw)], dtype=float)
+                    cte = float(np.dot(np.array([p[0] - p1[0], p[1] - p1[1]], dtype=float), left_n))
 
-                wp_1_mod = (wp_1 + t) @ R_QLabs_ROS
+                    # Pure pursuit target
+                    target = self.wp_map_xy[i_ref]
+                    v = np.array([target[0] - p[0], target[1] - p[1]], dtype=float)
 
-                L = 0.256
+                    # world->car (row vector trick)
+                    Rmat = np.array([[np.cos(th), -np.sin(th)],
+                                     [np.sin(th),  np.cos(th)]], dtype=float)
+                    v_car = v @ Rmat
 
-                # ----------------- Pure pursuit geometry (unchanged) -----------------
-                v = [wp_1_mod[0] - p[0], wp_1_mod[1] - p[1]]
-                Rmat = np.array([[np.cos(th), -np.sin(th)], [np.sin(th), np.cos(th)]])
-                v_car = v @ Rmat
+                    WaypointDist = float(np.linalg.norm(v_car))
+                    WaypointDist = max(0.15, WaypointDist)  # prevent blow-up
 
-                WaypointDist = np.linalg.norm(v_car)
-                psi = np.arctan2(v_car[1], v_car[0])
+                    psi = float(np.arctan2(v_car[1], v_car[0]))
+                    L = 0.256
+                    delta_pp = float(np.arctan2(2.0 * L * np.sin(psi), WaypointDist))
 
-                delta = np.arctan2(2 * L * np.sin(psi), WaypointDist)
-                dist = np.linalg.norm([p[0] - wp_1_mod[0], p[1] - wp_1_mod[1]])
+                    # Stanley (parameters)
+                    v_meas = max(0.05, float(self.qcar2_measurred_speed))
+                    k_st = float(self.get_parameter('k_st').value)
+                    v_soft = float(self.get_parameter('v_soft').value)
+                    delta_st = float(heading_error + np.arctan2(k_st * cte, v_meas + v_soft))
 
-                # ----------------- Lookahead / index progression (your tuned version) -----------------
-                lookahead_dist = 0.45 + 0.6 * speed_command
-                skip_index = int(speed_command * (speed_command / max_speed))
-                lookahead_dist = np.clip(lookahead_dist, 0.45, 0.9)
-                skip_index = np.clip(skip_index, 5, 60)
+                    # Blend
+                    w_st = float(self.get_parameter('w_st').value)
+                    delta_blend = (1.0 - w_st) * delta_pp + w_st * delta_st
 
-                if dist < lookahead_dist:
-                    if self.wpi < self.N - 2:
-                        self.wpi += skip_index
+                    # Gyro damping (filtered)
+                    kd_steering = float(self.get_parameter('kd_steering').value)
+                    gyro_filtered = float(self.apply_filter('gyro', float(self.gyroscope[2]), self.a1, self.b1))
+                    delta_blend = float(delta_blend - kd_steering * gyro_filtered)
 
-                self.wpi = np.clip(self.wpi, 0, self.N - 5)
+                    # Clamp
+                    steer_limit = float(self.get_parameter('steer_limit').value)
+                    steer_raw = float(np.clip(delta_blend, -steer_limit, steer_limit))
 
-                if self.wpi >= self.N - 5:
-                    if dist < 0.4:
-                        speed_command = 0.0
-                        steering = 0.0
-                        self.wp_prior = self.wp
-                        self.path_complete = True
+                    # --- NEW: steering smoothing (LPF + rate limit) ---
+                    alpha = float(self.get_parameter('steer_lpf_alpha').value)
+                    alpha = float(np.clip(alpha, 0.01, 1.0))
 
-                # ----------------- Pure Pursuit + Stanley steering (your tuned values) -----------------
-                delta_pp = delta
+                    self._steer_lpf_state = alpha * steer_raw + (1.0 - alpha) * self._steer_lpf_state
 
-                wp_2_mod = (wp_2 + t) @ R_QLabs_ROS
+                    rate = float(self.get_parameter('steer_rate_limit').value)
+                    rate = max(0.1, rate)
+                    max_step = rate * self.dt
 
-                path_vec = np.array([wp_2_mod[0] - wp_1_mod[0], wp_2_mod[1] - wp_1_mod[1]], dtype=float)
-                path_yaw = np.arctan2(path_vec[1], path_vec[0])
+                    delta = float(self._steer_lpf_state - self.current_steering)
+                    delta = float(np.clip(delta, -max_step, +max_step))
+                    steering_cmd = float(self.current_steering + delta)
 
-                heading_error = wrap_to_pi(path_yaw - th)
-
-                left_n = np.array([-np.sin(path_yaw), np.cos(path_yaw)], dtype=float)
-                cte = float(np.dot(np.array([p[0] - wp_1_mod[0], p[1] - wp_1_mod[1]], dtype=float), left_n))
-
-                v_meas = max(0.05, float(self.qcar2_measurred_speed))
-                k_st = 1.1
-                v_soft = 0.3
-                delta_st = float(heading_error + np.arctan2(k_st * cte, v_meas + v_soft))
-
-                w_st = 0.25
-                delta_blend = (1.0 - w_st) * float(delta_pp) + w_st * float(delta_st)
-
-                kd_steering = 0.4
-                gyro_filtered = float(self.apply_filter('gyro', self.gyroscope[2], self.a1, self.b1))
-                delta_blend = delta_blend - kd_steering * gyro_filtered
-
-                steering = float(np.clip(delta_blend, -0.5, 0.5))
-                self.current_steering = steering
+                    steering_cmd = float(np.clip(steering_cmd, -steer_limit, steer_limit))
 
         except KeyboardInterrupt:
             speed_command = 0.0
-            steering = 0.0
+            steering_cmd = 0.0
 
-        if self.path_execute_flag == True:
-            if self.motion_flag == True:
-                enable = 1.0
-        if self.path_execute_flag == False or self.motion_flag == False or self.path_complete:
+        # store steering
+        self.current_steering = float(steering_cmd)
+
+        # Enable logic
+        if self.path_execute_flag is True and self.motion_flag is True and not self.path_complete:
+            enable = 1.0
+        else:
             enable = 0.0
 
-        # publishing commands
+        # publish commands
         self.nav_command(enable, speed_command)
         self.path_status()
 
-    def nav_command(self,enable, speed_command):
-      QCarCommands = Twist()
-      QCarCommands.linear.x = enable*np.clip(speed_command*np.power(np.cos(self.current_steering),2),0.05,0.7)
-      QCarCommands.angular.z = enable*self.current_steering
-      self.publisher.publish(QCarCommands)
+    def nav_command(self, enable, speed_command):
+        QCarCommands = Twist()
+        # same as your original
+        QCarCommands.linear.x = enable * np.clip(
+            float(speed_command) * float(np.power(np.cos(self.current_steering), 2)),
+            0.05, 0.7
+        )
+        QCarCommands.angular.z = enable * float(self.current_steering)
+        self.publisher.publish(QCarCommands)
 
     def path_status(self):
-      msg = Bool()
-      msg.data = self.path_complete
-      self.path_status_publisher.publish(msg)
+        msg = Bool()
+        msg.data = bool(self.path_complete)
+        self.path_status_publisher.publish(msg)
 
+    # ---------------- TF + EKF ----------------
     def tf_timer(self):
-      from_frame_rel= "map"
-      to_frame_rel = self.target_frame
+        from_frame_rel = "map"
+        to_frame_rel = self.target_frame
 
-      try:
-        t = self.tf_buffer.lookup_transform(
-        from_frame_rel,
-        to_frame_rel,
-        rclpy.time.Time())
-        self.translation = t.transform.translation
-        rotation = [t.transform.rotation.x,
-                    t.transform.rotation.y,
-                    t.transform.rotation.z,
-                    t.transform.rotation.w]
-        roll, pitch,self.yaw = R.from_quat(rotation).as_euler('xyz')
+        try:
+            t = self.tf_buffer.lookup_transform(from_frame_rel, to_frame_rel, rclpy.time.Time())
+            self.translation = t.transform.translation
+            rotation = [t.transform.rotation.x, t.transform.rotation.y, t.transform.rotation.z, t.transform.rotation.w]
+            roll, pitch, self.yaw = R.from_quat(rotation).as_euler('xyz')
 
-        # we correct the GPS when we get new data from cartographer package
-        self.gyro_kf.correction(self.yaw)
-        y = np.array([
-                  [self.translation.x],
-                  [self.translation.y],
-                  [self.gyro_kf.xHat[0,0]]
-              ])
+            self.gyro_kf.correction(self.yaw)
+            y = np.array([
+                [self.translation.x],
+                [self.translation.y],
+                [self.gyro_kf.xHat[0, 0]]
+            ])
+            self.qcar2_ekf.correction(y)
 
-        self.qcar2_ekf.correction(y)
-      except TransformException as ex:
-          self.get_logger().info(f'Could not transform {to_frame_rel} to {from_frame_rel}: {ex}')
-          return
+        except TransformException as ex:
+            self.get_logger().info(f'Could not transform {to_frame_rel} to {from_frame_rel}: {ex}')
+            return
 
     def ekf_filter_timer(self):
-      # we always predict based on the steering and measured speed
-      speed = self.qcar2_measurred_speed
-      delta = self.current_steering
-      self.qcar2_ekf.prediction(self.dt, [speed, delta])
+        speed = self.qcar2_measurred_speed
+        delta = self.current_steering
+        self.qcar2_ekf.prediction(self.dt, [speed, delta])
 
-      try:
-         th_gyro = self.gyroscope[2]
-      except AttributeError:
-         th_gyro = 0
+        try:
+            th_gyro = self.gyroscope[2]
+        except AttributeError:
+            th_gyro = 0.0
 
-      self.gyro_kf.prediction(self.dt, th_gyro)
+        self.gyro_kf.prediction(self.dt, th_gyro)
 
+    # ---------------- Scope plotting ----------------
     def scopeDataTimer(self):
-      if self.pose_visualize_flag:
-        p = [self.qcar2_ekf.xHat[0,0],self.qcar2_ekf.xHat[1,0],self.qcar2_ekf.xHat[2,0]]
+        if self.pose_visualize_flag:
+            p = [self.qcar2_ekf.xHat[0, 0], self.qcar2_ekf.xHat[1, 0], self.qcar2_ekf.xHat[2, 0]]
 
-        if self.t_plot >200:
-          self.t0 = time.time()
-          self.steeringScope.axes[0].clean()
-          self.steeringScope.axes[1].clean()
-          self.steeringScope.axes[2].clean()
-          self.steeringScope.axes[3].clean()
-          MultiScope.refreshAll()
+            if self.t_plot > 200:
+                self.t0 = time.time()
+                self.steeringScope.axes[0].clean()
+                self.steeringScope.axes[1].clean()
+                self.steeringScope.axes[2].clean()
+                self.steeringScope.axes[3].clean()
+                MultiScope.refreshAll()
 
-        try:
-          x_ref = self.translation.x
-          y_ref = self.translation.y
-        except AttributeError:
-          x_ref = 0
-          y_ref = 0
-        self.steeringScope.axes[0].sample(self.t_plot, [x_ref, p[0] ])
-        self.steeringScope.axes[1].sample(self.t_plot, [y_ref, p[1]])
-        self.steeringScope.axes[2].sample(self.t_plot, [self.current_steering])
-        self.steeringScope.axes[3].sample(self.t_plot, [self.yaw,self.qcar2_ekf.xHat[2,0]])
+            try:
+                x_ref = self.translation.x
+                y_ref = self.translation.y
+            except AttributeError:
+                x_ref = 0
+                y_ref = 0
 
-        MultiScope.refreshAll()     
-      
-      else:
-        try:
-            self.steeringScope.graphicsLayoutWidget.close()
-            self.get_logger().info('previous scope closed...')
+            self.steeringScope.axes[0].sample(self.t_plot, [x_ref, p[0]])
+            self.steeringScope.axes[1].sample(self.t_plot, [y_ref, p[1]])
+            self.steeringScope.axes[2].sample(self.t_plot, [self.current_steering])
+            self.steeringScope.axes[3].sample(self.t_plot, [self.yaw, self.qcar2_ekf.xHat[2, 0]])
 
-        except AttributeError:
-          # self.get_logger().info('no visualization running...')
-          pass
+            MultiScope.refreshAll()
 
+        else:
+            try:
+                self.steeringScope.graphicsLayoutWidget.close()
+                self.get_logger().info('previous scope closed...')
+            except AttributeError:
+                pass
 
 
 def main():
+    rclpy.init()
+    node = PathFollower()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    rclpy.shutdown()
 
-  # Start the ROS 2 Python Client Library
-  rclpy.init()
-
-  node = PathFollower()
-  try:
-      rclpy.spin(node)
-  except KeyboardInterrupt:
-      pass
-
-  rclpy.shutdown()
 
 if __name__ == '__main__':
-  main()
+    main()
