@@ -3,7 +3,7 @@ Repository for Quanser ACC competition 2026
 
 This guide covers the commands and procedure for running the Visual Odometry (VO) redundancy system on the virtual QCar 2. The VO system independently verifies Cartographer (IMU + encoder odometry) using camera-based visual odometry and flags disagreements in real time.
 
-[VO_Technical_Reference.pdf]
+[VO_Technical_Reference.pdf][VO_Technical_Reference.pdf](https://github.com/user-attachments/files/25639831/VO_Technical_Reference.pdf)
 
 - [Overview](#overview)
 - [File Locations](#file-locations)
