@@ -28,9 +28,7 @@ setup(
             'lane_detector=autonomy.lane_detector:main',
             'yolo_detector=autonomy.yolo_detector:main',
             'trip_planner=autonomy.trip_planner:main',
-            'dataset_collector=autonomy.dataset_collector:main',
             'Planner_server=autonomy.Planner_server:main',
-            'avoid_sidewalks=autonomy.avoid_sidewalks:main',
             'lane_seg_node=autonomy.lane_seg_node:main',
             'bev_csi_node=autonomy.bev_csi_node:main'
         ],
