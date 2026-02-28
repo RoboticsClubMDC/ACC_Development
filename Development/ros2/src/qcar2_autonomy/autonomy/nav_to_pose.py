@@ -111,7 +111,7 @@ class PathFollower(Node):
         self.declare_parameter('node_values', [0, 8, 10])
         self.waypoints = list(self.get_parameter('node_values').get_parameter_value().integer_array_value)
 
-        self.declare_parameter('desired_speed', [0.4])
+        self.declare_parameter('desired_speed', [0.3])
         self.desired_speed = list(self.get_parameter('desired_speed').get_parameter_value().double_array_value)
 
         self.declare_parameter('visualize_pose', [True])
@@ -133,8 +133,8 @@ class PathFollower(Node):
         self.declare_parameter('mission_enable',     [False])
 
         # ---- Stanley blending — HARDCODED, not runtime-tunable ----
-        self.stanley_blend     = 0.05   # 5% max stanley contribution
-        self.stanley_trust_min = 0.80   # needs 80% lane confidence to activate
+        self.stanley_blend     = 0.3   # 5% max stanley contribution
+        self.stanley_trust_min = 0.50   # needs 80% lane confidence to activate
 
         self.add_on_set_parameters_callback(self.parameter_update_callback)
 

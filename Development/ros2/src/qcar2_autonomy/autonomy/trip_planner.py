@@ -35,12 +35,9 @@ class TripPlanner(Node):
         self.qcar_hardware_client = self.create_client(
             SetParameters, '/qcar2_hardware/set_parameters'
         )
-        # Non-blocking: if LED service isn't up, just skip LEDs — don't freeze startup
-        if not self.qcar_hardware_client.wait_for_service(timeout_sec=2.0):
-            self.get_logger().warn('qcar2_hardware LED service not available — LEDs disabled')
-            self.qcar_hardware_client = None
-        else:
-            self.get_logger().info('connected to qcar2_hardware.')
+        while not self.qcar_hardware_client.wait_for_service(timeout_sec=4.0):
+            self.get_logger().info('waiting for qcar2_hardware parameter service...')
+        self.get_logger().info('connected to qcar2_hardware.')
 
         # params
         self.declare_parameter('taxi_node', [10])
@@ -229,8 +226,6 @@ class TripPlanner(Node):
     # ---- LED ----
 
     def _set_led(self, led_id: int):
-        if self.qcar_hardware_client is None:
-            return
         led_id = int(led_id)
         if self._last_led == led_id:
             return
@@ -283,11 +278,27 @@ class TripPlanner(Node):
                 self._set_led(self.LED_GREEN)
             return
 
-        # mission in progress: block while pausing at a stop
+        # mission in progress
+        # WAIT stages: trigger as soon as pause expires (no path event needed)
+        if self.mission_stage == MissionStage.WAIT_AT_PICKUP and now >= self.pause_until:
+            ok = self._send_path_to(self.dropoff_xy, label='DROPOFF')
+            if ok:
+                self.mission_stage = MissionStage.TO_DROPOFF
+                self._set_led(self.LED_BLUE)
+            return
+
+        if self.mission_stage == MissionStage.WAIT_AT_DROPOFF and now >= self.pause_until:
+            ok = self._send_path_to(self.hub_xy, label='HUB')
+            if ok:
+                self.mission_stage = MissionStage.TO_HUB
+                self._set_led(self.LED_ORANGE)
+            return
+
+        # driving stages: block until pause clears (shouldn't be set, but safety)
         if now < self.pause_until:
             return
 
-        # advance mission on path completion
+        # advance driving stages on path completion
         if not self._path_completed_event:
             return
         self._path_completed_event = False
@@ -299,24 +310,12 @@ class TripPlanner(Node):
             self.pause_until = now + self.stop_seconds
             self.get_logger().info('Arrived at PICKUP.')
 
-        elif self.mission_stage == MissionStage.WAIT_AT_PICKUP:
-            ok = self._send_path_to(self.dropoff_xy, label='DROPOFF')
-            if ok:
-                self.mission_stage = MissionStage.TO_DROPOFF
-                self._set_led(self.LED_BLUE)  # hold blue while carrying
-
         elif self.mission_stage == MissionStage.TO_DROPOFF:
             self.mission_stage = MissionStage.WAIT_AT_DROPOFF
             self.dropped_off = True
             self._set_led(self.LED_ORANGE)
             self.pause_until = now + self.stop_seconds
             self.get_logger().info('Arrived at DROPOFF.')
-
-        elif self.mission_stage == MissionStage.WAIT_AT_DROPOFF:
-            ok = self._send_path_to(self.hub_xy, label='HUB')
-            if ok:
-                self.mission_stage = MissionStage.TO_HUB
-                self._set_led(self.LED_ORANGE)  # hold orange returning to hub
 
         elif self.mission_stage == MissionStage.TO_HUB:
             self.mission_stage = MissionStage.IDLE
