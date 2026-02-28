@@ -111,11 +111,11 @@ class PathFollower(Node):
         self.declare_parameter('node_values', [0, 8, 10])
         self.waypoints = list(self.get_parameter('node_values').get_parameter_value().integer_array_value)
 
-        self.declare_parameter('desired_speed', [0.6])
+        self.declare_parameter('desired_speed', [0.4])
         self.desired_speed = list(self.get_parameter('desired_speed').get_parameter_value().double_array_value)
 
-        self.declare_parameter('visualize_pose', [False])
-        self.pose_visualize_flag = list(self.get_parameter('visualize_pose').get_parameter_value().bool_array_value)[0]
+        self.declare_parameter('visualize_pose', [True])
+        self.pose_visualize_flag = True  # hardcoded on
 
         self.scale = 1.0
 
@@ -128,9 +128,13 @@ class PathFollower(Node):
         self.declare_parameter('start_path', [True])
         self.path_execute_flag = list(self.get_parameter('start_path').get_parameter_value().bool_array_value)[0]
 
+        self.declare_parameter('mission_pickup_xy',  [0.0, 0.0])
+        self.declare_parameter('mission_dropoff_xy', [0.0, 0.0])
+        self.declare_parameter('mission_enable',     [False])
+
         # ---- Stanley blending parameters ----
         self.declare_parameter('stanley_blend',     0.3)   # 0=pure pursuit only, 1=stanley only
-        self.declare_parameter('stanley_trust_min', 0.8)   # trust threshold to engage stanley
+        self.declare_parameter('stanley_trust_min', 0.1)   # trust threshold to engage stanley
         self.stanley_blend     = self.get_parameter('stanley_blend').value
         self.stanley_trust_min = self.get_parameter('stanley_trust_min').value
 
@@ -275,6 +279,12 @@ class PathFollower(Node):
                 self.get_logger().info(f'stanley_blend updated to {self.stanley_blend}')
             elif param.name == 'stanley_trust_min' and param.type_ == param.Type.DOUBLE:
                 self.stanley_trust_min = float(param.value)
+            elif param.name == 'mission_pickup_xy' and param.type_ == param.Type.DOUBLE_ARRAY:
+                self.get_logger().info(f'mission_pickup_xy updated: {list(param.value)}')
+            elif param.name == 'mission_dropoff_xy' and param.type_ == param.Type.DOUBLE_ARRAY:
+                self.get_logger().info(f'mission_dropoff_xy updated: {list(param.value)}')
+            elif param.name == 'mission_enable' and param.type_ == param.Type.BOOL_ARRAY:
+                self.get_logger().info(f'mission_enable updated: {list(param.value)}')
             elif param.name == 'visualize_pose' and param.type_ == param.Type.BOOL_ARRAY:
                 self.pose_visualize_flag = list(param.value)[0]
                 if self.pose_visualize_flag and not self.plot_visualized:
@@ -292,7 +302,10 @@ class PathFollower(Node):
                     self.steeringScope.axes[1].attachSignal(name='y_ekf')
                     self.steeringScope.addAxis(row=2, col=0, timeWindow=tf,
                                                yLabel='steering cmd [rad]', yLim=(-0.6, 0.6))
-                    self.steeringScope.axes[2].attachSignal(name='delta')
+                    self.steeringScope.axes[2].attachSignal(name='pp_delta')
+                    self.steeringScope.axes[2].attachSignal(name='stanley_delta')
+                    self.steeringScope.axes[2].attachSignal(name='blended_delta')
+                    self.steeringScope.axes[2].attachSignal(name='blend_alpha')
                     self.steeringScope.addAxis(row=3, col=0, timeWindow=tf,
                                                yLabel='heading', yLim=(-np.pi, np.pi))
                     self.steeringScope.axes[3].attachSignal(name='theta_meas')
@@ -488,6 +501,10 @@ class PathFollower(Node):
         self.gyro_kf.prediction(self.dt, th_gyro)
 
     def scopeDataTimer(self):
+        if not getattr(self, 'pose_visualize_flag', False):
+            return
+        if not hasattr(self, 'steeringScope') or self.steeringScope is None:
+            return
         if self.pose_visualize_flag:
             p = [self.qcar2_ekf.xHat[0, 0], self.qcar2_ekf.xHat[1, 0], self.qcar2_ekf.xHat[2, 0]]
             if self.t_plot > 200:
@@ -503,7 +520,12 @@ class PathFollower(Node):
                 y_ref = 0
             self.steeringScope.axes[0].sample(self.t_plot, [x_ref, p[0]])
             self.steeringScope.axes[1].sample(self.t_plot, [y_ref, p[1]])
-            self.steeringScope.axes[2].sample(self.t_plot, [self.current_steering])
+            self.steeringScope.axes[2].sample(self.t_plot, [
+                self.pp_delta_raw,
+                self.stanley_delta,
+                self.current_steering,
+                float(np.clip(self.stanley_blend * self.stanley_trust, 0.0, 1.0))
+            ])
             self.steeringScope.axes[3].sample(self.t_plot, [self.yaw, self.qcar2_ekf.xHat[2, 0]])
             MultiScope.refreshAll()
         else:
