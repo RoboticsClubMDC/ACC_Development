@@ -35,9 +35,12 @@ class TripPlanner(Node):
         self.qcar_hardware_client = self.create_client(
             SetParameters, '/qcar2_hardware/set_parameters'
         )
-        while not self.qcar_hardware_client.wait_for_service(timeout_sec=4.0):
-            self.get_logger().info('waiting for qcar2_hardware parameter service...')
-        self.get_logger().info('connected to qcar2_hardware.')
+        # Non-blocking — if LED service not up, skip LEDs and continue
+        if not self.qcar_hardware_client.wait_for_service(timeout_sec=2.0):
+            self.get_logger().warn('qcar2_hardware LED service not available — LEDs disabled')
+            self.qcar_hardware_client = None
+        else:
+            self.get_logger().info('connected to qcar2_hardware.')
 
         # params
         self.declare_parameter('taxi_node', [10])
@@ -223,9 +226,40 @@ class TripPlanner(Node):
         self.get_logger().info(f'Path published -> {label} ({goal_xy[0]:.2f}, {goal_xy[1]:.2f})')
         return True
 
+    def _snap_to_exact(self, goal_xy, label=''):
+        """
+        Send a minimal 2-point path from current position to exact target.
+        Used after arriving at pickup/dropoff to correct residual offset.
+        """
+        if self.robot_pose is None:
+            return self._send_path_to(goal_xy, label)
+
+        rx = float(self.robot_pose.pose.position.x)
+        ry = float(self.robot_pose.pose.position.y)
+        # Convert current ROS pose back to QLabs frame to build a 2-point path
+        R_mat = self._rot_matrix()
+        t = np.array(self.translation_offset)
+        # ROS -> QLabs: inverse of (qlabs + t) @ R = ros
+        # qlabs = ros @ R.T - t
+        cur_q = np.array([rx, ry]) @ R_mat.T - t
+        goal_q = np.array([float(goal_xy[0]), float(goal_xy[1])])
+
+        dist = float(np.linalg.norm(cur_q - goal_q))
+        if dist < 0.10:
+            self.get_logger().info(f'Already within 0.10m of {label}, no snap needed')
+            return True
+
+        wp = np.stack([cur_q, goal_q], axis=1)   # shape (2, 2)
+        self.waypoints_pub.publish(self._qlabs_path_to_ros(wp))
+        self.get_logger().info(
+            f'Snap path -> {label} ({goal_xy[0]:.2f}, {goal_xy[1]:.2f}) dist={dist:.3f}m')
+        return True
+
     # ---- LED ----
 
     def _set_led(self, led_id: int):
+        if self.qcar_hardware_client is None:
+            return
         led_id = int(led_id)
         if self._last_led == led_id:
             return
@@ -277,7 +311,6 @@ class TripPlanner(Node):
                 self.mission_stage = MissionStage.TO_PICKUP
                 self._set_led(self.LED_GREEN)
             return
-
         # mission in progress
         # WAIT stages: trigger as soon as pause expires (no path event needed)
         if self.mission_stage == MissionStage.WAIT_AT_PICKUP and now >= self.pause_until:
@@ -293,7 +326,6 @@ class TripPlanner(Node):
                 self.mission_stage = MissionStage.TO_HUB
                 self._set_led(self.LED_ORANGE)
             return
-
         # driving stages: block until pause clears (shouldn't be set, but safety)
         if now < self.pause_until:
             return
@@ -304,6 +336,8 @@ class TripPlanner(Node):
         self._path_completed_event = False
 
         if self.mission_stage == MissionStage.TO_PICKUP:
+            # Snap to exact pickup coordinate before pausing
+            self._snap_to_exact(self.pickup_xy, label='PICKUP-snap')
             self.mission_stage = MissionStage.WAIT_AT_PICKUP
             self.picked_up = True
             self._set_led(self.LED_BLUE)
@@ -311,6 +345,8 @@ class TripPlanner(Node):
             self.get_logger().info('Arrived at PICKUP.')
 
         elif self.mission_stage == MissionStage.TO_DROPOFF:
+            # Snap to exact dropoff coordinate before pausing
+            self._snap_to_exact(self.dropoff_xy, label='DROPOFF-snap')
             self.mission_stage = MissionStage.WAIT_AT_DROPOFF
             self.dropped_off = True
             self._set_led(self.LED_ORANGE)

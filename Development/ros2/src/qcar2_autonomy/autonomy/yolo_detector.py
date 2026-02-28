@@ -2,197 +2,343 @@
 import sys
 sys.path.insert(0, "/workspaces/isaac_ros-dev/MDC_libraries/python")
 
-# Quanser specific packages
 from pit.YOLO.nets import YOLOv8
 from pit.YOLO.utils import QCar2DepthAligned
 
-# Generic python packages
-import time  # Time library
+import time
 import numpy as np
 import cv2
+from pathlib import Path
+import urllib.request
+import tempfile
+import os
 
-# ROS specific packages
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Bool, UInt8   # <-- ADDED UInt8
+from std_msgs.msg import Bool
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 
-'''
-Description:
 
-Node for detecting traffic light state and signs on the road. Provides flags
-which define if a traffic signal has been detected and what action to take.
-'''
+def ensure_model_exists(model_path: Path, url: str, logger=None) -> None:
+    model_path = Path(model_path)
+    model_path.parent.mkdir(parents=True, exist_ok=True)
+    if model_path.exists() and model_path.stat().st_size > 1024 * 1024:
+        if logger:
+            logger.info(f"YOLO model found: {model_path} ({model_path.stat().st_size/1e6:.1f} MB)")
+        return
+    if logger:
+        logger.warn(f"YOLO model not found, downloading to: {model_path}")
+    with tempfile.NamedTemporaryFile(dir=str(model_path.parent), delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+    try:
+        with urllib.request.urlopen(url) as r, open(tmp_path, "wb") as f:
+            chunk = 1024 * 1024
+            while True:
+                data = r.read(chunk)
+                if not data:
+                    break
+                f.write(data)
+        size = tmp_path.stat().st_size
+        if size < 1024 * 1024:
+            raise RuntimeError(f"Downloaded file too small ({size} bytes)")
+        tmp_path.replace(model_path)
+        if logger:
+            logger.info(f"YOLO model downloaded OK: {model_path}")
+    finally:
+        if tmp_path.exists() and (not model_path.exists() or tmp_path != model_path):
+            try:
+                tmp_path.unlink()
+            except Exception:
+                pass
+
 
 class ObjectDetector(Node):
 
     def __init__(self):
         super().__init__('yolo_detector')
 
-        # Additional parameters
-        imageWidth  = 640
+        imageWidth = 640
         imageHeight = 480
         self.QCarImg = QCar2DepthAligned()
-        self.myYolo  = YOLOv8(
-                    modelPath = "./ros2/src/qcar2_autonomy/models/quanser_yolov8s-seg.pt",
-                    imageHeight= imageHeight,
-                    imageWidth = imageWidth,
-                    convert_tensorrt = False,
-                )
 
-        # Call on_timer function every second to receive pose info
-        self.dt = 1/30
+        model_dir = Path("/workspaces/isaac_ros-dev/ros2/src/qcar2_autonomy/models")
+        model_path = model_dir / "quanser_yolov8s-seg.pt"
+        model_url = "https://quanserinc.box.com/shared/static/ce0gxomeg4b12wlcch9cmlh0376nditf.pt"
+        ensure_model_exists(model_path, model_url, logger=self.get_logger())
+
+        self.myYolo = YOLOv8(
+            modelPath=str(model_path),
+            imageHeight=imageHeight,
+            imageWidth=imageWidth,
+            convert_tensorrt=False,
+        )
+
+        self.dt = 1 / 30
         self.timer = self.create_timer(self.dt, self.on_timer)
 
-        self.motion_publisher = self.create_publisher(Bool,'/motion_enable',1)
-        self.motion_enable = True
-        self.detection_cooldown = 10.0
-        self.disable_until = 0.0
-        self.flag_value = True   # FIX: was False — was killing motion_enable on startup
-        self.t0 = time.time()
+        # /motion_enable — always True; intersections handled by nav_to_pose state machine
+        self.motion_publisher = self.create_publisher(Bool, '/motion_enable', 1)
+        self.flag_value = True
 
-        self.sign_detected = False
+        # /intersection_rule — what we see at the current intersection node
+        # Values published: "NONE" | "STOP" | "YIELD" | "RED" | "GREEN" | "YELLOW"
+        from std_msgs.msg import String as StringMsg
+        self.rule_pub = self.create_publisher(StringMsg, '/intersection_rule', 1)
 
-        # publish image aligned information
+        # Only run detection when nav_to_pose says car is stopped at a node
+        self.at_intersection = False
+        self.create_subscription(Bool, '/at_intersection', self._at_intersection_cb, 1)
+
+        # ── Tuning ───────────────────────────────────────────────────────────
+        self.tl_conf      = 0.40   # min YOLO conf for traffic light
+        self.tl_stop_dist = 3.0    # max dist (m) to act on light
+        self.tl_min_dist  = 0.3    # ignore lights closer than this
+        self.stop_dist    = 0.40   # max dist (m) to trigger stop sign
+        self.yield_dist   = 0.50   # max dist (m) to trigger yield sign
+        self.depth_patch  = 9
+        # ─────────────────────────────────────────────────────────────────────
+
         self.bridge = CvBridge()
-        self.publish_rgb = self.create_publisher(Image,'/qcar_camera/rgb',10)
-        self.publish_depth = self.create_publisher(Image,'/qcar_camera/depth',10)
+        self.publish_rgb       = self.create_publisher(Image, '/qcar_camera/rgb',      10)
+        self.publish_depth     = self.create_publisher(Image, '/qcar_camera/depth',    10)
+        self.publish_rgb_yolo  = self.create_publisher(Image, '/qcar_camera/rgb_yolo', 10)
 
-        # --- ADDED: publish qcar_state override to existing topic ---
-        self.qcar_state_pub = self.create_publisher(UInt8, '/trip_planner/qcar_state', 10)
-        self.stop_override_active = False
-        self.stop_override_until = 0.0
-        # -----------------------------------------------------------
+        self.timer2 = self.create_timer(1 / 500, self.flag_publisher)
 
-        self.timer2 = self.create_timer(1/500, self.flag_publisher)
+    # ------------------------------------------------------------------
+
+    def _at_intersection_cb(self, msg: Bool):
+        self.at_intersection = bool(msg.data)
+        if not self.at_intersection:
+            # Left intersection — reset so next node starts fresh
+            self._publish_rule("NONE")
+
+    def _publish_rule(self, rule: str):
+        from std_msgs.msg import String as StringMsg
+        m = StringMsg()
+        m.data = rule
+        self.rule_pub.publish(m)
 
     def flag_publisher(self):
-        # keep existing behavior
         self.publish_motion_flag(self.flag_value)
 
-        # --- ADDED: while stop override active, spam state=1 so it wins over trip_planner 10Hz ---
-        now = time.time()
-        if self.stop_override_active and now < self.stop_override_until:
-            msg = UInt8()
-            msg.data = 1
-            self.qcar_state_pub.publish(msg)
-        elif self.stop_override_active and now >= self.stop_override_until:
-            self.stop_override_active = False
-        # --------------------------------------------------------------------------------------
-
     def on_timer(self):
-        # Get aligned RGB and Depth images and publish them
         self.QCarImg.read()
 
-        rgb = self.QCarImg.rgb
+        rgb   = self.QCarImg.rgb
         depth = self.QCarImg.depth
 
-        # --- fix: force depth to float32 for 32FC1 ---
         if depth is not None:
             depth = np.asarray(depth)
             if depth.ndim == 3 and depth.shape[2] == 1:
                 depth = depth[:, :, 0]
             depth = depth.astype(np.float32, copy=False)
 
-        msg_rgb = self.bridge.cv2_to_imgmsg(rgb, "bgr8")
-        msg_depth = self.bridge.cv2_to_imgmsg(depth, "32FC1")
+        self.publish_rgb.publish(self.bridge.cv2_to_imgmsg(rgb, "bgr8"))
+        self.publish_depth.publish(self.bridge.cv2_to_imgmsg(depth, "32FC1"))
 
-        self.publish_rgb.publish(msg_rgb)
-        self.publish_depth.publish(msg_depth)
+        # Always publish motion_enable=True — nav_to_pose state machine owns stopping
+        self.flag_value = True
 
-        current_time = time.time()-self.t0
-        delay = 0
-        sign_delay = 0
-        sign_detected = False
+        # Only run YOLO when nav_to_pose has hard-stopped at an intersection node
+        if self.at_intersection:
+            self.yolo_detect()
 
-        if not self.sign_detected:
-            sign_delay, sign_detected = self.yolo_detect()
+    # ------------------------------------------------------------------
 
-            if sign_detected:
-                delay = sign_delay
+    def _stable_dist(self, obj) -> float:
+        """
+        Median depth over a self.depth_patch x self.depth_patch pixel square
+        centred on the bounding box centre. Much more stable than the wrapper's
+        per-mask average which jumps all over the place.
+        Falls back to wrapper distance if bbox attribute not found.
+        """
+        depth = self.QCarImg.depth
+        if depth is None:
+            return float(obj.__dict__.get("distance", -1.0))
 
-            if delay > 0.0 and not self.sign_detected:
-                self.sign_detected = True
-                self.disable_until = delay
-                self.flag_value = False
-            else:
-                self.flag_value = True
+        depth = np.asarray(depth, dtype=np.float32)
+        if depth.ndim == 3:
+            depth = depth[:, :, 0]
+        h, w = depth.shape
 
-        elif self.sign_detected:
-            if current_time >= self.disable_until:
-                if current_time >= self.detection_cooldown:
-                    self.sign_detected = False
-                self.flag_value = True
+        # Quanser wrapper may call it bbox / box / xyxy / rect — try all
+        bbox = None
+        for key in ("bbox", "box", "xyxy", "rect"):
+            v = obj.__dict__.get(key)
+            if v is not None:
+                bbox = v
+                break
+
+        if bbox is None:
+            return float(obj.__dict__.get("distance", -1.0))
+
+        try:
+            x1, y1, x2, y2 = float(bbox[0]), float(bbox[1]), float(bbox[2]), float(bbox[3])
+        except Exception:
+            return float(obj.__dict__.get("distance", -1.0))
+
+        cx   = int((x1 + x2) / 2)
+        cy   = int((y1 + y2) / 2)
+        half = self.depth_patch // 2
+
+        r0 = max(0, cy - half);  r1 = min(h, cy + half + 1)
+        c0 = max(0, cx - half);  c1 = min(w, cx + half + 1)
+
+        vals  = depth[r0:r1, c0:c1].flatten()
+        valid = vals[(vals > 0.05) & np.isfinite(vals)]
+
+        if valid.size == 0:
+            return float(obj.__dict__.get("distance", -1.0))
+
+        return float(np.median(valid))
+
+    # ------------------------------------------------------------------
+
+    def _get_bbox(self, obj):
+        for key in ("bbox", "box", "xyxy", "rect"):
+            v = obj.__dict__.get(key)
+            if v is not None:
+                try:
+                    return float(v[0]), float(v[1]), float(v[2]), float(v[3])
+                except Exception:
+                    continue
+        return None
+
+    def _classify_light_color(self, obj):
+        """
+        Crop YOLO bbox, classify traffic light color via HSV.
+        Uses thresholds from traffic_system_detector.py.
+        Returns (is_red, is_green, is_yellow).
+        """
+        rgb = self.QCarImg.rgb
+        if rgb is None:
+            return False, False, False
+        bbox = self._get_bbox(obj)
+        if bbox is None:
+            return False, False, False
+
+        x1, y1, x2, y2 = bbox
+        h, w = rgb.shape[:2]
+        x1 = max(0, int(x1)); y1 = max(0, int(y1))
+        x2 = min(w, int(x2)); y2 = min(h, int(y2))
+        if x2 <= x1 or y2 <= y1:
+            return False, False, False
+
+        crop = rgb[y1:y2, x1:x2]
+        if crop.size == 0:
+            return False, False, False
+
+        ch = crop.shape[0]
+        top = crop[:max(1, ch // 3), :]
+        bot = crop[max(0, 2 * ch // 3):, :]
+
+        hsv_top = cv2.cvtColor(top, cv2.COLOR_BGR2HSV)
+        hsv_bot = cv2.cvtColor(bot, cv2.COLOR_BGR2HSV)
+
+        r1 = cv2.inRange(hsv_top, np.array([0,   200, 200]), np.array([10,  255, 255]))
+        r2 = cv2.inRange(hsv_top, np.array([170, 120,  70]), np.array([180, 255, 255]))
+        red_px    = cv2.countNonZero(r1) + cv2.countNonZero(r2)
+        yellow_px = cv2.countNonZero(
+            cv2.inRange(hsv_top, np.array([20, 100, 100]), np.array([30, 255, 255])))
+        green_px  = cv2.countNonZero(
+            cv2.inRange(hsv_bot, np.array([40, 100, 100]), np.array([90, 255, 255])))
+
+        self.get_logger().info(
+            f"  TL HSV: red={red_px} yellow={yellow_px} green={green_px}")
+        return red_px >= 5, green_px > 30, yellow_px > 200
 
     def yolo_detect(self):
-        detected = False
-        delay = 0.0
-
+        """
+        Called only when nav_to_pose has hard-stopped at an intersection node.
+        Publishes /intersection_rule: STOP | YIELD | RED | GREEN | YELLOW | NONE
+        """
         rgbProcessed = self.myYolo.pre_process(self.QCarImg.rgb)
-        predecion = self.myYolo.predict(inputImg = rgbProcessed,
-                                    classes = [2,9,11,33],
-                                    confidence = 0.3,
-                                    half = True,
-                                    verbose = False
-                                    )
+        pred = self.myYolo.predict(
+            inputImg=rgbProcessed,
+            classes=[9, 11, 33],
+            confidence=0.3,
+            half=True,
+            verbose=False
+        )
 
-        processedResults = self.myYolo.post_processing(alignedDepth = self.QCarImg.depth,
-                                                clippingDistance = 5)
-        labelName = []
-        labelConf = []
-        for object in processedResults:
-            labelName = object.__dict__["name"]
-            labelConf = object.__dict__["conf"]
-            objectDist = object.__dict__["distance"]
+        try:
+            ann = None
+            if isinstance(pred, (list, tuple)) and len(pred) > 0 and hasattr(pred[0], "plot"):
+                ann = pred[0].plot()
+            elif hasattr(pred, "plot"):
+                ann = pred.plot()
+            if ann is not None and isinstance(ann, np.ndarray) and ann.size:
+                self.publish_rgb_yolo.publish(self.bridge.cv2_to_imgmsg(ann, "bgr8"))
+        except Exception as e:
+            self.get_logger().warn(f"YOLO overlay failed: {e}")
 
-            if labelName == 'car' and labelConf > 0.9 and objectDist < 0.45 :
-                self.get_logger().info("Car found!")
+        processedResults = self.myYolo.post_processing(
+            alignedDepth=self.QCarImg.depth,
+            clippingDistance=5
+        )
 
-            elif labelName == "stop sign" and labelConf > 0.9 and objectDist < 0.52:
-                self.get_logger().info("Stop Sign Detected!")
+        rule = "NONE"   # default — nav_to_pose will treat as yield after 1s
 
-                delay = 3.0
-                self.t0 = time.time()
-                detected = True
-                self.detection_cooldown = 10.0
+        for obj in processedResults:
+            labelName  = obj.__dict__.get("name", "")
+            labelConf  = float(obj.__dict__.get("conf", 0.0))
+            objectDist = self._stable_dist(obj)
 
-                # --- ADDED: publish qcar_state=1 while we are stopped ---
-                self.stop_override_active = True
-                self.stop_override_until = time.time() + delay
-                msg = UInt8()
-                msg.data = 1
-                self.qcar_state_pub.publish(msg)
-                # -------------------------------------------------------
+            self.get_logger().info(
+                f"[INTERSECTION] {labelName} conf={labelConf:.2f} dist={objectDist:.3f}m")
 
-            elif labelName == "yield sign" and labelConf > 0.9 and objectDist < 0.52:
-                self.get_logger().info("Yield Sign Detected!")
-                delay = 1.5
-                self.t0 = time.time()
-                detected = True
-                self.detection_cooldown = 10.0
+            # ── TRAFFIC LIGHT ─────────────────────────────────────────────────
+            if str(labelName).startswith("traffic light"):
+                valid_dist = self.tl_min_dist < objectDist < self.tl_stop_dist
+                if labelConf >= self.tl_conf and valid_dist:
+                    is_red, is_green, is_yellow = self._classify_light_color(obj)
+                    if is_red and not is_green:
+                        rule = "RED"
+                        self.get_logger().info(f"RED LIGHT @ {objectDist:.2f}m")
+                        break   # red is highest priority — stop immediately
+                    elif is_green:
+                        rule = "GREEN"
+                        self.get_logger().info(f"GREEN LIGHT @ {objectDist:.2f}m")
+                    elif is_yellow:
+                        rule = "YELLOW"
+                        self.get_logger().info(f"YELLOW LIGHT @ {objectDist:.2f}m")
 
-        print("===============================")
-        return delay, detected
+            # ── STOP SIGN ─────────────────────────────────────────────────────
+            elif labelName == "stop sign" and labelConf > 0.9 and 0 < objectDist < self.stop_dist:
+                rule = "STOP"
+                self.get_logger().info(f"STOP SIGN @ {objectDist:.2f}m")
+                break   # stop sign is definitive
 
-    def publish_motion_flag(self, enable:bool):
-       msg = Bool()
-       msg.data = enable
-       self.motion_publisher.publish(msg)
+            # ── YIELD SIGN ────────────────────────────────────────────────────
+            elif labelName == "yield sign" and labelConf > 0.9 and 0 < objectDist < self.yield_dist:
+                rule = "YIELD"
+                self.get_logger().info(f"YIELD SIGN @ {objectDist:.2f}m")
+
+        self._publish_rule(rule)
+        print("=" * 31)
+
+    # ------------------------------------------------------------------
+
+    def publish_motion_flag(self, enable: bool):
+        msg = Bool()
+        msg.data = enable
+        self.motion_publisher.publish(msg)
 
     def terminate(self):
-       self.QCarImg.terminate()
+        self.QCarImg.terminate()
 
 
 def main():
-  rclpy.init()
-  node = ObjectDetector()
-  try:
-      rclpy.spin(node)
-  except KeyboardInterrupt:
-      node.terminate()
-      pass
-  rclpy.shutdown()
+    rclpy.init()
+    node = ObjectDetector()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        node.terminate()
+    rclpy.shutdown()
+
 
 if __name__ == '__main__':
-  main()
+    main()
