@@ -1,260 +1,207 @@
 #!/usr/bin/env python3
-"""
-Lane Detector (CSI) - Yellow-only + Drift CTE Reference
-
-Subscribes:
-  /camera/csi_image   (sensor_msgs/Image)
-
-Publishes:
-  /vision/yellow_mask     (sensor_msgs/Image, mono8)
-  /vision/lanes/cte       (std_msgs/Float64)   # meters, ZEROED to first valid frame
-  /vision/yellow_debug    (sensor_msgs/Image, bgr8) overlay with dots + text
-
-Logic:
-  - Threshold "any yellow" in HSV (loose)
-  - Compute centroid of the yellow mask
-  - Dot A (red): camera center
-  - Dot B (green): lane centroid
-  - Compute raw CTE (meters) from centroid x-offset
-  - On first valid frame: lock cte_ref
-  - Publish cte_out = cte_raw - cte_ref  (drift-only CTE)
-"""
+import os
+import cv2
+import numpy as np
 
 import rclpy
 from rclpy.node import Node
-
-import cv2
-import numpy as np
-import time
-import math
+from rclpy.qos import qos_profile_sensor_data
 
 from sensor_msgs.msg import Image
-from std_msgs.msg import Float64
+from std_msgs.msg import String
 from cv_bridge import CvBridge
 
+from ultralytics import YOLO
 
-class LaneDetector(Node):
+
+# Class IDs (must match your training YAML)
+LANE = 0
+
+# Overlay colors (BGR)
+COLORS_BGR = {
+    LANE: (0, 255, 0),     # green
+}
+
+ALPHA = 0.45
+NO_GO_MARGIN_PX = 10
+
+
+def overlay_mask(img_bgr: np.ndarray, mask_bool: np.ndarray, color_bgr, alpha: float) -> np.ndarray:
+    """Overlay a boolean mask onto an image with alpha blending."""
+    if mask_bool is None or mask_bool.sum() == 0:
+        return img_bgr
+    overlay = img_bgr.copy()
+    overlay[mask_bool] = color_bgr
+    return cv2.addWeighted(overlay, alpha, img_bgr, 1 - alpha, 0)
+
+
+class LaneDetectionNode(Node):
     def __init__(self):
-        super().__init__('lane_detector')
+        super().__init__("lane_detection")
 
-        # -------------------- ROS Params --------------------
-        self.declare_parameter('image_topic', '/camera/csi_image')
+        # ROS params
+        self.declare_parameter("image_topic", "/camera/color_image")
+        self.declare_parameter("model_path", "ros2/src/qcar2_autonomy/models/lane_seg_yolo.pt")
+        self.declare_parameter("imgsz", 640)
+        self.declare_parameter("device", 0)
+        
+        self.declare_parameter("lane_seed_x_frac", 0.55)
+        self.last_lane_cx = None
+        self.last_lane_seen = 0
+        self.declare_parameter("lane_lost_frames", 10)  # how long we keep last choice if it vanishes
 
-        # Yellow HSV (loose)
-        self.declare_parameter('h_low', 15)
-        self.declare_parameter('h_high', 50)
-        self.declare_parameter('s_low', 40)
-        self.declare_parameter('s_high', 255)
-        self.declare_parameter('v_low', 40)
-        self.declare_parameter('v_high', 255)
+        image_topic = self.get_parameter("image_topic").get_parameter_value().string_value
+        model_path_param = self.get_parameter("model_path").get_parameter_value().string_value
+        imgsz = int(self.get_parameter("imgsz").get_parameter_value().integer_value)
+        device = int(self.get_parameter("device").get_parameter_value().integer_value)
 
-        # Morph cleanup (helps gaps + anti-aliasing)
-        self.declare_parameter('use_morph', True)
-        self.declare_parameter('kernel_size', 5)
-        self.declare_parameter('close_iters', 2)
-        self.declare_parameter('open_iters', 1)
-        self.declare_parameter('dilate_iters', 1)
+        model_path = self._resolve_model_path(model_path_param)
 
-        # Centroid validity (avoid locking reference on noise)
-        self.declare_parameter('min_mask_pixels', 300)
+        self.get_logger().info(f"Subscribing to: {image_topic}")
+        self.get_logger().info(f"Using model: {model_path}")
+        self.get_logger().info(f"imgsz: {imgsz}, device: {device}")
 
-        # Convert pixels -> meters (CTE in meters)
-        # Keep this consistent with your earlier scaling; tune later if needed.
-        self.declare_parameter('xm_per_pix', 3.7 / 700.0)
-
-        # Reference behavior
-        self.declare_parameter('auto_zero_reference', True)   # lock first valid frame as reference
-        self.declare_parameter('ref_reset_seconds', 0.0)      # 0 = never reset; >0 = periodic reset
-
-        # Output topics
-        self.declare_parameter('mask_topic', '/vision/yellow_mask')
-        self.declare_parameter('cte_topic', '/vision/lanes/cte')
-        self.declare_parameter('debug_topic', '/vision/yellow_debug')
-
-        # -------------------- Internal State --------------------
         self.bridge = CvBridge()
+        self.model = YOLO(model_path)
 
-        self._ref_set = False
-        self._cte_ref_m = 0.0
-        self._last_ref_time_s = 0.0
+        # Publishers
+        self.pub_overlay       = self.create_publisher(Image,  "/lane_detection/overlay",       qos_profile_sensor_data)
+        self.pub_lane_selected = self.create_publisher(Image,  "/lane_detection/lane_selected", qos_profile_sensor_data)
+        self.pub_debug         = self.create_publisher(String, "/lane_detection/debug_detections", 10)
 
-        # -------------------- ROS IO --------------------
-        self.sub = self.create_subscription(
-            Image,
-            self.get_parameter('image_topic').value,
-            self.on_image,
-            10
-        )
+        self.imgsz = imgsz
+        self.device = device
 
-        self.pub_mask = self.create_publisher(Image, self.get_parameter('mask_topic').value, 1)
-        self.pub_cte = self.create_publisher(Float64, self.get_parameter('cte_topic').value, 1)
-        self.pub_dbg = self.create_publisher(Image, self.get_parameter('debug_topic').value, 1)
+        # Subscriber
+        self.sub = self.create_subscription(Image, image_topic, self.image_cb, qos_profile_sensor_data)
 
-        self.get_logger().info(
-            f"lane_detector up. sub={self.get_parameter('image_topic').value} "
-            f"pub_cte={self.get_parameter('cte_topic').value} pub_dbg={self.get_parameter('debug_topic').value}"
-        )
+    def _resolve_model_path(self, model_path_param: str) -> str:
+        """Resolve model path for both source-tree and installed layouts."""
+        if os.path.isabs(model_path_param):
+            return model_path_param
 
-    # ------------------------------------------------------------
-    # Yellow threshold
-    # ------------------------------------------------------------
-    def yellow_mask(self, bgr: np.ndarray) -> np.ndarray:
-        hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
+        # Try install space: <prefix>/share/<relative>
+        prefix_paths = os.environ.get("AMENT_PREFIX_PATH", "").split(":")
+        for p in prefix_paths:
+            cand = os.path.join(p, "share", model_path_param)
+            if os.path.exists(cand):
+                return cand
 
-        lower = np.array([
-            int(self.get_parameter('h_low').value),
-            int(self.get_parameter('s_low').value),
-            int(self.get_parameter('v_low').value)
-        ], dtype=np.uint8)
+        # Fallback: relative to CWD
+        return os.path.abspath(model_path_param)
 
-        upper = np.array([
-            int(self.get_parameter('h_high').value),
-            int(self.get_parameter('s_high').value),
-            int(self.get_parameter('v_high').value)
-        ], dtype=np.uint8)
-
-        mask = cv2.inRange(hsv, lower, upper)
-
-        if bool(self.get_parameter('use_morph').value):
-            k = int(self.get_parameter('kernel_size').value)
-            if k < 1:
-                k = 1
-            if k % 2 == 0:
-                k += 1
-            kernel = np.ones((k, k), np.uint8)
-
-            close_iters = int(self.get_parameter('close_iters').value)
-            open_iters = int(self.get_parameter('open_iters').value)
-            dil_iters = int(self.get_parameter('dilate_iters').value)
-
-            # Close gaps -> open noise -> optional thicken
-            if close_iters > 0:
-                mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=close_iters)
-            if open_iters > 0:
-                mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=open_iters)
-            if dil_iters > 0:
-                mask = cv2.dilate(mask, kernel, iterations=dil_iters)
-
-        return mask
-
-    # ------------------------------------------------------------
-    # Centroid + CTE
-    # ------------------------------------------------------------
-    def centroid_cte_m(self, mask: np.ndarray, W: int, H: int):
-        # Require enough yellow pixels so centroid is meaningful
-        if int(np.count_nonzero(mask)) < int(self.get_parameter('min_mask_pixels').value):
-            return None, None, None
-
-        M = cv2.moments(mask, binaryImage=True)
-        if M["m00"] <= 1e-6:
-            return None, None, None
-
-        cx = int(M["m10"] / M["m00"])
-        cy = int(M["m01"] / M["m00"])
-
-        x_center = W // 2
-        cte_pix = float(cx - x_center)
-        xm_per_pix = float(self.get_parameter('xm_per_pix').value)
-        cte_m = cte_pix * xm_per_pix
-
-        return cx, cy, cte_m
-
-    # ------------------------------------------------------------
-    # Main callback
-    # ------------------------------------------------------------
-    def on_image(self, msg: Image):
+    def image_cb(self, msg: Image):
+        # ROS Image -> OpenCV BGR
         try:
-            bgr = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+            img_bgr = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
         except Exception as e:
-            self.get_logger().error(f"cv_bridge decode failed: {e} | encoding={getattr(msg,'encoding','?')}")
+            self.get_logger().error(f"cv_bridge failed: encoding={msg.encoding} error={e}")
             return
 
-        if bgr is None:
+        if img_bgr is None:
             return
 
-        H, W = bgr.shape[:2]
+        h, w = img_bgr.shape[:2]
 
-        mask = self.yellow_mask(bgr)
+        # Run YOLO segmentation
+        res = self.model.predict(
+            img_bgr,
+            imgsz=self.imgsz,
+            device=self.device,
+            verbose=False
+        )[0]
 
-        # Publish mask (mono8)
-        mask_msg = self.bridge.cv2_to_imgmsg(mask, encoding='mono8')
-        mask_msg.header = msg.header
-        self.pub_mask.publish(mask_msg)
+        # Union masks per class
+        union = {
+            LANE: np.zeros((h, w), dtype=bool)}
 
-        # Compute centroid + raw CTE
-        cx, cy, cte_raw_m = self.centroid_cte_m(mask, W, H)
+        dbg_lines = []
 
-        # Reference logic: lock first valid frame
-        cte_out = float('nan')
-        now_s = time.time()
+        # Fill union masks from YOLO output
+        if res.masks is not None and res.boxes is not None and len(res.boxes) == len(res.masks.data):
+            masks = res.masks.data.cpu().numpy()            # (N, mh, mw)
+            clss  = res.boxes.cls.cpu().numpy().astype(int) # (N,)
+            confs = res.boxes.conf.cpu().numpy()            # (N,)
 
-        # Optional periodic reset
-        reset_period = float(self.get_parameter('ref_reset_seconds').value)
-        if reset_period > 0.0 and self._ref_set and ((now_s - self._last_ref_time_s) > reset_period):
-            self._ref_set = False
+            for i, (m, c) in enumerate(zip(masks, clss)):
+                if c not in union:
+                    continue
 
-        if cte_raw_m is not None:
-            auto_zero = bool(self.get_parameter('auto_zero_reference').value)
+                m_resized = cv2.resize(m, (w, h), interpolation=cv2.INTER_NEAREST).astype(bool)
+                union[c] |= m_resized
 
-            if auto_zero and not self._ref_set:
-                self._cte_ref_m = float(cte_raw_m)
-                self._ref_set = True
-                self._last_ref_time_s = now_s
-                self.get_logger().info(f"[lane] Reference locked: cte_ref_m={self._cte_ref_m:+.4f} m")
+                area_px = int(m_resized.sum())
+                conf = float(confs[i])
+                dbg_lines.append(f"i={i} class={c} conf={conf:.3f} area_px={area_px}")
 
-            if auto_zero and self._ref_set:
-                # ✅ drift-only CTE (goal is zero)
-                cte_out = float(cte_raw_m - self._cte_ref_m)
+        if not dbg_lines:
+            dbg_lines = ["no detections"]
+
+        dbg = String()
+        dbg.data = " | ".join(dbg_lines)
+        self.pub_debug.publish(dbg)
+
+        # -------- Lane selection with hysteresis (choose one lane and stick to it) --------
+        lane_bool = union[LANE]
+        lane_sel = np.zeros((h, w), dtype=bool)
+
+        if lane_bool.any():
+            lane_u8 = lane_bool.astype(np.uint8)
+            num_labels, labels = cv2.connectedComponents(lane_u8)
+
+            comps = []
+            for lab in range(1, num_labels):
+                ys, xs = np.where(labels == lab)
+                if xs.size < 200:  # ignore tiny blobs
+                    continue
+                cx = float(xs.mean())
+                area = float(xs.size)
+                comps.append((lab, cx, area))
+
+            if comps:
+                seed_x = float(self.get_parameter("lane_seed_x_frac").value) * w
+                target_cx = self.last_lane_cx if self.last_lane_cx is not None else seed_x
+
+                # closest to last/seed, tie-break by larger area
+                comps.sort(key=lambda t: (abs(t[1] - target_cx), -t[2]))
+                best_lab, best_cx, _ = comps[0]
+
+                lane_sel = (labels == best_lab)
+                self.last_lane_cx = best_cx
+                self.last_lane_seen = 0
             else:
-                # raw CTE if auto_zero_reference disabled
-                cte_out = float(cte_raw_m)
-
-        # Publish CTE
-        cte_msg = Float64()
-        cte_msg.data = float(cte_out)
-        self.pub_cte.publish(cte_msg)
-
-        # Debug overlay (dots + info)
-        overlay = bgr.copy()
-
-        # Dot A: camera center (red)
-        cv2.circle(overlay, (W // 2, H // 2), 6, (0, 0, 255), -1)
-
-        # Dot B: lane centroid (green)
-        if cx is not None:
-            cv2.circle(overlay, (cx, cy), 6, (0, 255, 0), -1)
-            cv2.line(overlay, (W // 2, H // 2), (cx, cy), (255, 255, 255), 2)
-
-        # Text
-        if cte_raw_m is None:
-            txt = "cte_raw=nan  cte_zeroed=nan  (no centroid)"
+                self.last_lane_seen += 1
         else:
-            txt = f"cte_raw={cte_raw_m:+.3f}m  ref={self._cte_ref_m:+.3f}m  cte_zeroed={cte_out:+.3f}m"
+            self.last_lane_seen += 1
 
-        cv2.putText(
-            overlay, txt,
-            (20, 30),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.7,
-            (255, 255, 255),
-            2
-        )
+        # Unlock if lane missing too long
+        if self.last_lane_seen > int(self.get_parameter("lane_lost_frames").value):
+            self.last_lane_cx = None
+            self.last_lane_seen = 0
+        # -------------------------------------------------------------------------------
 
-        dbg_msg = self.bridge.cv2_to_imgmsg(overlay, encoding='bgr8')
-        dbg_msg.header = msg.header
-        self.pub_dbg.publish(dbg_msg)
+        # Overlay (lane_detection shows ONLY the selected lane)
+        out = overlay_mask(img_bgr.copy(), lane_sel, COLORS_BGR[LANE], ALPHA)
 
+        overlay_msg = self.bridge.cv2_to_imgmsg(out, encoding="bgr8")
+        overlay_msg.header = msg.header
+        self.pub_overlay.publish(overlay_msg)
+
+        # Publish selected lane mask (mono8)
+        lane_sel_u8 = (lane_sel.astype(np.uint8) * 255)
+        lane_sel_msg = self.bridge.cv2_to_imgmsg(lane_sel_u8, encoding="mono8")
+        lane_sel_msg.header = msg.header
+        self.pub_lane_selected.publish(lane_sel_msg)
 
 def main():
     rclpy.init()
-    node = LaneDetector()
+    node = LaneDetectionNode()
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
-    node.destroy_node()
-    rclpy.shutdown()
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -181,7 +181,7 @@ class PathFollower(Node):
         self.declare_parameter('node_values', [0, 8, 10])
         self.waypoints = list(self.get_parameter("node_values").get_parameter_value().integer_array_value)
 
-        self.declare_parameter('desired_speed', [0.4])
+        self.declare_parameter('desired_speed', [0.6])
         self.desired_speed = list(self.get_parameter("desired_speed").get_parameter_value().double_array_value)
 
         self.declare_parameter('visualize_pose', [False])
