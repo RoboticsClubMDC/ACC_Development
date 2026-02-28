@@ -31,7 +31,8 @@ setup(
             'dataset_collector=autonomy.dataset_collector:main',
             'Planner_server=autonomy.Planner_server:main',
             'avoid_sidewalks=autonomy.avoid_sidewalks:main',
-            'lane_seg_node=autonomy.lane_seg_node:main'
+            'lane_seg_node=autonomy.lane_seg_node:main',
+            'bev_csi_node=autonomy.bev_csi_node:main'
         ],
     },
 )
