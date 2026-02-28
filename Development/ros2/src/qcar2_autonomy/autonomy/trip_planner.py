@@ -1,346 +1,257 @@
-#! /usr/bin/env python3
-
-import rclpy # Python client library for ROS 2
-from rclpy.node import Node
-from rcl_interfaces.srv import SetParameters
-from rcl_interfaces.msg import Parameter,SetParametersResult
-from rclpy.parameter import ParameterType
-from std_msgs.msg import Bool
+# =========================
+# OVERALL: trip_planner.py  (NO PlannerServer)
+# ✅ Subscribes to /path_follower/qcar_state (2/4/5/6)
+# ✅ Directly sets /qcar2_hardware led_color_id
+# ✅ Behavior:
+#    - HUB (5): MAGENTA
+#    - Driving to pickup (4 before pickup): GREEN
+#    - Pickup stop (2): BLUE and hold BLUE until dropoff
+#    - Dropoff stop (6): ORANGE and hold ORANGE until hub
+# =========================
+#!/usr/bin/env python3
 
 import time
+import rclpy
+from rclpy.node import Node
+
+from std_msgs.msg import Bool, UInt8
+from rcl_interfaces.srv import SetParameters
+from rcl_interfaces.msg import Parameter, SetParametersResult
+from rclpy.parameter import ParameterType
 
 
 class tripPlanner(Node):
     def __init__(self):
         super().__init__('trip_planner')
 
-        # node names to set 
+        # Nodes
         self.path_follower_node = "path_follower"
-        self.qcar_hardware_node= "qcar2_hardware"
+        self.qcar_hardware_node = "qcar2_hardware"
 
-
-        # start clients for node parameters
+        # Clients
         self.path_follower_client = self.create_client(SetParameters, f'/{self.path_follower_node}/set_parameters')
         self.qcar_hardware_client = self.create_client(SetParameters, f'/{self.qcar_hardware_node}/set_parameters')
-        
-        #waiting for services to become availble...
-        while not self.path_follower_client.wait_for_service(timeout_sec = 4.0):
-            self.get_logger().info(f'waiting for {self.path_follower_node} parameter service!.....')
-        
-        self.get_logger().info(f'connected to  {self.path_follower_node} parameter service!.....')
-        
-        while not self.qcar_hardware_client.wait_for_service(timeout_sec = 4.0):
-            self.get_logger().info(f'waiting for {self.qcar_hardware_node} parameter service!.....')
-        
-        self.get_logger().info(f'connected to  {self.qcar_hardware_node} parameter service!.....')
 
-        self.parameter_change_retries = 5
-        self.parameter_sleep_time = 2
+        while not self.path_follower_client.wait_for_service(timeout_sec=4.0):
+            self.get_logger().info(f'waiting for {self.path_follower_node} parameter service...')
+        self.get_logger().info(f'connected to {self.path_follower_node} parameter service.')
 
+        while not self.qcar_hardware_client.wait_for_service(timeout_sec=4.0):
+            self.get_logger().info(f'waiting for {self.qcar_hardware_node} parameter service...')
+        self.get_logger().info(f'connected to {self.qcar_hardware_node} parameter service.')
 
-        # define new parameters for taxi node to use 
+        # ---------------- user-facing params ----------------
         self.declare_parameter('taxi_node', [10])
-        self.taxi_node = list(self.get_parameter("taxi_node").get_parameter_value().integer_array_value)[0]
-        
-        # define new parameters for node to use 
-        self.declare_parameter('trip_nodes', [2, 8])
-        self.trip_nodes = list(self.get_parameter("trip_nodes").get_parameter_value().integer_array_value)
+        self.taxi_node = int(list(self.get_parameter("taxi_node").get_parameter_value().integer_array_value)[0])
 
+        # Scenario defaults (override anytime)
+        self.declare_parameter('pickup_xy', [0.125, 4.395])
+        self.declare_parameter('dropoff_xy', [-0.905, 0.800])
 
+        self.declare_parameter('stop_seconds', [3.0])
+        self.stop_seconds = float(list(self.get_parameter("stop_seconds").get_parameter_value().double_array_value)[0])
 
-        # parameter callback for new rides/update to taxi node
-        self.add_on_set_parameters_callback(self.parameter_update_callback) 
+        self.pickup_xy = list(self.get_parameter("pickup_xy").get_parameter_value().double_array_value)
+        self.dropoff_xy = list(self.get_parameter("dropoff_xy").get_parameter_value().double_array_value)
 
+        self.add_on_set_parameters_callback(self.parameter_update_callback)
 
-        '''
-        State definition for trip planner logic
-        trip super states 
-        1 - going to taxi hub 
-        2 - ready for rides
+        # ---------------- LED IDs (ACTUAL led_color_id) ----------------
+        self.LED_GREEN = 1
+        self.LED_BLUE = 2
+        self.LED_MAGENTA = 5
+        self.LED_ORANGE = 6  # ✅ now used
 
-
-        trip actions
-        0 - driving to taxi hub
-        1 - driving to pickup
-        2 - driving to stops (optional)  
-        3 - driving to dropoff
-        4 - driving to taxi hub        
-        
-        trip states
-        1 - driving -> green led 
-        2 - waiting -> colors led for specific time
-        
-
-        '''
-        self.trip_super_state = 1.0 # qcar first drives to taxi hub
-        self.current_trip_state = 1.0 # once at taxi hub, hold red for 3s
-        self.path_nodes = []
-        self.super_state_1_flags = [False, False]
-        self.taxi_node = 10
-        self.new_ride_requested = False
-        self.trip_length = 0
-        self.current_trip_status = False # True/False if trip complete/not complete
-        self.current_stop = 0
-        self.goal_stop = 0
-        self.stop_index = 0
-        self.nodes_sent = False
-
-        # LED specific parameters 
-        self.led_time = 3
-        self.led_time_t0 = time.time()
-        self.led_timer_reset = False
-        self.path_status_subscrition = self.create_subscription(Bool, '/path_status',self.path_status_callback, 1)
-        self.qcar_state = 4.0
-        self.previous_led_state = 0.0
+        # ---------------- internal state ----------------
         self.current_path_status = False
-        self.led_set_logic()
+        self.startup_sent = False
+        self.ready_for_rides = False
+        self.mission_running = False
+        self.new_ride_requested = False
 
-        self.dt = 1/10
-        self.trip_time = time.time()
-        self.timer1 = self.create_timer(self.dt, self.trip_planner_controller)
+        # follower publishes 4 driving, 2 pickup, 6 dropoff, 5 hub
+        self.follower_event = 0
 
-        
+        # latch flags
+        self.picked_up = False
+        self.dropped_off = False
+
+        # LED state
+        self._last_led = None
+
+        # subscribe
+        self.create_subscription(Bool, '/path_status', self.path_status_callback, 10)
+        self.create_subscription(UInt8, '/path_follower/qcar_state', self.follower_event_callback, 10)
+
+        # start at HUB idle magenta (accepting rides)
+        self._set_led(self.LED_MAGENTA)
+
+        # loop (mission control only; LEDs driven by follower callback)
+        self.timer = self.create_timer(0.1, self.loop)
+
+    # ---------------- callbacks ----------------
+    def path_status_callback(self, msg):
+        self.current_path_status = bool(msg.data)
+
+    def follower_event_callback(self, msg):
+        """
+        PathFollower publishes:
+          4 = driving
+          2 = pickup stop
+          6 = dropoff stop
+          5 = hub/ready
+
+        Desired LED behavior:
+          - HUB: MAGENTA
+          - Going to pickup: GREEN
+          - Pickup reached: BLUE and HOLD until dropoff
+          - Dropoff reached: ORANGE and HOLD until hub
+        """
+        s = int(msg.data)
+        self.follower_event = s
+
+        # HUB reached / idle: reset everything
+        if s == 5:
+            self.picked_up = False
+            self.dropped_off = False
+            self._set_led(self.LED_MAGENTA)
+            return
+
+        # PICKUP reached -> latch blue-until-dropoff
+        if s == 2:
+            self.picked_up = True
+            self.dropped_off = False
+            self._set_led(self.LED_BLUE)
+            return
+
+        # DROPOFF reached -> latch orange-until-hub
+        if s == 6:
+            self.dropped_off = True
+            self.picked_up = False
+            self._set_led(self.LED_ORANGE)
+            return
+
+        # DRIVING
+        if s == 4:
+            if self.dropped_off:
+                self._set_led(self.LED_ORANGE)  # ✅ hold orange until hub
+            elif self.picked_up:
+                self._set_led(self.LED_BLUE)    # ✅ hold blue until dropoff
+            else:
+                self._set_led(self.LED_GREEN)   # ✅ going to pickup
+            return
+
     def parameter_update_callback(self, params):
-        for param in params:
-            if param.name == 'taxi_node' and param.type_== param.Type.INTEGER_ARRAY:
-                # Navigation specific variables
-                self.taxi_node = list(param.value)
-                if len(self.taxi_node > 1):
-                    self.get_logger().info('Incorrect number of nodes given... setting default')
-                    self.taxi_node = 10
-                          
-            elif param.name == 'trip_nodes' and param.type_== param.Type.INTEGER_ARRAY:
-                if self.trip_super_state ==1:
-                        self.get_logger().info('Cant assign trip, not at the taxi hub!')
+        for p in params:
+            if p.name == 'pickup_xy' and p.type_ == p.Type.DOUBLE_ARRAY:
+                self.pickup_xy = list(p.value)
+                self.get_logger().info(f"pickup_xy updated: {self.pickup_xy}")
 
-                # The QCar2 has to reach the taxi hub before a new trip can be requested
-                if self.current_trip_status == True and self.trip_super_state == 2: 
-                    self.trip_nodes = list(param.value)
-                    self.path_nodes = []
-                    self.trip_length = len(self.trip_nodes)
+            elif p.name == 'dropoff_xy' and p.type_ == p.Type.DOUBLE_ARRAY:
+                self.dropoff_xy = list(p.value)
+                self.get_logger().info(f"dropoff_xy updated: {self.dropoff_xy}")
 
-                    if self.trip_length <2:
-                        self.get_logger().info('Invalid trip scenario... minimum 2 point required for trip')
-                    else:
-                        for i in range(2+self.trip_length):
-                            if i == 0 or i == len(self.trip_nodes)+1:
-                                self.path_nodes.append(10)
-                            else:
-                                self.path_nodes.append(self.trip_nodes[i-1])
+            elif p.name == 'stop_seconds' and p.type_ == p.Type.DOUBLE_ARRAY:
+                self.stop_seconds = float(list(p.value)[0])
+                self.get_logger().info(f"stop_seconds updated: {self.stop_seconds}")
 
-                        print("New trip requested!")
-                        print(self.path_nodes)                        
+        if self.ready_for_rides and not self.mission_running:
+            self.new_ride_requested = True
 
-                        self.new_ride_requested = True
-                        self.stop_index = 0
-                        self.trip_time = time.time()
-                        
-                        # We travel slowly to pickup station and speed up during actual rides
-                        self.send_request(param_name="desired_speed",
-                                    param_value= [1.0],
-                                    param_type= ParameterType.PARAMETER_DOUBLE_ARRAY,
-                                    client= self.path_follower_client)
-                            
+        return SetParametersResult(successful=True)
 
-                # The QCar2 has to reach the taxi hub before a new trip can be requested
-                if self.current_trip_status == False and self.trip_super_state == 2:
-                    self.get_logger().info('Cant assign trip, current trip in progress!')
-
-        return SetParametersResult(successful = True)
-
-    def trip_planner_controller(self):
-        # Note: initial condition for qcar2 as it travels from strating origin to taxi hub keeps LED green
-        t_current = time.time() - self.trip_time
-        # construct total path to know how many LED states the QCar will have 
-        
-        # At the start the QCar will need to generate a path from the starting origin to the taxihub
-        # this path is different from every other path
-        if self.trip_super_state == 1:
-            # Generate path
-            if t_current < 10 and len(self.path_nodes) == 0 and self.current_path_status == False:
-                self.path_nodes.append(0)
-                for node in self.trip_nodes:
-                    self.path_nodes.append(node)
-                self.path_nodes.append(self.taxi_node)
-                
-                if self.super_state_1_flags[0] == False:
-                    self.super_state_1_flags[0] = self.send_request(param_name="node_values",
-                              param_value= self.path_nodes,
-                              param_type= ParameterType.PARAMETER_INTEGER_ARRAY,
-                              client= self.path_follower_client)
-                
-                if self.super_state_1_flags[1] == False:
-                    self.super_state_1_flags[1] = self.send_request(param_name="start_path",
-                              param_value= [True],
-                              param_type= ParameterType.PARAMETER_BOOL_ARRAY,
-                              client= self.path_follower_client)
-
-            # We have passed the first 10 seconds and are now waiting for new rides 
-            if self.current_path_status == True and t_current > 10:
-
-                # reset LED timer to ensure LEDs are only on for 3s
-                if not self.led_timer_reset:
-                    self.led_time_t0 = time.time()
-                    self.led_timer_reset = True                    
-                
-                if time.time()-self.led_time_t0 < self.led_time:
-                    # this will set the LED red for 3 seconds
-                    self.qcar_state = 1
-                elif time.time()-self.led_time_t0 > self.led_time: 
-                    #ready for another ride
-                    self.qcar_state = 4
-                
-                    # clear current nodes
-                    self.path_nodes = []
-
-                    # switch into full ride planning mode
-                    self.trip_super_state = 2
-                    
-                    # ready for a new trip!
-                    self.current_trip_status = True
-                    self.led_timer_reset = False
-
-        # QCar has reached the taxihub area and is ready for a new trip!
-        if  self.trip_super_state == 2:
-            self.qcar_state = 4
-            if self.new_ride_requested:
-                # breakdown ride into subsets of paths 
-                if self.stop_index+1 <= len(self.path_nodes)-1:
-                    if self.nodes_sent == False:
-                        
-                        # extract current trip values
-                        self.current_stop = self.path_nodes[self.stop_index]
-                        self.goal_stop = self.path_nodes[self.stop_index+1]
-                        
-                        trip = [self.current_stop,self.goal_stop]
-
-                        # send nodes to path follower
-                        if not self.nodes_sent: 
-                            self.nodes_sent = self.send_request(param_name="node_values",
-                                param_value= trip,
-                                param_type= ParameterType.PARAMETER_INTEGER_ARRAY,
-                                client= self.path_follower_client)
-                        
-                        
-                    
-                    if self.current_path_status == True and t_current > 2:
-                        if not self.led_timer_reset: 
-                            self.led_time_t0 = time.time()
-                            self.led_timer_reset = True
-
-                        if time.time() - self.led_time_t0 < self.led_time:
-                            
-                            if len(self.path_nodes) > 4:
-                                # First stop is the pickup
-                                if self.stop_index+1 == 1:
-                                    self.qcar_state = 2
-
-                                # This is for intermediate stops or back at taxi hub
-                                if (self.stop_index+1 > 1 or self.stop_index+1 == len(self.path_nodes)-1 and 
-                                    self.stop_index+1 !=  len(self.path_nodes)-2):
-                                    
-                                    self.qcar_state = 1
-
-                                # This is for drop off stop 
-                                if self.stop_index+1 ==  len(self.path_nodes)-2:
-                                    self.qcar_state = 3
-                            elif len(self.path_nodes) == 4:
-                                #becomes ambigious to decern stops, manually define the sequence
-                                if self.stop_index+1 == 1:
-                                    self.qcar_state = 2
-                                elif self.stop_index+1 == 2:
-                                    self.qcar_state = 3
-                                elif self.stop_index+1 == 3:
-                                    self.qcar_state = 1
-                            
-
-                        elif time.time()-self.led_time_t0 > self.led_time: 
-
-                            #reset triggers used for timing lights
-                            self.led_timer_reset = False
-                            self.nodes_sent = False
-                            self.qcar_state = 4
-                            self.stop_index +=1
-                            self.trip_time = time.time()
-        
-        if self.previous_led_state != self.qcar_state:
-            self.previous_led_state = self.qcar_state
-            self.led_set_logic()
-
-    def led_set_logic(self):
-
-        # This section is trying to emulate the cli call -> ros2 param set qcar2_hardware led_color_id <value>
-        # LED Red (used for taxi hub stop and inbetween ride stops)
-
-        if self.qcar_state == 1.0:
-            self.send_request(param_name="led_color_id",
-                              param_value= 0,
-                              param_type= ParameterType.PARAMETER_INTEGER,
-                              client= self.qcar_hardware_client)
-        
-        # Arrived at pickup
-        elif self.qcar_state == 2.0:
-            self.send_request(param_name="led_color_id",
-                              param_value= 2,
-                              param_type= ParameterType.PARAMETER_INTEGER,
-                              client= self.qcar_hardware_client)
-        
-        # Drop off coordinate
-        elif self.qcar_state == 3.0:
-            self.send_request(param_name="led_color_id",
-                              param_value= 3,
-                              param_type= ParameterType.PARAMETER_INTEGER,
-                              client= self.qcar_hardware_client)
-        # Driving state
-        elif self.qcar_state == 4.0:
-            self.send_request(param_name="led_color_id",
-                              param_value= 1,
-                              param_type= ParameterType.PARAMETER_INTEGER,
-                              client= self.qcar_hardware_client)
-
-    def path_status_callback(self,msg):
-        self.current_path_status  = msg.data
-
-    # method used to end multiple parameters to multiple nodes
-    def send_request(self, param_name, param_value, param_type,client):
-            
-
+    # ---------------- ROS param helper ----------------
+    def _set_param(self, client, name, value, ptype):
         param = Parameter()
-        param.name = param_name
-        param.value.type = param_type
+        param.name = name
+        param.value.type = ptype
 
-        if param_type == ParameterType.PARAMETER_INTEGER_ARRAY:
-            param.value.integer_array_value = param_value
+        if ptype == ParameterType.PARAMETER_INTEGER_ARRAY:
+            param.value.integer_array_value = list(value)
+        elif ptype == ParameterType.PARAMETER_DOUBLE_ARRAY:
+            param.value.double_array_value = list(value)
+        elif ptype == ParameterType.PARAMETER_BOOL_ARRAY:
+            param.value.bool_array_value = list(value)
+        elif ptype == ParameterType.PARAMETER_INTEGER:
+            param.value.integer_value = int(value)
+        else:
+            raise RuntimeError(f"Unsupported param type: {ptype}")
 
-        elif param_type == ParameterType.PARAMETER_INTEGER:
-            param.value.integer_value = param_value
+        req = SetParameters.Request()
+        req.parameters = [param]
+        client.call_async(req)
 
-        elif param_type == ParameterType.PARAMETER_BOOL_ARRAY:
-            param.value.bool_array_value = param_value
-        
-        elif param_type == ParameterType.PARAMETER_DOUBLE_ARRAY:
-            param.value.double_array_value = param_value
+    # ---------------- LED setter (DIRECT TO HARDWARE) ----------------
+    def _set_led(self, led_color_id: int):
+        led_color_id = int(led_color_id)
+        if self._last_led == led_color_id:
+            return
+        self._last_led = led_color_id
 
+        self._set_param(
+            self.qcar_hardware_client,
+            "led_color_id",
+            led_color_id,
+            ParameterType.PARAMETER_INTEGER
+        )
 
-        request = SetParameters.Request()
-        request.parameters = [param]
-        future = client.call_async(request)
+    # ---------------- main loop (NO LED forcing here) ----------------
+    def loop(self):
+        # STARTUP: go to hub once (if you spawn elsewhere)
+        if not self.ready_for_rides and not self.mission_running:
+            if not self.startup_sent and not self.current_path_status:
+                self._set_param(self.path_follower_client, "node_values",
+                                [0, self.taxi_node], ParameterType.PARAMETER_INTEGER_ARRAY)
+                self._set_param(self.path_follower_client, "start_path",
+                                [True], ParameterType.PARAMETER_BOOL_ARRAY)
+                self.startup_sent = True
 
- 
-        
+            if self.current_path_status:
+                self.ready_for_rides = True
+                self.startup_sent = False
+            return
+
+        # READY
+        if self.ready_for_rides and not self.mission_running and not self.new_ride_requested:
+            return
+
+        # START MISSION
+        if self.ready_for_rides and not self.mission_running and self.new_ride_requested:
+            self._set_param(self.path_follower_client, "mission_use_xy",
+                            [True], ParameterType.PARAMETER_BOOL_ARRAY)
+            self._set_param(self.path_follower_client, "mission_pickup_xy",
+                            self.pickup_xy, ParameterType.PARAMETER_DOUBLE_ARRAY)
+            self._set_param(self.path_follower_client, "mission_dropoff_xy",
+                            self.dropoff_xy, ParameterType.PARAMETER_DOUBLE_ARRAY)
+            self._set_param(self.path_follower_client, "mission_stop_seconds",
+                            [float(self.stop_seconds)], ParameterType.PARAMETER_DOUBLE_ARRAY)
+
+            self._set_param(self.path_follower_client, "mission_enable",
+                            [True], ParameterType.PARAMETER_BOOL_ARRAY)
+
+            self.mission_running = True
+            self.ready_for_rides = False
+            self.new_ride_requested = False
+            return
+
+        # END MISSION when follower reports HUB (5)
+        if self.mission_running:
+            if self.follower_event == 5:
+                self._set_param(self.path_follower_client, "mission_enable",
+                                [False], ParameterType.PARAMETER_BOOL_ARRAY)
+                self.mission_running = False
+                self.ready_for_rides = True
+
 
 def main():
- 
-  # Start the ROS 2 Python Client Library
-  rclpy.init()
+    rclpy.init()
+    node = tripPlanner()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    rclpy.shutdown()
 
-  node = tripPlanner()
-  try:
-      rclpy.spin(node)
-  except KeyboardInterrupt:
-      pass
 
-  rclpy.shutdown()
-  
 if __name__ == '__main__':
-  main()
+    main()

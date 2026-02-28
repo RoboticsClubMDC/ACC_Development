@@ -1,52 +1,25 @@
+# =========================
+# OVERALL: path_follower.py  (FULL FILE)
+# ✅ Adds /path_follower/qcar_state publisher so your tripPlanner subscription works
+# =========================
 #! /usr/bin/env python3
-"""
-nav_to_pose — Stanley path-tracking controller for QCar2
-=========================================================
-
-v3: Replaces pure-pursuit with a **Stanley controller** which naturally damps
-heading oscillation.  Adds **curvature feedforward** so the car leads into
-corners, and **adaptive speed** that slows in tight curves.
-
-Algorithms / filters / math used
----------------------------------
-1. **Stanley controller** (Stanford, Thrun 2006)
-       δ = ψ_error + arctan(k_e · e_cte / (v + k_soft))
-   Heading-error term provides natural damping; cross-track term provides
-   lateral convergence.
-
-2. **Path curvature feedforward**
-       δ_ff = arctan(L · κ)
-   Pre-steers into upcoming curves using the discrete curvature of the path.
-
-3. **Extended Kalman Filter (EKF)** for fused pose estimation
-   (bicycle motion model + SLAM/cartographer correction).
-
-4. **Gyroscope Kalman Filter** for heading estimation
-   (IMU angular velocity + SLAM heading correction).
-
-5. **2nd-order Butterworth low-pass filter** (15 Hz cut-off) on gyroscope.
-
-6. **Steering rate-limiter** (actuator constraint, 3.0 rad/s max slew).
-
-7. **Curvature-adaptive speed control**
-       v_cmd = v_desired · (1 − α · |κ|) , clamped above v_min.
-"""
 
 # Quanser specific packages
 from hal.products.mats import SDCSRoadMap
 from pal.utilities.math import wrap_to_pi
 
 # Generic python packages
-import time
+import time  # Time library
 import numpy as np
 import scipy.signal as signal
 from scipy.spatial.transform import Rotation as R
 from pal.utilities.scope import MultiScope
+from enum import Enum
 
 # ROS specific packages
-from rclpy.duration import Duration
-import rclpy
-from geometry_msgs.msg import PoseStamped
+from rclpy.duration import Duration # Handles time for ROS 2
+import rclpy # Python client library for ROS 2
+from geometry_msgs.msg import PoseStamped # Pose with ref frame and timestamp
 from rclpy.node import Node
 from nav_msgs.msg import Path
 from tf2_ros import TransformException
@@ -55,15 +28,31 @@ from tf2_ros.transform_listener import TransformListener
 from geometry_msgs.msg import Twist, PoseStamped
 from sensor_msgs.msg import Imu, JointState
 from rcl_interfaces.msg import SetParametersResult
-from std_msgs.msg import Bool
+from std_msgs.msg import Bool, UInt8   # ✅ ADDED UInt8
 
 
-# ===================================================================
-#  State estimation (unchanged from original)
-# ===================================================================
+'''
+Description:
 
+Navigates a robot from an initial pose to a goal pose described by a series of
+given nodes based on Quanser's SDCSRoadMap class.
+
+UPGRADE:
+- You can provide pickup/dropoff as XY coordinates in meters (QLabs map meters)
+- It will snap current pose -> closest node (FIXED: ROS->QLabs conversion)
+- Snap goal XY -> closest node
+- A* shortest path between nodes
+- Append exact goal XY as final waypoint so you actually end at that coordinate
+
+MISSION:
+- Provide TWO coordinates: pickup_xy and dropoff_xy
+- Go to pickup, STOP 3s
+- Go to dropoff, STOP 3s
+- Go back to Taxi Hub (FIXED to node 10), DONE
+'''
+
+# region: Helper classes for state estimation
 class QcarEKF:
-    """Extended Kalman Filter for QCar2 pose [x, y, θ]."""
 
     def __init__(self, x0, P0, Q, R):
         self.L = 0.257
@@ -72,44 +61,56 @@ class QcarEKF:
         self.P = P0
         self.Q = Q
         self.R = R
-        self.C = np.eye(3)
+
+        self.C = np.array([
+            [1, 0, 0],
+            [0, 1, 0],
+            [0, 0, 1]
+        ])
 
     def f(self, X, u, dt):
         return X + dt * u[0] * np.array([
-            [np.cos(X[2, 0])],
-            [np.sin(X[2, 0])],
+            [np.cos(X[2,0])],
+            [np.sin(X[2,0])],
             [np.tan(u[1]) / self.L]
         ])
 
     def Jf(self, X, u, dt):
         return np.array([
-            [1, 0, -dt * u[0] * np.sin(X[2, 0])],
-            [0, 1,  dt * u[0] * np.cos(X[2, 0])],
+            [1, 0, -dt*u[0]*np.sin(X[2,0])],
+            [0, 1, dt*u[0]*np.cos(X[2,0])],
             [0, 0, 1]
         ])
 
     def prediction(self, dt, u):
         F = self.Jf(self.xHat, u, dt)
-        self.P = F @ self.P @ F.T + self.Q
+        self.P = F@self.P@np.transpose(F) + self.Q
+
         self.xHat = self.f(self.xHat, u, dt)
         self.xHat[2] = wrap_to_pi(self.xHat[2])
+        return
 
     def correction(self, y):
         H = self.C
-        S = H @ self.P @ H.T + self.R
-        K = self.P @ H.T @ np.linalg.inv(S)
-        z = y - H @ self.xHat
+        P_times_HTransposed = self.P @ np.transpose(H)
+
+        S = H @ P_times_HTransposed + self.R
+        K = P_times_HTransposed @ np.linalg.inv(S)
+
+        z = (y - H@self.xHat)
         if len(y) > 1:
             z[2] = wrap_to_pi(z[2])
         else:
             z = wrap_to_pi(z)
+
         self.xHat += K @ z
         self.xHat[2] = wrap_to_pi(self.xHat[2])
-        self.P = (self.I - K @ H) @ self.P
+
+        self.P = (self.I - K@H) @ self.P
+        return
 
 
 class GyroKF:
-    """Kalman Filter fusing gyroscope heading with SLAM heading."""
 
     def __init__(self, x0, P0, Q, R):
         self.I = np.eye(2)
@@ -117,38 +118,70 @@ class GyroKF:
         self.P = P0
         self.Q = Q
         self.R = R
-        self.A = np.array([[0, -1], [0, 0]])
-        self.B = np.array([[1], [0]])
-        self.C = np.array([[1, 0]])
+
+        self.A = np.array([
+            [0, -1],
+            [0, 0]
+        ])
+        self.B = np.array([
+            [1],
+            [0]
+        ])
+        self.C = np.array([
+            [1, 0]
+        ])
 
     def prediction(self, dt, u):
-        Ad = self.I + self.A * dt
-        self.xHat = Ad @ self.xHat + dt * self.B * u
-        self.P = Ad @ self.P @ Ad.T + self.Q
+        Ad = self.I + self.A*dt
+        self.xHat = Ad@self.xHat + dt*self.B*u
+        self.P = Ad@self.P@np.transpose(Ad) + self.Q
 
     def correction(self, y):
-        S = self.C @ self.P @ self.C.T + self.R
-        K = self.P @ self.C.T @ np.linalg.inv(S)
-        z = wrap_to_pi(y - self.C @ self.xHat)
+        P_times_CTransposed = self.P @ np.transpose(self.C)
+
+        S = self.C @ P_times_CTransposed + self.R
+        K = P_times_CTransposed @ np.linalg.inv(S)
+
+        z = y - self.C@self.xHat
+        z = wrap_to_pi(z)
+
         self.xHat += K @ z
         self.xHat[0] = wrap_to_pi(self.xHat[0])
-        self.P = (self.I - K @ self.C) @ self.P
+
+        self.P = (self.I - K@self.C) @ self.P
+        return
+
+# endregion
 
 
-# ===================================================================
-#  Path follower using Stanley controller
-# ===================================================================
+class MissionStage(Enum):
+    IDLE = 0
+    TO_PICKUP = 1
+    WAIT_AT_PICKUP = 2
+    TO_DROPOFF = 3
+    WAIT_AT_DROPOFF = 4
+    TO_HUB = 5
+    DONE = 6
+
 
 class PathFollower(Node):
 
     def __init__(self):
         super().__init__('path_follower')
 
-        # --------------- ROS parameters ---------------
-        self.declare_parameter('node_values', [0, 8, 10, 14, 20, 10])
+        # Roadmap (we use it for snapping pose->node and A*)
+        self.roadmap = SDCSRoadMap()
+
+
+        self.qcar_state_pub = self.create_publisher(UInt8, '/path_follower/qcar_state', 10)
+        self._last_qcar_state = None
+        self._publish_qcar_state(5)   # MAGENTA at hub/ready at startup
+
+        # ---------------- Existing params ----------------
+        self.declare_parameter('node_values', [0, 8, 10])
         self.waypoints = list(self.get_parameter("node_values").get_parameter_value().integer_array_value)
 
-        self.declare_parameter('desired_speed', [0.4])
+        self.declare_parameter('desired_speed', [0.6])
         self.desired_speed = list(self.get_parameter("desired_speed").get_parameter_value().double_array_value)
 
         self.declare_parameter('visualize_pose', [False])
@@ -159,521 +192,729 @@ class PathFollower(Node):
         self.declare_parameter('rotation_offset', [82.0])
         self.rotation_offset = list(self.get_parameter("rotation_offset").get_parameter_value().double_array_value)
 
-        self.declare_parameter('translation_offset', [0.0, -0.125])
+        self.declare_parameter('translation_offset', [0.0, 0.0])
         self.translation_offset = list(self.get_parameter("translation_offset").get_parameter_value().double_array_value)
 
-        self.declare_parameter('start_path', [False])
+        self.declare_parameter('start_path', [True])
         self.path_execute_flag = list(self.get_parameter("start_path").get_parameter_value().bool_array_value)[0]
+
+        # ---------------- NEW mission params ----------------
+        self.declare_parameter('mission_enable', [False])
+        self.mission_enable = list(self.get_parameter("mission_enable").get_parameter_value().bool_array_value)[0]
+
+        self.declare_parameter('mission_use_xy', [True])
+        self.mission_use_xy = list(self.get_parameter("mission_use_xy").get_parameter_value().bool_array_value)[0]
+
+        self.declare_parameter('mission_pickup_xy', [0.0, 0.0])
+        self.pickup_xy = list(self.get_parameter("mission_pickup_xy").get_parameter_value().double_array_value)
+
+        self.declare_parameter('mission_dropoff_xy', [0.0, 0.0])
+        self.dropoff_xy = list(self.get_parameter("mission_dropoff_xy").get_parameter_value().double_array_value)
+
+        self.declare_parameter('mission_stop_seconds', [3.0])
+        self.stop_seconds = float(list(self.get_parameter("mission_stop_seconds").get_parameter_value().double_array_value)[0])
+
+        # mission state
+        self.mission_stage = MissionStage.IDLE
+        self.mission_initialized = False
+        self.current_goal_desc = "none"
+        self.mission_pause_until = 0.0
 
         self.add_on_set_parameters_callback(self.parameter_update_callback)
 
+        # Declare and acquire `target_frame` parameter
         self.target_frame = self.declare_parameter(
             'target_frame', 'base_link').get_parameter_value().string_value
 
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
-        # --------------- Control parameters ---------------
-        self.dt = 1 / 80
-        self.L = 0.256                  # wheelbase [m]
-        self.max_steering_angle = 0.6   # [rad]
-        self.max_steer_rate = 3.0       # [rad/s] — actuator slew limit
+        # parameters common to all methods
+        self.dt = 1/80
 
-        # Stanley gains
-        self.k_e = 2.5                  # cross-track gain
-        self.k_soft = 0.1              # softening constant [m/s]
-        self.k_heading = 1.0           # heading error gain (≤1 to soften)
-
-        # Curvature feedforward
-        self.k_ff = 1.0                 # feedforward gain
-
-        # Curvature-adaptive speed:  v = v_des * (1 - k_curv_speed * |κ|)
-        self.k_curv_speed = 0.5
-        self.v_min_curve = 0.15         # minimum speed in tight curves [m/s]
-
-        # --------------- EKF / KF ---------------
-        x0 = np.zeros((3, 1))
+        # EKF init
+        x0 = np.zeros((3,1))
         P0 = np.eye(3)
+        R_combined = np.diagflat([0.1, 0.1, 0.01])
 
         self.qcar2_ekf = QcarEKF(
-            x0=x0, P0=P0,
+            x0=x0,
+            P0=P0,
             Q=np.diagflat([0.0001, 0.0001, 0.001]),
-            R=np.diagflat([0.1, 0.1, 0.01]))
-        self.pose_ekf = np.zeros((3, 1))
+            R=R_combined)
+
+        self.pose_ekf = np.zeros((3,1))
 
         self.gyro_kf = GyroKF(
-            x0=np.zeros((2, 1)), P0=np.eye(2),
+            x0=np.zeros((2,1)),
+            P0=np.eye(2),
             Q=np.diagflat([0.01, 0.01]),
-            R=np.diagflat([0.1]))
+            R=np.diagflat([.1])
+        )
 
+        # filter parameters
         self.yaw = 0
         self.cutoff_frequency_filter = 15.0
         self.a1, self.b1 = self.filter_coefficients(self.cutoff_frequency_filter, self.dt)
 
-        # --------------- Timers ---------------
+        # timers
         self.path_control_timer = self.create_timer(self.dt, self.path_planner)
         self.timer = self.create_timer(self.dt, self.tf_timer)
 
-        # --------------- Path ---------------
-        self.translation = [0, 0, 0]
-        self.rotation = [0, 0, 0]
-        self.wp = SDCSRoadMap().generate_path(self.waypoints) * self.scale
-        self.N = len(self.wp[0, :])
+        # TF pose placeholders
+        self.translation = [0,0,0]
+        self.rotation = [0,0,0]
+
+        # start with manual node_values path until mission replans
+        self.wp = self.roadmap.generate_path(self.waypoints) * self.scale
+        if self.wp is None:
+            self.wp = np.zeros((2,1))
+        self.N = self.wp.shape[1]
         self.wpi = 0
         self.wp_prior = []
-        self.current_steering = 0.0
-        self.previous_steering = 0.0
+        self.current_steering = 0
 
-        # Precompute path geometry (headings, curvatures, transformed coords)
-        self._rebuild_path()
+        self.publisher = self.create_publisher(Twist,'/cmd_vel_nav', 1)
+        self.max_steering_angle = 0.6
 
-        # --------------- Publishers / Subscribers ---------------
-        self.publisher = self.create_publisher(Twist, '/cmd_vel_nav', 1)
-        self.cyclic = False
-
-        self.joint_state_subscriber = self.create_subscription(
-            JointState, '/qcar2_joint', self.joint_state_callback, 1)
+        self.joint_state_subscriber = self.create_subscription(JointState, '/qcar2_joint', self.joint_state_callback, 1)
         self.qcar2_measurred_speed = 0
 
-        self.object_detection_flag = self.create_subscription(
-            Bool, '/motion_enable', self.object_detector_callback, 1)
+        self.object_detection_flag = self.create_subscription(Bool, '/motion_enable', self.object_detector_callback, 1)
         self.motion_flag = True
         self.path_complete = False
 
-        self.imu_subscrition = self.create_subscription(
-            Imu, '/qcar2_imu', self.imu_callback, 10)
-        self.gyroscope = [0, 0, 0]
+        self.imu_subscrition = self.create_subscription(Imu, '/qcar2_imu', self.imu_callback, 10)
+        self.gyroscope = [0,0,0]
 
         self.path_publisher_topic = self.create_publisher(Path, '/planned_path', 1)
         self.path_status_publisher = self.create_publisher(Bool, '/path_status', 1)
 
-        # Multiscope
+        # ---------------- TAXI HUB FIX ----------------
+        self.hub_xy = list(self._get_node_xy(10))
+        self.get_logger().info(f"Taxi hub locked to node 10 => hub_xy={self.hub_xy}")
+        # ------------------------------------------------
+
+        # ---------------- ✅ NEW: publish qcar_state for LEDs ----------------
+        # 2 = BLUE pickup
+        # 4 = GREEN driving
+        # 5 = MAGENTA hub/ready
+        # 6 = ORANGE dropoff
+        # --------------------------------------------------------------------
+
+        # Multiscope info
         self.t0 = time.time()
         self.t_plot = 0
         self.plot_visualized = False
         self.scopeTimer = self.create_timer(0.1, self.scopeDataTimer)
 
-    # =============================================================
-    #  Path geometry precomputation
-    # =============================================================
-    def _rebuild_path(self):
-        """Precompute transformed waypoints, path headings, and curvatures."""
-        self.wp_t = self._transform_all_waypoints()   # (N, 2)
-        self.N = self.wp_t.shape[0]
-        self.path_headings = self._compute_path_headings()
-        self.path_curvatures = self._compute_path_curvatures()
-        self.wpi = 0
+    # ---------------- ✅ NEW: qcar_state publisher helpers ----------------
+    def _publish_qcar_state(self, s: int):
+        s = int(s)
+        if self._last_qcar_state == s:
+            return
+        self._last_qcar_state = s
+        m = UInt8()
+        m.data = s
+        self.qcar_state_pub.publish(m)
 
-    def _transform_all_waypoints(self):
-        angle_offset = self.rotation_offset[0]
-        c = np.cos(-angle_offset * np.pi / 180)
-        s = np.sin(-angle_offset * np.pi / 180)
-        R_rot = np.array([[c, -s], [s, c]])
-        t = np.array([self.translation_offset[0], self.translation_offset[1]])
-        wp_shifted = self.wp[:2, :].T + t
-        return wp_shifted @ R_rot
-
-    def _compute_path_headings(self):
-        """Heading at each waypoint from the tangent vector."""
-        headings = np.zeros(self.N)
-        for i in range(self.N - 1):
-            dx = self.wp_t[i + 1, 0] - self.wp_t[i, 0]
-            dy = self.wp_t[i + 1, 1] - self.wp_t[i, 1]
-            headings[i] = np.arctan2(dy, dx)
-        headings[-1] = headings[-2]  # copy last
-        return headings
-
-    def _compute_path_curvatures(self):
-        """Discrete curvature: κ = Δθ / Δs  at each waypoint."""
-        curvatures = np.zeros(self.N)
-        for i in range(1, self.N - 1):
-            dtheta = wrap_to_pi(self.path_headings[i] - self.path_headings[i - 1])
-            ds = np.linalg.norm(self.wp_t[i] - self.wp_t[i - 1])
-            if ds > 1e-6:
-                curvatures[i] = dtheta / ds
-        # Smooth curvatures with a small running average to reduce noise
-        kernel = 15
-        if self.N > kernel:
-            pad = kernel // 2
-            c_padded = np.pad(curvatures, pad, mode='edge')
-            curvatures = np.convolve(c_padded, np.ones(kernel) / kernel, mode='valid')[:self.N]
-        return curvatures
-
-    # =============================================================
-    #  Stanley controller helpers
-    # =============================================================
-    def _find_closest_segment(self, p):
-        """Find the path segment closest to position p.
-
-        Returns (idx, projection_frac) where the closest point on the path
-        is between wp_t[idx] and wp_t[idx+1], at fraction `projection_frac`
-        along that segment.
-
-        Only searches forward from self.wpi to avoid going backward.
+    def _update_led_state_from_context(self):
         """
-        p = np.array(p)
-        best_dist = np.inf
-        best_idx = self.wpi
-        best_frac = 0.0
+        Keeps LEDs correct even if we miss a single transition.
+        """
+        if self.mission_enable:
+            if self.mission_stage == MissionStage.WAIT_AT_PICKUP:
+                self._publish_qcar_state(2)   # BLUE
+            elif self.mission_stage == MissionStage.WAIT_AT_DROPOFF:
+                self._publish_qcar_state(6)   # ORANGE
+            elif self.mission_stage == MissionStage.DONE:
+                self._publish_qcar_state(5)   # MAGENTA
+            else:
+                # driving stages: TO_PICKUP / TO_DROPOFF / TO_HUB
+                self._publish_qcar_state(4)   # GREEN
+        else:
+            # manual path: green while moving, magenta when complete
+            if self.path_execute_flag and self.motion_flag and not self.path_complete:
+                self._publish_qcar_state(4)   # GREEN
+            else:
+                self._publish_qcar_state(5)   # MAGENTA
+    # --------------------------------------------------------------------
 
-        search_start = max(0, self.wpi - 5)
-        search_end = min(self.N - 1, self.wpi + 300)
+    # --------------------- FRAME FIX HELPERS ---------------------
+    def _R_qlabs_to_ros_2d(self):
+        angle_offset = float(self.rotation_offset[0])
+        return np.array([
+            [np.cos(-angle_offset*np.pi/180.0), -np.sin(-angle_offset*np.pi/180.0)],
+            [np.sin(-angle_offset*np.pi/180.0),  np.cos(-angle_offset*np.pi/180.0)]
+        ])
 
-        for i in range(search_start, search_end):
-            a = self.wp_t[i]
-            b = self.wp_t[i + 1]
-            ab = b - a
-            ab_len_sq = np.dot(ab, ab)
-            if ab_len_sq < 1e-12:
+    def _ros_to_qlabs_xy(self, x_ros, y_ros):
+        Rq = self._R_qlabs_to_ros_2d()
+        t = np.array([float(self.translation_offset[0]), float(self.translation_offset[1])])
+        p_ros = np.array([float(x_ros), float(y_ros)])
+        p_qlabs = (p_ros @ Rq.T) - t
+        return float(p_qlabs[0]), float(p_qlabs[1])
+
+    # --------------------- Roadmap helpers ---------------------
+    def _roadmap_node_count(self):
+        if hasattr(self.roadmap, "nodes"):
+            try:
+                return len(self.roadmap.nodes)
+            except Exception:
+                pass
+        if hasattr(self.roadmap, "get_node_pose"):
+            i = 0
+            while True:
+                try:
+                    _ = self.roadmap.get_node_pose(i)
+                    i += 1
+                    if i > 1000:
+                        return i
+                except Exception:
+                    return i
+        return 0
+
+    def _get_node_xy(self, node_id):
+        if hasattr(self.roadmap, "get_node_pose"):
+            pose = np.array(self.roadmap.get_node_pose(node_id)).reshape(-1)
+            return float(pose[0]), float(pose[1])
+        if hasattr(self.roadmap, "nodes"):
+            pose = np.array(self.roadmap.nodes[node_id].pose).reshape(-1)
+            return float(pose[0]), float(pose[1])
+        raise RuntimeError("SDCSRoadMap does not expose node poses in a known way.")
+
+    def _closest_node_to_xy(self, x, y):
+        n = self._roadmap_node_count()
+        if n <= 0:
+            self.get_logger().error("Could not determine roadmap node count.")
+            return 0
+
+        best_i = 0
+        best_d = float("inf")
+        for i in range(n):
+            try:
+                nx, ny = self._get_node_xy(i)
+                d = (nx - x)**2 + (ny - y)**2
+                if d < best_d:
+                    best_d = d
+                    best_i = i
+            except Exception:
                 continue
-            t_frac = np.clip(np.dot(p - a, ab) / ab_len_sq, 0.0, 1.0)
-            proj = a + t_frac * ab
-            d = np.linalg.norm(p - proj)
-            if d < best_dist:
-                best_dist = d
-                best_idx = i
-                best_frac = t_frac
+        return best_i
 
-        return best_idx, best_frac
+    def _plan_shortest_path_nodes(self, start_node, goal_node):
+        if hasattr(self.roadmap, "find_shortest_path"):
+            return self.roadmap.find_shortest_path(start_node, goal_node)
+        return self.roadmap.generate_path([start_node, goal_node])
 
-    def _get_path_heading_at(self, idx, frac):
-        """Interpolated path heading between idx and idx+1."""
-        if idx >= self.N - 1:
-            return self.path_headings[self.N - 1]
-        h0 = self.path_headings[idx]
-        h1 = self.path_headings[min(idx + 1, self.N - 1)]
-        # Unwrap for interpolation
-        dh = wrap_to_pi(h1 - h0)
-        return wrap_to_pi(h0 + frac * dh)
+    def _set_new_waypoint_path(self, path_2xn, info=""):
+        if path_2xn is None or np.size(path_2xn) == 0:
+            self.get_logger().error(f"Planner returned empty path. {info}")
+            self.wp = np.zeros((2,1))
+            self.N = 1
+            self.wpi= 0
+            self.path_complete = True
+            return
 
-    def _get_curvature_at(self, idx, frac):
-        """Interpolated curvature between idx and idx+1."""
-        if idx >= self.N - 1:
-            return 0.0
-        k0 = self.path_curvatures[idx]
-        k1 = self.path_curvatures[min(idx + 1, self.N - 1)]
-        return k0 + frac * (k1 - k0)
+        wp = np.array(path_2xn)
+        if wp.ndim != 2 or wp.shape[0] != 2:
+            self.get_logger().error(f"Planned path has wrong shape: {wp.shape}. {info}")
+            self.wp = np.zeros((2,1))
+            self.N = 1
+            self.wpi = 0
+            self.path_complete = True
+            return
 
-    def _compute_cross_track_error(self, p, idx, frac):
-        """Signed cross-track error.  Positive = car is to the RIGHT of the path."""
-        p = np.array(p)
-        a = self.wp_t[idx]
-        b = self.wp_t[min(idx + 1, self.N - 1)]
-        proj = a + frac * (b - a)
-        error_vec = p - proj
+        self.wp = wp * self.scale
+        self.N = self.wp.shape[1]
+        self.wpi = 0
+        self.path_complete = False
+        self.wp_prior = self.wp
+        self.get_logger().info(f"New path set. N={self.N}. {info}")
 
-        # Path tangent and right-normal
-        tangent = b - a
-        t_len = np.linalg.norm(tangent)
-        if t_len < 1e-6:
-            return 0.0
-        tangent = tangent / t_len
-        # Right normal: rotate tangent 90° clockwise
-        normal_right = np.array([tangent[1], -tangent[0]])
+    def _append_goal_xy(self, path_2xn, goal_xy):
+        wp = np.array(path_2xn)
+        goal_xy = np.array(goal_xy).reshape(2,)
+        if wp.ndim != 2 or wp.shape[0] != 2:
+            return wp
+        goal_col = goal_xy.reshape(2,1)
+        return np.hstack([wp, goal_col])
 
-        return float(np.dot(error_vec, normal_right))
+    def _plan_leg_to_xy(self, goal_xy, stage_name=""):
+        try:
+            px_ros = float(self.translation.x)
+            py_ros = float(self.translation.y)
+        except Exception:
+            self.get_logger().warn("No TF pose yet; cannot plan leg.")
+            return False
 
-    # =============================================================
-    #  Parameter callback
-    # =============================================================
+        px_qlabs, py_qlabs = self._ros_to_qlabs_xy(px_ros, py_ros)
+
+        start_node = self._closest_node_to_xy(px_qlabs, py_qlabs)
+        goal_node = self._closest_node_to_xy(float(goal_xy[0]), float(goal_xy[1]))
+
+        base_path = self._plan_shortest_path_nodes(start_node, goal_node)
+        if base_path is None or np.size(base_path) == 0:
+            self.get_logger().error(f"A* returned empty path. [{stage_name}]")
+            return False
+
+        full_path = self._append_goal_xy(base_path, goal_xy)
+
+        self.current_goal_desc = (
+            f"{stage_name} goal_xy=({goal_xy[0]:.2f},{goal_xy[1]:.2f}) "
+            f"start_node={start_node} goal_node={goal_node} "
+            f"start_pose_qlabs=({px_qlabs:.2f},{py_qlabs:.2f})"
+        )
+        self._set_new_waypoint_path(full_path, info=self.current_goal_desc)
+        return True
+
+    # --------------------- Parameter callback ---------------------
     def parameter_update_callback(self, params):
         for param in params:
+
             if param.name == 'node_values' and param.type_ == param.Type.INTEGER_ARRAY:
                 self.waypoints = list(param.value)
-                self.wp = SDCSRoadMap().generate_path(self.waypoints) * 0.975
-                self.N = len(self.wp[0, :])
-                self.previous_steering = 0.0
-                self.current_steering = 0.0
-                self.path_complete = False
-                self._rebuild_path()
+                wp_new = self.roadmap.generate_path(self.waypoints) * self.scale
+                self._set_new_waypoint_path(wp_new, info="[node_values updated]")
                 self.get_logger().info('nodes updated!')
                 print(self.waypoints)
 
             elif param.name == 'desired_speed' and param.type_ == param.Type.DOUBLE_ARRAY:
                 self.desired_speed = list(param.value)
                 self.get_logger().info('new desired speed...')
+                print(self.desired_speed)
 
             elif param.name == 'rotation_offset' and param.type_ == param.Type.DOUBLE_ARRAY:
                 self.rotation_offset = list(param.value)
-                self._rebuild_path()
 
             elif param.name == 'translation_offset' and param.type_ == param.Type.DOUBLE_ARRAY:
                 self.translation_offset = list(param.value)
-                self._rebuild_path()
 
             elif param.name == 'start_path' and param.type_ == param.Type.BOOL_ARRAY:
                 self.path_execute_flag = list(param.value)[0]
                 self.get_logger().info('path status changed!')
 
-            elif param.name == 'visualize_pose' and param.type_ == param.Type.BOOL_ARRAY:
-                self.pose_visualize_flag = list(param.value)[0]
-                if self.pose_visualize_flag and not self.plot_visualized:
-                    self.get_logger().info('Pose visualizing...')
-                    tf = 200
-                    self.steeringScope = MultiScope(rows=4, cols=1,
-                                                     title='Vehicle Steering Control', fps=10)
-                    self.steeringScope.addAxis(row=0, col=0, timeWindow=tf,
-                                                yLabel='x Position [m]', yLim=(-2.5, 2.5))
-                    self.steeringScope.axes[0].attachSignal(name='x_meas')
-                    self.steeringScope.axes[0].attachSignal(name='x_ekf')
-                    self.steeringScope.addAxis(row=1, col=0, timeWindow=tf,
-                                                yLabel='y Position [m]', yLim=(-1, 6))
-                    self.steeringScope.axes[1].attachSignal(name='y_meas')
-                    self.steeringScope.axes[1].attachSignal(name='y_ekf')
-                    self.steeringScope.addAxis(row=2, col=0, timeWindow=tf,
-                                                yLabel='steering cmd [rad]', yLim=(-0.6, 0.6))
-                    self.steeringScope.axes[2].attachSignal(name='delta')
-                    self.steeringScope.addAxis(row=3, col=0, timeWindow=tf,
-                                                yLabel='heading', yLim=(-np.pi, np.pi))
-                    self.steeringScope.axes[3].attachSignal(name='theta_meas')
-                    self.steeringScope.axes[3].attachSignal(name='theta_EKF_sf')
-                    self.plot_visualized = True
-                elif self.pose_visualize_flag and self.plot_visualized:
-                    self.get_logger().info('visualization running...')
-                elif not self.pose_visualize_flag and self.plot_visualized:
-                    self.plot_visualized = False
+            # --- mission params ---
+            elif param.name == 'mission_enable' and param.type_ == param.Type.BOOL_ARRAY:
+                self.mission_enable = list(param.value)[0]
+                self.get_logger().info(f"mission_enable set to {self.mission_enable}")
+                self.mission_initialized = False
+                self.mission_stage = MissionStage.IDLE
+                self.path_complete = False
+                self.mission_pause_until = 0.0
+
+            elif param.name == 'mission_use_xy' and param.type_ == param.Type.BOOL_ARRAY:
+                self.mission_use_xy = list(param.value)[0]
+                self.get_logger().info(f"mission_use_xy set to {self.mission_use_xy}")
+                self.mission_initialized = False
+                self.mission_stage = MissionStage.IDLE
+                self.path_complete = False
+                self.mission_pause_until = 0.0
+
+            elif param.name == 'mission_pickup_xy' and param.type_ == param.Type.DOUBLE_ARRAY:
+                self.pickup_xy = list(param.value)
+                self.get_logger().info(f"pickup_xy set to {self.pickup_xy}")
+                self.mission_initialized = False
+                self.mission_stage = MissionStage.IDLE
+
+            elif param.name == 'mission_dropoff_xy' and param.type_ == param.Type.DOUBLE_ARRAY:
+                self.dropoff_xy = list(param.value)
+                self.get_logger().info(f"dropoff_xy set to {self.dropoff_xy}")
+                self.mission_initialized = False
+                self.mission_stage = MissionStage.IDLE
+
+            elif param.name == 'mission_stop_seconds' and param.type_ == param.Type.DOUBLE_ARRAY:
+                self.stop_seconds = float(list(param.value)[0])
+                self.get_logger().info(f"mission_stop_seconds set to {self.stop_seconds}")
 
             return SetParametersResult(successful=True)
 
-    # =============================================================
-    #  Signal processing helpers
-    # =============================================================
+        return SetParametersResult(successful=True)
+
+    # --------------------- Filters / callbacks ---------------------
     def filter_coefficients(self, freq, dt):
-        nyq = 0.5 / dt
-        b, a = signal.butter(2, freq / nyq)
-        self.hist = {'gyro': {'in': [0.0] * 3, 'out': [0.0] * 3}}
+        nyq_freq = 0.5*(1/dt)
+        norm_cut = freq/nyq_freq
+        b, a = signal.butter(2, norm_cut)
+        self.hist = {'gyro': {'in': [0.0]*3, 'out': [0.0]*3}}
         return a, b
 
-    def apply_filter(self, key, x, a, b):
+    def apply_filter(self, key, new_input, a, b):
         h = self.hist[key]
-        h['in'] = [x] + h['in'][:2]
-        y = (b[0]*h['in'][0] + b[1]*h['in'][1] + b[2]*h['in'][2]
-             - a[1]*h['out'][0] - a[2]*h['out'][1])
+        h['in'] = [new_input] + h['in'][:2]
+        y = (
+            b[0]*h['in'][0] +
+            b[1]*h['in'][1] +
+            b[2]*h['in'][2] -
+            a[1]*h['out'][0] -
+            a[2]*h['out'][1]
+        )
         h['out'] = [y] + h['out'][:2]
         return y
 
-    # =============================================================
-    #  ROS callbacks
-    # =============================================================
     def object_detector_callback(self, msg):
         self.motion_flag = msg.data
 
     def joint_state_callback(self, msg):
-        self.qcar2_measurred_speed = (
-            (msg.velocity[0] / (720.0 * 4.0))
-            * ((13.0 * 19.0) / (70.0 * 30.0))
-            * (2.0 * np.pi) * 0.033)
+        self.qcar2_measurred_speed = (msg.velocity[0]/(720.0*4.0))*((13.0*19.0)/(70.0*30.0))*(2.0*np.pi)*0.033
 
     def imu_callback(self, msg):
-        self.gyroscope = [msg.angular_velocity.x,
-                          msg.angular_velocity.y,
-                          msg.angular_velocity.z]
+        self.gyroscope = [msg.angular_velocity.x, msg.angular_velocity.y, msg.angular_velocity.z]
 
-    # =============================================================
-    #  Path publisher (RViz visualisation)
-    # =============================================================
+    # --------------------- Path publishing ---------------------
     def path_publisher(self):
         path_msg = Path()
         path_msg.header.stamp = self.get_clock().now().to_msg()
         path_msg.header.frame_id = "map"
-        for i in range(self.wpi, self.N):
+
+        if self.wp is None or self.wp.shape[1] < 1:
+            self.path_publisher_topic.publish(path_msg)
+            return
+
+        upto = min(self.wpi, self.wp.shape[1]-1)
+        for i in range(upto):
             pose = PoseStamped()
+
+            angle_offset = self.rotation_offset[0]
+            R_QLabs_ROS = np.array([[np.cos(-angle_offset*np.pi/180), -np.sin(-angle_offset*np.pi/180)],
+                                    [np.sin(-angle_offset*np.pi/180),  np.cos(-angle_offset*np.pi/180)]])
+            t = np.array([self.translation_offset[0], self.translation_offset[1]])
+
+            wp_i_mod = (np.array([self.wp[0,i], self.wp[1,i]]) + t) @ R_QLabs_ROS
+
             pose.header.stamp = self.get_clock().now().to_msg()
             pose.header.frame_id = "map"
-            pose.pose.position.x = float(self.wp_t[i, 0])
-            pose.pose.position.y = float(self.wp_t[i, 1])
+            pose.pose.position.x = wp_i_mod[0]
+            pose.pose.position.y = wp_i_mod[1]
             path_msg.poses.append(pose)
+
         self.path_publisher_topic.publish(path_msg)
 
-    # =============================================================
-    #  MAIN CONTROL LOOP — Stanley controller
-    # =============================================================
+    # --------------------- Mission helpers ---------------------
+    def _mission_in_pause(self):
+        return time.time() < self.mission_pause_until
+
+    def _start_pause(self, seconds, reason=""):
+        self.mission_pause_until = time.time() + float(seconds)
+        if reason:
+            self.get_logger().info(f"MISSION PAUSE: {reason} for {seconds:.1f}s")
+
+    # --------------------- Main control loop ---------------------
     def path_planner(self):
-        enable = 1
-        speed_des = self.desired_speed[0]
-        speed_command = speed_des          # default; overwritten below
+
+        enable = 1.0
+        speed_command = self.desired_speed[0]
         self.t_plot = time.time() - self.t0
 
-        # EKF predict
+        # update ekf filters
         self.ekf_filter_timer()
 
-        # Publish path for visualisation every 2 s
+        # publish path every 2 seconds
         if round(self.t_plot) % 2 == 0:
             self.path_publisher()
 
+        # =======================
+        #   Mission logic (XY)
+        # =======================
+        if self.mission_enable:
+
+            if self._mission_in_pause():
+                speed_command = 0.0
+                self.current_steering = 0.0
+                self.path_complete = True
+
+            
+            else:
+                if not self.mission_initialized:
+                    ok = self._plan_leg_to_xy(self.pickup_xy, stage_name="TO_PICKUP") if self.mission_use_xy else False
+                    if ok:
+                        self.mission_initialized = True
+                        self.mission_stage = MissionStage.TO_PICKUP
+                        self._publish_qcar_state(4)  # ✅ driving => GREEN
+
+                if self.path_complete and self.mission_initialized:
+
+                    if self.mission_stage == MissionStage.TO_PICKUP:
+                        self.get_logger().info("Arrived at PICKUP. Stopping 3s...")
+                        self.mission_stage = MissionStage.WAIT_AT_PICKUP
+                        self._publish_qcar_state(2)  # ✅ pickup => BLUE
+                        self._start_pause(self.stop_seconds, reason="at PICKUP")
+
+                    elif self.mission_stage == MissionStage.WAIT_AT_PICKUP:
+                        self.get_logger().info("Leaving PICKUP. Planning to DROPOFF...")
+                        ok = self._plan_leg_to_xy(self.dropoff_xy, stage_name="TO_DROPOFF") if self.mission_use_xy else False
+                        if ok:
+                            self.mission_stage = MissionStage.TO_DROPOFF
+                            self._publish_qcar_state(4)  # ✅ driving => GREEN
+                            self.path_complete = False
+
+                    elif self.mission_stage == MissionStage.TO_DROPOFF:
+                        self.get_logger().info("Arrived at DROPOFF. Stopping 3s...")
+                        self.mission_stage = MissionStage.WAIT_AT_DROPOFF
+                        self._publish_qcar_state(6)  # ✅ dropoff => ORANGE
+                        self._start_pause(self.stop_seconds, reason="at DROPOFF")
+
+                    elif self.mission_stage == MissionStage.WAIT_AT_DROPOFF:
+                        self.get_logger().info(f"Leaving DROPOFF. Planning back to HUB (node 10) hub_xy={self.hub_xy}...")
+                        ok = self._plan_leg_to_xy(self.hub_xy, stage_name="TO_HUB")
+                        if ok:
+                            self.mission_stage = MissionStage.TO_HUB
+                            self._publish_qcar_state(4)  # ✅ driving => GREEN
+                            self.path_complete = False
+
+                    elif self.mission_stage == MissionStage.TO_HUB:
+                        self.get_logger().info("Arrived at HUB. Mission DONE.")
+                        self.mission_stage = MissionStage.DONE
+                        self._publish_qcar_state(5)  # ✅ hub/ready => MAGENTA
+                        self.path_complete = True
+
+        # =======================
+        #   Track current path
+        # =======================
         try:
-            if not self.path_complete:
+            if self.mission_enable and self.mission_stage == MissionStage.DONE:
+                speed_command = 0.0
+                self.current_steering = 0.0
+                self.path_complete = True
 
-                # --- Car pose (prefer TF, fall back to EKF) ---
-                try:
-                    p = [self.translation.x, self.translation.y]
-                    th = self.yaw
-                except AttributeError:
-                    p = [self.qcar2_ekf.xHat[0, 0], self.qcar2_ekf.xHat[1, 0]]
-                    th = self.qcar2_ekf.xHat[2, 0]
+            if self.mission_enable and self._mission_in_pause():
+                speed_command = 0.0
+                self.current_steering = 0.0
+                self.path_complete = True
 
-                # Front-axle position (Stanley is defined at front axle)
-                p_front = [p[0] + self.L * np.cos(th),
-                           p[1] + self.L * np.sin(th)]
-
-                # ==================================================
-                # 1.  Find closest point on the path
-                # ==================================================
-                seg_idx, seg_frac = self._find_closest_segment(p_front)
-                self.wpi = max(self.wpi, seg_idx)
-
-                # ==================================================
-                # 2.  Heading error   ψ_e = ψ_path − ψ_car
-                # ==================================================
-                path_heading = self._get_path_heading_at(seg_idx, seg_frac)
-                heading_error = wrap_to_pi(path_heading - th)
-
-                # ==================================================
-                # 3.  Cross-track error  (+ = car right of path)
-                # ==================================================
-                cte = self._compute_cross_track_error(p_front, seg_idx, seg_frac)
-
-                # ==================================================
-                # 4.  Curvature feedforward
-                # ==================================================
-                kappa = self._get_curvature_at(seg_idx, seg_frac)
-                delta_ff = np.arctan(self.L * kappa)
-
-                # ==================================================
-                # 5.  Stanley law
-                #     δ = k_h · ψ_e + arctan(k_e · e / (v + k_s)) + δ_ff
-                # ==================================================
-                v = max(abs(self.qcar2_measurred_speed), 0.05)
-
-                delta_heading  = self.k_heading * heading_error
-                delta_cte      = np.arctan2(self.k_e * cte, v + self.k_soft)
-                delta_ff_term  = self.k_ff * delta_ff
-
-                steering_raw = float(delta_heading + delta_cte + delta_ff_term)
-
-                # ==================================================
-                # 6.  Curvature-adaptive speed
-                # ==================================================
-                abs_kappa = min(abs(kappa), 10.0)
-                speed_scale = max(1.0 - self.k_curv_speed * abs_kappa, 0.0)
-                speed_command = max(speed_des * speed_scale, self.v_min_curve)
-
-                # ==================================================
-                # 7.  End-of-path handling
-                # ==================================================
-                dist_to_end = np.linalg.norm(
-                    np.array(p) - self.wp_t[self.N - 1])
-
-                if self.wpi >= self.N - 5 and dist_to_end < 0.4:
+            else:
+                if self.wp is None or self.wp.shape[1] < 2:
                     speed_command = 0.0
-                    steering_raw = 0.0
-                    self.wp_prior = self.wp
+                    self.current_steering = 0.0
                     self.path_complete = True
+                else:
+                    self.N = self.wp.shape[1]
+                    self.wpi = int(np.clip(self.wpi, 0, max(self.N - 2, 0)))
 
-                if self.wpi > self.N - 100:
-                    speed_command = min(speed_command, 0.2)
+                    wp_1 = np.array(self.wp[:, self.wpi])
 
-                # ==================================================
-                # 8.  Steering rate limiter (actuator constraint)
-                # ==================================================
-                max_step = self.max_steer_rate * self.dt
-                diff = steering_raw - self.previous_steering
-                diff = float(np.clip(diff, -max_step, max_step))
-                steering = self.previous_steering + diff
-                steering = float(np.clip(steering,
-                                         -self.max_steering_angle,
-                                          self.max_steering_angle))
+                    angle_offset = self.rotation_offset[0]
+                    R_QLabs_ROS = np.array([[np.cos(-angle_offset*np.pi/180), -np.sin(-angle_offset*np.pi/180)],
+                                            [np.sin(-angle_offset*np.pi/180),  np.cos(-angle_offset*np.pi/180)]])
+                    t_off = np.array([self.translation_offset[0], self.translation_offset[1]])
+                    wp_1_mod = (wp_1 + t_off) @ R_QLabs_ROS
 
-                self.previous_steering = steering
-                self.current_steering = steering
+                    wp_next = np.array(self.wp[:, min(self.wpi+1, self.N-1)])
+                    wp_next_mod = (wp_next + t_off) @ R_QLabs_ROS
+
+                    dx = wp_next_mod[0] - wp_1_mod[0]
+                    dy = wp_next_mod[1] - wp_1_mod[1]
+                    path_heading = np.arctan2(dy, dx)
+
+                    self.get_logger().info(f"Path heading (deg): {np.degrees(path_heading):.2f}")
+
+                    cte = self._cte_to_waypoint(wp_1_mod)
+
+                    L = 0.256
+
+                    try:
+                        p_map = np.array([float(self.translation.x), float(self.translation.y)])
+                        th = float(self.yaw)
+                    except Exception:
+                        p_map = np.array([0.0, 0.0])
+                        th = 0.0
+
+                    v_map = (wp_1_mod - p_map).reshape(2, 1)
+
+                    Rot = np.array([[np.cos(th), -np.sin(th)],
+                                    [np.sin(th),  np.cos(th)]])
+                    v_car = (Rot.T @ v_map).reshape(2,)
+
+                    WaypointDist = float(np.linalg.norm(v_car))
+                    WaypointDist = max(WaypointDist, 0.05)
+                    psi = float(np.arctan2(v_car[1], v_car[0]))
+
+                    delta = float(np.arctan2(2 * L * np.sin(psi), WaypointDist))
+
+                    dist_to_target = float(np.linalg.norm(p_map - wp_1_mod))
+
+                    wp_final = np.array(self.wp[:, -1])
+                    wp_final_mod = (wp_final + t_off) @ R_QLabs_ROS
+                    dist_to_final = float(np.linalg.norm(p_map - wp_final_mod))
+
+                    v_eff = max(self.qcar2_measurred_speed, 0.05)
+                    lookahead_dist = max(0.30, v_eff * 1.7)
+
+                    # heading_err = self._heading_error_to_path(self.wpi)
+
+                    if dist_to_target < lookahead_dist and self.wpi < self.N - 2:
+                        self.wpi += 1
+
+                    near_final = (dist_to_final < 0.50)          # looser tolerance
+                    at_end = (self.wpi >= self.N - 2)            # reached end of waypoint list
+
+                    if near_final or at_end:
+                        speed_command = 0.0
+                        self.current_steering = 0.0
+                        self.path_complete = True
+
+                    Kp_steering = 1.1
+                    kd_steering = 7
+
+                    gyro_filtered = self.apply_filter('gyro', self.gyroscope[2], self.a1, self.b1)
+
+                    steering = np.clip(
+                        Kp_steering * delta - gyro_filtered * np.pi/180 * kd_steering,
+                        -self.max_steering_angle,
+                        self.max_steering_angle)
+
+                    self.current_steering = steering
+
+                    if int(self.t_plot * 5) != int((self.t_plot - self.dt) * 5):
+                        stage = self.mission_stage.name if self.mission_enable else "MANUAL"
+                        self.get_logger().info(
+                            f"stage={stage} wpi={self.wpi}/{self.N} "
+                            f"Ld={lookahead_dist:.2f} distT={dist_to_target:.2f} distF={dist_to_final:.2f} "
+                            f"delta={delta:.2f} gyro={gyro_filtered:.3f} steer={steering:.3f} v={speed_command:.2f} "
+                            f"{self.current_goal_desc}"
+                        )
 
         except KeyboardInterrupt:
             speed_command = 0.0
+            self.current_steering = 0.0
 
-        # Enable / disable
-        if self.path_execute_flag and self.motion_flag:
+        if self.path_execute_flag and self.motion_flag and not self.path_complete:
             enable = 1.0
-        if not self.path_execute_flag or not self.motion_flag or self.path_complete:
+        else:
             enable = 0.0
+
+        # ✅ ALWAYS push LED state based on current stage/context
+        # self._update_led_state_from_context()
 
         self.nav_command(enable, speed_command)
         self.path_status()
 
-    # =============================================================
     def nav_command(self, enable, speed_command):
-        cmd = Twist()
-        cmd.linear.x = float(enable * np.clip(
-            speed_command * np.cos(self.current_steering) ** 2,
-            0.05, 0.7))
-        cmd.angular.z = float(enable * self.current_steering)
-        self.publisher.publish(cmd)
+        QCarCommands = Twist()
+        QCarCommands.linear.x = enable*np.clip(speed_command*np.power(np.cos(self.current_steering), 2), 0.05, 0.7)
+        QCarCommands.angular.z = enable*self.current_steering
+        self.publisher.publish(QCarCommands)
 
     def path_status(self):
         msg = Bool()
         msg.data = self.path_complete
         self.path_status_publisher.publish(msg)
 
-    # =============================================================
-    #  TF / EKF
-    # =============================================================
+    # --------------------- TF + EKF ---------------------
     def tf_timer(self):
+        from_frame_rel= "map"
+        to_frame_rel = self.target_frame
+
         try:
-            t = self.tf_buffer.lookup_transform("map", self.target_frame,
-                                                 rclpy.time.Time())
+            t = self.tf_buffer.lookup_transform(from_frame_rel, to_frame_rel, rclpy.time.Time())
             self.translation = t.transform.translation
-            rot = [t.transform.rotation.x, t.transform.rotation.y,
-                   t.transform.rotation.z, t.transform.rotation.w]
-            _, _, self.yaw = R.from_quat(rot).as_euler('xyz')
+
+            rotation = [t.transform.rotation.x,
+                        t.transform.rotation.y,
+                        t.transform.rotation.z,
+                        t.transform.rotation.w]
+            roll, pitch, self.yaw = R.from_quat(rotation).as_euler('xyz')
 
             self.gyro_kf.correction(self.yaw)
-            y = np.array([[self.translation.x],
-                          [self.translation.y],
-                          [self.gyro_kf.xHat[0, 0]]])
+
+            y = np.array([
+                [self.translation.x],
+                [self.translation.y],
+                [self.gyro_kf.xHat[0,0]]
+            ])
             self.qcar2_ekf.correction(y)
 
         except TransformException as ex:
-            self.get_logger().info(f'TF error: {ex}')
+            self.get_logger().info(f'Could not transform {to_frame_rel} to {from_frame_rel}: {ex}')
+            return
 
     def ekf_filter_timer(self):
-        self.qcar2_ekf.prediction(self.dt,
-                                   [self.qcar2_measurred_speed,
-                                    self.current_steering])
+        speed = self.qcar2_measurred_speed
+        delta = self.current_steering
+        self.qcar2_ekf.prediction(self.dt, [speed, delta])
+
         try:
             th_gyro = self.gyroscope[2]
         except AttributeError:
             th_gyro = 0
         self.gyro_kf.prediction(self.dt, th_gyro)
 
-    # =============================================================
-    #  Scope / debug
-    # =============================================================
+    # --------------------- Visualization ---------------------
     def scopeDataTimer(self):
         if self.pose_visualize_flag:
-            p = [self.qcar2_ekf.xHat[0, 0],
-                 self.qcar2_ekf.xHat[1, 0],
-                 self.qcar2_ekf.xHat[2, 0]]
+            p = [self.qcar2_ekf.xHat[0,0], self.qcar2_ekf.xHat[1,0], self.qcar2_ekf.xHat[2,0]]
+
             if self.t_plot > 200:
                 self.t0 = time.time()
-                for ax in self.steeringScope.axes:
-                    ax.clean()
+                self.steeringScope.axes[0].clean()
+                self.steeringScope.axes[1].clean()
+                self.steeringScope.axes[2].clean()
+                self.steeringScope.axes[3].clean()
                 MultiScope.refreshAll()
+
             try:
                 x_ref = self.translation.x
                 y_ref = self.translation.y
             except AttributeError:
-                x_ref = y_ref = 0
+                x_ref = 0
+                y_ref = 0
+
             self.steeringScope.axes[0].sample(self.t_plot, [x_ref, p[0]])
             self.steeringScope.axes[1].sample(self.t_plot, [y_ref, p[1]])
             self.steeringScope.axes[2].sample(self.t_plot, [self.current_steering])
-            self.steeringScope.axes[3].sample(self.t_plot,
-                                               [self.yaw, self.qcar2_ekf.xHat[2, 0]])
+            self.steeringScope.axes[3].sample(self.t_plot, [self.yaw, self.qcar2_ekf.xHat[2,0]])
+
             MultiScope.refreshAll()
         else:
             try:
                 self.steeringScope.graphicsLayoutWidget.close()
-                self.get_logger().info('previous scope closed...')
             except AttributeError:
                 pass
+
+    def _path_heading_at_index(self, i: int):
+        if self.wp is None or self.wp.shape[1] < 2:
+            return 0.0
+
+        N = self.wp.shape[1]
+        i = int(np.clip(i, 0, N - 2))
+
+        angle_offset = float(self.rotation_offset[0])
+        R_QLabs_ROS = np.array([
+            [np.cos(-angle_offset*np.pi/180.0), -np.sin(-angle_offset*np.pi/180.0)],
+            [np.sin(-angle_offset*np.pi/180.0),  np.cos(-angle_offset*np.pi/180.0)]
+        ])
+        t_off = np.array([float(self.translation_offset[0]), float(self.translation_offset[1])])
+
+        p0 = (np.array([self.wp[0, i],   self.wp[1, i]])   + t_off) @ R_QLabs_ROS
+        p1 = (np.array([self.wp[0, i+1], self.wp[1, i+1]]) + t_off) @ R_QLabs_ROS
+
+        dx = float(p1[0] - p0[0])
+        dy = float(p1[1] - p0[1])
+        return float(np.arctan2(dy, dx))
+
+    def _heading_error_to_path(self, idx_for_heading: int):
+        path_h = self._path_heading_at_index(idx_for_heading)
+        try:
+            robot_yaw = float(self.yaw)
+        except Exception:
+            robot_yaw = 0.0
+        return float(wrap_to_pi(path_h - robot_yaw))
+
+    def _cte_to_waypoint(self, wp_map_xy):
+        try:
+            rx = float(self.translation.x)
+            ry = float(self.translation.y)
+            yaw = float(self.yaw)
+        except Exception:
+            return 0.0
+
+        dx = float(wp_map_xy[0] - rx)
+        dy = float(wp_map_xy[1] - ry)
+
+        c = np.cos(yaw)
+        s = np.sin(yaw)
+        y_r = -s*dx + c*dy
+        return float(y_r)
 
 
 def main():
@@ -684,7 +925,6 @@ def main():
     except KeyboardInterrupt:
         pass
     rclpy.shutdown()
-
 
 if __name__ == '__main__':
     main()
