@@ -25,11 +25,10 @@ setup(
         'console_scripts': [
             'path_follower = autonomy.nav_to_pose:main',
             'traffic_system_detector=autonomy.traffic_system_detector:main',
-            'lane_detector=autonomy.lane_detector:main',
+            'lane_detection=autonomy.lane_detection:main',
             'yolo_detector=autonomy.yolo_detector:main',
             'trip_planner=autonomy.trip_planner:main',
             'Planner_server=autonomy.Planner_server:main',
-            'lane_seg_node=autonomy.lane_seg_node:main',
             'bev_csi_node=autonomy.bev_csi_node:main'
         ],
     },

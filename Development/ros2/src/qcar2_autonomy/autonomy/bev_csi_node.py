@@ -240,6 +240,7 @@ class BevCsiNode(Node):
         self.declare_parameter('bev_width_px',  600)
         self.declare_parameter('bev_height_px', 600)
         self.declare_parameter('debug_grid',    True)
+        self.declare_parameter('lane_mask_topic', '/lane_detection/lane_selected')
 
         self.img_topic    = self.get_parameter('image_topic').value
         self.cam_height   = self.get_parameter('cam_height').value
@@ -251,6 +252,7 @@ class BevCsiNode(Node):
         self.bev_w        = self.get_parameter('bev_width_px').value
         self.bev_h        = self.get_parameter('bev_height_px').value
         self.dbg          = self.get_parameter('debug_grid').value
+        self.lane_topic   = self.get_parameter('lane_mask_topic').value
 
         self.bridge = CvBridge()
         self.ipm    = None
@@ -259,15 +261,18 @@ class BevCsiNode(Node):
 
         self.pub_bev = self.create_publisher(
             Image, '/csi/front/image_bev', QoSProfile(depth=2))
+        self.pub_lane_bev = self.create_publisher(
+            Image, '/csi/front/lane_bev', QoSProfile(depth=2))
 
         sensor_qos = QoSProfile(
             depth=2,
             reliability=ReliabilityPolicy.BEST_EFFORT,
             durability=DurabilityPolicy.VOLATILE)
         self.create_subscription(Image, self.img_topic, self._cb, sensor_qos)
+        self.create_subscription(Image, self.lane_topic, self._lane_cb, sensor_qos)
 
         self.get_logger().info(
-            f"BEV node ready | subscribing '{self.img_topic}' | "
+            f"BEV node ready | image='{self.img_topic}' lane='{self.lane_topic}' | "
             f"height={self.cam_height}m pitch={self.cam_pitch}deg | "
             f"world X[{self.x_min},{self.x_max}] Y[{self.y_min},{self.y_max}] m")
 
@@ -308,6 +313,34 @@ class BevCsiNode(Node):
         out = self.bridge.cv2_to_imgmsg(bev, encoding='bgr8')
         out.header = msg.header
         self.pub_bev.publish(out)
+
+
+    def _lane_cb(self, msg: Image):
+        """Receive binary lane mask (mono8), warp to BEV, publish mono8."""
+        if self.ipm is None:
+            return   # wait until IPM is built from first camera frame
+
+        try:
+            mask = self.bridge.imgmsg_to_cv2(msg, desired_encoding='mono8')
+        except Exception as e:
+            self.get_logger().error(f'lane cv_bridge: {e}')
+            return
+
+        # Ensure mask matches expected input size
+        if mask.shape[1] != self._last_fw or mask.shape[0] != self._last_fh:
+            mask = cv2.resize(mask, (self._last_fw, self._last_fh),
+                              interpolation=cv2.INTER_NEAREST)
+
+        # Warp with same homography — keep binary (nearest-neighbour)
+        bev_mask = cv2.warpPerspective(
+            mask, self.ipm.M, self.ipm.bev_shape,
+            flags=cv2.INTER_NEAREST,
+            borderMode=cv2.BORDER_CONSTANT,
+            borderValue=0)
+
+        out = self.bridge.cv2_to_imgmsg(bev_mask, encoding='mono8')
+        out.header = msg.header
+        self.pub_lane_bev.publish(out)
 
 
 # ---------------------------------------------------------------------------

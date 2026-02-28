@@ -41,10 +41,10 @@ def generate_launch_description():
         name='lane_seg_node',
     )
 
-    lane_detector = Node(
+    lane_detection = Node(
         package='qcar2_autonomy',
-        executable='lane_detector',
-        name='lane_detector',
+        executable='lane_detection',
+        name='lane_detection',
     )
 
     bev_csi_node = Node(
@@ -66,6 +66,6 @@ def generate_launch_description():
         Planner_server,
         bev_csi_node,
         # lane_seg_node,
-        # lane_detector
+        lane_detection
         ]
     )
