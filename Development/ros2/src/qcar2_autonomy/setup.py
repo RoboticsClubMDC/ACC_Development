@@ -31,7 +31,7 @@ setup(
             'Planner_server=autonomy.Planner_server:main',
             'bev_csi_node=autonomy.bev_csi_node:main',
             'stanley_live_plot=autonomy.stanley_live_plot:main',
-            'lane_stanley_node=autonomy.lane_stanley_node:main'
+            'lane_stanley_node=autonomy.lane_stanley_node:main',
 
         ],
     },

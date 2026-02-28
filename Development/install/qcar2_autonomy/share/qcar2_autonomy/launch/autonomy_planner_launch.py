@@ -35,11 +35,6 @@ def generate_launch_description():
         
     )
 
-    lane_seg_node = Node(
-        package='qcar2_autonomy',
-        executable='lane_seg_node',
-        name='lane_seg_node',
-    )
 
     lane_detection = Node(
         package='qcar2_autonomy',
@@ -47,12 +42,18 @@ def generate_launch_description():
         name='lane_detection',
     )
 
+
+    lane_stanley_node = Node(
+        package='qcar2_autonomy',
+        executable='lane_stanley_node',
+        name='lane_stanley_node',
+    )
+
     bev_csi_node = Node(
         package='qcar2_autonomy',
         executable='bev_csi_node',
         name='bev_csi_node',
     )
-
 
     ''' TODO: Once finished this launch file must also include
     - Lane detector to help smooth out tracking of lanes while driving
@@ -65,7 +66,7 @@ def generate_launch_description():
         trip_planner,
         Planner_server,
         bev_csi_node,
-        # lane_seg_node,
-        lane_detection
+        lane_detection,
+        lane_stanley_node
         ]
     )

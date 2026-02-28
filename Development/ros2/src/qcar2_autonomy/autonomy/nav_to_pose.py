@@ -107,7 +107,7 @@ class PathFollower(Node):
     def __init__(self):
         super().__init__('path_follower')
 
-        # ---- Existing parameters (unchanged) ----
+        # ---- Existing parameters ----
         self.declare_parameter('node_values', [0, 8, 10])
         self.waypoints = list(self.get_parameter('node_values').get_parameter_value().integer_array_value)
 
@@ -119,16 +119,16 @@ class PathFollower(Node):
 
         self.scale = 1.0
 
-        self.declare_parameter('rotation_offset', [90.0])
+        self.declare_parameter('rotation_offset', [82.0])
         self.rotation_offset = list(self.get_parameter('rotation_offset').get_parameter_value().double_array_value)
 
         self.declare_parameter('translation_offset', [0.0, 0.0])
         self.translation_offset = list(self.get_parameter('translation_offset').get_parameter_value().double_array_value)
 
-        self.declare_parameter('start_path', [False])
+        self.declare_parameter('start_path', [True])
         self.path_execute_flag = list(self.get_parameter('start_path').get_parameter_value().bool_array_value)[0]
 
-        # ---- Stanley blending parameters (NEW) ----
+        # ---- Stanley blending parameters ----
         self.declare_parameter('stanley_blend',     0.3)   # 0=pure pursuit only, 1=stanley only
         self.declare_parameter('stanley_trust_min', 0.8)   # trust threshold to engage stanley
         self.stanley_blend     = self.get_parameter('stanley_blend').value
@@ -171,10 +171,10 @@ class PathFollower(Node):
         self.wp_prior = []
         self.current_steering = 0
 
-        # ---- Stanley state (NEW) ----
+        # ---- Stanley state ----
         self.stanley_delta = 0.0
         self.stanley_trust = 0.0
-        self.pp_delta_raw  = 0.0   # pure pursuit delta before blending (for plot)
+        self.pp_delta_raw  = 0.0
 
         self.publisher = self.create_publisher(Twist, '/cmd_vel_nav', 1)
         self.cyclic = False
@@ -196,11 +196,11 @@ class PathFollower(Node):
         self.path_publisher_topic = self.create_publisher(Path, '/planned_path', 1)
         self.path_status_publisher = self.create_publisher(Bool, '/path_status', 1)
 
-        # ---- Stanley subscribers (NEW) ----
+        # ---- Stanley subscribers ----
         self.create_subscription(Float32, '/lane_stanley/delta', self._stanley_delta_cb, 2)
         self.create_subscription(Float32, '/lane_stanley/trust', self._stanley_trust_cb, 2)
 
-        # ---- Debug publishers for plot (NEW) ----
+        # ---- Debug publishers for live plot ----
         self.pub_pp_delta      = self.create_publisher(Float32, '/nav/pp_delta',      2)
         self.pub_stanley_delta = self.create_publisher(Float32, '/nav/stanley_delta', 2)
         self.pub_blended_delta = self.create_publisher(Float32, '/nav/blended_delta', 2)
@@ -216,7 +216,7 @@ class PathFollower(Node):
             f'trust_min={self.stanley_trust_min}')
 
     # ------------------------------------------------------------------
-    # Stanley callbacks (NEW)
+    # Stanley callbacks
     # ------------------------------------------------------------------
     def _stanley_delta_cb(self, msg: Float32):
         self.stanley_delta = float(msg.data)
@@ -225,15 +225,9 @@ class PathFollower(Node):
         self.stanley_trust = float(msg.data)
 
     # ------------------------------------------------------------------
-    # Steering blend (NEW)
+    # Steering blend
     # ------------------------------------------------------------------
     def _blend_steering(self, pp_delta: float) -> float:
-        """
-        Blend pure pursuit and Stanley:
-          - If Stanley trust < threshold: use pure pursuit only
-          - Otherwise: weighted blend
-          alpha = stanley_blend * stanley_trust
-        """
         self.pp_delta_raw = pp_delta
 
         if self.stanley_trust < self.stanley_trust_min:
@@ -244,7 +238,6 @@ class PathFollower(Node):
         blended = (1.0 - alpha) * pp_delta + alpha * self.stanley_delta
         blended = float(np.clip(blended, -self.max_steering_angle, self.max_steering_angle))
 
-        # Publish debug signals
         def f32(v):
             m = Float32(); m.data = float(v); return m
 
@@ -255,8 +248,6 @@ class PathFollower(Node):
 
         return blended
 
-    # ------------------------------------------------------------------
-    # All original methods below — only path_planner has one line changed
     # ------------------------------------------------------------------
 
     def parameter_update_callback(self, params):
@@ -402,7 +393,6 @@ class PathFollower(Node):
                 WaypointDist = max(np.linalg.norm(v_car), 0.05)
                 psi = np.arctan2(v_car[1], v_car[0])
 
-                # Pure pursuit delta
                 pp_delta = np.arctan2(2 * L * np.sin(psi), WaypointDist)
 
                 dist = np.linalg.norm([p[0] - wp_1_mod[0], p[1] - wp_1_mod[1]])
@@ -430,13 +420,12 @@ class PathFollower(Node):
                 kd_steering = 5
                 gyro_filtered = self.apply_filter('gyro', self.gyroscope[2], self.a1, self.b1)
 
-                # ---- Pure pursuit with gyro damping ----
                 pp_delta_damped = np.clip(
                     Kp_steering * pp_delta - gyro_filtered * np.pi / 180 * kd_steering,
                     -self.max_steering_angle,
                     self.max_steering_angle)
 
-                # ---- Blend with Stanley (NEW) ----
+                # Blend pure pursuit with Stanley
                 steering = self._blend_steering(pp_delta_damped)
 
                 self.current_steering = steering
