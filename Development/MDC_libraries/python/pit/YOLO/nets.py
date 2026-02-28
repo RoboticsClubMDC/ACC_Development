@@ -41,7 +41,7 @@ class YOLOv8():
         """
         self.defaultPath = os.path.normpath(os.path.join(
                         os.path.dirname(__file__), 
-                        '../../../resources/pretrained_models/yolov8s-seg.engine'))
+                        '../../../resources/pretrained_models/yoloObjDetBP01.pt'))
         self.imageWidth , self.imageHeight = self._dim_check(imageWidth, imageHeight)
         self.convert_tensorrt = convert_tensorrt and not platform.system() == "Windows"
         
