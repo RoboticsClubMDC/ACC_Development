@@ -340,7 +340,7 @@ class NavToPose(Node):
         enable = 1.0 if (self.path_execute_flag and self.motion_flag and not self.path_complete) else 0.0
 
         cmd = Twist()
-        cmd.linear.x = enable * np.clip(speed_command * np.power(np.cos(self.current_steering), 2), 0.05, 0.7)
+        cmd.linear.x = enable * np.clip(speed_command * np.power(np.cos(self.current_steering), 2), 0.05, 6.0)
         cmd.angular.z = enable * self.current_steering
         self.cmd_vel_pub.publish(cmd)
 
