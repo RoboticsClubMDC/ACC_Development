@@ -1,3 +1,7 @@
+# =========================
+# OVERALL: path_follower.py  (FULL FILE)
+# ✅ Adds /path_follower/qcar_state publisher so your tripPlanner subscription works
+# =========================
 #! /usr/bin/env python3
 
 # Quanser specific packages
@@ -24,7 +28,7 @@ from tf2_ros.transform_listener import TransformListener
 from geometry_msgs.msg import Twist, PoseStamped
 from sensor_msgs.msg import Imu, JointState
 from rcl_interfaces.msg import SetParametersResult
-from std_msgs.msg import Bool
+from std_msgs.msg import Bool, UInt8   # ✅ ADDED UInt8
 
 
 '''
@@ -168,11 +172,16 @@ class PathFollower(Node):
         # Roadmap (we use it for snapping pose->node and A*)
         self.roadmap = SDCSRoadMap()
 
+
+        self.qcar_state_pub = self.create_publisher(UInt8, '/path_follower/qcar_state', 10)
+        self._last_qcar_state = None
+        self._publish_qcar_state(5)   # MAGENTA at hub/ready at startup
+
         # ---------------- Existing params ----------------
         self.declare_parameter('node_values', [0, 8, 10])
         self.waypoints = list(self.get_parameter("node_values").get_parameter_value().integer_array_value)
 
-        self.declare_parameter('desired_speed', [0.6])
+        self.declare_parameter('desired_speed', [0.4])
         self.desired_speed = list(self.get_parameter("desired_speed").get_parameter_value().double_array_value)
 
         self.declare_parameter('visualize_pose', [False])
@@ -180,10 +189,10 @@ class PathFollower(Node):
 
         self.scale = 1.0
 
-        self.declare_parameter('rotation_offset', [86.5])
+        self.declare_parameter('rotation_offset', [82.0])
         self.rotation_offset = list(self.get_parameter("rotation_offset").get_parameter_value().double_array_value)
 
-        self.declare_parameter('translation_offset', [0.0, 0.0])
+        self.declare_parameter('translation_offset', [0.0, -0.125])
         self.translation_offset = list(self.get_parameter("translation_offset").get_parameter_value().double_array_value)
 
         self.declare_parameter('start_path', [True])
@@ -193,7 +202,6 @@ class PathFollower(Node):
         self.declare_parameter('mission_enable', [False])
         self.mission_enable = list(self.get_parameter("mission_enable").get_parameter_value().bool_array_value)[0]
 
-        # This code assumes XY mission (pickup/dropoff in QLabs meters)
         self.declare_parameter('mission_use_xy', [True])
         self.mission_use_xy = list(self.get_parameter("mission_use_xy").get_parameter_value().bool_array_value)[0]
 
@@ -203,7 +211,6 @@ class PathFollower(Node):
         self.declare_parameter('mission_dropoff_xy', [0.0, 0.0])
         self.dropoff_xy = list(self.get_parameter("mission_dropoff_xy").get_parameter_value().double_array_value)
 
-        # stop duration at pickup / dropoff
         self.declare_parameter('mission_stop_seconds', [3.0])
         self.stop_seconds = float(list(self.get_parameter("mission_stop_seconds").get_parameter_value().double_array_value)[0])
 
@@ -211,8 +218,6 @@ class PathFollower(Node):
         self.mission_stage = MissionStage.IDLE
         self.mission_initialized = False
         self.current_goal_desc = "none"
-
-        # Prevent “path_complete -> instant plan -> instant complete -> spam”
         self.mission_pause_until = 0.0
 
         self.add_on_set_parameters_callback(self.parameter_update_callback)
@@ -230,7 +235,6 @@ class PathFollower(Node):
         # EKF init
         x0 = np.zeros((3,1))
         P0 = np.eye(3)
-
         R_combined = np.diagflat([0.1, 0.1, 0.01])
 
         self.qcar2_ekf = QcarEKF(
@@ -287,17 +291,54 @@ class PathFollower(Node):
         self.path_status_publisher = self.create_publisher(Bool, '/path_status', 1)
 
         # ---------------- TAXI HUB FIX ----------------
-        # Taxi hub is node 10 (right-hand, big map). We always return here after dropoff.
-        # This is in QLabs coordinates (same coordinate system as roadmap node poses).
         self.hub_xy = list(self._get_node_xy(10))
         self.get_logger().info(f"Taxi hub locked to node 10 => hub_xy={self.hub_xy}")
         # ------------------------------------------------
+
+        # ---------------- ✅ NEW: publish qcar_state for LEDs ----------------
+        # 2 = BLUE pickup
+        # 4 = GREEN driving
+        # 5 = MAGENTA hub/ready
+        # 6 = ORANGE dropoff
+        # --------------------------------------------------------------------
 
         # Multiscope info
         self.t0 = time.time()
         self.t_plot = 0
         self.plot_visualized = False
         self.scopeTimer = self.create_timer(0.1, self.scopeDataTimer)
+
+    # ---------------- ✅ NEW: qcar_state publisher helpers ----------------
+    def _publish_qcar_state(self, s: int):
+        s = int(s)
+        if self._last_qcar_state == s:
+            return
+        self._last_qcar_state = s
+        m = UInt8()
+        m.data = s
+        self.qcar_state_pub.publish(m)
+
+    def _update_led_state_from_context(self):
+        """
+        Keeps LEDs correct even if we miss a single transition.
+        """
+        if self.mission_enable:
+            if self.mission_stage == MissionStage.WAIT_AT_PICKUP:
+                self._publish_qcar_state(2)   # BLUE
+            elif self.mission_stage == MissionStage.WAIT_AT_DROPOFF:
+                self._publish_qcar_state(6)   # ORANGE
+            elif self.mission_stage == MissionStage.DONE:
+                self._publish_qcar_state(5)   # MAGENTA
+            else:
+                # driving stages: TO_PICKUP / TO_DROPOFF / TO_HUB
+                self._publish_qcar_state(4)   # GREEN
+        else:
+            # manual path: green while moving, magenta when complete
+            if self.path_execute_flag and self.motion_flag and not self.path_complete:
+                self._publish_qcar_state(4)   # GREEN
+            else:
+                self._publish_qcar_state(5)   # MAGENTA
+    # --------------------------------------------------------------------
 
     # --------------------- FRAME FIX HELPERS ---------------------
     def _R_qlabs_to_ros_2d(self):
@@ -371,7 +412,7 @@ class PathFollower(Node):
             self.get_logger().error(f"Planner returned empty path. {info}")
             self.wp = np.zeros((2,1))
             self.N = 1
-            self.wpi = 0
+            self.wpi= 0
             self.path_complete = True
             return
 
@@ -407,7 +448,6 @@ class PathFollower(Node):
             self.get_logger().warn("No TF pose yet; cannot plan leg.")
             return False
 
-        # CRITICAL FIX: Convert ROS pose -> QLabs pose before snapping to closest node
         px_qlabs, py_qlabs = self._ros_to_qlabs_xy(px_ros, py_ros)
 
         start_node = self._closest_node_to_xy(px_qlabs, py_qlabs)
@@ -578,26 +618,26 @@ class PathFollower(Node):
         # =======================
         if self.mission_enable:
 
-            # If we're in a timed stop, force stop and DO NOT replan
             if self._mission_in_pause():
                 speed_command = 0.0
                 self.current_steering = 0.0
                 self.path_complete = True
 
+            
             else:
-                # init once pose exists
                 if not self.mission_initialized:
                     ok = self._plan_leg_to_xy(self.pickup_xy, stage_name="TO_PICKUP") if self.mission_use_xy else False
                     if ok:
                         self.mission_initialized = True
                         self.mission_stage = MissionStage.TO_PICKUP
+                        self._publish_qcar_state(4)  # ✅ driving => GREEN
 
-                # stage transitions ONLY when not paused
                 if self.path_complete and self.mission_initialized:
 
                     if self.mission_stage == MissionStage.TO_PICKUP:
                         self.get_logger().info("Arrived at PICKUP. Stopping 3s...")
                         self.mission_stage = MissionStage.WAIT_AT_PICKUP
+                        self._publish_qcar_state(2)  # ✅ pickup => BLUE
                         self._start_pause(self.stop_seconds, reason="at PICKUP")
 
                     elif self.mission_stage == MissionStage.WAIT_AT_PICKUP:
@@ -605,24 +645,27 @@ class PathFollower(Node):
                         ok = self._plan_leg_to_xy(self.dropoff_xy, stage_name="TO_DROPOFF") if self.mission_use_xy else False
                         if ok:
                             self.mission_stage = MissionStage.TO_DROPOFF
+                            self._publish_qcar_state(4)  # ✅ driving => GREEN
                             self.path_complete = False
 
                     elif self.mission_stage == MissionStage.TO_DROPOFF:
                         self.get_logger().info("Arrived at DROPOFF. Stopping 3s...")
                         self.mission_stage = MissionStage.WAIT_AT_DROPOFF
+                        self._publish_qcar_state(6)  # ✅ dropoff => ORANGE
                         self._start_pause(self.stop_seconds, reason="at DROPOFF")
 
                     elif self.mission_stage == MissionStage.WAIT_AT_DROPOFF:
-                        # FIXED HUB RETURN: always plan back to node 10 hub after dropoff wait
                         self.get_logger().info(f"Leaving DROPOFF. Planning back to HUB (node 10) hub_xy={self.hub_xy}...")
                         ok = self._plan_leg_to_xy(self.hub_xy, stage_name="TO_HUB")
                         if ok:
                             self.mission_stage = MissionStage.TO_HUB
+                            self._publish_qcar_state(4)  # ✅ driving => GREEN
                             self.path_complete = False
 
                     elif self.mission_stage == MissionStage.TO_HUB:
                         self.get_logger().info("Arrived at HUB. Mission DONE.")
                         self.mission_stage = MissionStage.DONE
+                        self._publish_qcar_state(5)  # ✅ hub/ready => MAGENTA
                         self.path_complete = True
 
         # =======================
@@ -656,6 +699,17 @@ class PathFollower(Node):
                     t_off = np.array([self.translation_offset[0], self.translation_offset[1]])
                     wp_1_mod = (wp_1 + t_off) @ R_QLabs_ROS
 
+                    wp_next = np.array(self.wp[:, min(self.wpi+1, self.N-1)])
+                    wp_next_mod = (wp_next + t_off) @ R_QLabs_ROS
+
+                    dx = wp_next_mod[0] - wp_1_mod[0]
+                    dy = wp_next_mod[1] - wp_1_mod[1]
+                    path_heading = np.arctan2(dy, dx)
+
+                    self.get_logger().info(f"Path heading (deg): {np.degrees(path_heading):.2f}")
+
+                    cte = self._cte_to_waypoint(wp_1_mod)
+
                     L = 0.256
 
                     try:
@@ -686,19 +740,21 @@ class PathFollower(Node):
                     v_eff = max(self.qcar2_measurred_speed, 0.05)
                     lookahead_dist = max(0.30, v_eff * 1.7)
 
+                    # heading_err = self._heading_error_to_path(self.wpi)
+
                     if dist_to_target < lookahead_dist and self.wpi < self.N - 2:
                         self.wpi += 1
 
-                    if dist_to_final < 0.35:
+                    near_final = (dist_to_final < 0.50)          # looser tolerance
+                    at_end = (self.wpi >= self.N - 2)            # reached end of waypoint list
+
+                    if near_final or at_end:
                         speed_command = 0.0
                         self.current_steering = 0.0
                         self.path_complete = True
 
-                    # if self.wpi > max(self.N - 100, 0):
-                    #     speed_command = min(speed_command, self.desired_speed)
-
                     Kp_steering = 1.1
-                    kd_steering = 5
+                    kd_steering = 7
 
                     gyro_filtered = self.apply_filter('gyro', self.gyroscope[2], self.a1, self.b1)
 
@@ -726,6 +782,9 @@ class PathFollower(Node):
             enable = 1.0
         else:
             enable = 0.0
+
+        # ✅ ALWAYS push LED state based on current stage/context
+        # self._update_led_state_from_context()
 
         self.nav_command(enable, speed_command)
         self.path_status()
@@ -811,6 +870,51 @@ class PathFollower(Node):
                 self.steeringScope.graphicsLayoutWidget.close()
             except AttributeError:
                 pass
+
+    def _path_heading_at_index(self, i: int):
+        if self.wp is None or self.wp.shape[1] < 2:
+            return 0.0
+
+        N = self.wp.shape[1]
+        i = int(np.clip(i, 0, N - 2))
+
+        angle_offset = float(self.rotation_offset[0])
+        R_QLabs_ROS = np.array([
+            [np.cos(-angle_offset*np.pi/180.0), -np.sin(-angle_offset*np.pi/180.0)],
+            [np.sin(-angle_offset*np.pi/180.0),  np.cos(-angle_offset*np.pi/180.0)]
+        ])
+        t_off = np.array([float(self.translation_offset[0]), float(self.translation_offset[1])])
+
+        p0 = (np.array([self.wp[0, i],   self.wp[1, i]])   + t_off) @ R_QLabs_ROS
+        p1 = (np.array([self.wp[0, i+1], self.wp[1, i+1]]) + t_off) @ R_QLabs_ROS
+
+        dx = float(p1[0] - p0[0])
+        dy = float(p1[1] - p0[1])
+        return float(np.arctan2(dy, dx))
+
+    def _heading_error_to_path(self, idx_for_heading: int):
+        path_h = self._path_heading_at_index(idx_for_heading)
+        try:
+            robot_yaw = float(self.yaw)
+        except Exception:
+            robot_yaw = 0.0
+        return float(wrap_to_pi(path_h - robot_yaw))
+
+    def _cte_to_waypoint(self, wp_map_xy):
+        try:
+            rx = float(self.translation.x)
+            ry = float(self.translation.y)
+            yaw = float(self.yaw)
+        except Exception:
+            return 0.0
+
+        dx = float(wp_map_xy[0] - rx)
+        dy = float(wp_map_xy[1] - ry)
+
+        c = np.cos(yaw)
+        s = np.sin(yaw)
+        y_r = -s*dx + c*dy
+        return float(y_r)
 
 
 def main():

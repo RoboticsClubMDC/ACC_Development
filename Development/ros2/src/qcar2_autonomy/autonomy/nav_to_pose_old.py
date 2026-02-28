@@ -172,7 +172,7 @@ class PathFollower(Node):
         self.declare_parameter('node_values', [0, 8, 10])
         self.waypoints = list(self.get_parameter("node_values").get_parameter_value().integer_array_value)
 
-        self.declare_parameter('desired_speed', [0.6])
+        self.declare_parameter('desired_speed', [0.4])
         self.desired_speed = list(self.get_parameter("desired_speed").get_parameter_value().double_array_value)
 
         self.declare_parameter('visualize_pose', [False])
@@ -180,7 +180,7 @@ class PathFollower(Node):
 
         self.scale = 1.0
 
-        self.declare_parameter('rotation_offset', [86.5])
+        self.declare_parameter('rotation_offset', [82.0])
         self.rotation_offset = list(self.get_parameter("rotation_offset").get_parameter_value().double_array_value)
 
         self.declare_parameter('translation_offset', [0.0, 0.0])
@@ -371,7 +371,7 @@ class PathFollower(Node):
             self.get_logger().error(f"Planner returned empty path. {info}")
             self.wp = np.zeros((2,1))
             self.N = 1
-            self.wpi = 0
+            self.wpi= 0
             self.path_complete = True
             return
 
@@ -656,6 +656,18 @@ class PathFollower(Node):
                     t_off = np.array([self.translation_offset[0], self.translation_offset[1]])
                     wp_1_mod = (wp_1 + t_off) @ R_QLabs_ROS
 
+                    wp_next = np.array(self.wp[:, min(self.wpi+1, self.N-1)])
+
+                    wp_next_mod = (wp_next + t_off) @ R_QLabs_ROS
+
+                    dx = wp_next_mod[0] - wp_1_mod[0]
+                    dy = wp_next_mod[1] - wp_1_mod[1]
+                    path_heading = np.arctan2(dy, dx)
+
+                    self.get_logger().info(f"Path heading (deg): {np.degrees(path_heading):.2f}")
+
+                    cte = self._cte_to_waypoint(wp_1_mod)
+
                     L = 0.256
 
                     try:
@@ -684,7 +696,9 @@ class PathFollower(Node):
                     dist_to_final = float(np.linalg.norm(p_map - wp_final_mod))
 
                     v_eff = max(self.qcar2_measurred_speed, 0.05)
-                    lookahead_dist = max(0.30, v_eff * 1.7)
+                    lookahead_dist = max(0.30, v_eff * 1.4)
+
+                    heading_err = self._heading_error_to_path(self.wpi)
 
                     if dist_to_target < lookahead_dist and self.wpi < self.N - 2:
                         self.wpi += 1
@@ -811,6 +825,71 @@ class PathFollower(Node):
                 self.steeringScope.graphicsLayoutWidget.close()
             except AttributeError:
                 pass
+            
+    def _path_heading_at_index(self, i: int):
+      """
+      Returns heading of the path tangent (in MAP frame) around waypoint index i.
+      Uses wp points already in QLabs, so we convert to MAP (ROS) like you do elsewhere.
+      """
+      if self.wp is None or self.wp.shape[1] < 2:
+          return 0.0
+
+      N = self.wp.shape[1]
+      i = int(np.clip(i, 0, N - 2))
+
+      angle_offset = float(self.rotation_offset[0])
+      R_QLabs_ROS = np.array([
+          [np.cos(-angle_offset*np.pi/180.0), -np.sin(-angle_offset*np.pi/180.0)],
+          [np.sin(-angle_offset*np.pi/180.0),  np.cos(-angle_offset*np.pi/180.0)]
+      ])
+      t_off = np.array([float(self.translation_offset[0]), float(self.translation_offset[1])])
+
+      p0 = (np.array([self.wp[0, i],   self.wp[1, i]])   + t_off) @ R_QLabs_ROS
+      p1 = (np.array([self.wp[0, i+1], self.wp[1, i+1]]) + t_off) @ R_QLabs_ROS
+
+      dx = float(p1[0] - p0[0])
+      dy = float(p1[1] - p0[1])
+
+      # path tangent heading in map frame
+      return float(np.arctan2(dy, dx))
+
+
+    def _heading_error_to_path(self, idx_for_heading: int):
+        """
+        Heading error = wrap_to_pi(path_heading - robot_yaw)
+        Both in MAP frame.
+        """
+        path_h = self._path_heading_at_index(idx_for_heading)
+
+        try:
+            robot_yaw = float(self.yaw)  # you already compute this in tf_timer()
+        except Exception:
+            robot_yaw = 0.0
+
+        return float(wrap_to_pi(path_h - robot_yaw))  
+    
+
+    def _cte_to_waypoint(self, wp_map_xy):
+      """
+      Cross-track error using a target point in MAP frame.
+      Positive means target is to the LEFT of the car (robot frame +y).
+      """
+      try:
+          rx = float(self.translation.x)
+          ry = float(self.translation.y)
+          yaw = float(self.yaw)
+      except Exception:
+          return 0.0
+
+      dx = float(wp_map_xy[0] - rx)
+      dy = float(wp_map_xy[1] - ry)
+
+      # Rotate MAP->ROBOT: [x_r; y_r] = R(-yaw) * [dx; dy]
+      c = np.cos(yaw)
+      s = np.sin(yaw)
+      y_r = -s*dx + c*dy  # this is lateral offset in robot frame
+
+      return float(y_r)
 
 
 def main():
