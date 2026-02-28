@@ -132,11 +132,9 @@ class PathFollower(Node):
         self.declare_parameter('mission_dropoff_xy', [0.0, 0.0])
         self.declare_parameter('mission_enable',     [False])
 
-        # ---- Stanley blending parameters ----
-        self.declare_parameter('stanley_blend',     0.3)   # 0=pure pursuit only, 1=stanley only
-        self.declare_parameter('stanley_trust_min', 0.1)   # trust threshold to engage stanley
-        self.stanley_blend     = self.get_parameter('stanley_blend').value
-        self.stanley_trust_min = self.get_parameter('stanley_trust_min').value
+        # ---- Stanley blending — HARDCODED, not runtime-tunable ----
+        self.stanley_blend     = 0.05   # 5% max stanley contribution
+        self.stanley_trust_min = 0.80   # needs 80% lane confidence to activate
 
         self.add_on_set_parameters_callback(self.parameter_update_callback)
 
@@ -174,6 +172,7 @@ class PathFollower(Node):
         self.wpi = 0
         self.wp_prior = []
         self.current_steering = 0
+        self._wp_in_ros_frame = False  # True when path came from TripPlanner (already transformed)
 
         # ---- Stanley state ----
         self.stanley_delta = 0.0
@@ -200,6 +199,12 @@ class PathFollower(Node):
         self.path_publisher_topic = self.create_publisher(Path, '/planned_path', 1)
         self.path_status_publisher = self.create_publisher(Bool, '/path_status', 1)
 
+        # /robot_pose — TripPlanner needs this to plan each leg
+        self.robot_pose_publisher = self.create_publisher(PoseStamped, '/robot_pose', 10)
+
+        # /cmd_waypoints — TripPlanner sends pre-transformed paths here
+        self.create_subscription(Path, '/cmd_waypoints', self._cmd_waypoints_cb, 1)
+
         # ---- Stanley subscribers ----
         self.create_subscription(Float32, '/lane_stanley/delta', self._stanley_delta_cb, 2)
         self.create_subscription(Float32, '/lane_stanley/trust', self._stanley_trust_cb, 2)
@@ -218,6 +223,23 @@ class PathFollower(Node):
         self.get_logger().info(
             f'PathFollower ready | stanley_blend={self.stanley_blend} '
             f'trust_min={self.stanley_trust_min}')
+
+    # ------------------------------------------------------------------
+    # /cmd_waypoints — TripPlanner sends path already in ROS/map frame
+    # ------------------------------------------------------------------
+    def _cmd_waypoints_cb(self, msg: Path):
+        if not msg.poses:
+            self.get_logger().warn('/cmd_waypoints empty — ignoring')
+            return
+        xs = [p.pose.position.x for p in msg.poses]
+        ys = [p.pose.position.y for p in msg.poses]
+        self.wp              = np.array([xs, ys])
+        self.N               = self.wp.shape[1]
+        self.wpi             = 0
+        self.path_complete   = False
+        self.path_execute_flag = True
+        self._wp_in_ros_frame = True   # skip rotation in path_planner — already transformed
+        self.get_logger().info(f'/cmd_waypoints received N={self.N}')
 
     # ------------------------------------------------------------------
     # Stanley callbacks
@@ -274,11 +296,8 @@ class PathFollower(Node):
             elif param.name == 'start_path' and param.type_ == param.Type.BOOL_ARRAY:
                 self.path_execute_flag = list(param.value)[0]
                 self.get_logger().info('path status changed!')
-            elif param.name == 'stanley_blend' and param.type_ == param.Type.DOUBLE:
-                self.stanley_blend = float(param.value)
-                self.get_logger().info(f'stanley_blend updated to {self.stanley_blend}')
-            elif param.name == 'stanley_trust_min' and param.type_ == param.Type.DOUBLE:
-                self.stanley_trust_min = float(param.value)
+            elif param.name == 'stanley_blend' or param.name == 'stanley_trust_min':
+                self.get_logger().warn(f'{param.name} is hardcoded — ignoring')
             elif param.name == 'mission_pickup_xy' and param.type_ == param.Type.DOUBLE_ARRAY:
                 self.get_logger().info(f'mission_pickup_xy updated: {list(param.value)}')
             elif param.name == 'mission_dropoff_xy' and param.type_ == param.Type.DOUBLE_ARRAY:
@@ -355,7 +374,10 @@ class PathFollower(Node):
                 [np.sin(-angle_offset * np.pi / 180),  np.cos(-angle_offset * np.pi / 180)]
             ])
             t = np.array([self.translation_offset[0], self.translation_offset[1]])
-            wp_1_mod = ([self.wp[0, i], self.wp[1, i]] + t) @ R_QLabs_ROS
+            if self._wp_in_ros_frame:
+                wp_1_mod = np.array([self.wp[0, i], self.wp[1, i]])
+            else:
+                wp_1_mod = ([self.wp[0, i], self.wp[1, i]] + t) @ R_QLabs_ROS
             pose.header.stamp = self.get_clock().now().to_msg()
             pose.header.frame_id = 'map'
             pose.pose.position.x = wp_1_mod[0]
@@ -385,7 +407,10 @@ class PathFollower(Node):
                     [np.sin(-angle_offset * np.pi / 180),  np.cos(-angle_offset * np.pi / 180)]
                 ])
                 t = np.array([self.translation_offset[0], self.translation_offset[1]])
-                wp_1_mod = (wp_1 + t) @ R_QLabs_ROS
+                if self._wp_in_ros_frame:
+                    wp_1_mod = wp_1  # already in ROS/map frame — TripPlanner did the transform
+                else:
+                    wp_1_mod = (wp_1 + t) @ R_QLabs_ROS
 
                 L = 0.256
 
@@ -455,10 +480,11 @@ class PathFollower(Node):
         except KeyboardInterrupt:
             speed_command = 0.0
 
-        if self.path_execute_flag and self.motion_flag:
-            enable = 1.0
-        if not self.path_execute_flag or not self.motion_flag or self.path_complete:
-            enable = 0.0
+        enable = float(
+            self.path_execute_flag and
+            self.motion_flag and
+            not self.path_complete
+        )
 
         self.nav_command(enable, speed_command)
         self.path_status()
@@ -487,6 +513,18 @@ class PathFollower(Node):
             self.gyro_kf.correction(self.yaw)
             y = np.array([[self.translation.x], [self.translation.y], [self.gyro_kf.xHat[0, 0]]])
             self.qcar2_ekf.correction(y)
+
+            # Publish /robot_pose so TripPlanner can plan next leg
+            pose_msg = PoseStamped()
+            pose_msg.header.stamp = self.get_clock().now().to_msg()
+            pose_msg.header.frame_id = 'map'
+            pose_msg.pose.position.x = float(self.translation.x)
+            pose_msg.pose.position.y = float(self.translation.y)
+            pose_msg.pose.orientation.x = t.transform.rotation.x
+            pose_msg.pose.orientation.y = t.transform.rotation.y
+            pose_msg.pose.orientation.z = t.transform.rotation.z
+            pose_msg.pose.orientation.w = t.transform.rotation.w
+            self.robot_pose_publisher.publish(pose_msg)
         except TransformException as ex:
             self.get_logger().info(f'Could not transform {to_frame_rel} to {from_frame_rel}: {ex}')
 

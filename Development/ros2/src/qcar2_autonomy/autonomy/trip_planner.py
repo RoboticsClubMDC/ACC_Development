@@ -35,9 +35,12 @@ class TripPlanner(Node):
         self.qcar_hardware_client = self.create_client(
             SetParameters, '/qcar2_hardware/set_parameters'
         )
-        while not self.qcar_hardware_client.wait_for_service(timeout_sec=4.0):
-            self.get_logger().info('waiting for qcar2_hardware parameter service...')
-        self.get_logger().info('connected to qcar2_hardware.')
+        # Non-blocking: if LED service isn't up, just skip LEDs — don't freeze startup
+        if not self.qcar_hardware_client.wait_for_service(timeout_sec=2.0):
+            self.get_logger().warn('qcar2_hardware LED service not available — LEDs disabled')
+            self.qcar_hardware_client = None
+        else:
+            self.get_logger().info('connected to qcar2_hardware.')
 
         # params
         self.declare_parameter('taxi_node', [10])
@@ -226,6 +229,8 @@ class TripPlanner(Node):
     # ---- LED ----
 
     def _set_led(self, led_id: int):
+        if self.qcar_hardware_client is None:
+            return
         led_id = int(led_id)
         if self._last_led == led_id:
             return
