@@ -68,11 +68,11 @@ class LaneStanleyNode(Node):
         self.declare_parameter('bev_x_max',       20.0)
         self.declare_parameter('bev_y_min',       -6.0)
         self.declare_parameter('bev_y_max',        6.0)
-        self.declare_parameter('stanley_k',        0.8)   # cross-track gain
+        self.declare_parameter('stanley_k',        0.20)   # cross-track gain
         self.declare_parameter('stanley_v_min',    0.05)
-        self.declare_parameter('max_steer',        0.6)
+        self.declare_parameter('max_steer',        0.25)
         # Row fraction from bottom to sample front-axle CTE (0=car, 1=far)
-        self.declare_parameter('fa_row_frac',      0.15)
+        self.declare_parameter('fa_row_frac',      0.22)
         # Minimum lane pixels to trust the detection
         self.declare_parameter('min_lane_px',      300)
 
