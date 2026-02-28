@@ -77,25 +77,25 @@ class ObjectDetector(Node):
         self.dt = 1 / 30
         self.timer = self.create_timer(self.dt, self.on_timer)
 
-        # /motion_enable — always True; intersections handled by nav_to_pose state machine
+        # /motion_enable — always True; nav_to_pose state machine owns all stopping
         self.motion_publisher = self.create_publisher(Bool, '/motion_enable', 1)
         self.flag_value = True
 
         # /intersection_rule — what we see at the current intersection node
-        # Values published: "NONE" | "STOP" | "YIELD" | "RED" | "GREEN" | "YELLOW"
+        # Published values: "NONE" | "STOP" | "YIELD" | "RED" | "GREEN" | "YELLOW"
         from std_msgs.msg import String as StringMsg
         self.rule_pub = self.create_publisher(StringMsg, '/intersection_rule', 1)
 
-        # Only run detection when nav_to_pose says car is stopped at a node
+        # Only run YOLO when nav_to_pose has stopped at an intersection node
         self.at_intersection = False
         self.create_subscription(Bool, '/at_intersection', self._at_intersection_cb, 1)
 
         # ── Tuning ───────────────────────────────────────────────────────────
-        self.tl_conf      = 0.40   # min YOLO conf for traffic light
-        self.tl_stop_dist = 3.0    # max dist (m) to act on light
-        self.tl_min_dist  = 0.3    # ignore lights closer than this
-        self.stop_dist    = 0.40   # max dist (m) to trigger stop sign
-        self.yield_dist   = 0.50   # max dist (m) to trigger yield sign
+        self.tl_conf      = 0.85
+        self.tl_stop_dist = 3.0
+        self.tl_min_dist  = 0.3
+        self.stop_dist    = 0.40
+        self.yield_dist   = 0.50
         self.depth_patch  = 9
         # ─────────────────────────────────────────────────────────────────────
 
@@ -109,10 +109,10 @@ class ObjectDetector(Node):
     # ------------------------------------------------------------------
 
     def _at_intersection_cb(self, msg: Bool):
+        prev = self.at_intersection
         self.at_intersection = bool(msg.data)
-        if not self.at_intersection:
-            # Left intersection — reset so next node starts fresh
-            self._publish_rule("NONE")
+        if prev and not self.at_intersection:
+            self._publish_rule("NONE")  # clear rule when leaving intersection
 
     def _publish_rule(self, rule: str):
         from std_msgs.msg import String as StringMsg
@@ -138,10 +138,10 @@ class ObjectDetector(Node):
         self.publish_rgb.publish(self.bridge.cv2_to_imgmsg(rgb, "bgr8"))
         self.publish_depth.publish(self.bridge.cv2_to_imgmsg(depth, "32FC1"))
 
-        # Always publish motion_enable=True — nav_to_pose state machine owns stopping
+        # motion_enable is always True — nav_to_pose owns all stopping
         self.flag_value = True
 
-        # Only run YOLO when nav_to_pose has hard-stopped at an intersection node
+        # Only run YOLO when hard-stopped at an intersection node
         if self.at_intersection:
             self.yolo_detect()
 
@@ -207,53 +207,37 @@ class ObjectDetector(Node):
         return None
 
     def _classify_light_color(self, obj):
-        """
-        Crop YOLO bbox, classify traffic light color via HSV.
-        Uses thresholds from traffic_system_detector.py.
-        Returns (is_red, is_green, is_yellow).
-        """
+        """Crop YOLO bbox, classify traffic light via HSV. Returns (is_red, is_green, is_yellow)."""
         rgb = self.QCarImg.rgb
         if rgb is None:
             return False, False, False
         bbox = self._get_bbox(obj)
         if bbox is None:
             return False, False, False
-
         x1, y1, x2, y2 = bbox
         h, w = rgb.shape[:2]
         x1 = max(0, int(x1)); y1 = max(0, int(y1))
         x2 = min(w, int(x2)); y2 = min(h, int(y2))
         if x2 <= x1 or y2 <= y1:
             return False, False, False
-
         crop = rgb[y1:y2, x1:x2]
         if crop.size == 0:
             return False, False, False
-
         ch = crop.shape[0]
         top = crop[:max(1, ch // 3), :]
         bot = crop[max(0, 2 * ch // 3):, :]
-
         hsv_top = cv2.cvtColor(top, cv2.COLOR_BGR2HSV)
         hsv_bot = cv2.cvtColor(bot, cv2.COLOR_BGR2HSV)
-
         r1 = cv2.inRange(hsv_top, np.array([0,   200, 200]), np.array([10,  255, 255]))
         r2 = cv2.inRange(hsv_top, np.array([170, 120,  70]), np.array([180, 255, 255]))
         red_px    = cv2.countNonZero(r1) + cv2.countNonZero(r2)
-        yellow_px = cv2.countNonZero(
-            cv2.inRange(hsv_top, np.array([20, 100, 100]), np.array([30, 255, 255])))
-        green_px  = cv2.countNonZero(
-            cv2.inRange(hsv_bot, np.array([40, 100, 100]), np.array([90, 255, 255])))
-
-        self.get_logger().info(
-            f"  TL HSV: red={red_px} yellow={yellow_px} green={green_px}")
+        yellow_px = cv2.countNonZero(cv2.inRange(hsv_top, np.array([20, 100, 100]), np.array([30, 255, 255])))
+        green_px  = cv2.countNonZero(cv2.inRange(hsv_bot, np.array([40, 100, 100]), np.array([90, 255, 255])))
+        self.get_logger().info(f"  TL HSV: red={red_px} yellow={yellow_px} green={green_px}")
         return red_px >= 5, green_px > 30, yellow_px > 200
 
     def yolo_detect(self):
-        """
-        Called only when nav_to_pose has hard-stopped at an intersection node.
-        Publishes /intersection_rule: STOP | YIELD | RED | GREEN | YELLOW | NONE
-        """
+        """Called only when at an intersection node. Publishes /intersection_rule."""
         rgbProcessed = self.myYolo.pre_process(self.QCarImg.rgb)
         pred = self.myYolo.predict(
             inputImg=rgbProcessed,
@@ -262,7 +246,6 @@ class ObjectDetector(Node):
             half=True,
             verbose=False
         )
-
         try:
             ann = None
             if isinstance(pred, (list, tuple)) and len(pred) > 0 and hasattr(pred[0], "plot"):
@@ -279,7 +262,7 @@ class ObjectDetector(Node):
             clippingDistance=5
         )
 
-        rule = "NONE"   # default — nav_to_pose will treat as yield after 1s
+        rule = "NONE"  # default — nav_to_pose treats as yield after 1s grace
 
         for obj in processedResults:
             labelName  = obj.__dict__.get("name", "")
@@ -289,7 +272,7 @@ class ObjectDetector(Node):
             self.get_logger().info(
                 f"[INTERSECTION] {labelName} conf={labelConf:.2f} dist={objectDist:.3f}m")
 
-            # ── TRAFFIC LIGHT ─────────────────────────────────────────────────
+            # ── TRAFFIC LIGHT — HSV color check ──────────────────────────────
             if str(labelName).startswith("traffic light"):
                 valid_dist = self.tl_min_dist < objectDist < self.tl_stop_dist
                 if labelConf >= self.tl_conf and valid_dist:
@@ -297,7 +280,7 @@ class ObjectDetector(Node):
                     if is_red and not is_green:
                         rule = "RED"
                         self.get_logger().info(f"RED LIGHT @ {objectDist:.2f}m")
-                        break   # red is highest priority — stop immediately
+                        break  # red is highest priority
                     elif is_green:
                         rule = "GREEN"
                         self.get_logger().info(f"GREEN LIGHT @ {objectDist:.2f}m")
@@ -305,16 +288,16 @@ class ObjectDetector(Node):
                         rule = "YELLOW"
                         self.get_logger().info(f"YELLOW LIGHT @ {objectDist:.2f}m")
 
-            # ── STOP SIGN ─────────────────────────────────────────────────────
-            elif labelName == "stop sign" and labelConf > 0.9 and 0 < objectDist < self.stop_dist:
+            # ── STOP SIGN — 3s ────────────────────────────────────────────────
+            elif labelName == "stop sign" and labelConf > 0.85 and 0 < objectDist < self.stop_dist:
                 rule = "STOP"
-                self.get_logger().info(f"STOP SIGN @ {objectDist:.2f}m")
-                break   # stop sign is definitive
+                self.get_logger().info(f"STOP SIGN @ {objectDist:.2f}m conf={labelConf:.2f}")
+                break
 
-            # ── YIELD SIGN ────────────────────────────────────────────────────
-            elif labelName == "yield sign" and labelConf > 0.9 and 0 < objectDist < self.yield_dist:
+            # ── YIELD SIGN — 1.5s ────────────────────────────────────────────
+            elif labelName == "yield sign" and labelConf > 0.85 and 0 < objectDist < self.yield_dist:
                 rule = "YIELD"
-                self.get_logger().info(f"YIELD SIGN @ {objectDist:.2f}m")
+                self.get_logger().info(f"YIELD SIGN @ {objectDist:.2f}m conf={labelConf:.2f}")
 
         self._publish_rule(rule)
         print("=" * 31)

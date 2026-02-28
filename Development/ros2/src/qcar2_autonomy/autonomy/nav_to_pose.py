@@ -105,12 +105,11 @@ class GyroKF:
 from enum import Enum
 
 class IntersectionState(Enum):
-    DRIVE   = 0   # normal path following
-    STOPPED = 1   # hard-stopped at node, waiting for YOLO rule
-    WAITING = 2   # timed wait (stop sign / yield)
-    DONE    = 3   # wait complete, advance past node
+    DRIVE   = 0
+    STOPPED = 1
+    WAITING = 2
+    DONE    = 3
 
-# Intersection node IDs — car will hard-stop here and check for sign/light
 INTERSECTION_NODES = {10, 1, 4, 6, 14, 20, 19, 11, 12, 9}
 
 class PathFollower(Node):
@@ -183,11 +182,11 @@ class PathFollower(Node):
         self.wpi = 0
         self.wp_prior = []
         self.current_steering = 0
-        self._wp_in_ros_frame = False  # True when path came from TripPlanner (already transformed)
+        self._wp_in_ros_frame = False
 
         # ── Intersection node XY table (QLabs frame) ─────────────────────────
         _rm = SDCSRoadMap()
-        self._node_xy = {}   # node_id -> np.array([x, y])
+        self._node_xy = {}
         for nid in INTERSECTION_NODES:
             try:
                 if hasattr(_rm, 'get_node_pose'):
@@ -196,16 +195,17 @@ class PathFollower(Node):
                     pose = np.array(_rm.nodes[nid].pose).reshape(-1)
                 self._node_xy[nid] = np.array([float(pose[0]), float(pose[1])])
             except Exception as e:
-                self.get_logger().warn(f'Could not load intersection node {nid}: {e}')
+                self.get_logger().warn(f'Could not load node {nid}: {e}')
 
         # Intersection state machine
         self._isec_state       = IntersectionState.DRIVE
-        self._isec_wpi         = -1    # which wpi triggered the current intersection
-        self._isec_wait_until  = 0.0   # absolute time.time() to release timed waits
-        self._isec_nodes_done  = set() # node ids already handled on this path
-        self._intersection_wpi = {}    # wpi -> node_id for current path
+        self._isec_wpi         = -1
+        self._isec_wait_until  = 0.0
+        self._isec_nodes_done  = set()
+        self._intersection_wpi = {}
+        self._intersection_rule = "NONE"
+        self._isec_stopped_at  = None
 
-        # ── Intersection topics ───────────────────────────────────────────────
         # ---- Stanley state ----
         self.stanley_delta = 0.0
         self.stanley_trust = 0.0
@@ -232,9 +232,6 @@ class PathFollower(Node):
         self.path_status_publisher = self.create_publisher(Bool, '/path_status', 1)
         self.at_intersection_pub   = self.create_publisher(Bool, '/at_intersection', 1)
 
-        # /intersection_rule — yolo_detector tells us what it sees at this node
-        # Values: "NONE" | "STOP" | "YIELD" | "RED" | "GREEN" | "YELLOW"
-        self._intersection_rule = "NONE"
         from std_msgs.msg import String as StringMsg
         self.create_subscription(StringMsg, '/intersection_rule',
                                  lambda m: setattr(self, '_intersection_rule', m.data), 1)
@@ -279,51 +276,36 @@ class PathFollower(Node):
         self.path_complete   = False
         self.path_execute_flag = True
         self._wp_in_ros_frame = True
-        # Reset intersection state for new path
         self._isec_state      = IntersectionState.DRIVE
         self._isec_wpi        = -1
         self._isec_nodes_done = set()
         self._intersection_rule = "NONE"
-        # Find which wpi indices correspond to intersection nodes
+        self._isec_stopped_at = None
         self._intersection_wpi = self._mark_intersection_waypoints()
         self.get_logger().info(
             f'/cmd_waypoints received N={self.N} '
-            f'intersection_wpi={list(self._intersection_wpi.keys())}')
+            f'intersections at wpi={list(self._intersection_wpi.keys())}')
 
     # ------------------------------------------------------------------
-    # Intersection waypoint marking
-    # ------------------------------------------------------------------
     def _mark_intersection_waypoints(self):
-        """
-        For each intersection node, find the single closest waypoint index
-        in self.wp (already in ROS frame). Returns dict: wpi -> node_id.
-        """
+        """Map each intersection node to its nearest wpi on the current path."""
         mapping = {}
         if not self._node_xy or self.N == 0:
             return mapping
-
         angle_offset = self.rotation_offset[0]
         R = np.array([
             [np.cos(-angle_offset * np.pi / 180), -np.sin(-angle_offset * np.pi / 180)],
             [np.sin(-angle_offset * np.pi / 180),  np.cos(-angle_offset * np.pi / 180)]
         ])
         t = np.array(self.translation_offset)
-
         for nid, xy_q in self._node_xy.items():
-            # Transform node from QLabs → ROS frame (same as path waypoints)
             xy_ros = (xy_q + t) @ R
-            # Find nearest waypoint
-            dists = np.linalg.norm(
-                self.wp.T - xy_ros, axis=1)   # shape (N,)
+            dists = np.linalg.norm(self.wp.T - xy_ros, axis=1)
             best_wpi = int(np.argmin(dists))
-            # Only mark if close enough to actually be on this path
-            if dists[best_wpi] < 0.8:
-                # Don't double-mark same wpi for two nodes
-                if best_wpi not in mapping:
-                    mapping[best_wpi] = nid
-                    self.get_logger().info(
-                        f'  node {nid} → wpi {best_wpi} dist={dists[best_wpi]:.3f}m')
-
+            if dists[best_wpi] < 0.8 and best_wpi not in mapping:
+                mapping[best_wpi] = nid
+                self.get_logger().info(
+                    f'  node {nid} → wpi {best_wpi} dist={dists[best_wpi]:.3f}m')
         return mapping
 
     # ------------------------------------------------------------------
@@ -524,74 +506,79 @@ class PathFollower(Node):
                 lookahead_dist = max(v_eff * 1.7, 0.30)
 
                 if dist < lookahead_dist:
-                    if self.wpi < self.N - 2:
+                    if self.wpi < self.N - 1:
                         self.wpi += skip_index
 
                 self.wpi = np.clip(self.wpi, 0, self.N - 1)
 
-                # ── End of path stop ──────────────────────────────────────────
+                # ── Creep slow near end of path ───────────────────────────────
                 if self.wpi > self.N - 100:
                     speed_command = min(speed_command, 0.2)
-                if self.wpi >= self.N - 1 and dist < 0.4:
-                    speed_command = 0.0
-                    pp_delta = 0.0
-                    self.wp_prior = self.wp
-                    self.path_complete = True
 
-                # ── Intersection node state machine ───────────────────────────
+                # ── Full stop: measure dist to ACTUAL final waypoint ──────────
+                wp_final = np.array(self.wp[:, -1])
+                wp_final_mod = wp_final if self._wp_in_ros_frame else (wp_final + t) @ R_QLabs_ROS
+                dist_to_final = np.linalg.norm([p[0] - wp_final_mod[0],
+                                                p[1] - wp_final_mod[1]])
+                if dist_to_final < 0.25:
+                    speed_command        = 0.0
+                    pp_delta             = 0.0
+                    self.current_steering = 0.0   # zero steering — stops spinning
+                    self.wp_prior        = self.wp
+                    self.path_complete   = True
+
+                # ── Intersection node state machine ───────────────────────
                 now_isec = time.time()
                 node_id  = self._intersection_wpi.get(self.wpi)
 
                 if (self._isec_state == IntersectionState.DRIVE
                         and node_id is not None
                         and node_id not in self._isec_nodes_done):
-                    # Arrived at intersection node — hard stop
-                    self._isec_state      = IntersectionState.STOPPED
-                    self._isec_wpi        = self.wpi
+                    self._isec_state        = IntersectionState.STOPPED
+                    self._isec_wpi          = self.wpi
                     self._intersection_rule = "NONE"
-                    self.get_logger().info(
-                        f'INTERSECTION node {node_id} @ wpi={self.wpi} — HARD STOP')
+                    self._isec_stopped_at   = now_isec
                     ai = Bool(); ai.data = True
                     self.at_intersection_pub.publish(ai)
+                    self.get_logger().info(
+                        f'INTERSECTION node {node_id} @ wpi={self.wpi} — HARD STOP')
 
                 if self._isec_state == IntersectionState.STOPPED:
-                    speed_command = 0.0   # hard stop
+                    speed_command        = 0.0
+                    pp_delta             = 0.0
+                    self.current_steering = 0.0
                     rule = self._intersection_rule.upper().strip()
 
                     if rule == "STOP":
-                        self._isec_state     = IntersectionState.WAITING
+                        self._isec_state      = IntersectionState.WAITING
                         self._isec_wait_until = now_isec + 3.0
-                        self.get_logger().info('Intersection rule: STOP SIGN — waiting 3s')
-
+                        self.get_logger().info('STOP SIGN — waiting 3s')
                     elif rule == "YIELD":
-                        self._isec_state     = IntersectionState.WAITING
+                        self._isec_state      = IntersectionState.WAITING
                         self._isec_wait_until = now_isec + 1.5
-                        self.get_logger().info('Intersection rule: YIELD — waiting 1.5s')
-
+                        self.get_logger().info('YIELD — waiting 1.5s')
                     elif rule in ("GREEN", "YELLOW"):
                         self._isec_state = IntersectionState.DONE
-                        self.get_logger().info(f'Intersection rule: {rule} — go')
-
+                        self.get_logger().info(f'{rule} — go')
                     elif rule == "NONE":
-                        # Nothing detected after brief grace period — treat as yield
-                        if not hasattr(self, '_isec_stopped_at'):
-                            self._isec_stopped_at = now_isec
-                        elif now_isec - self._isec_stopped_at > 1.0:
-                            self._isec_state     = IntersectionState.WAITING
-                            self._isec_wait_until = now_isec + 1.5
-                            self.get_logger().info('Intersection: nothing detected — default yield 1.5s')
-                            del self._isec_stopped_at
+                        # Nothing detected with sufficient confidence — drive through
+                        if self._isec_stopped_at and (now_isec - self._isec_stopped_at) > 1.0:
+                            self._isec_state = IntersectionState.DONE
+                            self.get_logger().info('No sign detected — driving through')
 
                 if self._isec_state == IntersectionState.WAITING:
-                    speed_command = 0.0
+                    speed_command        = 0.0
+                    pp_delta             = 0.0
+                    self.current_steering = 0.0
                     if now_isec >= self._isec_wait_until:
                         self._isec_state = IntersectionState.DONE
 
                 if self._isec_state == IntersectionState.DONE:
                     nid = self._intersection_wpi.get(self._isec_wpi, -1)
                     self._isec_nodes_done.add(nid)
-                    self._isec_state = IntersectionState.DRIVE
-                    self._isec_wpi   = -1
+                    self._isec_state      = IntersectionState.DRIVE
+                    self._isec_wpi        = -1
+                    self._isec_stopped_at = None
                     ai = Bool(); ai.data = False
                     self.at_intersection_pub.publish(ai)
                     self.get_logger().info(f'Intersection node {nid} cleared — DRIVE')
@@ -635,7 +622,7 @@ class PathFollower(Node):
     def nav_command(self, enable, speed_command):
         QCarCommands = Twist()
         QCarCommands.linear.x = enable * np.clip(
-            speed_command * np.power(np.cos(self.current_steering), 2), 0.05, 0.7)
+            speed_command * np.power(np.cos(self.current_steering), 2), 0.0, 0.7)
         QCarCommands.angular.z = enable * self.current_steering
         self.publisher.publish(QCarCommands)
 
