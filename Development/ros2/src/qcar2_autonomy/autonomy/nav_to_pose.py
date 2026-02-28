@@ -114,7 +114,7 @@ class PathFollower(Node):
         self.declare_parameter('desired_speed', [0.6])
         self.desired_speed = list(self.get_parameter('desired_speed').get_parameter_value().double_array_value)
 
-        self.declare_parameter('visualize_pose', [False])
+        self.declare_parameter('visualize_pose', [True])
         self.pose_visualize_flag = list(self.get_parameter('visualize_pose').get_parameter_value().bool_array_value)[0]
 
         self.scale = 1.0
@@ -292,7 +292,10 @@ class PathFollower(Node):
                     self.steeringScope.axes[1].attachSignal(name='y_ekf')
                     self.steeringScope.addAxis(row=2, col=0, timeWindow=tf,
                                                yLabel='steering cmd [rad]', yLim=(-0.6, 0.6))
-                    self.steeringScope.axes[2].attachSignal(name='delta')
+                    self.steeringScope.axes[2].attachSignal(name='pp_delta')
+                    self.steeringScope.axes[2].attachSignal(name='stanley_delta')
+                    self.steeringScope.axes[2].attachSignal(name='blended_delta')
+                    self.steeringScope.axes[2].attachSignal(name='blend_alpha')
                     self.steeringScope.addAxis(row=3, col=0, timeWindow=tf,
                                                yLabel='heading', yLim=(-np.pi, np.pi))
                     self.steeringScope.axes[3].attachSignal(name='theta_meas')
@@ -503,7 +506,12 @@ class PathFollower(Node):
                 y_ref = 0
             self.steeringScope.axes[0].sample(self.t_plot, [x_ref, p[0]])
             self.steeringScope.axes[1].sample(self.t_plot, [y_ref, p[1]])
-            self.steeringScope.axes[2].sample(self.t_plot, [self.current_steering])
+            self.steeringScope.axes[2].sample(self.t_plot, [
+                self.pp_delta_raw,
+                self.stanley_delta,
+                self.current_steering,
+                float(np.clip(self.stanley_blend * self.stanley_trust, 0.0, 1.0))
+            ])
             self.steeringScope.axes[3].sample(self.t_plot, [self.yaw, self.qcar2_ekf.xHat[2, 0]])
             MultiScope.refreshAll()
         else:
