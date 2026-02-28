@@ -35,7 +35,7 @@ class ObjectDetector(Node):
         imageHeight = 480
         self.QCarImg = QCar2DepthAligned()
         self.myYolo  = YOLOv8(
-                    modelPath = "./ros2/src/qcar2_autonomy/models/quanser_yolov8s-seg.pt",
+                    modelPath = "./ros2/src/qcar2_autonomy/models/yoloObjDetBP01.pt",
                     imageHeight= imageHeight,
                     imageWidth = imageWidth,
                     convert_tensorrt = False,
