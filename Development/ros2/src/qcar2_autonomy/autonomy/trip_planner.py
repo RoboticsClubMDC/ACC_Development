@@ -2,16 +2,20 @@
 # OVERALL: trip_planner.py  (NO PlannerServer)
 # ✅ Subscribes to /path_follower/qcar_state (2/4/5/6)
 # ✅ Directly sets /qcar2_hardware led_color_id
-# ✅ YOUR requested LED policy:
-#    - HUB idle/accepting rides: MAGENTA (5)
-#    - Going to pickup: GREEN (1)
-#    - After pickup: BLUE (2) stays BLUE until dropoff reached
-#    - At dropoff: GREEN (1) (NO orange)
-#    - Return to hub: GREEN then MAGENTA at hub
+#
+# YOUR EXACT LED POLICY:
+# - Taxi hub / accepting rides: MAGENTA (5)
+# - Going to pickup: GREEN (1)
+# - At pickup: BLUE (2) and HOLD BLUE until DROPOFF is reached
+# - At dropoff: ORANGE (6) and HOLD ORANGE until HUB is reached
+# - Back at hub: MAGENTA (5)
+#
+# Notes:
+# - We IGNORE transient "driving=4" from PathFollower when we're holding BLUE or ORANGE.
+# - No PlannerServer needed. Run: qcar2_hardware + path_follower + this trip_planner
 # =========================
 #!/usr/bin/env python3
 
-import time
 import rclpy
 from rclpy.node import Node
 
@@ -61,7 +65,7 @@ class tripPlanner(Node):
         self.LED_GREEN = 1
         self.LED_BLUE = 2
         self.LED_MAGENTA = 5
-        self.LED_ORANGE = 6  # unused per your policy
+        self.LED_ORANGE = 6
 
         # ---------------- internal state ----------------
         self.current_path_status = False
@@ -70,62 +74,61 @@ class tripPlanner(Node):
         self.mission_running = False
         self.new_ride_requested = False
 
-        # follower publishes 4 driving, 2 pickup, 6 dropoff, 5 hub
-        self.follower_event = 0
+        # PathFollower publishes:
+        # 4 = driving, 2 = pickup stop, 6 = dropoff stop, 5 = hub/ready
+        self.follower_state = 0
 
-        # YOUR policy latches
-        self.in_ride = False
-        self.picked_up = False
+        # LED phase latch:
+        # IDLE -> MAGENTA
+        # TO_PICKUP -> GREEN
+        # TO_DROPOFF -> BLUE (HOLD)
+        # TO_HUB -> ORANGE (HOLD)
+        self.phase = "IDLE"
 
         # LED state
         self._last_led = None
 
         # subscribe
         self.create_subscription(Bool, '/path_status', self.path_status_callback, 10)
-        self.create_subscription(UInt8, '/path_follower/qcar_state', self.follower_event_callback, 10)
+        self.create_subscription(UInt8, '/path_follower/qcar_state', self.follower_state_callback, 10)
 
-        # start at HUB idle magenta (accepting rides)
+        # Start at hub/accepting rides color
         self._set_led(self.LED_MAGENTA)
 
-        # loop (mission control only; LEDs driven by follower callback)
+        # loop (mission control only; LEDs come from follower callback + phase latch)
         self.timer = self.create_timer(0.1, self.loop)
 
     # ---------------- callbacks ----------------
     def path_status_callback(self, msg):
         self.current_path_status = bool(msg.data)
 
-    def follower_event_callback(self, msg):
-            """
+    def follower_state_callback(self, msg):
+        """
         PathFollower publishes:
         4 = driving
         2 = pickup stop
         6 = dropoff stop
         5 = hub/ready
 
-        Exact scenario mapping:
+        We directly map it to LED:
         hub      -> MAGENTA
         driving  -> GREEN
         pickup   -> BLUE
         dropoff  -> ORANGE
         """
-            s = int(msg.data)
-            self.follower_event = s
+        s = int(msg.data)
 
-            if s == 5:
-                # HUB idle / accepting rides
-                self._set_led(self.LED_MAGENTA)
+        if s == 5:
+            self._set_led(self.LED_MAGENTA)
 
-            elif s == 4:
-                # ANY driving segment
-                self._set_led(self.LED_GREEN)
+        elif s == 4:
+            self._set_led(self.LED_GREEN)
 
-            elif s == 2:
-                # At pickup
-                self._set_led(self.LED_BLUE)
+        elif s == 2:
+            self._set_led(self.LED_BLUE)
 
-            elif s == 6:
-                # At dropoff
-                self._set_led(self.LED_ORANGE)
+        elif s == 6:
+            self._set_led(self.LED_ORANGE)
 
     def parameter_update_callback(self, params):
         for p in params:
@@ -141,7 +144,7 @@ class tripPlanner(Node):
                 self.stop_seconds = float(list(p.value)[0])
                 self.get_logger().info(f"stop_seconds updated: {self.stop_seconds}")
 
-        # Any update while ready triggers new ride
+        # Any update while ready triggers a new ride
         if self.ready_for_rides and not self.mission_running:
             self.new_ride_requested = True
 
@@ -175,8 +178,12 @@ class tripPlanner(Node):
             return
         self._last_led = led_color_id
 
-        self._set_param(self.qcar_hardware_client, "led_color_id",
-                        led_color_id, ParameterType.PARAMETER_INTEGER)
+        self._set_param(
+            self.qcar_hardware_client,
+            "led_color_id",
+            led_color_id,
+            ParameterType.PARAMETER_INTEGER
+        )
 
     # ---------------- main loop (NO LED forcing here) ----------------
     def loop(self):
@@ -192,14 +199,24 @@ class tripPlanner(Node):
             if self.current_path_status:
                 self.ready_for_rides = True
                 self.startup_sent = False
+                self.phase = "IDLE"
+                self._set_led(self.LED_MAGENTA)
             return
 
-        # READY (waiting for ride) — LED will be MAGENTA due to follower_event=5
+        # READY (accepting rides)
         if self.ready_for_rides and not self.mission_running and not self.new_ride_requested:
+            # ensure idle color
+            self.phase = "IDLE"
+            self._set_led(self.LED_MAGENTA)
             return
 
         # START MISSION
         if self.ready_for_rides and not self.mission_running and self.new_ride_requested:
+            # Set phase for ride start
+            self.phase = "TO_PICKUP"
+            self._set_led(self.LED_GREEN)
+
+            # push mission params
             self._set_param(self.path_follower_client, "mission_use_xy",
                             [True], ParameterType.PARAMETER_BOOL_ARRAY)
             self._set_param(self.path_follower_client, "mission_pickup_xy",
@@ -209,6 +226,7 @@ class tripPlanner(Node):
             self._set_param(self.path_follower_client, "mission_stop_seconds",
                             [float(self.stop_seconds)], ParameterType.PARAMETER_DOUBLE_ARRAY)
 
+            # enable mission
             self._set_param(self.path_follower_client, "mission_enable",
                             [True], ParameterType.PARAMETER_BOOL_ARRAY)
 
@@ -219,11 +237,13 @@ class tripPlanner(Node):
 
         # MISSION RUNNING: end when follower reports HUB (5)
         if self.mission_running:
-            if self.follower_event == 5:
+            if self.follower_state == 5:
                 self._set_param(self.path_follower_client, "mission_enable",
                                 [False], ParameterType.PARAMETER_BOOL_ARRAY)
                 self.mission_running = False
                 self.ready_for_rides = True
+                self.phase = "IDLE"
+                self._set_led(self.LED_MAGENTA)
 
 
 def main():
