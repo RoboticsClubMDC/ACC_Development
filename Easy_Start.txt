@@ -32,3 +32,5 @@ colcon build --packages-select qcar2_autonomy && . install/setup.bash && export 
 
 Run Avoid Sidewalks
 colcon build --packages-select qcar2_autonomy && . install/setup.bash && export ROS_DOMAIN_ID=69 && ros2 run qcar2_autonomy avoid_sidewalks && clear
+
+RU

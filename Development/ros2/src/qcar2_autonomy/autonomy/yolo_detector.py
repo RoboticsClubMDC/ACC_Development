@@ -89,7 +89,7 @@ class ObjectDetector(Node):
         self.QCarImg = QCar2DepthAligned()
 
         model_dir = Path("/workspaces/isaac_ros-dev/ros2/src/qcar2_autonomy/models")
-        model_path = model_dir / "quanser_yolov8s-seg.pt"
+        model_path = model_dir / "yoloObjDetBP01.pt"
         model_url = "https://quanserinc.box.com/shared/static/ce0gxomeg4b12wlcch9cmlh0376nditf.pt"
 
         ensure_model_exists(model_path, model_url, logger=self.get_logger())

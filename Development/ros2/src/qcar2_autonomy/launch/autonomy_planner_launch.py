@@ -33,11 +33,12 @@ def generate_launch_description():
         output='screen'
     )
     
-    # traffic_system_detector = Node(
-    #     package ='qcar2_autonomy',
-    #     executable='yolo_detector',
-    #     name = 'qcar2_yolo_detector'
-    # )
+    traffic_system_detector = Node(
+        package ='qcar2_autonomy',
+        executable='yolo_detector',
+        name = 'qcar2_yolo_detector'
+    )
+    
     
     # trip_planner = Node(
     # package='qcar2_autonomy',
@@ -52,7 +53,7 @@ def generate_launch_description():
         lane_detection,
         sidewalk_detection,
         lane_keeping,
-        # traffic_system_detector,
+        traffic_system_detector,
         # trip_planner,
         ]
     )
