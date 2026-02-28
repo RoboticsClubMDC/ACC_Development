@@ -28,6 +28,12 @@ def generate_launch_description():
     # }]
 )
     
+    yolo_detector = Node(
+        package='qcar2_autonomy',
+        executable='yolo_detector',
+        name='yolo_detector',
+
+    )
 
     lane_detection = Node(
         package='qcar2_autonomy',
@@ -59,6 +65,7 @@ def generate_launch_description():
         trip_planner,
         bev_csi_node,
         lane_detection,
-        lane_stanley_node
+        lane_stanley_node,
+        yolo_detector
         ]
     )

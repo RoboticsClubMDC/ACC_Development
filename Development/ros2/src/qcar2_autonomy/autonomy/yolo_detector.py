@@ -35,7 +35,7 @@ class ObjectDetector(Node):
         imageHeight = 480
         self.QCarImg = QCar2DepthAligned()
         self.myYolo  = YOLOv8(
-                    modelPath = "./ros2/src/qcar2_autonomy/models/yoloObjDetBP01.pt",
+                    modelPath = "./ros2/src/qcar2_autonomy/models/quanser_yolov8s-seg.pt",
                     imageHeight= imageHeight,
                     imageWidth = imageWidth,
                     convert_tensorrt = False,
@@ -49,8 +49,7 @@ class ObjectDetector(Node):
         self.motion_enable = True
         self.detection_cooldown = 10.0
         self.disable_until = 0.0
-        self.flag_value = False
-        self.publish_motion_flag(True)
+        self.flag_value = True   # FIX: was False — was killing motion_enable on startup
         self.t0 = time.time()
 
         self.sign_detected = False
