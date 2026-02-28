@@ -160,7 +160,7 @@ class tripPlanner(Node):
 
         # Super state 1: drive to taxi hub
         if self.trip_super_state == 1:
-            if t_current < 10 and len(self.path_nodes) == 0 and self.current_path_status is False:
+            if 5 < t_current < 15 and len(self.path_nodes) == 0 and self.current_path_status is False:
                 self.path_nodes.append(0)
                 for node in self.trip_nodes:
                     self.path_nodes.append(node)

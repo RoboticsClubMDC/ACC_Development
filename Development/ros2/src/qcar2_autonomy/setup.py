@@ -22,14 +22,17 @@ setup(
     license='TODO: License declaration',
     tests_require=['pytest'],
     entry_points={
-        'console_scripts': [
-            'path_follower = autonomy.nav_to_pose:main',
-            'traffic_system_detector=autonomy.traffic_system_detector:main',
-            'lane_detector=autonomy.lane_detector:main',
-            'yolo_detector=autonomy.yolo_detector:main',
-            'trip_planner=autonomy.trip_planner:main',
-            'dataset_collector=autonomy.dataset_collector:main',
-            'Planner_server=autonomy.Planner_server:main'
+    'console_scripts': [
+        'path_follower = autonomy.nav_to_pose:main',
+        'traffic_system_detector=autonomy.traffic_system_detector:main',
+        'lane_detector=autonomy.lane_detector:main',
+        'yolo_detector=autonomy.yolo_detector:main',
+        'trip_planner=autonomy.trip_planner:main',
+        'dataset_collector=autonomy.dataset_collector:main',
+        'Planner_server=autonomy.Planner_server:main',
+        'vo_node=autonomy.vo_node:main',
+        'vo_supervisor=autonomy.vo_supervisor:main',
+        'vo_dashboard=autonomy.vo_terminal_dashboard:main',
         ],
     },
 )
