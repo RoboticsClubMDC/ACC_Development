@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""stanley_live_plot.py — CTE and heading error live plot."""
 
 import threading
 from collections import deque
@@ -14,13 +13,11 @@ from rclpy.node import Node
 from std_msgs.msg import Float32
 
 
-# ── Tune these constants ──────────────────────────────────────────────
-WINDOW_SEC   = 30
-INTERVAL_MS  = 200
-CTE_THRESH   = 0.3    # margin lines on CTE plot (meters)
-CTE_YLIM     = 2.0    # y-axis limit for CTE (meters)
-HE_YLIM      = 1.0    # y-axis limit for heading error (radians)
-# ─────────────────────────────────────────────────────────────────────
+WINDOW_SEC  = 30
+INTERVAL_MS = 200
+CTE_THRESH  = 0.3
+CTE_YLIM    = 2.0
+HE_YLIM     = 1.0
 
 
 class PlotData:
@@ -66,8 +63,7 @@ def main():
     spin_thread.start()
 
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 6), sharex=True)
-    fig.suptitle('Lane Stanley — CTE & Heading Error', fontsize=13, fontweight='bold',
-                 color='#cccccc')
+    fig.suptitle('Lane Stanley — CTE & Heading Error', fontsize=13, fontweight='bold', color='#cccccc')
     fig.patch.set_facecolor('#1e1e1e')
 
     for ax in (ax1, ax2):
@@ -79,24 +75,20 @@ def main():
         ax.spines['right'].set_visible(False)
         ax.grid(True, alpha=0.2, color='#666666')
 
-    # ── Row 1: Cross-track error ──
     line_cte, = ax1.plot([], [], color='#ff6b6b', linewidth=1.5, label='cross-track error')
-    ax1.axhline(y=0,           color='#555555', linestyle='-',  alpha=0.5)
-    ax1.axhline(y= CTE_THRESH, color='#ff6b6b', linestyle='--', alpha=0.6, label=f'±{CTE_THRESH}m')
-    ax1.axhline(y=-CTE_THRESH, color='#ff6b6b', linestyle='--', alpha=0.6)
+    ax1.axhline(y=0,            color='#555555', linestyle='-',  alpha=0.5)
+    ax1.axhline(y= CTE_THRESH,  color='#ff6b6b', linestyle='--', alpha=0.6, label=f'±{CTE_THRESH}m')
+    ax1.axhline(y=-CTE_THRESH,  color='#ff6b6b', linestyle='--', alpha=0.6)
     ax1.set_ylabel('CTE (m)', color='#ff6b6b', fontsize=9)
     ax1.set_ylim(-CTE_YLIM, CTE_YLIM)
-    ax1.legend(loc='upper right', fontsize=7, facecolor='#2d2d2d',
-               edgecolor='#555555', labelcolor='#cccccc')
+    ax1.legend(loc='upper right', fontsize=7, facecolor='#2d2d2d', edgecolor='#555555', labelcolor='#cccccc')
 
-    # ── Row 2: Heading error ──
     line_he, = ax2.plot([], [], color='#ffd54f', linewidth=1.5, label='heading error')
     ax2.axhline(y=0, color='#555555', linestyle='-', alpha=0.5)
     ax2.set_ylabel('heading error (rad)', color='#ffd54f', fontsize=9)
     ax2.set_ylim(-HE_YLIM, HE_YLIM)
     ax2.set_xlabel('time (s)', color='#cccccc', fontsize=9)
-    ax2.legend(loc='upper right', fontsize=7, facecolor='#2d2d2d',
-               edgecolor='#555555', labelcolor='#cccccc')
+    ax2.legend(loc='upper right', fontsize=7, facecolor='#2d2d2d', edgecolor='#555555', labelcolor='#cccccc')
 
     def update(frame):
         with data.lock:

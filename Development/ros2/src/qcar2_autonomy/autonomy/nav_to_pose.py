@@ -1,17 +1,14 @@
 #! /usr/bin/env python3
 
-# Quanser specific packages
 from hal.products.mats import SDCSRoadMap
 from pal.utilities.math import wrap_to_pi
 
-# Generic python packages
 import time
 import numpy as np
 import scipy.signal as signal
 from scipy.spatial.transform import Rotation as R
 from pal.utilities.scope import MultiScope
 
-# ROS specific packages
 from rclpy.duration import Duration
 import rclpy
 from geometry_msgs.msg import PoseStamped
@@ -26,7 +23,6 @@ from rcl_interfaces.msg import SetParametersResult
 from std_msgs.msg import Bool, Float32
 
 
-# region: EKF / KF helpers (unchanged)
 class QcarEKF:
 
     def __init__(self, x0, P0, Q, R):
@@ -99,16 +95,12 @@ class GyroKF:
         self.xHat[0] = wrap_to_pi(self.xHat[0])
         self.P = (self.I - K @ self.C) @ self.P
 
-# endregion
-
-
 
 class PathFollower(Node):
 
     def __init__(self):
         super().__init__('path_follower')
 
-        # ---- Existing parameters ----
         self.declare_parameter('node_values', [0, 8, 10])
         self.waypoints = list(self.get_parameter('node_values').get_parameter_value().integer_array_value)
 
@@ -116,7 +108,7 @@ class PathFollower(Node):
         self.desired_speed = list(self.get_parameter('desired_speed').get_parameter_value().double_array_value)
 
         self.declare_parameter('visualize_pose', [True])
-        self.pose_visualize_flag = True  # hardcoded on
+        self.pose_visualize_flag = True
 
         self.scale = 1.0
 
@@ -133,8 +125,7 @@ class PathFollower(Node):
         self.declare_parameter('mission_dropoff_xy', [0.0, 0.0])
         self.declare_parameter('mission_enable',     [False])
 
-        # ---- Stanley blending — DISABLED (PURE PURSUIT VISUAL BASELINE) ----
-        # (We keep these variables for plotting/visibility, but they do NOT affect steering.)
+        # Stanley blend is kept at 0 — pure pursuit only
         self.stanley_blend     = 0.0
         self.stanley_trust_min = 999.0
 
@@ -176,7 +167,6 @@ class PathFollower(Node):
         self.current_steering = 0
         self._wp_in_ros_frame = False
 
-        # ---- Stanley state (kept ONLY for visuals; steering ignores it) ----
         self.stanley_delta = 0.0
         self.stanley_trust = 0.0
         self.pp_delta_raw  = 0.0
@@ -200,18 +190,10 @@ class PathFollower(Node):
 
         self.path_publisher_topic  = self.create_publisher(Path, '/planned_path', 1)
         self.path_status_publisher = self.create_publisher(Bool, '/path_status', 1)
+        self.robot_pose_publisher  = self.create_publisher(PoseStamped, '/robot_pose', 10)
 
-        # /robot_pose — TripPlanner needs this to plan each leg
-        self.robot_pose_publisher = self.create_publisher(PoseStamped, '/robot_pose', 10)
-
-        # /cmd_waypoints — TripPlanner sends pre-transformed paths here
         self.create_subscription(Path, '/cmd_waypoints', self._cmd_waypoints_cb, 1)
 
-        # ---- Stanley subscribers (COMMENTED OUT: PURE PURSUIT VISUAL BASELINE) ----
-        # self.create_subscription(Float32, '/lane_stanley/delta', self._stanley_delta_cb, 2)
-        # self.create_subscription(Float32, '/lane_stanley/trust', self._stanley_trust_cb, 2)
-
-        # ---- Debug publishers for live plot ----
         self.pub_pp_delta      = self.create_publisher(Float32, '/nav/pp_delta',      2)
         self.pub_stanley_delta = self.create_publisher(Float32, '/nav/stanley_delta', 2)
         self.pub_blended_delta = self.create_publisher(Float32, '/nav/blended_delta', 2)
@@ -226,9 +208,6 @@ class PathFollower(Node):
             f'PathFollower ready | PURE PURSUIT BASELINE | '
             f'stanley_blend={self.stanley_blend} trust_min={self.stanley_trust_min}')
 
-    # ------------------------------------------------------------------
-    # /cmd_waypoints — TripPlanner sends path already in ROS/map frame
-    # ------------------------------------------------------------------
     def _cmd_waypoints_cb(self, msg: Path):
         if not msg.poses:
             self.get_logger().warn('/cmd_waypoints empty — ignoring')
@@ -243,18 +222,12 @@ class PathFollower(Node):
         self._wp_in_ros_frame = True
         self.get_logger().info(f'/cmd_waypoints received N={self.N}')
 
-    # ------------------------------------------------------------------
-    # Stanley callbacks (kept but unused when subscribers are commented out)
-    # ------------------------------------------------------------------
     def _stanley_delta_cb(self, msg: Float32):
         self.stanley_delta = float(msg.data)
 
     def _stanley_trust_cb(self, msg: Float32):
         self.stanley_trust = float(msg.data)
 
-    # ------------------------------------------------------------------
-    # Steering blend (kept for reference; NOT USED in pure pursuit baseline)
-    # ------------------------------------------------------------------
     def _blend_steering(self, pp_delta: float) -> float:
         self.pp_delta_raw = pp_delta
 
@@ -275,8 +248,6 @@ class PathFollower(Node):
         self.pub_blend_alpha.publish(f32(alpha))
 
         return blended
-
-    # ------------------------------------------------------------------
 
     def parameter_update_callback(self, params):
         for param in params:
@@ -410,7 +381,7 @@ class PathFollower(Node):
                 ])
                 t = np.array([self.translation_offset[0], self.translation_offset[1]])
                 if self._wp_in_ros_frame:
-                    wp_1_mod = wp_1  # already in ROS/map frame — TripPlanner did the transform
+                    wp_1_mod = wp_1
                 else:
                     wp_1_mod = (wp_1 + t) @ R_QLabs_ROS
 
@@ -446,11 +417,9 @@ class PathFollower(Node):
 
                 self.wpi = np.clip(self.wpi, 0, self.N - 1)
 
-                # ── Creep slow near end of path ───────────────────────────────
                 if self.wpi > self.N - 100:
                     speed_command = min(speed_command, 0.2)
 
-                # ── Full stop: measure dist to ACTUAL final waypoint ──────────
                 wp_final = np.array(self.wp[:, -1])
                 wp_final_mod = wp_final if self._wp_in_ros_frame else (wp_final + t) @ R_QLabs_ROS
                 dist_to_final = np.linalg.norm([p[0] - wp_final_mod[0],
@@ -458,7 +427,7 @@ class PathFollower(Node):
                 if dist_to_final < 0.25:
                     speed_command        = 0.0
                     pp_delta             = 0.0
-                    self.current_steering = 0.0   # zero steering — stops spinning
+                    self.current_steering = 0.0
                     self.wp_prior        = self.wp
                     self.path_complete   = True
 
@@ -471,11 +440,8 @@ class PathFollower(Node):
                     -self.max_steering_angle,
                     self.max_steering_angle)
 
-                # ============================================================
-                # PURE PURSUIT ONLY (NO STANLEY / NO LANE KEEPING EFFECT)
-                # ============================================================
-                self.pp_delta_raw  = float(pp_delta_damped)  # keep the plot signal alive
-                self.stanley_delta = 0.0                     # force lane signals to zero
+                self.pp_delta_raw  = float(pp_delta_damped)
+                self.stanley_delta = 0.0
                 self.stanley_trust = 0.0
 
                 steering = float(np.clip(pp_delta_damped,
@@ -483,7 +449,6 @@ class PathFollower(Node):
                                          self.max_steering_angle))
                 self.current_steering = steering
 
-                # Publish debug topics (so your plot still works, but shows PP-only truth)
                 def f32(v):
                     m = Float32(); m.data = float(v); return m
                 self.pub_pp_delta.publish(f32(self.pp_delta_raw))
@@ -535,7 +500,6 @@ class PathFollower(Node):
             y = np.array([[self.translation.x], [self.translation.y], [self.gyro_kf.xHat[0, 0]]])
             self.qcar2_ekf.correction(y)
 
-            # Publish /robot_pose so TripPlanner can plan next leg
             pose_msg = PoseStamped()
             pose_msg.header.stamp = self.get_clock().now().to_msg()
             pose_msg.header.frame_id = 'map'
@@ -579,16 +543,12 @@ class PathFollower(Node):
                 y_ref = 0
             self.steeringScope.axes[0].sample(self.t_plot, [x_ref, p[0]])
             self.steeringScope.axes[1].sample(self.t_plot, [y_ref, p[1]])
-
-            # PURE PURSUIT ONLY VISUALS:
-            # [pp_delta, stanley_delta(0), blended_delta (=steering), blend_alpha(0)]
             self.steeringScope.axes[2].sample(self.t_plot, [
                 self.pp_delta_raw,
                 0.0,
                 self.current_steering,
                 0.0
             ])
-
             self.steeringScope.axes[3].sample(self.t_plot, [self.yaw, self.qcar2_ekf.xHat[2, 0]])
             MultiScope.refreshAll()
         else:

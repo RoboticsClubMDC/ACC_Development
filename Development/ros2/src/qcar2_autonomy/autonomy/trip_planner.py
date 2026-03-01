@@ -17,12 +17,12 @@ from hal.products.mats import SDCSRoadMap
 
 
 class MissionStage(Enum):
-    IDLE = 0
-    TO_PICKUP = 1
+    IDLE           = 0
+    TO_PICKUP      = 1
     WAIT_AT_PICKUP = 2
-    TO_DROPOFF = 3
+    TO_DROPOFF     = 3
     WAIT_AT_DROPOFF = 4
-    TO_HUB = 5
+    TO_HUB         = 5
 
 
 class TripPlanner(Node):
@@ -32,29 +32,25 @@ class TripPlanner(Node):
 
         self.roadmap = SDCSRoadMap()
 
-        self.qcar_hardware_client = self.create_client(
-            SetParameters, '/qcar2_hardware/set_parameters'
-        )
-        # Non-blocking — if LED service not up, skip LEDs and continue
+        self.qcar_hardware_client = self.create_client(SetParameters, '/qcar2_hardware/set_parameters')
         if not self.qcar_hardware_client.wait_for_service(timeout_sec=2.0):
             self.get_logger().warn('qcar2_hardware LED service not available — LEDs disabled')
             self.qcar_hardware_client = None
         else:
             self.get_logger().info('connected to qcar2_hardware.')
 
-        # params
-        self.declare_parameter('taxi_node', [10])
-        self.declare_parameter('pickup_xy', [0.125, 4.395])
-        self.declare_parameter('dropoff_xy', [-0.905, 0.800])
-        self.declare_parameter('stop_seconds', [3.0])
-        self.declare_parameter('rotation_offset', [82.0])
+        self.declare_parameter('taxi_node',          [10])
+        self.declare_parameter('pickup_xy',          [0.125, 4.395])
+        self.declare_parameter('dropoff_xy',         [-0.905, 0.800])
+        self.declare_parameter('stop_seconds',       [3.0])
+        self.declare_parameter('rotation_offset',    [82.0])
         self.declare_parameter('translation_offset', [0.0, 0.0])
 
-        self.taxi_node = int(list(self.get_parameter('taxi_node').get_parameter_value().integer_array_value)[0])
-        self.pickup_xy = list(self.get_parameter('pickup_xy').get_parameter_value().double_array_value)
-        self.dropoff_xy = list(self.get_parameter('dropoff_xy').get_parameter_value().double_array_value)
-        self.stop_seconds = float(list(self.get_parameter('stop_seconds').get_parameter_value().double_array_value)[0])
-        self.rotation_offset = list(self.get_parameter('rotation_offset').get_parameter_value().double_array_value)
+        self.taxi_node          = int(list(self.get_parameter('taxi_node').get_parameter_value().integer_array_value)[0])
+        self.pickup_xy          = list(self.get_parameter('pickup_xy').get_parameter_value().double_array_value)
+        self.dropoff_xy         = list(self.get_parameter('dropoff_xy').get_parameter_value().double_array_value)
+        self.stop_seconds       = float(list(self.get_parameter('stop_seconds').get_parameter_value().double_array_value)[0])
+        self.rotation_offset    = list(self.get_parameter('rotation_offset').get_parameter_value().double_array_value)
         self.translation_offset = list(self.get_parameter('translation_offset').get_parameter_value().double_array_value)
 
         self.add_on_set_parameters_callback(self.parameter_update_callback)
@@ -62,39 +58,33 @@ class TripPlanner(Node):
         self.hub_xy = list(self._get_node_xy(self.taxi_node))
         self.get_logger().info(f'Hub at node {self.taxi_node}: {self.hub_xy}')
 
-        # LED IDs
-        self.LED_GREEN = 1
-        self.LED_BLUE = 2
+        self.LED_GREEN   = 1
+        self.LED_BLUE    = 2
         self.LED_MAGENTA = 5
-        self.LED_ORANGE = 6
+        self.LED_ORANGE  = 6
 
-        # state
-        self.robot_pose = None
-        self.path_status = False
-        self._path_completed_event = False  # latched on False->True edge
+        self.robot_pose             = None
+        self.path_status            = False
+        self._path_completed_event  = False
 
-        self.startup_done = False
-        self._startup_path_sent = False
-        self.ready_for_rides = False
-        self.new_ride_requested = False
+        self.startup_done          = False
+        self._startup_path_sent    = False
+        self.ready_for_rides       = False
+        self.new_ride_requested    = False
 
         self.mission_stage = MissionStage.IDLE
-        self.pause_until = 0.0
-        self.picked_up = False
-        self.dropped_off = False
-        self._last_led = None
+        self.pause_until   = 0.0
+        self.picked_up     = False
+        self.dropped_off   = False
+        self._last_led     = None
 
-        # publishers
         self.waypoints_pub = self.create_publisher(Path, '/cmd_waypoints', 1)
 
-        # subscribers
-        self.create_subscription(Bool, '/path_status', self.path_status_callback, 10)
-        self.create_subscription(PoseStamped, '/robot_pose', self.robot_pose_callback, 10)
+        self.create_subscription(Bool,        '/path_status',  self.path_status_callback,  10)
+        self.create_subscription(PoseStamped, '/robot_pose',   self.robot_pose_callback,   10)
 
         self._set_led(self.LED_MAGENTA)
         self.create_timer(0.1, self.loop)
-
-    # ---- subscriber callbacks ----
 
     def path_status_callback(self, msg):
         prev = self.path_status
@@ -125,8 +115,6 @@ class TripPlanner(Node):
 
         return SetParametersResult(successful=True)
 
-    # ---- coordinate helpers ----
-
     def _rot_matrix(self):
         angle = float(self.rotation_offset[0]) * np.pi / 180.0
         return np.array([
@@ -136,25 +124,23 @@ class TripPlanner(Node):
 
     def _ros_to_qlabs(self, x, y):
         R_mat = self._rot_matrix()
-        t = np.array(self.translation_offset)
+        t     = np.array(self.translation_offset)
         return tuple((np.array([float(x), float(y)]) @ R_mat.T) - t)
 
     def _qlabs_path_to_ros(self, wp_2xn):
-        R_mat = self._rot_matrix()
-        t_off = np.array(self.translation_offset)
+        R_mat   = self._rot_matrix()
+        t_off   = np.array(self.translation_offset)
         path_msg = Path()
-        path_msg.header.stamp = self.get_clock().now().to_msg()
+        path_msg.header.stamp    = self.get_clock().now().to_msg()
         path_msg.header.frame_id = 'map'
         for i in range(wp_2xn.shape[1]):
-            pt = (wp_2xn[:, i] + t_off) @ R_mat
+            pt   = (wp_2xn[:, i] + t_off) @ R_mat
             pose = PoseStamped()
             pose.header = path_msg.header
             pose.pose.position.x = float(pt[0])
             pose.pose.position.y = float(pt[1])
             path_msg.poses.append(pose)
         return path_msg
-
-    # ---- roadmap helpers ----
 
     def _get_node_xy(self, node_id):
         if hasattr(self.roadmap, 'get_node_pose'):
@@ -198,12 +184,11 @@ class TripPlanner(Node):
         if self.robot_pose is None:
             return None
 
-        rx = float(self.robot_pose.pose.position.x)
-        ry = float(self.robot_pose.pose.position.y)
+        rx, ry   = float(self.robot_pose.pose.position.x), float(self.robot_pose.pose.position.y)
         px_q, py_q = self._ros_to_qlabs(rx, ry)
 
         start_node = self._closest_node(px_q, py_q)
-        goal_node = self._closest_node(float(goal_xy[0]), float(goal_xy[1]))
+        goal_node  = self._closest_node(float(goal_xy[0]), float(goal_xy[1]))
 
         if hasattr(self.roadmap, 'find_shortest_path'):
             base = self.roadmap.find_shortest_path(start_node, goal_node)
@@ -214,7 +199,6 @@ class TripPlanner(Node):
             self.get_logger().error(f'No path from node {start_node} to {goal_node}')
             return None
 
-        # append exact goal coordinate so we actually arrive at the target
         goal_col = np.array(goal_xy).reshape(2, 1)
         return np.hstack([np.array(base), goal_col])
 
@@ -227,21 +211,13 @@ class TripPlanner(Node):
         return True
 
     def _snap_to_exact(self, goal_xy, label=''):
-        """
-        Send a minimal 2-point path from current position to exact target.
-        Used after arriving at pickup/dropoff to correct residual offset.
-        """
         if self.robot_pose is None:
             return self._send_path_to(goal_xy, label)
 
-        rx = float(self.robot_pose.pose.position.x)
-        ry = float(self.robot_pose.pose.position.y)
-        # Convert current ROS pose back to QLabs frame to build a 2-point path
-        R_mat = self._rot_matrix()
-        t = np.array(self.translation_offset)
-        # ROS -> QLabs: inverse of (qlabs + t) @ R = ros
-        # qlabs = ros @ R.T - t
-        cur_q = np.array([rx, ry]) @ R_mat.T - t
+        rx, ry = float(self.robot_pose.pose.position.x), float(self.robot_pose.pose.position.y)
+        R_mat  = self._rot_matrix()
+        t      = np.array(self.translation_offset)
+        cur_q  = np.array([rx, ry]) @ R_mat.T - t
         goal_q = np.array([float(goal_xy[0]), float(goal_xy[1])])
 
         dist = float(np.linalg.norm(cur_q - goal_q))
@@ -249,13 +225,10 @@ class TripPlanner(Node):
             self.get_logger().info(f'Already within 0.10m of {label}, no snap needed')
             return True
 
-        wp = np.stack([cur_q, goal_q], axis=1)   # shape (2, 2)
+        wp = np.stack([cur_q, goal_q], axis=1)
         self.waypoints_pub.publish(self._qlabs_path_to_ros(wp))
-        self.get_logger().info(
-            f'Snap path -> {label} ({goal_xy[0]:.2f}, {goal_xy[1]:.2f}) dist={dist:.3f}m')
+        self.get_logger().info(f'Snap path -> {label} ({goal_xy[0]:.2f}, {goal_xy[1]:.2f}) dist={dist:.3f}m')
         return True
-
-    # ---- LED ----
 
     def _set_led(self, led_id: int):
         if self.qcar_hardware_client is None:
@@ -265,23 +238,19 @@ class TripPlanner(Node):
             return
         self._last_led = led_id
         param = Parameter()
-        param.name = 'led_color_id'
-        param.value.type = ParameterType.PARAMETER_INTEGER
-        param.value.integer_value = led_id
-        req = SetParameters.Request()
-        req.parameters = [param]
+        param.name                  = 'led_color_id'
+        param.value.type            = ParameterType.PARAMETER_INTEGER
+        param.value.integer_value   = led_id
+        req                         = SetParameters.Request()
+        req.parameters              = [param]
         self.qcar_hardware_client.call_async(req)
-
-    # ---- main loop ----
 
     def loop(self):
         now = time.time()
 
-        # wait for first pose before doing anything
         if self.robot_pose is None:
             return
 
-        # drive to hub on startup
         if not self.startup_done:
             if not self._startup_path_sent:
                 ok = self._send_path_to(self.hub_xy, label='HUB (startup)')
@@ -290,29 +259,26 @@ class TripPlanner(Node):
                 return
             if self._path_completed_event:
                 self._path_completed_event = False
-                self.startup_done = True
+                self.startup_done    = True
                 self.ready_for_rides = True
                 self._set_led(self.LED_MAGENTA)
                 self.get_logger().info('Startup complete. Ready for rides.')
             return
 
-        # idle: waiting for a new pickup/dropoff
         if self.ready_for_rides and not self.new_ride_requested:
             return
 
-        # kick off a new mission
         if self.ready_for_rides and self.new_ride_requested:
             self.new_ride_requested = False
-            self.ready_for_rides = False
-            self.picked_up = False
-            self.dropped_off = False
+            self.ready_for_rides    = False
+            self.picked_up          = False
+            self.dropped_off        = False
             ok = self._send_path_to(self.pickup_xy, label='PICKUP')
             if ok:
                 self.mission_stage = MissionStage.TO_PICKUP
                 self._set_led(self.LED_GREEN)
             return
-        # mission in progress
-        # WAIT stages: trigger as soon as pause expires (no path event needed)
+
         if self.mission_stage == MissionStage.WAIT_AT_PICKUP and now >= self.pause_until:
             ok = self._send_path_to(self.dropoff_xy, label='DROPOFF')
             if ok:
@@ -326,37 +292,34 @@ class TripPlanner(Node):
                 self.mission_stage = MissionStage.TO_HUB
                 self._set_led(self.LED_ORANGE)
             return
-        # driving stages: block until pause clears (shouldn't be set, but safety)
+
         if now < self.pause_until:
             return
 
-        # advance driving stages on path completion
         if not self._path_completed_event:
             return
         self._path_completed_event = False
 
         if self.mission_stage == MissionStage.TO_PICKUP:
-            # Snap to exact pickup coordinate before pausing
             self._snap_to_exact(self.pickup_xy, label='PICKUP-snap')
             self.mission_stage = MissionStage.WAIT_AT_PICKUP
-            self.picked_up = True
+            self.picked_up     = True
             self._set_led(self.LED_BLUE)
-            self.pause_until = now + self.stop_seconds
+            self.pause_until   = now + self.stop_seconds
             self.get_logger().info('Arrived at PICKUP.')
 
         elif self.mission_stage == MissionStage.TO_DROPOFF:
-            # Snap to exact dropoff coordinate before pausing
             self._snap_to_exact(self.dropoff_xy, label='DROPOFF-snap')
             self.mission_stage = MissionStage.WAIT_AT_DROPOFF
-            self.dropped_off = True
+            self.dropped_off   = True
             self._set_led(self.LED_ORANGE)
-            self.pause_until = now + self.stop_seconds
+            self.pause_until   = now + self.stop_seconds
             self.get_logger().info('Arrived at DROPOFF.')
 
         elif self.mission_stage == MissionStage.TO_HUB:
             self.mission_stage = MissionStage.IDLE
-            self.picked_up = False
-            self.dropped_off = False
+            self.picked_up     = False
+            self.dropped_off   = False
             self._set_led(self.LED_MAGENTA)
             self.ready_for_rides = True
             self.get_logger().info('Mission complete. Ready for next ride.')
