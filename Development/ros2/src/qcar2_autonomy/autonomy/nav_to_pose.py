@@ -133,9 +133,10 @@ class PathFollower(Node):
         self.declare_parameter('mission_dropoff_xy', [0.0, 0.0])
         self.declare_parameter('mission_enable',     [False])
 
-        # ---- Stanley blending — HARDCODED, not runtime-tunable ----
-        self.stanley_blend     = 0.3   # 5% max stanley contribution
-        self.stanley_trust_min = 0.50   # needs 80% lane confidence to activate
+        # ---- Stanley blending — DISABLED (PURE PURSUIT VISUAL BASELINE) ----
+        # (We keep these variables for plotting/visibility, but they do NOT affect steering.)
+        self.stanley_blend     = 0.0
+        self.stanley_trust_min = 999.0
 
         self.add_on_set_parameters_callback(self.parameter_update_callback)
 
@@ -175,7 +176,7 @@ class PathFollower(Node):
         self.current_steering = 0
         self._wp_in_ros_frame = False
 
-        # ---- Stanley state ----
+        # ---- Stanley state (kept ONLY for visuals; steering ignores it) ----
         self.stanley_delta = 0.0
         self.stanley_trust = 0.0
         self.pp_delta_raw  = 0.0
@@ -206,9 +207,9 @@ class PathFollower(Node):
         # /cmd_waypoints — TripPlanner sends pre-transformed paths here
         self.create_subscription(Path, '/cmd_waypoints', self._cmd_waypoints_cb, 1)
 
-        # ---- Stanley subscribers ----
-        self.create_subscription(Float32, '/lane_stanley/delta', self._stanley_delta_cb, 2)
-        self.create_subscription(Float32, '/lane_stanley/trust', self._stanley_trust_cb, 2)
+        # ---- Stanley subscribers (COMMENTED OUT: PURE PURSUIT VISUAL BASELINE) ----
+        # self.create_subscription(Float32, '/lane_stanley/delta', self._stanley_delta_cb, 2)
+        # self.create_subscription(Float32, '/lane_stanley/trust', self._stanley_trust_cb, 2)
 
         # ---- Debug publishers for live plot ----
         self.pub_pp_delta      = self.create_publisher(Float32, '/nav/pp_delta',      2)
@@ -222,8 +223,8 @@ class PathFollower(Node):
         self.scopeTimer = self.create_timer(0.1, self.scopeDataTimer)
 
         self.get_logger().info(
-            f'PathFollower ready | stanley_blend={self.stanley_blend} '
-            f'trust_min={self.stanley_trust_min}')
+            f'PathFollower ready | PURE PURSUIT BASELINE | '
+            f'stanley_blend={self.stanley_blend} trust_min={self.stanley_trust_min}')
 
     # ------------------------------------------------------------------
     # /cmd_waypoints — TripPlanner sends path already in ROS/map frame
@@ -243,7 +244,7 @@ class PathFollower(Node):
         self.get_logger().info(f'/cmd_waypoints received N={self.N}')
 
     # ------------------------------------------------------------------
-    # Stanley callbacks
+    # Stanley callbacks (kept but unused when subscribers are commented out)
     # ------------------------------------------------------------------
     def _stanley_delta_cb(self, msg: Float32):
         self.stanley_delta = float(msg.data)
@@ -252,7 +253,7 @@ class PathFollower(Node):
         self.stanley_trust = float(msg.data)
 
     # ------------------------------------------------------------------
-    # Steering blend
+    # Steering blend (kept for reference; NOT USED in pure pursuit baseline)
     # ------------------------------------------------------------------
     def _blend_steering(self, pp_delta: float) -> float:
         self.pp_delta_raw = pp_delta
@@ -470,18 +471,31 @@ class PathFollower(Node):
                     -self.max_steering_angle,
                     self.max_steering_angle)
 
-                # Blend pure pursuit with Stanley
-                steering = self._blend_steering(pp_delta_damped)
+                # ============================================================
+                # PURE PURSUIT ONLY (NO STANLEY / NO LANE KEEPING EFFECT)
+                # ============================================================
+                self.pp_delta_raw  = float(pp_delta_damped)  # keep the plot signal alive
+                self.stanley_delta = 0.0                     # force lane signals to zero
+                self.stanley_trust = 0.0
 
+                steering = float(np.clip(pp_delta_damped,
+                                         -self.max_steering_angle,
+                                         self.max_steering_angle))
                 self.current_steering = steering
+
+                # Publish debug topics (so your plot still works, but shows PP-only truth)
+                def f32(v):
+                    m = Float32(); m.data = float(v); return m
+                self.pub_pp_delta.publish(f32(self.pp_delta_raw))
+                self.pub_stanley_delta.publish(f32(0.0))
+                self.pub_blended_delta.publish(f32(self.current_steering))
+                self.pub_blend_alpha.publish(f32(0.0))
 
                 if int(self.t_plot * 5) != int((self.t_plot - self.dt) * 5):
                     self.get_logger().info(
                         f"wpi={self.wpi} dist={dist:.2f} "
                         f"pp={pp_delta_damped:.3f} "
-                        f"st={self.stanley_delta:.3f} "
-                        f"trust={self.stanley_trust:.2f} "
-                        f"blended={steering:.3f} "
+                        f"steering={steering:.3f} "
                         f"v={speed_command:.2f}")
 
         except KeyboardInterrupt:
@@ -565,12 +579,16 @@ class PathFollower(Node):
                 y_ref = 0
             self.steeringScope.axes[0].sample(self.t_plot, [x_ref, p[0]])
             self.steeringScope.axes[1].sample(self.t_plot, [y_ref, p[1]])
+
+            # PURE PURSUIT ONLY VISUALS:
+            # [pp_delta, stanley_delta(0), blended_delta (=steering), blend_alpha(0)]
             self.steeringScope.axes[2].sample(self.t_plot, [
                 self.pp_delta_raw,
-                self.stanley_delta,
+                0.0,
                 self.current_steering,
-                float(np.clip(self.stanley_blend * self.stanley_trust, 0.0, 1.0))
+                0.0
             ])
+
             self.steeringScope.axes[3].sample(self.t_plot, [self.yaw, self.qcar2_ekf.xHat[2, 0]])
             MultiScope.refreshAll()
         else:
