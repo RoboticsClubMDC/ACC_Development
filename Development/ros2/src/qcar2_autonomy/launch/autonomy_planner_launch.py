@@ -60,6 +60,12 @@ def generate_launch_description():
         name='sidewalk_detection',
     )
 
+    bev_csi_seg = Node(
+        package='qcar2_autonomy',
+        executable='bev_csi_seg',
+        name='bev_csi_seg',
+    )
+
     ''' TODO: Once finished this launch file must also include
     - Lane detector to help smooth out tracking of lanes while driving
     - Planner server to coordinate which LEDs on the QCar should be on based on trip logic
@@ -74,5 +80,6 @@ def generate_launch_description():
         lane_stanley_node,
         yolo_detector,
         sidewalk_detection,
+        bev_csi_seg,
         ]
     )

@@ -32,6 +32,7 @@ setup(
             'stanley_live_plot=autonomy.stanley_live_plot:main',
             'lane_stanley_node=autonomy.lane_stanley_node:main',
             'sidewalk_detection=autonomy.sidewalk_detection:main',
+            'bev_csi_seg=autonomy.bev_csi_seg:main',
 
         ],
     },

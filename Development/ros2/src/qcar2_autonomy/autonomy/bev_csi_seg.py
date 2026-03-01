@@ -222,10 +222,10 @@ def scale_K(K, w, h):
     return Ks
 
 
-class BevCsiNode(Node):
+class BevCsiSeg(Node):
 
     def __init__(self):
-        super().__init__('bev_csi_node')
+        super().__init__('bev_csi_seg')
 
         # ---- Parameters ----
         self.declare_parameter('image_topic',   'camera/csi_image')
@@ -240,7 +240,7 @@ class BevCsiNode(Node):
         self.declare_parameter('bev_width_px',  600)
         self.declare_parameter('bev_height_px', 600)
         self.declare_parameter('debug_grid',    True)
-        self.declare_parameter('lane_mask_topic', '/lane_detection/lane_selected')
+        self.declare_parameter('sidewalk_mask_topic', '/sidewalk_detection/no_go_margin')
 
         self.img_topic    = self.get_parameter('image_topic').value
         self.cam_height   = self.get_parameter('cam_height').value
@@ -252,7 +252,7 @@ class BevCsiNode(Node):
         self.bev_w        = self.get_parameter('bev_width_px').value
         self.bev_h        = self.get_parameter('bev_height_px').value
         self.dbg          = self.get_parameter('debug_grid').value
-        self.lane_topic   = self.get_parameter('lane_mask_topic').value
+        self.sidewalk_topic = self.get_parameter('sidewalk_mask_topic').value
 
         self.bridge = CvBridge()
         self.ipm    = None
@@ -260,19 +260,19 @@ class BevCsiNode(Node):
         self._last_fh = None
 
         self.pub_bev = self.create_publisher(
-            Image, '/csi/front/image_bev', QoSProfile(depth=2))
+            Image, '/d435/front/image_bev', QoSProfile(depth=2))
         self.pub_lane_bev = self.create_publisher(
-            Image, '/csi/front/lane_bev', QoSProfile(depth=2))
+            Image, '/d435/front/sidewalk_bev', QoSProfile(depth=2))
 
         sensor_qos = QoSProfile(
             depth=2,
             reliability=ReliabilityPolicy.BEST_EFFORT,
             durability=DurabilityPolicy.VOLATILE)
         self.create_subscription(Image, self.img_topic, self._cb, sensor_qos)
-        self.create_subscription(Image, self.lane_topic, self._lane_cb, sensor_qos)
+        self.create_subscription(Image, self.sidewalk_topic, self._lane_cb, sensor_qos)
 
         self.get_logger().info(
-            f"BEV node ready | image='{self.img_topic}' lane='{self.lane_topic}' | "
+            f"BEV node ready | image='{self.img_topic}' sidewalk='{self.sidewalk_topic} | "
             f"height={self.cam_height}m pitch={self.cam_pitch}deg | "
             f"world X[{self.x_min},{self.x_max}] Y[{self.y_min},{self.y_max}] m")
 
@@ -346,7 +346,7 @@ class BevCsiNode(Node):
 # ---------------------------------------------------------------------------
 def main(args=None):
     rclpy.init(args=args)
-    node = BevCsiNode()
+    node = BevCsiSeg()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
