@@ -349,6 +349,381 @@ class RoadMapEdge:
         self.waypoints = None
         self.length = None
 
+# class RoadMap:
+#     """
+#     Graph-based roadmap for generating paths between points in a road network.
+
+#     Attributes:
+#         nodes (list): List of nodes in the roadmap.
+#         edges (list): List of edges in the roadmap.
+#     """
+
+#     def __init__(self):
+#         """Initialize a RoadMap instance."""
+#         self.nodes = []
+#         self.edges = []
+
+#     def add_node(self, pose):
+#         """
+#         Add a node to the roadmap.
+
+#         Args:
+#             pose (list or numpy.ndarray): Node's pose in the form [x, y, th].
+#         """
+#         self.nodes.append(RoadMapNode(pose))
+
+#     def add_edge(self, fromNode, toNode, radius):
+#         """Add an edge between two nodes in the roadmap.
+
+#         Args:
+#             fromNode (int or RoadMapNode): Starting node (index or instance).
+#             toNode (int or RoadMapNode): Ending node (index or instance).
+#             radius (float): Radius of the turn connecting the two nodes.
+#         """
+#         if type(fromNode) == int:
+#             fromNode = self.nodes[fromNode]
+#         if type(toNode) == int:
+#             toNode = self.nodes[toNode]
+
+#         edge = RoadMapEdge(fromNode, toNode)
+#         self.edges.append(edge)
+#         fromNode.outEdges.append(edge)
+#         toNode.inEdges.append(edge)
+
+#         self._calculate_trajectory(edge, radius)
+
+#     def remove_edge(self, fromNode, toNode):
+#         """Remove an edge between two nodes in the roadmap.
+
+#         Args:
+#             fromNode (int or RoadMapNode): Starting node (index or instance).
+#             toNode (int or RoadMapNode): Ending node (index or instance).
+#         """
+#         if type(fromNode) == int:
+#             fromNode = self.nodes[fromNode]
+#         if type(toNode) == int:
+#             toNode = self.nodes[toNode]
+
+#         for edge in self.edges:
+#             if edge.fromNode == fromNode and edge.toNode == toNode:
+#                 self.edges.remove(edge)
+#                 fromNode.outEdges.remove(edge)
+#                 toNode.inEdges.remove(edge)
+#                 return
+
+#     def _calculate_trajectory(self, edge, radius):
+#         """Calculate the waypoints and length of the given edge
+
+#         Args:
+#             edge (RoadMapEdge): Instance of the edge.
+#             radius (float): Radius of the turn connecting the two nodes.
+#         """
+#         points, length = SCSPath(
+#             startPose=edge.fromNode.pose,
+#             endPose=edge.toNode.pose,
+#             radius=radius,
+#             stepSize=0.01
+#         )
+#         edge.waypoints = points
+#         edge.length = length
+
+#     def get_node_pose(self, nodeID):
+#         """Get the pose of a node by its index.
+
+#         Args:
+#             nodeID (int): Index of the node in the roadmap.
+
+#         Returns:
+#             numpy.ndarray: Pose of the node in the form [x, y, th].
+#         """
+#         return self.nodes[nodeID].pose
+
+#     def generate_path(self, nodeSequence):
+#         """
+#         Generate the shortest path passing through the given sequence of nodes
+
+#         Args:
+#             nodeSequence (list or tuple): Sequence of node indices.
+
+#         Returns:
+#             numpy.ndarray: generated path as a 2xn numpy array
+#         """
+#         assert isinstance(nodeSequence, (list, tuple)), \
+#             "Node sequence must be provided as either a list or a tuple."
+
+#         path = np.empty((2, 0))
+#         for i in range(len(nodeSequence) - 1):
+#             pathSegment = self.find_shortest_path(
+#                 nodeSequence[i],
+#                 nodeSequence[i+1]
+#             )
+#             if pathSegment is None:
+#                 return None
+#             path = np.hstack((path, pathSegment[:, :-1]))
+#         return path
+
+#     def _heuristic(self, node, goalNode):
+#         """Calculate the heuristic cost between two nodes.
+
+#         Args:
+#             node (RoadMapNode): Instance of the current node.
+#             goalNode (RoadMapNode): Instance of the goal node.
+
+#         Returns:
+#             float: Heuristic cost between the current node and goal node.
+#         """
+#         return np.linalg.norm(goalNode.pose[:2, :] - node.pose[:2, :])
+
+#     def find_shortest_path(self, startNode, goalNode):
+#         """Find the shortest path between two nodes using the A* algorithm.
+
+#         Args:
+#             startNode (int or RoadMapNode): Starting node (index or instance).
+#             goalNode (int or RoadMapNode): Goal node (index or instance).
+#             radius (float): Minimum turning radius.
+
+#         Returns:
+#             path: generated path as a 2xn numpy array
+#         """
+        
+
+#         if type(startNode) == int:
+#             startNode = self.nodes[startNode]
+#         if type(goalNode) == int:
+#             goalNode = self.nodes[goalNode]
+        
+#         if startNode == goalNode:
+#             return None
+        
+#         # Initialize the open set and closed set
+#         openSet = []
+#         closedSet = set()
+
+#         # Add the start node to the open set with a cost of 0 and an
+#         # f-score equal to the heuristic estimate
+#         heapq.heappush(
+#             openSet,
+#             (0 + self._heuristic(startNode, goalNode), startNode)
+#         )
+
+#         # Initialize the g-scores for each node to infinity
+#         gScore = {node: float('inf') for node in self.nodes}
+#         gScore[startNode] = 0
+
+#         # Initialize the 'came from' (node, edge) pair
+#         # for each node to None
+#         cameFrom = {node: None for node in self.nodes}
+
+#         while openSet:
+#             # Pop the node with the lowest f-score from the open set
+#             currentNode = heapq.heappop(openSet)[1]
+
+#             if currentNode == goalNode:
+#                 # Goal node found, construct the optimal path, then return
+#                 path = goalNode.pose[:2,:]
+#                 node = goalNode
+#                 while True:
+#                     (node, edge) = cameFrom[node]
+#                     path = np.hstack((
+#                         node.pose[:2,:],
+#                         edge.waypoints,
+#                         path
+#                     ))
+#                     if cameFrom[node] is None:
+#                         break
+#                 return path
+
+#             closedSet.add(currentNode)
+
+#             for edge in currentNode.outEdges:
+#                 neighborNode = edge.toNode
+#                 if neighborNode in closedSet:
+#                     # Neighbor node already explored
+#                     continue
+
+#                 if edge.length is None:
+#                     tentative_g = float('inf')
+#                 else:
+#                     tentative_g = gScore[currentNode] + edge.length
+
+#                 if tentative_g < gScore[neighborNode]:
+#                     # New path to neighbor node found,
+#                     # update parent pointer and g-score
+#                     cameFrom[neighborNode] = (currentNode, edge)
+#                     gScore[neighborNode] = tentative_g
+
+#                     # Add the neighbor node to the open set with a cost
+#                     # equal to the g-score plus the heuristic estimate
+#                     hScore = self._heuristic(neighborNode, goalNode)
+#                     heapq.heappush(
+#                         openSet,
+#                         (gScore[neighborNode] + hScore, neighborNode)
+#                     )
+
+#         # Open set is empty and goal node not found, no path exists
+#         return None
+
+#     def display(self, ax=None):
+#         """Display the roadmap with nodes, edges, and labels using matplotlib.
+
+#         Args:
+#             ax (matplotlib.axes.Axes, optional): A matplotlib axes object
+#                 to draw the roadmap on. If not provided, a new figure and axes
+#                 will be created.
+
+#         Returns:
+#             tuple: A tuple containing the matplotlib.pyplot instance
+#                 and the axes object.
+#         """
+#         import matplotlib.pyplot as plt
+#         import matplotlib.image as mpimg
+#         import matplotlib.patheffects as path_effects
+
+#         if ax is None:
+#             fig, ax = plt.subplots()
+#             fig.gca().set_aspect('equal', adjustable='box')
+
+#         for edge in self.edges:
+#             if edge.waypoints is None:
+#                 continue
+#             ax.plot(
+#                 edge.waypoints[0, :],
+#                 edge.waypoints[1, :],
+#                 'green',
+#                 linestyle='-',
+#                 linewidth=1.5,
+#                 zorder=1
+#             )
+
+#         for idx, node in enumerate(self.nodes):
+#             x, y, heading = node.pose[:, 0]
+#             ax.plot(x, y, marker='o', markersize=6, color='red')
+
+#             text = ax.text(
+#                 x + 0.03,
+#                 y + 0.03,
+#                 str(idx),
+#                 fontsize=12,
+#                 color='white'
+#             )
+#             text.set_path_effects([
+#                 path_effects.Stroke(linewidth=1.5, foreground='black'),
+#                 path_effects.Normal()
+#             ])
+
+#             # Draw arrow representing the heading direction
+#             arrow_length = 0.1
+#             arrow_dx = arrow_length * np.cos(heading)
+#             arrow_dy = arrow_length * np.sin(heading)
+#             ax.arrow(
+#                 x,
+#                 y,
+#                 arrow_dx,
+#                 arrow_dy,
+#                 head_width=0.05,
+#                 head_length=0.1,
+#                 fc='red',
+#                 ec='red'
+#             )
+
+#         ax.set_xlabel('X (m)')
+#         ax.set_ylabel('Y (m)')
+
+#         return plt, ax
+    
+#     def initial_check(self,initPose,nodeSequence,waypointSequence):
+#         # check if the start node is reached
+#         turning_radius = 0.45 # minimum turning radius of the vehicle in meters
+#         point_separation = 0.01
+#         dubins = Dubins(turning_radius, point_separation)
+#         startNode = self.nodes[nodeSequence[0]]
+#         # calculate dubin path distance between initPose and startNode.pose
+#         options = dubins.all_options(initPose, startNode.pose[:,0],sort=True)
+#         distToStart = options[0][0]
+#         startNodeReached = distToStart < 0.1
+#         # find the closest node and waypoint, then generate the initial path going 
+#         # to the first node
+#         if not startNodeReached:
+#             initNode,waypointsToinit=self.get_init_waypoints(initPose)
+#             initNodeSequence = [initNode,nodeSequence[0]]
+#             waypointsTostart = self.generate_path(initNodeSequence)
+#             if waypointsTostart is not None:
+#                 initWaypointSequence = np.hstack((waypointsToinit, waypointsTostart))
+#             else:
+#                 initWaypointSequence = waypointsToinit
+#             return startNodeReached, initWaypointSequence
+#         else:
+#             return True, None
+    
+#     def get_init_waypoints(self,pose):
+#         """Find the closest waypoint to the given pose.
+
+#         Args:
+#             pose (numpy.ndarray): Pose in the form [x, y, th].
+
+#         Returns:
+#             int: Index of the closest waypoint in the roadmap.
+#         """
+#         node_idx = self.get_closest_node(pose)
+#         node = self.nodes[node_idx]
+#         waypoint_poses=[]
+#         edges = node.outEdges + node.inEdges
+#         for edge in edges:
+#             waypoint_poses_temp = []
+#             waypoints=edge.waypoints
+#             for i in range(waypoints.shape[1]-1):
+#                 x1= waypoints[0,i]
+#                 y1= waypoints[1,i]
+#                 x2= waypoints[0,i+1]
+#                 y2= waypoints[1,i+1]
+#                 th = np.arctan2(y2 - y1, x2 - x1)
+#                 waypoint_poses_temp.append([x1,y1,th])
+#             waypoint_poses.append(waypoint_poses_temp)
+        
+#         turning_radius = 0.45 # minimum turning radius of the vehicle in meters
+#         point_separation = 0.01
+#         dubins = Dubins(turning_radius, point_separation)
+
+#         closest_waypoint = None
+#         min_distance = float('inf')
+
+#         for i, edge in enumerate(waypoint_poses):
+#             for j , waypoint_pose in enumerate(edge):
+#                 # calculate dubin path distance between pose and node.pose
+#                 options = dubins.all_options(pose, waypoint_pose,sort=True)
+#                 distance = options[0][0]
+#                 if distance < min_distance:
+#                     min_distance = distance
+#                     closest_waypoint = (i,j)
+
+#         initNode = edges[closest_waypoint[0]].toNode
+#         initWaypoints = edges[closest_waypoint[0]].waypoints[:,closest_waypoint[1]:]
+#         return initNode, initWaypoints
+
+
+#     def get_closest_node(self,pose):
+#         """"find the closest node to the given pose.
+#             Args:
+#                 pose (numpy.ndarray): Pose in the form [x, y, th].
+#             Returns:
+#                 int: Index of the closest node in the roadmap.
+#         """
+#         turning_radius = 0.45 # minimum turning radius of the vehicle in meters
+#         point_separation = 0.01
+#         dubins = Dubins(turning_radius, point_separation)
+
+#         closest_node = None
+#         min_distance = float('inf')
+
+#         for idx, node in enumerate(self.nodes):
+#             # calculate dubin path distance between pose and node.pose
+#             options = dubins.all_options(pose, node.pose[:,0],sort=True)
+#             distance = options[0][0]
+#             if distance < min_distance:
+#                 min_distance = distance
+#                 closest_node = idx
+#         return closest_node
+
 class RoadMap:
     """
     Graph-based roadmap for generating paths between points in a road network.
@@ -356,12 +731,17 @@ class RoadMap:
     Attributes:
         nodes (list): List of nodes in the roadmap.
         edges (list): List of edges in the roadmap.
+        edge_step_size (float): Spacing between waypoints generated along each edge.
     """
 
-    def __init__(self):
+    def __init__(self, edge_step_size: float = 0.01):
         """Initialize a RoadMap instance."""
         self.nodes = []
         self.edges = []
+
+        # NEW: controls how many waypoints each edge gets
+        # Smaller = more points (denser), Larger = fewer points (faster)
+        self.edge_step_size = float(edge_step_size)
 
     def add_node(self, pose):
         """
@@ -393,12 +773,7 @@ class RoadMap:
         self._calculate_trajectory(edge, radius)
 
     def remove_edge(self, fromNode, toNode):
-        """Remove an edge between two nodes in the roadmap.
-
-        Args:
-            fromNode (int or RoadMapNode): Starting node (index or instance).
-            toNode (int or RoadMapNode): Ending node (index or instance).
-        """
+        """Remove an edge between two nodes in the roadmap."""
         if type(fromNode) == int:
             fromNode = self.nodes[fromNode]
         if type(toNode) == int:
@@ -412,123 +787,72 @@ class RoadMap:
                 return
 
     def _calculate_trajectory(self, edge, radius):
-        """Calculate the waypoints and length of the given edge
-
-        Args:
-            edge (RoadMapEdge): Instance of the edge.
-            radius (float): Radius of the turn connecting the two nodes.
-        """
+        """Calculate the waypoints and length of the given edge."""
         points, length = SCSPath(
             startPose=edge.fromNode.pose,
             endPose=edge.toNode.pose,
             radius=radius,
-            stepSize=0.01
+
+            # CHANGED: was hardcoded stepSize=0.01
+            # Now uses the tunable spacing parameter:
+            stepSize=self.edge_step_size
         )
         edge.waypoints = points
         edge.length = length
 
     def get_node_pose(self, nodeID):
-        """Get the pose of a node by its index.
-
-        Args:
-            nodeID (int): Index of the node in the roadmap.
-
-        Returns:
-            numpy.ndarray: Pose of the node in the form [x, y, th].
-        """
+        """Get the pose of a node by its index."""
         return self.nodes[nodeID].pose
 
     def generate_path(self, nodeSequence):
-        """
-        Generate the shortest path passing through the given sequence of nodes
-
-        Args:
-            nodeSequence (list or tuple): Sequence of node indices.
-
-        Returns:
-            numpy.ndarray: generated path as a 2xn numpy array
-        """
+        """Generate the shortest path passing through the given sequence of nodes."""
         assert isinstance(nodeSequence, (list, tuple)), \
             "Node sequence must be provided as either a list or a tuple."
 
         path = np.empty((2, 0))
         for i in range(len(nodeSequence) - 1):
-            pathSegment = self.find_shortest_path(
-                nodeSequence[i],
-                nodeSequence[i+1]
-            )
+            pathSegment = self.find_shortest_path(nodeSequence[i], nodeSequence[i+1])
             if pathSegment is None:
                 return None
             path = np.hstack((path, pathSegment[:, :-1]))
         return path
 
     def _heuristic(self, node, goalNode):
-        """Calculate the heuristic cost between two nodes.
-
-        Args:
-            node (RoadMapNode): Instance of the current node.
-            goalNode (RoadMapNode): Instance of the goal node.
-
-        Returns:
-            float: Heuristic cost between the current node and goal node.
-        """
+        """Calculate the heuristic cost between two nodes."""
         return np.linalg.norm(goalNode.pose[:2, :] - node.pose[:2, :])
 
     def find_shortest_path(self, startNode, goalNode):
-        """Find the shortest path between two nodes using the A* algorithm.
-
-        Args:
-            startNode (int or RoadMapNode): Starting node (index or instance).
-            goalNode (int or RoadMapNode): Goal node (index or instance).
-            radius (float): Minimum turning radius.
-
-        Returns:
-            path: generated path as a 2xn numpy array
-        """
-        
-
+        """Find the shortest path between two nodes using the A* algorithm."""
         if type(startNode) == int:
             startNode = self.nodes[startNode]
         if type(goalNode) == int:
             goalNode = self.nodes[goalNode]
-        
+
         if startNode == goalNode:
             return None
-        
-        # Initialize the open set and closed set
+
         openSet = []
         closedSet = set()
 
-        # Add the start node to the open set with a cost of 0 and an
-        # f-score equal to the heuristic estimate
         heapq.heappush(
             openSet,
             (0 + self._heuristic(startNode, goalNode), startNode)
         )
 
-        # Initialize the g-scores for each node to infinity
         gScore = {node: float('inf') for node in self.nodes}
         gScore[startNode] = 0
 
-        # Initialize the 'came from' (node, edge) pair
-        # for each node to None
         cameFrom = {node: None for node in self.nodes}
 
         while openSet:
-            # Pop the node with the lowest f-score from the open set
             currentNode = heapq.heappop(openSet)[1]
 
             if currentNode == goalNode:
-                # Goal node found, construct the optimal path, then return
-                path = goalNode.pose[:2,:]
+                path = goalNode.pose[:2, :]
                 node = goalNode
                 while True:
                     (node, edge) = cameFrom[node]
-                    path = np.hstack((
-                        node.pose[:2,:],
-                        edge.waypoints,
-                        path
-                    ))
+                    path = np.hstack((node.pose[:2, :], edge.waypoints, path))
                     if cameFrom[node] is None:
                         break
                 return path
@@ -538,191 +862,37 @@ class RoadMap:
             for edge in currentNode.outEdges:
                 neighborNode = edge.toNode
                 if neighborNode in closedSet:
-                    # Neighbor node already explored
                     continue
 
                 if edge.length is None:
                     tentative_g = float('inf')
                 else:
-                    tentative_g = gScore[currentNode] + edge.length
+                     
+                    _WAYPOINT_PENALTY = {
+                        6:  10.0,
+                        19: 10.0,
+                        21: 10.0,
+                        11: 6.0,
+                        13: 3.0,
+                        1:  3.0,
+                        2:  0.0,
+                        4:  0.0,
+                    }
 
-                if tentative_g < gScore[neighborNode]:
-                    # New path to neighbor node found,
-                    # update parent pointer and g-score
+                    neighbor_idx   = self.nodes.index(neighborNode)
+                    tentative_g    = gScore[currentNode] + edge.length + _WAYPOINT_PENALTY.get(neighbor_idx, 0.0)
+
+                if tentative_g <= gScore[neighborNode]:
                     cameFrom[neighborNode] = (currentNode, edge)
                     gScore[neighborNode] = tentative_g
 
-                    # Add the neighbor node to the open set with a cost
-                    # equal to the g-score plus the heuristic estimate
                     hScore = self._heuristic(neighborNode, goalNode)
                     heapq.heappush(
                         openSet,
                         (gScore[neighborNode] + hScore, neighborNode)
                     )
 
-        # Open set is empty and goal node not found, no path exists
         return None
-
-    def display(self, ax=None):
-        """Display the roadmap with nodes, edges, and labels using matplotlib.
-
-        Args:
-            ax (matplotlib.axes.Axes, optional): A matplotlib axes object
-                to draw the roadmap on. If not provided, a new figure and axes
-                will be created.
-
-        Returns:
-            tuple: A tuple containing the matplotlib.pyplot instance
-                and the axes object.
-        """
-        import matplotlib.pyplot as plt
-        import matplotlib.image as mpimg
-        import matplotlib.patheffects as path_effects
-
-        if ax is None:
-            fig, ax = plt.subplots()
-            fig.gca().set_aspect('equal', adjustable='box')
-
-        for edge in self.edges:
-            if edge.waypoints is None:
-                continue
-            ax.plot(
-                edge.waypoints[0, :],
-                edge.waypoints[1, :],
-                'green',
-                linestyle='-',
-                linewidth=1.5,
-                zorder=1
-            )
-
-        for idx, node in enumerate(self.nodes):
-            x, y, heading = node.pose[:, 0]
-            ax.plot(x, y, marker='o', markersize=6, color='red')
-
-            text = ax.text(
-                x + 0.03,
-                y + 0.03,
-                str(idx),
-                fontsize=12,
-                color='white'
-            )
-            text.set_path_effects([
-                path_effects.Stroke(linewidth=1.5, foreground='black'),
-                path_effects.Normal()
-            ])
-
-            # Draw arrow representing the heading direction
-            arrow_length = 0.1
-            arrow_dx = arrow_length * np.cos(heading)
-            arrow_dy = arrow_length * np.sin(heading)
-            ax.arrow(
-                x,
-                y,
-                arrow_dx,
-                arrow_dy,
-                head_width=0.05,
-                head_length=0.1,
-                fc='red',
-                ec='red'
-            )
-
-        ax.set_xlabel('X (m)')
-        ax.set_ylabel('Y (m)')
-
-        return plt, ax
-    
-    def initial_check(self,initPose,nodeSequence,waypointSequence):
-        # check if the start node is reached
-        turning_radius = 0.45 # minimum turning radius of the vehicle in meters
-        point_separation = 0.01
-        dubins = Dubins(turning_radius, point_separation)
-        startNode = self.nodes[nodeSequence[0]]
-        # calculate dubin path distance between initPose and startNode.pose
-        options = dubins.all_options(initPose, startNode.pose[:,0],sort=True)
-        distToStart = options[0][0]
-        startNodeReached = distToStart < 0.1
-        # find the closest node and waypoint, then generate the initial path going 
-        # to the first node
-        if not startNodeReached:
-            initNode,waypointsToinit=self.get_init_waypoints(initPose)
-            initNodeSequence = [initNode,nodeSequence[0]]
-            waypointsTostart = self.generate_path(initNodeSequence)
-            if waypointsTostart is not None:
-                initWaypointSequence = np.hstack((waypointsToinit, waypointsTostart))
-            else:
-                initWaypointSequence = waypointsToinit
-            return startNodeReached, initWaypointSequence
-        else:
-            return True, None
-    
-    def get_init_waypoints(self,pose):
-        """Find the closest waypoint to the given pose.
-
-        Args:
-            pose (numpy.ndarray): Pose in the form [x, y, th].
-
-        Returns:
-            int: Index of the closest waypoint in the roadmap.
-        """
-        node_idx = self.get_closest_node(pose)
-        node = self.nodes[node_idx]
-        waypoint_poses=[]
-        edges = node.outEdges + node.inEdges
-        for edge in edges:
-            waypoint_poses_temp = []
-            waypoints=edge.waypoints
-            for i in range(waypoints.shape[1]-1):
-                x1= waypoints[0,i]
-                y1= waypoints[1,i]
-                x2= waypoints[0,i+1]
-                y2= waypoints[1,i+1]
-                th = np.arctan2(y2 - y1, x2 - x1)
-                waypoint_poses_temp.append([x1,y1,th])
-            waypoint_poses.append(waypoint_poses_temp)
-        
-        turning_radius = 0.45 # minimum turning radius of the vehicle in meters
-        point_separation = 0.01
-        dubins = Dubins(turning_radius, point_separation)
-
-        closest_waypoint = None
-        min_distance = float('inf')
-
-        for i, edge in enumerate(waypoint_poses):
-            for j , waypoint_pose in enumerate(edge):
-                # calculate dubin path distance between pose and node.pose
-                options = dubins.all_options(pose, waypoint_pose,sort=True)
-                distance = options[0][0]
-                if distance < min_distance:
-                    min_distance = distance
-                    closest_waypoint = (i,j)
-
-        initNode = edges[closest_waypoint[0]].toNode
-        initWaypoints = edges[closest_waypoint[0]].waypoints[:,closest_waypoint[1]:]
-        return initNode, initWaypoints
-
-
-    def get_closest_node(self,pose):
-        """"find the closest node to the given pose.
-            Args:
-                pose (numpy.ndarray): Pose in the form [x, y, th].
-            Returns:
-                int: Index of the closest node in the roadmap.
-        """
-        turning_radius = 0.45 # minimum turning radius of the vehicle in meters
-        point_separation = 0.01
-        dubins = Dubins(turning_radius, point_separation)
-
-        closest_node = None
-        min_distance = float('inf')
-
-        for idx, node in enumerate(self.nodes):
-            # calculate dubin path distance between pose and node.pose
-            options = dubins.all_options(pose, node.pose[:,0],sort=True)
-            distance = options[0][0]
-            if distance < min_distance:
-                min_distance = distance
-                closest_node = idx
-        return closest_node
 
 class Dubins:
     """

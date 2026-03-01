@@ -867,9 +867,22 @@ class RoadMap:
                 if edge.length is None:
                     tentative_g = float('inf')
                 else:
-                    tentative_g = gScore[currentNode] + edge.length
+                     
+                    _WAYPOINT_PENALTY = {
+                        6:  10.0,
+                        19: 10.0,
+                        21: 10.0,
+                        11: 6.0,
+                        13: 3.0,
+                        1:  3.0,
+                        2:  0.0,
+                        4:  0.0,
+                    }
 
-                if tentative_g < gScore[neighborNode]:
+                    neighbor_idx   = self.nodes.index(neighborNode)
+                    tentative_g    = gScore[currentNode] + edge.length + _WAYPOINT_PENALTY.get(neighbor_idx, 0.0)
+
+                if tentative_g <= gScore[neighborNode]:
                     cameFrom[neighborNode] = (currentNode, edge)
                     gScore[neighborNode] = tentative_g
 
