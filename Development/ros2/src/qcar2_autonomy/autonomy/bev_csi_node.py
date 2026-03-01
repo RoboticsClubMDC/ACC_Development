@@ -1,360 +1,207 @@
 #!/usr/bin/env python3
-"""
-bev_csi_node.py
-===============
-ROS 2 (Humble) BEV node for QCar2 front CSI camera — VIRTUAL environment.
-
-Uses Quanser's InversePerspectiveMapping approach (cv2.getPerspectiveTransform
-+ cv2.warpPerspective) ported directly from their codebase. No TF tree needed.
-
-Key parameters to tune:
-  bev_x_min/max  : forward range in meters (virtual = 10x physical)
-  bev_y_min/max  : lateral range in meters
-  cam_height     : camera height above ground (virtual = 1.10 m)
-  cam_pitch_deg  : camera tilt down from horizontal (tune this for flat BEV)
-
-Run
----
-  ros2 run <your_pkg> bev_csi_node
-
-  ros2 run <your_pkg> bev_csi_node --ros-args \
-      -p cam_height:=1.10 \
-      -p cam_pitch_deg:=20.0 \
-      -p bev_x_min:=2.0 -p bev_x_max:=20.0 \
-      -p bev_y_min:=-6.0 -p bev_y_max:=6.0 \
-      -p bev_width_px:=600 -p bev_height_px:=600 \
-      -p debug_grid:=true
-"""
-
-import math
-import numpy as np
+import os
 import cv2
+import numpy as np
 
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
+from rclpy.qos import qos_profile_sensor_data
+
 from sensor_msgs.msg import Image
+from std_msgs.msg import String
 from cv_bridge import CvBridge
 
-
-# ---------------------------------------------------------------------------
-# InversePerspectiveMapping — ported directly from Quanser's codebase
-# Adapted for QCar2 front CSI camera parameters
-# ---------------------------------------------------------------------------
-
-class InversePerspectiveMapping:
-    """
-    Builds a homography from camera image to Bird's-Eye View using
-    camera intrinsics and extrinsics.
-
-    Ported from Quanser's hal/utilities/qcar.py InversePerspectiveMapping.
-    """
-
-    def __init__(self, bev_shape, bev_world_dims, cam_height, cam_pitch_deg,
-                 K, img_w, img_h):
-        """
-        Args:
-            bev_shape      : (width, height) of output BEV image in pixels
-            bev_world_dims : [x_min, x_max, y_min, y_max] in meters
-            cam_height     : camera height above ground plane (meters)
-            cam_pitch_deg  : camera tilt downward from horizontal (degrees, positive = down)
-            K              : 3x3 camera intrinsic matrix
-            img_w, img_h   : input image resolution
-        """
-        self.bev_shape   = bev_shape
-        self.world_dims  = bev_world_dims
-        self.cam_height  = cam_height
-        self.cam_pitch   = math.radians(cam_pitch_deg)
-        self.K           = K
-        self.img_w       = img_w
-        self.img_h       = img_h
-
-        x_range = bev_world_dims[1] - bev_world_dims[0]
-        y_range = bev_world_dims[3] - bev_world_dims[2]
-        self.m_per_pix_x = x_range / bev_shape[1]  # height axis = X (forward)
-        self.m_per_pix_y = y_range / bev_shape[0]  # width axis  = Y (lateral)
-
-        self._build_extrinsics()
-        self._build_homography()
-
-    def _build_extrinsics(self):
-        """
-        Build camera extrinsic matrix (vehicle -> camera).
-        Camera is mounted at height h, pitched down by cam_pitch.
-        Vehicle frame: X forward, Y left, Z up.
-        Camera frame: Z out (forward), X right, Y down.
-
-        Matches Quanser convention from their get_extrinsics():
-          phi   = pi/2   (roll:  rotate Y axis down)
-          psi   = pi/2   (yaw:   align X with lateral)
-          theta = -pitch (pitch: nose down)
-        """
-        phi   = math.pi / 2.0
-        theta = -self.cam_pitch   # negative = nose down
-        psi   = math.pi / 2.0
-
-        cx, sx = math.cos(phi),   math.sin(phi)
-        cy, sy = math.cos(theta), math.sin(theta)
-        cz, sz = math.cos(psi),   math.sin(psi)
-
-        Rx = np.array([[1,  0,   0 ],
-                       [0,  cx, -sx],
-                       [0,  sx,  cx]])
-        Ry = np.array([[ cy, 0, sy],
-                       [  0, 1,  0],
-                       [-sy, 0, cy]])
-        Rz = np.array([[cz, -sz, 0],
-                       [sz,  cz, 0],
-                       [ 0,   0, 1]])
-
-        self.R_v2cam = Rx @ Ry @ Rz
-        self.t_v2cam = np.array([[0, self.cam_height, 0]]).T
-        self.T_v2cam = np.vstack([
-            np.hstack([self.R_v2cam, self.t_v2cam]),
-            np.array([[0, 0, 0, 1]])
-        ])
-
-    def v2img(self, XYZ):
-        """Project Nx3 vehicle-frame points to (u,v) image pixels."""
-        # Build 3x4 projection matrix: K * [R | t]  (drop last row of T)
-        P = self.K @ self.T_v2cam[:3, :]
-        XYZ1 = np.hstack([XYZ, np.ones((XYZ.shape[0], 1))])
-        img_h = P @ XYZ1.T
-        img_h /= img_h[2]
-        return img_h[:2].T.astype(np.float32)
-
-    def _build_homography(self):
-        """
-        Pick 4 ground-plane corners in vehicle frame, project to image,
-        map to BEV pixel coords, compute homography H.
-        """
-        x_min, x_max = self.world_dims[0], self.world_dims[1]
-        y_min, y_max = self.world_dims[2], self.world_dims[3]
-
-        # 4 corners of the BEV world window on the ground plane (Z=0)
-        world_corners = np.array([
-            [x_max, y_max, 0],   # far-left
-            [x_max, y_min, 0],   # far-right
-            [x_min, y_max, 0],   # near-left
-            [x_min, y_min, 0],   # near-right
-        ], dtype=np.float64)
-
-        # Project to image
-        img_corners = self.v2img(world_corners)
-
-        # Corresponding BEV pixel coords
-        bev_w, bev_h = self.bev_shape
-        bev_corners = np.array([
-            [0,      0     ],   # far-left   -> top-left
-            [bev_w-1, 0    ],   # far-right  -> top-right
-            [0,      bev_h-1],  # near-left  -> bottom-left
-            [bev_w-1, bev_h-1], # near-right -> bottom-right
-        ], dtype=np.float32)
-
-        self.M = cv2.getPerspectiveTransform(img_corners, bev_corners)
-
-    def warp(self, img):
-        """Apply BEV warp to input image."""
-        return cv2.warpPerspective(
-            img, self.M, self.bev_shape,
-            flags=cv2.INTER_LINEAR,
-            borderMode=cv2.BORDER_CONSTANT,
-            borderValue=(50, 50, 50))
+from ultralytics import YOLO
 
 
-# ---------------------------------------------------------------------------
-# Debug grid overlay
-# ---------------------------------------------------------------------------
+# Class IDs (must match your training YAML)
+LANE = 0
 
-def draw_debug_grid(img, x_min, x_max, y_min, y_max,
-                    bev_w, bev_h, x_step=2.0, y_step=1.0):
-    out = img.copy()
+# Overlay colors (BGR)
+COLORS_BGR = {
+    LANE: (0, 255, 0),     # green
+}
 
-    def to_px(X, Y):
-        # BEV: col = (Y - y_min)/(y_max-y_min)*w,  row = (x_max-X)/(x_max-x_min)*h
-        c = int(np.clip((Y - y_min) / (y_max - y_min) * (bev_w - 1), 0, bev_w - 1))
-        r = int(np.clip((x_max - X) / (x_max - x_min) * (bev_h - 1), 0, bev_h - 1))
-        return c, r
-
-    GR, AX, TX = (0, 200, 0), (0, 80, 255), (255, 255, 0)
-
-    y = y_min
-    while y <= y_max + 1e-9:
-        c = AX if abs(y) < 1e-9 else GR
-        cv2.line(out, to_px(x_max, y), to_px(x_min, y), c, 1)
-        cv2.putText(out, f'Y={y:.1f}', to_px((x_min + x_max) / 2, y),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.33, TX, 1, cv2.LINE_AA)
-        y = round(y + y_step, 9)
-
-    x = x_min
-    while x <= x_max + 1e-9:
-        c = AX if abs(x) < 1e-9 else GR
-        cv2.line(out, to_px(x, y_min), to_px(x, y_max), c, 1)
-        cv2.putText(out, f'X={x:.1f}', to_px(x, (y_min + y_max) / 2),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.33, TX, 1, cv2.LINE_AA)
-        x = round(x + x_step, 9)
-
-    org = to_px(0.0, 0.0)
-    if 0 <= org[0] < bev_w and 0 <= org[1] < bev_h:
-        cv2.circle(out, org, 5, (0, 0, 255), -1)
-        cv2.putText(out, 'car', (org[0] + 5, org[1]),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 0, 255), 1)
-    return out
+ALPHA = 0.45
+NO_GO_MARGIN_PX = 10
 
 
-# ---------------------------------------------------------------------------
-# ROS 2 Node
-# ---------------------------------------------------------------------------
-
-# Nominal intrinsics for 820x410 — scaled if actual frame differs
-K_NOMINAL = np.array([
-    [318.86,   0.00, 401.34],
-    [  0.00, 312.14, 201.50],
-    [  0.00,   0.00,   1.00]
-], dtype=np.float64)
-NOMINAL_W, NOMINAL_H = 820.0, 410.0
+def overlay_mask(img_bgr: np.ndarray, mask_bool: np.ndarray, color_bgr, alpha: float) -> np.ndarray:
+    """Overlay a boolean mask onto an image with alpha blending."""
+    if mask_bool is None or mask_bool.sum() == 0:
+        return img_bgr
+    overlay = img_bgr.copy()
+    overlay[mask_bool] = color_bgr
+    return cv2.addWeighted(overlay, alpha, img_bgr, 1 - alpha, 0)
 
 
-def scale_K(K, w, h):
-    Ks = K.copy()
-    Ks[0, 0] *= w / NOMINAL_W;  Ks[0, 2] *= w / NOMINAL_W
-    Ks[1, 1] *= h / NOMINAL_H;  Ks[1, 2] *= h / NOMINAL_H
-    return Ks
-
-
-class BevCsiNode(Node):
-
+class LaneDetectionNode(Node):
     def __init__(self):
-        super().__init__('bev_csi_node')
+        super().__init__("lane_detection")
 
-        # ---- Parameters ----
-        self.declare_parameter('image_topic',   'camera/csi_image')
-        # Camera mounting (virtual = 10x physical heights)
-        self.declare_parameter('cam_height',    1.10)   # meters above ground
-        self.declare_parameter('cam_pitch_deg', 20.0)   # degrees nose-down (tune this)
-        # BEV world window (virtual scale)
-        self.declare_parameter('bev_x_min',    2.0)
-        self.declare_parameter('bev_x_max',   20.0)
-        self.declare_parameter('bev_y_min',   -6.0)
-        self.declare_parameter('bev_y_max',    6.0)
-        self.declare_parameter('bev_width_px',  600)
-        self.declare_parameter('bev_height_px', 600)
-        self.declare_parameter('debug_grid',    True)
-        self.declare_parameter('lane_mask_topic', '/lane_detection/lane_selected')
+        # ROS params
+        self.declare_parameter("image_topic", "/camera/color_image")
+        self.declare_parameter("model_path", "ros2/src/qcar2_autonomy/models/lane_seg_yolo.pt")
+        self.declare_parameter("imgsz", 640)
+        self.declare_parameter("device", 0)
+        
+        self.declare_parameter("lane_seed_x_frac", 0.55)
+        self.last_lane_cx = None
+        self.last_lane_seen = 0
+        self.declare_parameter("lane_lost_frames", 10)  # how long we keep last choice if it vanishes
 
-        self.img_topic    = self.get_parameter('image_topic').value
-        self.cam_height   = self.get_parameter('cam_height').value
-        self.cam_pitch    = self.get_parameter('cam_pitch_deg').value
-        self.x_min        = self.get_parameter('bev_x_min').value
-        self.x_max        = self.get_parameter('bev_x_max').value
-        self.y_min        = self.get_parameter('bev_y_min').value
-        self.y_max        = self.get_parameter('bev_y_max').value
-        self.bev_w        = self.get_parameter('bev_width_px').value
-        self.bev_h        = self.get_parameter('bev_height_px').value
-        self.dbg          = self.get_parameter('debug_grid').value
-        self.lane_topic   = self.get_parameter('lane_mask_topic').value
+        image_topic = self.get_parameter("image_topic").get_parameter_value().string_value
+        model_path_param = self.get_parameter("model_path").get_parameter_value().string_value
+        imgsz = int(self.get_parameter("imgsz").get_parameter_value().integer_value)
+        device = int(self.get_parameter("device").get_parameter_value().integer_value)
+
+        model_path = self._resolve_model_path(model_path_param)
+
+        self.get_logger().info(f"Subscribing to: {image_topic}")
+        self.get_logger().info(f"Using model: {model_path}")
+        self.get_logger().info(f"imgsz: {imgsz}, device: {device}")
 
         self.bridge = CvBridge()
-        self.ipm    = None
-        self._last_fw = None
-        self._last_fh = None
+        self.model = YOLO(model_path)
 
-        self.pub_bev = self.create_publisher(
-            Image, '/csi/front/image_bev', QoSProfile(depth=2))
-        self.pub_lane_bev = self.create_publisher(
-            Image, '/csi/front/lane_bev', QoSProfile(depth=2))
+        # Publishers
+        self.pub_overlay       = self.create_publisher(Image,  "/lane_detection/overlay",       qos_profile_sensor_data)
+        self.pub_lane_selected = self.create_publisher(Image,  "/lane_detection/lane_selected", qos_profile_sensor_data)
+        self.pub_debug         = self.create_publisher(String, "/lane_detection/debug_detections", 10)
 
-        sensor_qos = QoSProfile(
-            depth=2,
-            reliability=ReliabilityPolicy.BEST_EFFORT,
-            durability=DurabilityPolicy.VOLATILE)
-        self.create_subscription(Image, self.img_topic, self._cb, sensor_qos)
-        self.create_subscription(Image, self.lane_topic, self._lane_cb, sensor_qos)
+        self.imgsz = imgsz
+        self.device = device
 
-        self.get_logger().info(
-            f"BEV node ready | image='{self.img_topic}' lane='{self.lane_topic}' | "
-            f"height={self.cam_height}m pitch={self.cam_pitch}deg | "
-            f"world X[{self.x_min},{self.x_max}] Y[{self.y_min},{self.y_max}] m")
+        # Subscriber
+        self.sub = self.create_subscription(Image, image_topic, self.image_cb, qos_profile_sensor_data)
 
-    def _build_ipm(self, fw, fh):
-        K = scale_K(K_NOMINAL, fw, fh)
-        self.ipm = InversePerspectiveMapping(
-            bev_shape   = (self.bev_w, self.bev_h),
-            bev_world_dims = [self.x_min, self.x_max, self.y_min, self.y_max],
-            cam_height  = self.cam_height,
-            cam_pitch_deg = self.cam_pitch,
-            K           = K,
-            img_w       = fw,
-            img_h       = fh)
-        self._last_fw = fw
-        self._last_fh = fh
-        self.get_logger().info(f'IPM built for {fw}x{fh} | K:\n{np.round(K,2)}')
+    def _resolve_model_path(self, model_path_param: str) -> str:
+        """Resolve model path for both source-tree and installed layouts."""
+        if os.path.isabs(model_path_param):
+            return model_path_param
 
-    def _cb(self, msg: Image):
+        # Try install space: <prefix>/share/<relative>
+        prefix_paths = os.environ.get("AMENT_PREFIX_PATH", "").split(":")
+        for p in prefix_paths:
+            cand = os.path.join(p, "share", model_path_param)
+            if os.path.exists(cand):
+                return cand
+
+        # Fallback: relative to CWD
+        return os.path.abspath(model_path_param)
+
+    def image_cb(self, msg: Image):
+        # ROS Image -> OpenCV BGR
         try:
-            frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+            img_bgr = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
         except Exception as e:
-            self.get_logger().error(f'cv_bridge: {e}')
+            self.get_logger().error(f"cv_bridge failed: encoding={msg.encoding} error={e}")
             return
 
-        fh, fw = frame.shape[:2]
-
-        if self.ipm is None or fw != self._last_fw or fh != self._last_fh:
-            self._build_ipm(fw, fh)
-
-        bev = self.ipm.warp(frame)
-
-        if self.dbg:
-            bev = draw_debug_grid(bev,
-                                  self.x_min, self.x_max,
-                                  self.y_min, self.y_max,
-                                  self.bev_w, self.bev_h)
-
-        out = self.bridge.cv2_to_imgmsg(bev, encoding='bgr8')
-        out.header = msg.header
-        self.pub_bev.publish(out)
-
-
-    def _lane_cb(self, msg: Image):
-        """Receive binary lane mask (mono8), warp to BEV, publish mono8."""
-        if self.ipm is None:
-            return   # wait until IPM is built from first camera frame
-
-        try:
-            mask = self.bridge.imgmsg_to_cv2(msg, desired_encoding='mono8')
-        except Exception as e:
-            self.get_logger().error(f'lane cv_bridge: {e}')
+        if img_bgr is None:
             return
 
-        # Ensure mask matches expected input size
-        if mask.shape[1] != self._last_fw or mask.shape[0] != self._last_fh:
-            mask = cv2.resize(mask, (self._last_fw, self._last_fh),
-                              interpolation=cv2.INTER_NEAREST)
+        h, w = img_bgr.shape[:2]
 
-        # Warp with same homography — keep binary (nearest-neighbour)
-        bev_mask = cv2.warpPerspective(
-            mask, self.ipm.M, self.ipm.bev_shape,
-            flags=cv2.INTER_NEAREST,
-            borderMode=cv2.BORDER_CONSTANT,
-            borderValue=0)
+        # Run YOLO segmentation
+        res = self.model.predict(
+            img_bgr,
+            imgsz=self.imgsz,
+            device=self.device,
+            verbose=False
+        )[0]
 
-        out = self.bridge.cv2_to_imgmsg(bev_mask, encoding='mono8')
-        out.header = msg.header
-        self.pub_lane_bev.publish(out)
+        # Union masks per class
+        union = {
+            LANE: np.zeros((h, w), dtype=bool)}
 
+        dbg_lines = []
 
-# ---------------------------------------------------------------------------
-def main(args=None):
-    rclpy.init(args=args)
-    node = BevCsiNode()
+        # Fill union masks from YOLO output
+        if res.masks is not None and res.boxes is not None and len(res.boxes) == len(res.masks.data):
+            masks = res.masks.data.cpu().numpy()            # (N, mh, mw)
+            clss  = res.boxes.cls.cpu().numpy().astype(int) # (N,)
+            confs = res.boxes.conf.cpu().numpy()            # (N,)
+
+            for i, (m, c) in enumerate(zip(masks, clss)):
+                if c not in union:
+                    continue
+
+                m_resized = cv2.resize(m, (w, h), interpolation=cv2.INTER_NEAREST).astype(bool)
+                union[c] |= m_resized
+
+                area_px = int(m_resized.sum())
+                conf = float(confs[i])
+                dbg_lines.append(f"i={i} class={c} conf={conf:.3f} area_px={area_px}")
+
+        if not dbg_lines:
+            dbg_lines = ["no detections"]
+
+        dbg = String()
+        dbg.data = " | ".join(dbg_lines)
+        self.pub_debug.publish(dbg)
+
+        # -------- Lane selection with hysteresis (choose one lane and stick to it) --------
+        lane_bool = union[LANE]
+        lane_sel = np.zeros((h, w), dtype=bool)
+
+        if lane_bool.any():
+            lane_u8 = lane_bool.astype(np.uint8)
+            num_labels, labels = cv2.connectedComponents(lane_u8)
+
+            comps = []
+            for lab in range(1, num_labels):
+                ys, xs = np.where(labels == lab)
+                if xs.size < 200:  # ignore tiny blobs
+                    continue
+                cx = float(xs.mean())
+                area = float(xs.size)
+                comps.append((lab, cx, area))
+
+            if comps:
+                seed_x = float(self.get_parameter("lane_seed_x_frac").value) * w
+                target_cx = self.last_lane_cx if self.last_lane_cx is not None else seed_x
+
+                # closest to last/seed, tie-break by larger area
+                comps.sort(key=lambda t: (abs(t[1] - target_cx), -t[2]))
+                best_lab, best_cx, _ = comps[0]
+
+                lane_sel = (labels == best_lab)
+                self.last_lane_cx = best_cx
+                self.last_lane_seen = 0
+            else:
+                self.last_lane_seen += 1
+        else:
+            self.last_lane_seen += 1
+
+        # Unlock if lane missing too long
+        if self.last_lane_seen > int(self.get_parameter("lane_lost_frames").value):
+            self.last_lane_cx = None
+            self.last_lane_seen = 0
+        # -------------------------------------------------------------------------------
+
+        # Overlay (lane_detection shows ONLY the selected lane)
+        out = overlay_mask(img_bgr.copy(), lane_sel, COLORS_BGR[LANE], ALPHA)
+
+        overlay_msg = self.bridge.cv2_to_imgmsg(out, encoding="bgr8")
+        overlay_msg.header = msg.header
+        self.pub_overlay.publish(overlay_msg)
+
+        # Publish selected lane mask (mono8)
+        lane_sel_u8 = (lane_sel.astype(np.uint8) * 255)
+        lane_sel_msg = self.bridge.cv2_to_imgmsg(lane_sel_u8, encoding="mono8")
+        lane_sel_msg.header = msg.header
+        self.pub_lane_selected.publish(lane_sel_msg)
+
+def main():
+    rclpy.init()
+    node = LaneDetectionNode()
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
     finally:
         node.destroy_node()
         rclpy.shutdown()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
