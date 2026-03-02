@@ -127,6 +127,9 @@ class ObjectDetector(Node):
         self.tl_green_go_window = 5.0       # seconds to keep going after seeing green
         self.tl_green_until_wall = 0.0      # wall-clock time (time.time()) until which we ignore red/yellow
         
+        # Track whether last seen light state was green (for edge detection)
+        self.tl_was_green = False
+        
         # Publish image aligned information
         self.bridge = CvBridge()
         self.publish_rgb = self.create_publisher(Image, '/qcar_camera/rgb', 10)
@@ -236,32 +239,43 @@ class ObjectDetector(Node):
 
                 # Only act if confident and distance is sensible and close enough
                 is_valid_dist = (objectDist > self.tl_min_dist) and (objectDist < self.tl_stop_dist)
-
-                # --- NEW: if we see GREEN, start/refresh a 5s "go" window (commit to cross) ---
-                if (labelConf >= self.tl_conf) and is_valid_dist and ("green" in self.tl_last_color):
-                    self.tl_green_until_wall = time.time() + self.tl_green_go_window
-                    # do not force any stop; just latch the window
-                    self.get_logger().info(
-                        f"Traffic Light GREEN @ {objectDist:.2f}m -> GO window {self.tl_green_go_window:.1f}s"
-                    )
-
-                # Stop colors
+                is_green = ("green" in self.tl_last_color)
                 is_stop_color = ("red" in self.tl_last_color) or ("yellow" in self.tl_last_color)
 
-                # --- NEW: during the green-go window, ignore red/yellow ---
-                green_window_active = (time.time() < self.tl_green_until_wall)
+                now = time.time()
 
-                if (labelConf >= self.tl_conf) and is_valid_dist and is_stop_color and (not green_window_active):
-                    # Use the SAME mechanism as stop/yield: return (delay, detected)
-                    # Keep cooldown short so we can refresh the stop window repeatedly while TL stays red/yellow
+                # --- NEW: Start the 5s GO window ONLY when GREEN just ended ---
+                # Condition: last frame(s) had green (tl_was_green=True), now it is NOT green,
+                # and we are still confident/close enough for this to be the same intersection light.
+                if (labelConf >= self.tl_conf) and is_valid_dist:
+                    if self.tl_was_green and (not is_green):
+                        self.tl_green_until_wall = now + self.tl_green_go_window
+                        self.get_logger().info(
+                            f"Traffic Light GREEN ended @ {objectDist:.2f}m -> COMMIT GO {self.tl_green_go_window:.1f}s"
+                        )
+
+                # Update green history ONLY when we have a confident/valid detection
+                # (prevents random/noisy frames from flipping the edge detector)
+                if (labelConf >= self.tl_conf) and is_valid_dist:
+                    self.tl_was_green = is_green
+
+                # Commit window active?
+                green_commit_active = (now < self.tl_green_until_wall)
+
+                # Rules you asked for:
+                # - While GREEN is seen: never stop (go "like crazy")
+                # - On RED/YELLOW: fully stop, UNLESS we're in the commit window after green ended
+                if (labelConf >= self.tl_conf) and is_valid_dist and is_stop_color and (not green_commit_active):
+                    # Same stop mechanism as your stop/yield:
                     delay = max(delay, self.tl_hold)
                     detected = True
-                    self.detection_cooldown = 0.0  # allow frequent re-detection/refresh
-                    self.t0 = time.time()
+                    self.detection_cooldown = 0.0
+                    self.t0 = now
                     self.get_logger().info(
                         f"Traffic Light {self.tl_last_color.upper()} @ {objectDist:.2f}m -> STOP"
                     )
-                # If it's green/idle or far, do nothing (no forcing a stop)
+
+                # If GREEN or commit window active: do nothing (do not trigger stop)
 
             # -----------------------------
             # STOP SIGN
