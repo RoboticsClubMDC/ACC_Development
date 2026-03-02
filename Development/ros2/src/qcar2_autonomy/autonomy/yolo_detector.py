@@ -110,18 +110,11 @@ class ObjectDetector(Node):
         self.flag_value = False
         self.publish_motion_flag(True)
 
-        # Sign/traffic-light gating (shared logic) - ABSOLUTE time windows
+        # Sign/traffic-light gating (shared logic)
         self.sign_detected = False
-
-        # STOP window (force motion disable)
-        self.disable_until = 0.0          # epoch seconds
-
-        # Cooldown window (optional, prevents immediate re-triggering for stop/yield)
-        self.cooldown_until = 0.0         # epoch seconds
-
-        # GO window (force motion enable even if TL changes to yellow/red)
-        self.go_until = 0.0               # epoch seconds
-        self.go_hold = 5.0                # seconds to commit through intersection on GREEN
+        self.disable_until = 0.0          # seconds (relative to self.t0)
+        self.detection_cooldown = 10.0    # seconds (relative to self.t0)
+        self.t0 = time.time()             # reference time for relative windows
 
         # --- traffic light parameters ---
         self.tl_conf = 0.50
@@ -130,6 +123,10 @@ class ObjectDetector(Node):
         self.tl_hold = 0.25
         self.tl_last_color = "idle"
 
+        # --- GREEN "commit-to-go" window ---
+        self.tl_green_go_window = 5.0       # seconds to keep going after seeing green
+        self.tl_green_until_wall = 0.0      # wall-clock time (time.time()) until which we ignore red/yellow
+        
         # Publish image aligned information
         self.bridge = CvBridge()
         self.publish_rgb = self.create_publisher(Image, '/qcar_camera/rgb', 10)
@@ -142,45 +139,54 @@ class ObjectDetector(Node):
         self.publish_motion_flag(self.flag_value)
 
     def on_timer(self):
-        now = time.time()
+        # Get aligned RGB and Depth images and publish them
+        self.QCarImg.read()
 
-        # --- GO WINDOW: if we committed on GREEN, keep moving no matter what ---
-        if now < self.go_until:
-            self.flag_value = True
-            return
+        rgb = self.QCarImg.rgb
+        depth = self.QCarImg.depth
 
-        # If we are NOT in a stop window, run detection
+        # Force depth to float32 for 32FC1
+        if depth is not None:
+            depth = np.asarray(depth)
+            if depth.ndim == 3 and depth.shape[2] == 1:
+                depth = depth[:, :, 0]
+            depth = depth.astype(np.float32, copy=False)
+
+        msg_rgb = self.bridge.cv2_to_imgmsg(rgb, "bgr8")
+        msg_depth = self.bridge.cv2_to_imgmsg(depth, "32FC1")
+
+        self.publish_rgb.publish(msg_rgb)
+        self.publish_depth.publish(msg_depth)
+
+        current_time = time.time() - self.t0  # seconds since last trigger window reset
+
+        delay = 0.0
+        detected = False
+
+        # If we are NOT in a stop/yield/TL window, run detection
         if not self.sign_detected:
-            action, duration, cooldown = self.yolo_detect()
+            delay, detected = self.yolo_detect()
 
-            if action == "stop" and duration > 0.0:
-                # Enter STOP window (STOP / YIELD / TL red/yellow)
+            if detected and delay > 0.0:
+                # Enter a stop window (same behavior for STOP / YIELD / TL red/yellow)
                 self.sign_detected = True
-                self.disable_until = now + duration
-                self.cooldown_until = now + cooldown
+                self.disable_until = delay
                 self.flag_value = False
-
-            elif action == "go" and duration > 0.0:
-                # Enter GO window (TL green)
-                self.go_until = now + duration
-                self.flag_value = True
-
             else:
                 self.flag_value = True
 
-        # If we ARE in a stop window, keep stopped until time expires
+        # If we ARE in a stop window, keep stopped until time expires, then re-enable
         else:
-            if now >= self.disable_until:
-                # Stop window expired
-                self.sign_detected = False
+            if current_time >= self.disable_until:
+                # once the window expires, allow detection again
+                # (cooldown controls whether we allow re-triggering immediately)
+                if current_time >= self.detection_cooldown:
+                    self.sign_detected = False
                 self.flag_value = True
-            else:
-                self.flag_value = False
 
     def yolo_detect(self):
-        action = None      # "stop" | "go" | None
-        duration = 0.0
-        cooldown = 0.0
+        detected = False
+        delay = 0.0
 
         rgbProcessed = self.myYolo.pre_process(self.QCarImg.rgb)
         predicion = self.myYolo.predict(
@@ -211,6 +217,9 @@ class ObjectDetector(Node):
             clippingDistance=5
         )
 
+        # Default for stop/yield cooldown window length (seconds since trigger)
+        total_timer = 10.0
+
         for obj in processedResults:
             labelName = obj.__dict__.get("name", "")
             labelConf = float(obj.__dict__.get("conf", 0.0))
@@ -221,55 +230,61 @@ class ObjectDetector(Node):
             # -----------------------------
             # TRAFFIC LIGHT (matches stop/yield gating)
             # -----------------------------
-            # PIT uses name like "traffic light (red)" and also provides lightColor
             if str(labelName).startswith("traffic light"):
                 color = str(obj.__dict__.get("lightColor", "")).strip().lower()  # red/yellow/green/idle
                 self.tl_last_color = color if color else "idle"
 
                 # Only act if confident and distance is sensible and close enough
                 is_valid_dist = (objectDist > self.tl_min_dist) and (objectDist < self.tl_stop_dist)
-                is_stop_color = ("red" in self.tl_last_color) or ("yellow" in self.tl_last_color)
-                is_go_color = ("green" in self.tl_last_color)
 
-                # --- STOP on RED/YELLOW (refreshable) ---
-                if (labelConf >= self.tl_conf) and is_valid_dist and is_stop_color:
-                    # Small hold, but allow it to refresh quickly by re-triggering
-                    action = "stop"
-                    duration = max(duration, self.tl_hold)
-                    cooldown = 0.0
+                # --- NEW: if we see GREEN, start/refresh a 5s "go" window (commit to cross) ---
+                if (labelConf >= self.tl_conf) and is_valid_dist and ("green" in self.tl_last_color):
+                    self.tl_green_until_wall = time.time() + self.tl_green_go_window
+                    # do not force any stop; just latch the window
+                    self.get_logger().info(
+                        f"Traffic Light GREEN @ {objectDist:.2f}m -> GO window {self.tl_green_go_window:.1f}s"
+                    )
+
+                # Stop colors
+                is_stop_color = ("red" in self.tl_last_color) or ("yellow" in self.tl_last_color)
+
+                # --- NEW: during the green-go window, ignore red/yellow ---
+                green_window_active = (time.time() < self.tl_green_until_wall)
+
+                if (labelConf >= self.tl_conf) and is_valid_dist and is_stop_color and (not green_window_active):
+                    # Use the SAME mechanism as stop/yield: return (delay, detected)
+                    # Keep cooldown short so we can refresh the stop window repeatedly while TL stays red/yellow
+                    delay = max(delay, self.tl_hold)
+                    detected = True
+                    self.detection_cooldown = 0.0  # allow frequent re-detection/refresh
+                    self.t0 = time.time()
                     self.get_logger().info(
                         f"Traffic Light {self.tl_last_color.upper()} @ {objectDist:.2f}m -> STOP"
                     )
-
-                # --- GO on GREEN: commit for 5 seconds, ignore later changes ---
-                elif (labelConf >= self.tl_conf) and is_valid_dist and is_go_color:
-                    action = "go"
-                    duration = max(duration, self.go_hold)
-                    cooldown = 0.0
-                    self.get_logger().info(
-                        f"Traffic Light GREEN @ {objectDist:.2f}m -> GO for {self.go_hold:.1f}s"
-                    )
+                # If it's green/idle or far, do nothing (no forcing a stop)
 
             # -----------------------------
             # STOP SIGN
             # -----------------------------
             elif labelName == "stop sign" and labelConf > 0.9 and objectDist < 1.0:
                 self.get_logger().info(f"Stop Sign Detected at {objectDist}m!")
-                action = "stop"
-                duration = max(duration, 3.0)
-                cooldown = max(cooldown, 10.0)
+                delay = max(delay, 3.0)
+                self.t0 = time.time()
+                detected = True
+                self.detection_cooldown = total_timer
 
             # -----------------------------
             # YIELD SIGN
             # -----------------------------
             elif labelName == "yield sign" and labelConf > 0.9 and objectDist < 1.0:
                 self.get_logger().info(f"Yield Sign Detected at {objectDist}m!")
-                action = "stop"
-                duration = max(duration, 1.5)
-                cooldown = max(cooldown, 10.0)
+                delay = max(delay, 1.5)
+                self.t0 = time.time()
+                detected = True
+                self.detection_cooldown = total_timer
 
         print("===============================")
-        return action, duration, cooldown
+        return delay, detected
 
     def publish_motion_flag(self, enable: bool):
         msg = Bool()
