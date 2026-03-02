@@ -1,0 +1,16 @@
+================= For future reference =================
+
+If using the nav_to_pose on virtual qcar these are the values to use if the QCar starts close to node 10
+
+Rotation for virtual
+33.0
+Translation for virtual
+1.05,0.9
+
+set self.scale to 0.975
+
+If using the nav_to_pose on physical qcar but starting close to node 10
+Rotation
+44.0
+Translation
+1.15,0.55
