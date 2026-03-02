@@ -70,3 +70,4 @@ CATKIN_IGNORE
 /Development/MDC_libraries/resources/pretrained_models/lanenet.onnx
 
 
+/.vscode
