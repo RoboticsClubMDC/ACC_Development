@@ -280,7 +280,7 @@ class ObjectDetector(Node):
             # -----------------------------
             # STOP SIGN
             # -----------------------------
-            elif labelName == "stop sign" and labelConf > 0.9 and objectDist < 1.0:
+            elif labelName == "stop sign" and labelConf > 0.9 and objectDist < 0.25:
                 self.get_logger().info(f"Stop Sign Detected at {objectDist}m!")
                 delay = max(delay, 3.0)
                 self.t0 = time.time()
@@ -290,7 +290,7 @@ class ObjectDetector(Node):
             # -----------------------------
             # YIELD SIGN
             # -----------------------------
-            elif labelName == "yield sign" and labelConf > 0.9 and objectDist < 1.0:
+            elif labelName == "yield sign" and labelConf > 0.9 and objectDist < 0.25:
                 self.get_logger().info(f"Yield Sign Detected at {objectDist}m!")
                 delay = max(delay, 1.5)
                 self.t0 = time.time()
