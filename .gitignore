@@ -59,3 +59,6 @@ Development/log
 Development/ros2/src/qcar2_autonomy/models/lanenet.pt
 /Development/log
 /Development/ros2/install
+/Development/ros2/src/qcar2_autonomy/autonomy/datasets
+/Development/ros2/src/qcar2_autonomy/autonomy/install
+/Development/ros2/src/qcar2_autonomy/autonomy/log
