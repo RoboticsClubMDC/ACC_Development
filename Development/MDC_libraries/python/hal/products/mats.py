@@ -13,7 +13,7 @@ class SDCSRoadMap(RoadMap):
             useSmallMap (bool): If true, will use the smaller map variant.
                 Defaults to False.
         """
-        super().__init__()
+        super().__init__(edge_step_size=0.005)
 
         # useful constants
         scale = 0.002035

@@ -49,13 +49,24 @@ qtcreator-*
 
 # Catkin custom files
 CATKIN_IGNORE
-/.vscode
 
 # Custom
-Development/logs
-Development/build
-Development/install
-Development/log
-Development/ros2/src/qcar2_autonomy/models/lanenet.pt
+/.vscode
 /Development/log
-/Development/ros2/install
+/Development/build
+/Development/install
+
+# Custom
+/.vscode
+/Development/log
+/Development/build
+/Development/install
+
+# Ignore downloaded pretrained model (specific file)
+/Development/ros2/src/qcar2_autonomy/models/lanenet.engine
+/Development/ros2/src/qcar2_autonomy/models/lanenet.onnx
+/Development/ros2/src/qcar2_autonomy/models/lanenet.pt
+
+/Development/MDC_libraries/resources/pretrained_models/lanenet.onnx
+
+

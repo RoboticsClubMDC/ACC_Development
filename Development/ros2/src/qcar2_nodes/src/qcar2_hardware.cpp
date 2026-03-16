@@ -298,19 +298,52 @@ private:
         t_led_color color[LED_STRIP_SIZE];
         t_led_color color_value  = {0,0,0};
 
-        // color ID selection
-        if (led_color_id == 0)
-            {color_value = { 255, 0, 0 };}
-        if (led_color_id == 1)
-            {color_value = { 0, 255, 0 }; }
-        if (led_color_id == 2)
-            {color_value = { 0, 0, 255 };}
-        if (led_color_id == 3)
-            {color_value = { 255, 255, 0 };}
-        if (led_color_id == 4)
-            {color_value = { 0, 255, 255 };}
-        if (led_color_id == 5)
-            {color_value = { 255, 0, 255 };}
+        // // color ID selection
+        // if (led_color_id == 0)
+        //     {color_value = { 255, 0, 0};}
+        // if (led_color_id == 1)
+        //     {color_value = { 0, 255, 0 }; }
+        // if (led_color_id == 2)
+        //     {color_value = { 0, 0, 255 };}
+        // if (led_color_id == 3)
+        //     {color_value = { 255, 255, 0 };}
+        // if (led_color_id == 4)
+        //     {color_value = { 0, 255, 255 };}
+        // if (led_color_id == 5)
+        //     {color_value = { 255, 0, 255 };}
+
+        //             // color ID selection
+        //    if (led_color_id == 0)
+        //         {color_value = { 255, 0, 0};}       // red
+        //    if (led_color_id == 1)
+        //         {color_value = { 0, 255, 0 }; }     // green
+        //    if (led_color_id == 2)
+        //         {color_value = { 0, 0, 255 };}      // blue
+        //    if (led_color_id == 3)
+        //         {color_value = { 255, 255, 0 };}    // yellow
+        //    if (led_color_id == 4)
+        //         {color_value = { 0, 255, 255 };}    // cyan
+        //    if (led_color_id == 5)
+        //         {color_value = { 255, 0, 255 };}    // magenta
+        //    if (led_color_id == 6)
+        //         {color_value = { 255, 165, 0 };}    // ORANGE (NEW)
+
+
+                    // color ID selection
+           if (led_color_id == 0)
+                {color_value = { 30, 0, 0};}       // red
+           if (led_color_id == 1)
+                {color_value = { 0, 30, 0 }; }     // green
+           if (led_color_id == 2)
+                {color_value = { 0, 0, 30 };}      // blue
+           if (led_color_id == 3)
+                {color_value = { 30, 30, 0 };}    // yellow
+           if (led_color_id == 4)
+                {color_value = { 0, 30, 30 };}    // cyan
+           if (led_color_id == 5)
+                {color_value = { 30, 0, 30 };}    // magenta
+           if (led_color_id == 6)
+                {color_value = { 30, 15, 0 };}    // ORANGE (NEW)
 
         // { 255, 0, 0 };        /* LED #0: red     */
         // { 0, 255, 0 },        /* LED #1: green   */
