@@ -49,10 +49,17 @@ def generate_launch_description():
             parameters=[{"device_type":"virtual"}]
 
         )
-     
+
+    qcar2_odometry = Node(
+            package='qcar2_nodes',
+            executable='qcar2_odometry',
+            name='qcar2_odometry',
+        )
+
     return LaunchDescription([
         lidar_node,
         realsense_camera_node,
         csi_camera_node,
         qcar2_hardware,
+        qcar2_odometry,
     ])
