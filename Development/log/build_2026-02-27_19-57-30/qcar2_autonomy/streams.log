@@ -1,0 +1,29 @@
+[0.813s] Invoking command in '/workspaces/isaac_ros-dev/ros2/src/qcar2_autonomy': AMENT_PREFIX_PATH=/workspaces/isaac_ros-dev/install/qcar2_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/workspaces/isaac_ros-dev/install/qcar2_interfaces:${CMAKE_PREFIX_PATH} LD_LIBRARY_PATH=/workspaces/isaac_ros-dev/install/qcar2_interfaces/lib:${LD_LIBRARY_PATH} PYTHONPATH=/workspaces/isaac_ros-dev/build/qcar2_autonomy/prefix_override:/workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/python3.8/site-packages:/workspaces/isaac_ros-dev/install/qcar2_interfaces/lib/python3.8/site-packages:${PYTHONPATH} _=/usr/bin/env /usr/bin/python3 setup.py egg_info --egg-base ../../../build/qcar2_autonomy build --build-base /workspaces/isaac_ros-dev/build/qcar2_autonomy/build install --record /workspaces/isaac_ros-dev/build/qcar2_autonomy/install.log --single-version-externally-managed
+[1.055s] running egg_info
+[1.063s] writing ../../../build/qcar2_autonomy/qcar2_autonomy.egg-info/PKG-INFO
+[1.063s] writing dependency_links to ../../../build/qcar2_autonomy/qcar2_autonomy.egg-info/dependency_links.txt
+[1.063s] writing entry points to ../../../build/qcar2_autonomy/qcar2_autonomy.egg-info/entry_points.txt
+[1.063s] writing requirements to ../../../build/qcar2_autonomy/qcar2_autonomy.egg-info/requires.txt
+[1.063s] writing top-level names to ../../../build/qcar2_autonomy/qcar2_autonomy.egg-info/top_level.txt
+[1.080s] reading manifest file '../../../build/qcar2_autonomy/qcar2_autonomy.egg-info/SOURCES.txt'
+[1.081s] writing manifest file '../../../build/qcar2_autonomy/qcar2_autonomy.egg-info/SOURCES.txt'
+[1.081s] running build
+[1.081s] running build_py
+[1.082s] running install
+[1.088s] running install_lib
+[1.101s] running install_data
+[1.120s] running install_egg_info
+[1.128s] removing '/workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/python3.8/site-packages/qcar2_autonomy-0.0.0-py3.8.egg-info' (and everything under it)
+[1.128s] Copying ../../../build/qcar2_autonomy/qcar2_autonomy.egg-info to /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/python3.8/site-packages/qcar2_autonomy-0.0.0-py3.8.egg-info
+[1.128s] running install_scripts
+[1.162s] Installing Planner_server script to /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/qcar2_autonomy
+[1.162s] Installing avoid_sidewalks script to /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/qcar2_autonomy
+[1.163s] Installing dataset_collector script to /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/qcar2_autonomy
+[1.163s] Installing lane_detector script to /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/qcar2_autonomy
+[1.163s] Installing lane_seg_node script to /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/qcar2_autonomy
+[1.163s] Installing path_follower script to /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/qcar2_autonomy
+[1.163s] Installing traffic_system_detector script to /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/qcar2_autonomy
+[1.163s] Installing trip_planner script to /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/qcar2_autonomy
+[1.163s] Installing yolo_detector script to /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/qcar2_autonomy
+[1.163s] writing list of installed files to '/workspaces/isaac_ros-dev/build/qcar2_autonomy/install.log'
+[1.204s] Invoked command in '/workspaces/isaac_ros-dev/ros2/src/qcar2_autonomy' returned '0': AMENT_PREFIX_PATH=/workspaces/isaac_ros-dev/install/qcar2_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/workspaces/isaac_ros-dev/install/qcar2_interfaces:${CMAKE_PREFIX_PATH} LD_LIBRARY_PATH=/workspaces/isaac_ros-dev/install/qcar2_interfaces/lib:${LD_LIBRARY_PATH} PYTHONPATH=/workspaces/isaac_ros-dev/build/qcar2_autonomy/prefix_override:/workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/python3.8/site-packages:/workspaces/isaac_ros-dev/install/qcar2_interfaces/lib/python3.8/site-packages:${PYTHONPATH} _=/usr/bin/env /usr/bin/python3 setup.py egg_info --egg-base ../../../build/qcar2_autonomy build --build-base /workspaces/isaac_ros-dev/build/qcar2_autonomy/build install --record /workspaces/isaac_ros-dev/build/qcar2_autonomy/install.log --single-version-externally-managed

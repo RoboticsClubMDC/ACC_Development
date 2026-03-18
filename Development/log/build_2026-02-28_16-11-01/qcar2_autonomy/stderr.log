@@ -1,0 +1,5 @@
+  File "/workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy/yolo_detectorold2.py", line 93
+    model_url = " #"https://quanserinc.box.com/shared/static/ce0gxomeg4b12wlcch9cmlh0376nditf.pt"
+                    ^
+SyntaxError: invalid syntax
+

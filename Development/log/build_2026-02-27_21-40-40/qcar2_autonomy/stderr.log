@@ -1,0 +1,5 @@
+  File "/workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy/yolo_detectorLUigi.py", line 37
+    modelPath = 'home\Development\python_resources\NewModels_ByBP01\YoloTrainingByLuigi\Model\best.pt',
+                ^
+SyntaxError: (unicode error) 'unicodeescape' codec can't decode bytes in position 33-34: malformed \N character escape
+

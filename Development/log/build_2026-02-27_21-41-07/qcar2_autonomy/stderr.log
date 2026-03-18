@@ -1,0 +1,5 @@
+  File "/workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy/yolo_detectorLUigi.py", line 40
+    task="detect"`
+                 ^
+SyntaxError: invalid syntax
+

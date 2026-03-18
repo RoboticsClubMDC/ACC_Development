@@ -1,0 +1,9 @@
+[35m[1mConsolidate compiler generated dependencies of target qcar2_hardware[0m
+[  6%] [32m[1mLinking CXX executable qcar2_hardware[0m
+[ 18%] Built target rgbd
+[ 31%] Built target fixed_lidar_frame_virtual
+[ 43%] Built target lidar
+[ 56%] Built target command
+[ 68%] Built target nav2_qcar2_converter
+[ 81%] Built target fixed_lidar_frame
+[ 93%] Built target csi

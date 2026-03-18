@@ -1,0 +1,59 @@
+[0.942s] Invoking command in '/workspaces/isaac_ros-dev/ros2/src/qcar2_autonomy': AMENT_PREFIX_PATH=/workspaces/isaac_ros-dev/install/qcar2_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/workspaces/isaac_ros-dev/install/qcar2_interfaces:${CMAKE_PREFIX_PATH} LD_LIBRARY_PATH=/workspaces/isaac_ros-dev/install/qcar2_interfaces/lib:${LD_LIBRARY_PATH} PYTHONPATH=/workspaces/isaac_ros-dev/build/qcar2_autonomy/prefix_override:/workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/python3.8/site-packages:/workspaces/isaac_ros-dev/install/qcar2_interfaces/lib/python3.8/site-packages:${PYTHONPATH} _=/usr/bin/env /usr/bin/python3 setup.py egg_info --egg-base ../../../build/qcar2_autonomy build --build-base /workspaces/isaac_ros-dev/build/qcar2_autonomy/build install --record /workspaces/isaac_ros-dev/build/qcar2_autonomy/install.log --single-version-externally-managed
+[1.203s] running egg_info
+[1.210s] writing ../../../build/qcar2_autonomy/qcar2_autonomy.egg-info/PKG-INFO
+[1.210s] writing dependency_links to ../../../build/qcar2_autonomy/qcar2_autonomy.egg-info/dependency_links.txt
+[1.210s] writing entry points to ../../../build/qcar2_autonomy/qcar2_autonomy.egg-info/entry_points.txt
+[1.210s] writing requirements to ../../../build/qcar2_autonomy/qcar2_autonomy.egg-info/requires.txt
+[1.210s] writing top-level names to ../../../build/qcar2_autonomy/qcar2_autonomy.egg-info/top_level.txt
+[1.224s] reading manifest file '../../../build/qcar2_autonomy/qcar2_autonomy.egg-info/SOURCES.txt'
+[1.225s] writing manifest file '../../../build/qcar2_autonomy/qcar2_autonomy.egg-info/SOURCES.txt'
+[1.225s] running build
+[1.225s] running build_py
+[1.226s] copying autonomy/lane_stanley_node.py -> /workspaces/isaac_ros-dev/build/qcar2_autonomy/build/lib/autonomy
+[1.226s] copying autonomy/sidewalk_detection.py -> /workspaces/isaac_ros-dev/build/qcar2_autonomy/build/lib/autonomy
+[1.226s] copying autonomy/nav_to_pose.py -> /workspaces/isaac_ros-dev/build/qcar2_autonomy/build/lib/autonomy
+[1.227s] copying autonomy/lane_detection.py -> /workspaces/isaac_ros-dev/build/qcar2_autonomy/build/lib/autonomy
+[1.227s] copying autonomy/tuner.py -> /workspaces/isaac_ros-dev/build/qcar2_autonomy/build/lib/autonomy
+[1.227s] copying autonomy/stanley_live_plot.py -> /workspaces/isaac_ros-dev/build/qcar2_autonomy/build/lib/autonomy
+[1.227s] copying autonomy/lane_keeping.py -> /workspaces/isaac_ros-dev/build/qcar2_autonomy/build/lib/autonomy
+[1.227s] copying autonomy/bev_csi_node.py -> /workspaces/isaac_ros-dev/build/qcar2_autonomy/build/lib/autonomy
+[1.227s] copying autonomy/trip_planner.py -> /workspaces/isaac_ros-dev/build/qcar2_autonomy/build/lib/autonomy
+[1.227s] copying autonomy/yolo_detector.py -> /workspaces/isaac_ros-dev/build/qcar2_autonomy/build/lib/autonomy
+[1.228s] running install
+[1.231s] running install_lib
+[1.238s] copying /workspaces/isaac_ros-dev/build/qcar2_autonomy/build/lib/autonomy/lane_stanley_node.py -> /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy
+[1.239s] copying /workspaces/isaac_ros-dev/build/qcar2_autonomy/build/lib/autonomy/sidewalk_detection.py -> /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy
+[1.239s] copying /workspaces/isaac_ros-dev/build/qcar2_autonomy/build/lib/autonomy/nav_to_pose.py -> /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy
+[1.239s] copying /workspaces/isaac_ros-dev/build/qcar2_autonomy/build/lib/autonomy/lane_detection.py -> /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy
+[1.239s] copying /workspaces/isaac_ros-dev/build/qcar2_autonomy/build/lib/autonomy/tuner.py -> /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy
+[1.239s] copying /workspaces/isaac_ros-dev/build/qcar2_autonomy/build/lib/autonomy/stanley_live_plot.py -> /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy
+[1.239s] copying /workspaces/isaac_ros-dev/build/qcar2_autonomy/build/lib/autonomy/lane_keeping.py -> /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy
+[1.239s] copying /workspaces/isaac_ros-dev/build/qcar2_autonomy/build/lib/autonomy/bev_csi_node.py -> /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy
+[1.239s] copying /workspaces/isaac_ros-dev/build/qcar2_autonomy/build/lib/autonomy/trip_planner.py -> /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy
+[1.239s] copying /workspaces/isaac_ros-dev/build/qcar2_autonomy/build/lib/autonomy/yolo_detector.py -> /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy
+[1.240s] byte-compiling /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy/lane_stanley_node.py to lane_stanley_node.cpython-38.pyc
+[1.241s] byte-compiling /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy/sidewalk_detection.py to sidewalk_detection.cpython-38.pyc
+[1.241s] byte-compiling /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy/nav_to_pose.py to nav_to_pose.cpython-38.pyc
+[1.245s] byte-compiling /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy/lane_detection.py to lane_detection.cpython-38.pyc
+[1.246s] byte-compiling /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy/tuner.py to tuner.cpython-38.pyc
+[1.248s] byte-compiling /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy/stanley_live_plot.py to stanley_live_plot.cpython-38.pyc
+[1.248s] byte-compiling /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy/lane_keeping.py to lane_keeping.cpython-38.pyc
+[1.249s] byte-compiling /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy/bev_csi_node.py to bev_csi_node.cpython-38.pyc
+[1.250s] byte-compiling /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy/trip_planner.py to trip_planner.cpython-38.pyc
+[1.252s] byte-compiling /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy/yolo_detector.py to yolo_detector.cpython-38.pyc
+[1.254s] running install_data
+[1.270s] running install_egg_info
+[1.277s] removing '/workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/python3.8/site-packages/qcar2_autonomy-0.0.0-py3.8.egg-info' (and everything under it)
+[1.278s] Copying ../../../build/qcar2_autonomy/qcar2_autonomy.egg-info to /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/python3.8/site-packages/qcar2_autonomy-0.0.0-py3.8.egg-info
+[1.278s] running install_scripts
+[1.313s] Installing bev_csi_node script to /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/qcar2_autonomy
+[1.314s] Installing lane_detection script to /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/qcar2_autonomy
+[1.314s] Installing lane_stanley_node script to /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/qcar2_autonomy
+[1.314s] Installing path_follower script to /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/qcar2_autonomy
+[1.315s] Installing sidewalk_detection script to /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/qcar2_autonomy
+[1.315s] Installing stanley_live_plot script to /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/qcar2_autonomy
+[1.315s] Installing traffic_system_detector script to /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/qcar2_autonomy
+[1.315s] Installing trip_planner script to /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/qcar2_autonomy
+[1.316s] Installing yolo_detector script to /workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/qcar2_autonomy
+[1.316s] writing list of installed files to '/workspaces/isaac_ros-dev/build/qcar2_autonomy/install.log'
+[1.348s] Invoked command in '/workspaces/isaac_ros-dev/ros2/src/qcar2_autonomy' returned '0': AMENT_PREFIX_PATH=/workspaces/isaac_ros-dev/install/qcar2_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/workspaces/isaac_ros-dev/install/qcar2_interfaces:${CMAKE_PREFIX_PATH} LD_LIBRARY_PATH=/workspaces/isaac_ros-dev/install/qcar2_interfaces/lib:${LD_LIBRARY_PATH} PYTHONPATH=/workspaces/isaac_ros-dev/build/qcar2_autonomy/prefix_override:/workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/python3.8/site-packages:/workspaces/isaac_ros-dev/install/qcar2_interfaces/lib/python3.8/site-packages:${PYTHONPATH} _=/usr/bin/env /usr/bin/python3 setup.py egg_info --egg-base ../../../build/qcar2_autonomy build --build-base /workspaces/isaac_ros-dev/build/qcar2_autonomy/build install --record /workspaces/isaac_ros-dev/build/qcar2_autonomy/install.log --single-version-externally-managed

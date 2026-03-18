@@ -1,0 +1,5 @@
+CMakeFiles/qcar2_hardware.dir/src/qcar2_hardware.cpp.o: file not recognized: file format not recognized
+collect2: error: ld returned 1 exit status
+make[2]: *** [CMakeFiles/qcar2_hardware.dir/build.make:215: qcar2_hardware] Error 1
+make[1]: *** [CMakeFiles/Makefile2:177: CMakeFiles/qcar2_hardware.dir/all] Error 2
+make: *** [Makefile:146: all] Error 2
