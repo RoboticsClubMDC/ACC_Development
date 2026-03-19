@@ -1,0 +1,27 @@
+[ 16%] Built target example_containers_array
+[ 16%] Built target example
+[ 25%] Built target enum_flag_example
+[ 33%] Built target example_switch
+[ 41%] Built target test_wchar_t-cpp17
+[ 50%] Built target test_aliases-cpp17
+[ 58%] Built target example_custom_name
+[ 66%] Built target example_containers_bitset
+[ 75%] Built target test-cpp17
+[ 83%] Built target test_flags-cpp17
+[ 91%] Built target test_containers-cpp17
+[100%] Built target example_containers_set
+-- Install configuration: ""
+-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum
+-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_containers.hpp
+-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_fuse.hpp
+-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_switch.hpp
+-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_utility.hpp
+-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_iostream.hpp
+-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_all.hpp
+-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_format.hpp
+-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_flags.hpp
+-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum.hpp
+-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/share/cmake/magic_enum/magic_enumConfig.cmake
+-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/share/cmake/magic_enum/magic_enumConfigVersion.cmake
+-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/share/pkgconfig/magic_enum.pc
+-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/share/magic_enum/package.xml

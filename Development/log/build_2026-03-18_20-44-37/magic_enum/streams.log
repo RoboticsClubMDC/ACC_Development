@@ -1,0 +1,75 @@
+[0.099s] Invoking command in '/workspaces/isaac_ros-dev/build/magic_enum': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/workspaces/isaac_ros-dev/install/qcar2_autonomy:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble /usr/bin/cmake /workspaces/isaac_ros-dev/ros2/src/magic_enum -DCMAKE_INSTALL_PREFIX=/workspaces/isaac_ros-dev/install/magic_enum
+[0.149s] -- The CXX compiler identification is GNU 9.4.0
+[0.155s] -- Detecting CXX compiler ABI info
+[0.205s] -- Detecting CXX compiler ABI info - done
+[0.210s] -- Check for working CXX compiler: /usr/bin/c++ - skipped
+[0.210s] -- Detecting CXX compile features
+[0.210s] -- Detecting CXX compile features - done
+[0.214s] -- Performing Test HAS_CPP20_FLAG
+[0.226s] -- Performing Test HAS_CPP20_FLAG - Failed
+[0.226s] -- Performing Test HAS_CPP23_FLAG
+[0.240s] -- Performing Test HAS_CPP23_FLAG - Failed
+[0.246s] -- Configuring done
+[0.253s] -- Generating done
+[0.254s] -- Build files have been written to: /workspaces/isaac_ros-dev/build/magic_enum
+[0.256s] Invoked command in '/workspaces/isaac_ros-dev/build/magic_enum' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/workspaces/isaac_ros-dev/install/qcar2_autonomy:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble /usr/bin/cmake /workspaces/isaac_ros-dev/ros2/src/magic_enum -DCMAKE_INSTALL_PREFIX=/workspaces/isaac_ros-dev/install/magic_enum
+[0.257s] Invoking command in '/workspaces/isaac_ros-dev/build/magic_enum': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/workspaces/isaac_ros-dev/install/qcar2_autonomy:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble /usr/bin/cmake --build /workspaces/isaac_ros-dev/build/magic_enum -- -j20 -l20
+[0.282s] [  4%] [32mBuilding CXX object example/CMakeFiles/example.dir/example.cpp.o[0m
+[0.282s] [  8%] [32mBuilding CXX object test/CMakeFiles/test-cpp17.dir/test.cpp.o[0m
+[0.283s] [ 12%] [32mBuilding CXX object example/CMakeFiles/example_containers_bitset.dir/example_containers_bitset.cpp.o[0m
+[0.283s] [ 16%] [32mBuilding CXX object example/CMakeFiles/example_custom_name.dir/example_custom_name.cpp.o[0m
+[0.283s] [ 20%] [32mBuilding CXX object example/CMakeFiles/example_containers_array.dir/example_containers_array.cpp.o[0m
+[0.283s] [ 25%] [32mBuilding CXX object example/CMakeFiles/example_switch.dir/example_switch.cpp.o[0m
+[0.284s] [ 29%] [32mBuilding CXX object test/CMakeFiles/test_wchar_t-cpp17.dir/test_wchar_t.cpp.o[0m
+[0.284s] [ 33%] [32mBuilding CXX object test/CMakeFiles/test_flags-cpp17.dir/test_flags.cpp.o[0m
+[0.284s] [ 41%] [32mBuilding CXX object example/CMakeFiles/example_containers_set.dir/example_containers_set.cpp.o[0m
+[0.285s] [ 45%] [32mBuilding CXX object test/CMakeFiles/test_containers-cpp17.dir/test_containers.cpp.o[0m
+[0.285s] [ 45%] [32mBuilding CXX object test/CMakeFiles/test_aliases-cpp17.dir/test_aliases.cpp.o[0m
+[0.288s] [ 50%] [32mBuilding CXX object example/CMakeFiles/enum_flag_example.dir/enum_flag_example.cpp.o[0m
+[0.631s] [ 54%] [32m[1mLinking CXX executable example_containers_bitset[0m
+[0.638s] [ 58%] [32m[1mLinking CXX executable example_containers_set[0m
+[0.705s] [ 58%] Built target example_containers_set
+[0.719s] [ 58%] Built target example_containers_bitset
+[0.725s] [ 62%] [32m[1mLinking CXX executable example_containers_array[0m
+[0.743s] [ 66%] [32m[1mLinking CXX executable enum_flag_example[0m
+[0.784s] [ 70%] [32m[1mLinking CXX executable example_custom_name[0m
+[0.791s] [ 70%] Built target example_containers_array
+[0.823s] [ 75%] [32m[1mLinking CXX executable example[0m
+[0.824s] [ 75%] Built target enum_flag_example
+[0.850s] [ 79%] [32m[1mLinking CXX executable example_switch[0m
+[0.853s] [ 79%] Built target example_custom_name
+[0.896s] [ 79%] Built target example
+[0.904s] [ 79%] Built target example_switch
+[5.913s] [ 83%] [32m[1mLinking CXX executable test_aliases-cpp17[0m
+[5.917s] /usr/bin/c++ CMakeFiles/test_aliases-cpp17.dir/test_aliases.cpp.o -o test_aliases-cpp17 
+[6.083s] [ 83%] Built target test_aliases-cpp17
+[6.117s] [ 87%] [32m[1mLinking CXX executable test_wchar_t-cpp17[0m
+[6.121s] /usr/bin/c++ CMakeFiles/test_wchar_t-cpp17.dir/test_wchar_t.cpp.o -o test_wchar_t-cpp17 
+[6.236s] [ 91%] [32m[1mLinking CXX executable test_containers-cpp17[0m
+[6.241s] /usr/bin/c++ CMakeFiles/test_containers-cpp17.dir/test_containers.cpp.o -o test_containers-cpp17 
+[6.285s] [ 91%] Built target test_wchar_t-cpp17
+[6.402s] [ 91%] Built target test_containers-cpp17
+[6.822s] [ 95%] [32m[1mLinking CXX executable test_flags-cpp17[0m
+[6.826s] /usr/bin/c++ CMakeFiles/test_flags-cpp17.dir/test_flags.cpp.o -o test_flags-cpp17 
+[6.988s] [ 95%] Built target test_flags-cpp17
+[9.072s] [100%] [32m[1mLinking CXX executable test-cpp17[0m
+[9.076s] /usr/bin/c++ CMakeFiles/test-cpp17.dir/test.cpp.o -o test-cpp17 
+[9.241s] [100%] Built target test-cpp17
+[9.245s] Invoked command in '/workspaces/isaac_ros-dev/build/magic_enum' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/workspaces/isaac_ros-dev/install/qcar2_autonomy:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble /usr/bin/cmake --build /workspaces/isaac_ros-dev/build/magic_enum -- -j20 -l20
+[9.288s] Invoking command in '/workspaces/isaac_ros-dev/build/magic_enum': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/workspaces/isaac_ros-dev/install/qcar2_autonomy:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble /usr/bin/cmake --install /workspaces/isaac_ros-dev/build/magic_enum
+[9.292s] -- Install configuration: ""
+[9.292s] -- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum
+[9.292s] -- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_containers.hpp
+[9.292s] -- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_fuse.hpp
+[9.292s] -- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_switch.hpp
+[9.292s] -- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_utility.hpp
+[9.293s] -- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_iostream.hpp
+[9.293s] -- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_all.hpp
+[9.293s] -- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_format.hpp
+[9.293s] -- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_flags.hpp
+[9.293s] -- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum.hpp
+[9.293s] -- Installing: /workspaces/isaac_ros-dev/install/magic_enum/share/cmake/magic_enum/magic_enumConfig.cmake
+[9.293s] -- Installing: /workspaces/isaac_ros-dev/install/magic_enum/share/cmake/magic_enum/magic_enumConfigVersion.cmake
+[9.293s] -- Installing: /workspaces/isaac_ros-dev/install/magic_enum/share/pkgconfig/magic_enum.pc
+[9.293s] -- Installing: /workspaces/isaac_ros-dev/install/magic_enum/share/magic_enum/package.xml
+[9.294s] Invoked command in '/workspaces/isaac_ros-dev/build/magic_enum' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/workspaces/isaac_ros-dev/install/qcar2_autonomy:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble /usr/bin/cmake --install /workspaces/isaac_ros-dev/build/magic_enum

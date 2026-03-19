@@ -1,0 +1,65 @@
+-- The C compiler identification is GNU 9.4.0
+-- The CXX compiler identification is GNU 9.4.0
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Found ament_cmake_auto: 1.3.5 (/opt/ros/humble/share/ament_cmake_auto/cmake)
+-- Found Python3: /usr/bin/python3.8 (found version "3.8.10") found components: Interpreter 
+-- Override CMake install command with custom implementation using symlinks instead of copying resources
+-- Loading isaac_ros_common extras
+-- CMAKE_BUILD_TYPE: Release
+-- Looking for pthread.h
+-- Looking for pthread.h - found
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Failed
+-- Looking for pthread_create in pthreads
+-- Looking for pthread_create in pthreads - not found
+-- Looking for pthread_create in pthread
+-- Looking for pthread_create in pthread - found
+-- Found Threads: TRUE  
+-- Found CUDA: /usr/local/cuda (found version "11.8") 
+-- Loading isaac_ros_common extras (modules)
+-- Found rosidl_generator_c: 3.1.5 (/opt/ros/humble/share/rosidl_generator_c/cmake)
+-- Found rosidl_adapter: 3.1.5 (/opt/ros/humble/share/rosidl_adapter/cmake)
+-- Found rosidl_generator_cpp: 3.1.5 (/opt/ros/humble/share/rosidl_generator_cpp/cmake)
+-- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+-- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+-- Found rmw_implementation_cmake: 6.1.1 (/opt/ros/humble/share/rmw_implementation_cmake/cmake)
+-- Found rmw_fastrtps_cpp: 6.2.4 (/opt/ros/humble/share/rmw_fastrtps_cpp/cmake)
+-- Found OpenSSL: /usr/lib/x86_64-linux-gnu/libcrypto.so (found version "1.1.1f")  
+-- Found FastRTPS: /opt/ros/humble/include  
+-- Using RMW implementation 'rmw_fastrtps_cpp' as default
+-- Loading isaac_ros_gxf extras
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /workspaces/isaac_ros-dev/build/gxf_isaac_sight
+-- Install configuration: "Release"
+-- Execute custom install script
+-- Symlinking: /workspaces/isaac_ros-dev/install/gxf_isaac_sight/share/gxf_isaac_sight/gxf/lib/libgxf_isaac_sight.so
+-- Symlinking: /workspaces/isaac_ros-dev/install/gxf_isaac_sight/share/gxf_isaac_sight/environment/library_path.sh
+-- Symlinking: /workspaces/isaac_ros-dev/install/gxf_isaac_sight/share/gxf_isaac_sight/environment/library_path.dsv
+-- Symlinking: /workspaces/isaac_ros-dev/install/gxf_isaac_sight/share/ament_index/resource_index/package_run_dependencies/gxf_isaac_sight
+-- Symlinking: /workspaces/isaac_ros-dev/install/gxf_isaac_sight/share/ament_index/resource_index/parent_prefix_path/gxf_isaac_sight
+-- Symlinking: /workspaces/isaac_ros-dev/install/gxf_isaac_sight/share/gxf_isaac_sight/environment/ament_prefix_path.sh
+-- Symlinking: /workspaces/isaac_ros-dev/install/gxf_isaac_sight/share/gxf_isaac_sight/environment/ament_prefix_path.dsv
+-- Symlinking: /workspaces/isaac_ros-dev/install/gxf_isaac_sight/share/gxf_isaac_sight/environment/path.sh
+-- Symlinking: /workspaces/isaac_ros-dev/install/gxf_isaac_sight/share/gxf_isaac_sight/environment/path.dsv
+-- Symlinking: /workspaces/isaac_ros-dev/install/gxf_isaac_sight/share/gxf_isaac_sight/local_setup.bash
+-- Symlinking: /workspaces/isaac_ros-dev/install/gxf_isaac_sight/share/gxf_isaac_sight/local_setup.sh
+-- Symlinking: /workspaces/isaac_ros-dev/install/gxf_isaac_sight/share/gxf_isaac_sight/local_setup.zsh
+-- Symlinking: /workspaces/isaac_ros-dev/install/gxf_isaac_sight/share/gxf_isaac_sight/local_setup.dsv
+-- Symlinking: /workspaces/isaac_ros-dev/install/gxf_isaac_sight/share/gxf_isaac_sight/package.dsv
+-- Symlinking: /workspaces/isaac_ros-dev/install/gxf_isaac_sight/share/ament_index/resource_index/packages/gxf_isaac_sight
+-- Symlinking: /workspaces/isaac_ros-dev/install/gxf_isaac_sight/share/gxf_isaac_sight/cmake/ament_cmake_export_targets-extras.cmake
+-- Symlinking: /workspaces/isaac_ros-dev/install/gxf_isaac_sight/share/gxf_isaac_sight/cmake/ament_cmake_export_dependencies-extras.cmake
+-- Symlinking: /workspaces/isaac_ros-dev/install/gxf_isaac_sight/share/gxf_isaac_sight/cmake/gxf_isaac_sightConfig.cmake
+-- Symlinking: /workspaces/isaac_ros-dev/install/gxf_isaac_sight/share/gxf_isaac_sight/cmake/gxf_isaac_sightConfig-version.cmake
+-- Symlinking: /workspaces/isaac_ros-dev/install/gxf_isaac_sight/share/gxf_isaac_sight/package.xml
+-- Installing: /workspaces/isaac_ros-dev/install/gxf_isaac_sight/share/gxf_isaac_sight/cmake/export_gxf_isaac_sightExport.cmake

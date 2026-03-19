@@ -1,0 +1,3 @@
+source;share/gxf_isaac_hesai/environment/ament_prefix_path.sh
+source;share/gxf_isaac_hesai/environment/library_path.sh
+source;share/gxf_isaac_hesai/environment/path.sh

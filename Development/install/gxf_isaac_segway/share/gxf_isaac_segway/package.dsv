@@ -1,0 +1,8 @@
+source;share/gxf_isaac_segway/hook/cmake_prefix_path.ps1
+source;share/gxf_isaac_segway/hook/cmake_prefix_path.dsv
+source;share/gxf_isaac_segway/hook/cmake_prefix_path.sh
+source;share/gxf_isaac_segway/local_setup.bash
+source;share/gxf_isaac_segway/local_setup.dsv
+source;share/gxf_isaac_segway/local_setup.ps1
+source;share/gxf_isaac_segway/local_setup.sh
+source;share/gxf_isaac_segway/local_setup.zsh

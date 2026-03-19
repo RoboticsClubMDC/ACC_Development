@@ -1,0 +1,69 @@
+-- The CXX compiler identification is GNU 9.4.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Performing Test HAS_CPP20_FLAG
+-- Performing Test HAS_CPP20_FLAG - Failed
+-- Performing Test HAS_CPP23_FLAG
+-- Performing Test HAS_CPP23_FLAG - Failed
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /workspaces/isaac_ros-dev/build/magic_enum
+[  4%] [32mBuilding CXX object example/CMakeFiles/example_custom_name.dir/example_custom_name.cpp.o[0m
+[  8%] [32mBuilding CXX object example/CMakeFiles/enum_flag_example.dir/enum_flag_example.cpp.o[0m
+[ 12%] [32mBuilding CXX object example/CMakeFiles/example_containers_set.dir/example_containers_set.cpp.o[0m
+[ 16%] [32mBuilding CXX object example/CMakeFiles/example_switch.dir/example_switch.cpp.o[0m
+[ 20%] [32mBuilding CXX object test/CMakeFiles/test-cpp17.dir/test.cpp.o[0m
+[ 25%] [32mBuilding CXX object example/CMakeFiles/example_containers_bitset.dir/example_containers_bitset.cpp.o[0m
+[ 33%] [32mBuilding CXX object test/CMakeFiles/test_wchar_t-cpp17.dir/test_wchar_t.cpp.o[0m
+[ 33%] [32mBuilding CXX object example/CMakeFiles/example_containers_array.dir/example_containers_array.cpp.o[0m
+[ 41%] [32mBuilding CXX object example/CMakeFiles/example.dir/example.cpp.o[0m
+[ 41%] [32mBuilding CXX object test/CMakeFiles/test_containers-cpp17.dir/test_containers.cpp.o[0m
+[ 45%] [32mBuilding CXX object test/CMakeFiles/test_flags-cpp17.dir/test_flags.cpp.o[0m
+[ 50%] [32mBuilding CXX object test/CMakeFiles/test_aliases-cpp17.dir/test_aliases.cpp.o[0m
+[ 54%] [32m[1mLinking CXX executable enum_flag_example[0m
+[ 54%] Built target enum_flag_example
+[ 58%] [32m[1mLinking CXX executable example_containers_set[0m
+[ 62%] [32m[1mLinking CXX executable example[0m
+[ 62%] Built target example_containers_set
+[ 66%] [32m[1mLinking CXX executable example_containers_array[0m
+[ 66%] Built target example
+[ 70%] [32m[1mLinking CXX executable example_containers_bitset[0m
+[ 70%] Built target example_containers_array
+[ 75%] [32m[1mLinking CXX executable example_switch[0m
+[ 79%] [32m[1mLinking CXX executable example_custom_name[0m
+[ 79%] Built target example_containers_bitset
+[ 79%] Built target example_switch
+[ 79%] Built target example_custom_name
+[ 83%] [32m[1mLinking CXX executable test_aliases-cpp17[0m
+/usr/bin/c++ CMakeFiles/test_aliases-cpp17.dir/test_aliases.cpp.o -o test_aliases-cpp17 
+[ 83%] Built target test_aliases-cpp17
+[ 87%] [32m[1mLinking CXX executable test_containers-cpp17[0m
+/usr/bin/c++ CMakeFiles/test_containers-cpp17.dir/test_containers.cpp.o -o test_containers-cpp17 
+[ 91%] [32m[1mLinking CXX executable test_wchar_t-cpp17[0m
+/usr/bin/c++ CMakeFiles/test_wchar_t-cpp17.dir/test_wchar_t.cpp.o -o test_wchar_t-cpp17 
+[ 91%] Built target test_containers-cpp17
+[ 91%] Built target test_wchar_t-cpp17
+[ 95%] [32m[1mLinking CXX executable test_flags-cpp17[0m
+/usr/bin/c++ CMakeFiles/test_flags-cpp17.dir/test_flags.cpp.o -o test_flags-cpp17 
+[ 95%] Built target test_flags-cpp17
+[100%] [32m[1mLinking CXX executable test-cpp17[0m
+/usr/bin/c++ CMakeFiles/test-cpp17.dir/test.cpp.o -o test-cpp17 
+[100%] Built target test-cpp17
+-- Install configuration: ""
+-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum
+-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_containers.hpp
+-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_fuse.hpp
+-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_switch.hpp
+-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_utility.hpp
+-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_iostream.hpp
+-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_all.hpp
+-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_format.hpp
+-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_flags.hpp
+-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum.hpp
+-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/share/cmake/magic_enum/magic_enumConfig.cmake
+-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/share/cmake/magic_enum/magic_enumConfigVersion.cmake
+-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/share/pkgconfig/magic_enum.pc
+-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/share/magic_enum/package.xml

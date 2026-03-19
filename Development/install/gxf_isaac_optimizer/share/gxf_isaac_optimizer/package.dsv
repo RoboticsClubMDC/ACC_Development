@@ -1,0 +1,8 @@
+source;share/gxf_isaac_optimizer/hook/cmake_prefix_path.ps1
+source;share/gxf_isaac_optimizer/hook/cmake_prefix_path.dsv
+source;share/gxf_isaac_optimizer/hook/cmake_prefix_path.sh
+source;share/gxf_isaac_optimizer/local_setup.bash
+source;share/gxf_isaac_optimizer/local_setup.dsv
+source;share/gxf_isaac_optimizer/local_setup.ps1
+source;share/gxf_isaac_optimizer/local_setup.sh
+source;share/gxf_isaac_optimizer/local_setup.zsh

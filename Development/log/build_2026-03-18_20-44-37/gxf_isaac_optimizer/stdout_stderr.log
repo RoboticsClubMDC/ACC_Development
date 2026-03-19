@@ -1,0 +1,26 @@
+-- Install configuration: "Release"
+-- Execute custom install script
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_optimizer/share/gxf_isaac_optimizer/gxf/lib/libgxf_isaac_optimizer.so
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_optimizer/share/gxf_isaac_optimizer/gxf/include/extensions/gxf_optimizer/common/type.hpp
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_optimizer/share/gxf_isaac_optimizer/gxf/include/extensions/gxf_optimizer/core/optimizer.hpp
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_optimizer/share/gxf_isaac_optimizer/gxf/include/extensions/gxf_optimizer/exporter/graph_types.hpp
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_optimizer/share/gxf_isaac_optimizer/environment/library_path.sh
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_optimizer/share/gxf_isaac_optimizer/environment/library_path.dsv
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_optimizer/share/ament_index/resource_index/package_run_dependencies/gxf_isaac_optimizer
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_optimizer/share/ament_index/resource_index/parent_prefix_path/gxf_isaac_optimizer
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_optimizer/share/gxf_isaac_optimizer/environment/ament_prefix_path.sh
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_optimizer/share/gxf_isaac_optimizer/environment/ament_prefix_path.dsv
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_optimizer/share/gxf_isaac_optimizer/environment/path.sh
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_optimizer/share/gxf_isaac_optimizer/environment/path.dsv
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_optimizer/share/gxf_isaac_optimizer/local_setup.bash
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_optimizer/share/gxf_isaac_optimizer/local_setup.sh
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_optimizer/share/gxf_isaac_optimizer/local_setup.zsh
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_optimizer/share/gxf_isaac_optimizer/local_setup.dsv
+-- Symlinking: /workspaces/isaac_ros-dev/install/gxf_isaac_optimizer/share/gxf_isaac_optimizer/package.dsv
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_optimizer/share/ament_index/resource_index/packages/gxf_isaac_optimizer
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_optimizer/share/gxf_isaac_optimizer/cmake/ament_cmake_export_targets-extras.cmake
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_optimizer/share/gxf_isaac_optimizer/cmake/ament_cmake_export_dependencies-extras.cmake
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_optimizer/share/gxf_isaac_optimizer/cmake/gxf_isaac_optimizerConfig.cmake
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_optimizer/share/gxf_isaac_optimizer/cmake/gxf_isaac_optimizerConfig-version.cmake
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_optimizer/share/gxf_isaac_optimizer/package.xml
+-- Up-to-date: /workspaces/isaac_ros-dev/install/gxf_isaac_optimizer/share/gxf_isaac_optimizer/cmake/export_gxf_isaac_optimizerExport.cmake

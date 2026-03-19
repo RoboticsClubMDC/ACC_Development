@@ -1,0 +1,2 @@
+source;share/gxf_isaac_messages_throttler/environment/ament_prefix_path.sh
+source;share/gxf_isaac_messages_throttler/environment/path.sh

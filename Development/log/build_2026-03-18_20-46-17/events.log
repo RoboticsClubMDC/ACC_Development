@@ -1,0 +1,229 @@
+[0.000000] (-) TimerEvent: {}
+[0.000322] (-) JobUnselected: {'identifier': 'custom_nitros_dnn_image_encoder'}
+[0.000366] (-) JobUnselected: {'identifier': 'custom_nitros_image'}
+[0.000414] (-) JobUnselected: {'identifier': 'custom_nitros_message_filter'}
+[0.000439] (-) JobUnselected: {'identifier': 'custom_nitros_message_filter_interfaces'}
+[0.000536] (-) JobUnselected: {'identifier': 'custom_nitros_string'}
+[0.000592] (-) JobUnselected: {'identifier': 'gxf_isaac_argus'}
+[0.000646] (-) JobUnselected: {'identifier': 'gxf_isaac_atlas'}
+[0.000686] (-) JobUnselected: {'identifier': 'gxf_isaac_cuda'}
+[0.000720] (-) JobUnselected: {'identifier': 'gxf_isaac_flatscan_localization'}
+[0.000779] (-) JobUnselected: {'identifier': 'gxf_isaac_gems'}
+[0.000812] (-) JobUnselected: {'identifier': 'gxf_isaac_gxf_helpers'}
+[0.000848] (-) JobUnselected: {'identifier': 'gxf_isaac_hesai'}
+[0.000867] (-) JobUnselected: {'identifier': 'gxf_isaac_localization'}
+[0.000942] (-) JobUnselected: {'identifier': 'gxf_isaac_message_compositor'}
+[0.000963] (-) JobUnselected: {'identifier': 'gxf_isaac_messages'}
+[0.001007] (-) JobUnselected: {'identifier': 'gxf_isaac_messages_throttler'}
+[0.001035] (-) JobUnselected: {'identifier': 'gxf_isaac_optimizer'}
+[0.001070] (-) JobUnselected: {'identifier': 'gxf_isaac_point_cloud'}
+[0.001095] (-) JobUnselected: {'identifier': 'gxf_isaac_range_scan_processing'}
+[0.001154] (-) JobUnselected: {'identifier': 'gxf_isaac_ros_cuda'}
+[0.001180] (-) JobUnselected: {'identifier': 'gxf_isaac_ros_messages'}
+[0.001222] (-) JobUnselected: {'identifier': 'gxf_isaac_segway'}
+[0.001272] (-) JobUnselected: {'identifier': 'gxf_isaac_sight'}
+[0.001297] (-) JobUnselected: {'identifier': 'gxf_isaac_timestamp_correlator'}
+[0.001339] (-) JobUnselected: {'identifier': 'gxf_isaac_utils'}
+[0.001364] (-) JobUnselected: {'identifier': 'isaac_ros_gxf'}
+[0.001454] (-) JobUnselected: {'identifier': 'isaac_ros_managed_nitros'}
+[0.001479] (-) JobUnselected: {'identifier': 'isaac_ros_nitros'}
+[0.001511] (-) JobUnselected: {'identifier': 'isaac_ros_nitros_april_tag_detection_array_type'}
+[0.001536] (-) JobUnselected: {'identifier': 'isaac_ros_nitros_battery_state_type'}
+[0.001606] (-) JobUnselected: {'identifier': 'isaac_ros_nitros_camera_info_type'}
+[0.001631] (-) JobUnselected: {'identifier': 'isaac_ros_nitros_compressed_image_type'}
+[0.001685] (-) JobUnselected: {'identifier': 'isaac_ros_nitros_compressed_video_type'}
+[0.001715] (-) JobUnselected: {'identifier': 'isaac_ros_nitros_correlated_timestamp_type'}
+[0.001725] (-) JobUnselected: {'identifier': 'isaac_ros_nitros_detection2_d_array_type'}
+[0.001734] (-) JobUnselected: {'identifier': 'isaac_ros_nitros_detection3_d_array_type'}
+[0.001744] (-) JobUnselected: {'identifier': 'isaac_ros_nitros_disparity_image_type'}
+[0.001751] (-) JobUnselected: {'identifier': 'isaac_ros_nitros_encoder_ticks_type'}
+[0.001767] (-) JobUnselected: {'identifier': 'isaac_ros_nitros_flat_scan_type'}
+[0.001789] (-) JobUnselected: {'identifier': 'isaac_ros_nitros_image_type'}
+[0.001797] (-) JobUnselected: {'identifier': 'isaac_ros_nitros_imu_type'}
+[0.001805] (-) JobUnselected: {'identifier': 'isaac_ros_nitros_interfaces'}
+[0.001812] (-) JobUnselected: {'identifier': 'isaac_ros_nitros_occupancy_grid_type'}
+[0.001819] (-) JobUnselected: {'identifier': 'isaac_ros_nitros_odometry_type'}
+[0.001826] (-) JobUnselected: {'identifier': 'isaac_ros_nitros_point_cloud_type'}
+[0.001832] (-) JobUnselected: {'identifier': 'isaac_ros_nitros_pose_array_type'}
+[0.001839] (-) JobUnselected: {'identifier': 'isaac_ros_nitros_pose_cov_stamped_type'}
+[0.001846] (-) JobUnselected: {'identifier': 'isaac_ros_nitros_std_msg_type'}
+[0.001868] (-) JobUnselected: {'identifier': 'isaac_ros_nitros_tensor_list_type'}
+[0.001875] (-) JobUnselected: {'identifier': 'isaac_ros_nitros_topic_tools'}
+[0.001882] (-) JobUnselected: {'identifier': 'isaac_ros_nitros_twist_type'}
+[0.001889] (-) JobUnselected: {'identifier': 'isaac_ros_visual_slam'}
+[0.001895] (-) JobUnselected: {'identifier': 'isaac_ros_visual_slam_interfaces'}
+[0.001903] (-) JobUnselected: {'identifier': 'qcar2_autonomy'}
+[0.001920] (-) JobUnselected: {'identifier': 'qcar2_interfaces'}
+[0.001927] (-) JobUnselected: {'identifier': 'qcar2_nodes'}
+[0.001936] (magic_enum) JobQueued: {'identifier': 'magic_enum', 'dependencies': OrderedDict()}
+[0.001947] (magic_enum) JobStarted: {'identifier': 'magic_enum'}
+[0.038837] (magic_enum) JobProgress: {'identifier': 'magic_enum', 'progress': 'cmake'}
+[0.038999] (magic_enum) Command: {'cmd': ['/usr/bin/cmake', '/workspaces/isaac_ros-dev/ros2/src/magic_enum', '-DCMAKE_INSTALL_PREFIX=/workspaces/isaac_ros-dev/install/magic_enum'], 'cwd': '/workspaces/isaac_ros-dev/build/magic_enum', 'env': OrderedDict([('DALI_BUILD', '5838886'), ('LIBRARY_PATH', '/usr/local/cuda/lib64/stubs:'), ('NVIDIA_CTK_LIBCUDA_DIR', '/usr/lib/x86_64-linux-gnu'), ('PYTHONWARNINGS', 'ignore:::setuptools.command.install,ignore:::setuptools.command.easy_install,ignore:::pkg_resources'), ('USER', 'quanser'), ('TF_ADJUST_SATURATION_FUSED', '1'), ('CUSOLVER_VERSION', '11.4.1.48'), ('HOSTNAME', 'quanser-ground-station-1'), ('CUTENSOR_VERSION', '1.6.1.5'), ('SHLVL', '2'), ('LD_LIBRARY_PATH', '/workspaces/isaac_ros-dev/install/qcar2_interfaces/lib:/workspace/cartographer_ws/install/pcl_ros/lib:/workspace/cartographer_ws/install/cartographer_rviz/lib:/workspace/cartographer_ws/install/cartographer_ros/lib:/workspace/cartographer_ws/install/pcl_msgs/lib:/workspace/cartographer_ws/install/isaac_ros_tensor_list_interfaces/lib:/workspace/cartographer_ws/install/isaac_ros_pointcloud_interfaces/lib:/workspace/cartographer_ws/install/isaac_ros_nova_interfaces/lib:/workspace/cartographer_ws/install/isaac_ros_nitros_bridge_interfaces/lib:/workspace/cartographer_ws/install/isaac_ros_common/lib:/workspace/cartographer_ws/install/isaac_ros_bi3d_interfaces/lib:/workspace/cartographer_ws/install/isaac_ros_apriltag_interfaces/lib:/workspace/cartographer_ws/install/control_msgs/lib:/workspace/cartographer_ws/install/cartographer_ros_msgs/lib:/opt/ros/humble/opt/rviz_ogre_vendor/lib:/opt/ros/humble/lib/x86_64-linux-gnu:/opt/ros/humble/lib:/opt/tritonserver/backends/onnxruntime:/usr/local/cuda/compat/lib:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/opt/tritonserver/lib'), ('HOME', '/home/admin'), ('NVIDIA_TRITON_SERVER_VERSION', '22.09'), ('OLDPWD', '/workspaces/isaac_ros-dev'), ('CUDA_CACHE_DISABLE', '1'), ('ROS_PYTHON_VERSION', '3'), ('USER_UID', '1000'), ('ENV', '/etc/shinit_v2'), ('RDMACORE_VERSION', '36.0'), ('NVJPEG_VERSION', '11.9.0.86'), ('NVIDIA_BUILD_ID', '44909143'), ('CUDA_VERSION', '11.8.0.062'), ('CUBLAS_VERSION', '11.11.3.6'), ('NSIGHT_SYSTEMS_VERSION', '2022.3.1.43'), ('COLCON_PREFIX_PATH', '/workspaces/isaac_ros-dev/install:/workspace/cartographer_ws/install'), ('ROS_DISTRO', 'humble'), ('OPAL_PREFIX', '/opt/hpcx/ompi'), ('NVIDIA_REQUIRE_CUDA', 'cuda>=9.0'), ('TRT_VERSION', '8.5.0.12'), ('GDRCOPY_VERSION', '2.3'), ('_', '/usr/bin/colcon'), ('ROS_VERSION', '2'), ('PKG_CONFIG_PATH', '/workspace/cartographer_ws/install/cartographer/lib/x86_64-linux-gnu/pkgconfig:/workspace/cartographer_ws/install/cartographer/lib/pkgconfig'), ('NVIDIA_DRIVER_CAPABILITIES', 'all'), ('POLYGRAPHY_VERSION', '0.38.0'), ('CURAND_VERSION', '10.3.0.86'), ('MOFED_VERSION', '5.4-rdmacore36.0'), ('USERNAME', 'admin'), ('TERM', 'xterm'), ('ROS_LOCALHOST_ONLY', '0'), ('PATH', '/workspace/cartographer_ws/install/cartographer/bin:/opt/ros/humble/bin:/opt/tritonserver/bin:/usr/local/mpi/bin:/usr/local/nvidia/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/ucx/bin:/opt/nvidia/tao'), ('FASTRTPS_DEFAULT_PROFILES_FILE', '/usr/local/share/middleware_profiles/rtps_udp_profile.xml'), ('CUDA_DRIVER_VERSION', '520.61.03'), ('_CUDA_COMPAT_STATUS', 'System has unsupported display driver / cuda driver combination (CUDA_ERROR_SYSTEM_DRIVER_MISMATCH) cuInit()=803'), ('DISPLAY', ':1'), ('NVIDIA_PRODUCT_NAME', 'Triton Server'), ('LANG', 'en_US.UTF-8'), ('RMW_IMPLEMENTATION', 'rmw_fastrtps_cpp'), ('NPP_VERSION', '11.8.0.86'), ('ROS_ROOT', '/opt/ros/humble'), ('CUFFT_VERSION', '10.9.0.58'), ('TF_ENABLE_WINOGRAD_NONFUSED', '1'), ('AMENT_PREFIX_PATH', '/workspaces/isaac_ros-dev/install/qcar2_nodes:/workspaces/isaac_ros-dev/install/qcar2_autonomy:/workspaces/isaac_ros-dev/install/qcar2_interfaces:/workspace/cartographer_ws/install/perception_pcl:/workspace/cartographer_ws/install/pcl_ros:/workspace/cartographer_ws/install/cartographer_rviz:/workspace/cartographer_ws/install/cartographer_ros:/workspace/cartographer_ws/install/pcl_conversions:/workspace/cartographer_ws/install/pcl_msgs:/workspace/cartographer_ws/install/isaac_ros_test:/workspace/cartographer_ws/install/isaac_ros_tensor_list_interfaces:/workspace/cartographer_ws/install/isaac_ros_pointcloud_interfaces:/workspace/cartographer_ws/install/isaac_ros_nova_interfaces:/workspace/cartographer_ws/install/isaac_ros_nitros_bridge_interfaces:/workspace/cartographer_ws/install/isaac_ros_common:/workspace/cartographer_ws/install/isaac_ros_bi3d_interfaces:/workspace/cartographer_ws/install/isaac_ros_apriltag_interfaces:/workspace/cartographer_ws/install/control_msgs:/workspace/cartographer_ws/install/cartographer_ros_msgs:/opt/ros/humble'), ('CUDNN_VERSION', '8.6.0.163'), ('NSIGHT_COMPUTE_VERSION', '2022.3.0.22'), ('DALI_VERSION', '1.17.0'), ('DEBIAN_FRONTEND', 'noninteractive'), ('SHELL', '/bin/bash'), ('DCGM_VERSION', '2.2.9'), ('OPENMPI_VERSION', '4.1.4'), ('TRTOSS_VERSION', ''), ('OMPI_MCA_coll_hcoll_enable', '0'), ('CUSPARSE_VERSION', '11.7.5.86'), ('TRITON_SERVER_GPU_ENABLED', '1'), ('TRITON_SERVER_VERSION', '2.26.0'), ('BASH_ENV', '/etc/bash.bashrc'), ('PWD', '/workspaces/isaac_ros-dev/build/magic_enum'), ('PYTHONPATH', '/workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/python3.8/site-packages:/workspaces/isaac_ros-dev/install/qcar2_interfaces/lib/python3.8/site-packages:/workspace/cartographer_ws/install/pcl_msgs/lib/python3.8/site-packages:/workspace/cartographer_ws/build/isaac_ros_test:/workspace/cartographer_ws/install/isaac_ros_test/lib/python3.8/site-packages:/workspace/cartographer_ws/install/isaac_ros_tensor_list_interfaces/lib/python3.8/site-packages:/workspace/cartographer_ws/install/isaac_ros_pointcloud_interfaces/lib/python3.8/site-packages:/workspace/cartographer_ws/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages:/workspace/cartographer_ws/install/isaac_ros_nitros_bridge_interfaces/lib/python3.8/site-packages:/workspace/cartographer_ws/install/isaac_ros_bi3d_interfaces/lib/python3.8/site-packages:/workspace/cartographer_ws/install/isaac_ros_apriltag_interfaces/lib/python3.8/site-packages:/workspace/cartographer_ws/install/control_msgs/lib/python3.8/site-packages:/workspace/cartographer_ws/install/cartographer_ros_msgs/lib/python3.8/site-packages:/opt/ros/humble/lib/python3.8/site-packages:/home/Quanser/0_libraries/python'), ('_CUDA_COMPAT_PATH', '/usr/local/cuda/compat'), ('TRITON_SERVER_USER', 'triton-server'), ('TF_ADJUST_HUE_FUSED', '1'), ('NVIDIA_VISIBLE_DEVICES', 'void'), ('NCCL_VERSION', '2.15.1'), ('USER_GID', '1000'), ('COLCON', '1'), ('OPENUCX_VERSION', '1.14.0'), ('HPCX_VERSION', '2.12.1a0'), ('SHARP_COLL_ENABLE_CUDA', '0'), ('CMAKE_PREFIX_PATH', '/workspaces/isaac_ros-dev/install/qcar2_nodes:/workspaces/isaac_ros-dev/install/qcar2_interfaces:/workspace/cartographer_ws/install/perception_pcl:/workspace/cartographer_ws/install/pcl_ros:/workspace/cartographer_ws/install/cartographer_rviz:/workspace/cartographer_ws/install/cartographer_ros:/workspace/cartographer_ws/install/pcl_conversions:/workspace/cartographer_ws/install/pcl_msgs:/workspace/cartographer_ws/install/isaac_ros_tensor_list_interfaces:/workspace/cartographer_ws/install/isaac_ros_pointcloud_interfaces:/workspace/cartographer_ws/install/isaac_ros_nova_interfaces:/workspace/cartographer_ws/install/isaac_ros_nitros_bridge_interfaces:/workspace/cartographer_ws/install/isaac_ros_common:/workspace/cartographer_ws/install/isaac_ros_bi3d_interfaces:/workspace/cartographer_ws/install/isaac_ros_apriltag_interfaces:/workspace/cartographer_ws/install/control_msgs:/workspace/cartographer_ws/install/cartographer_ros_msgs:/workspace/cartographer_ws/install/cartographer:/workspace/cartographer_ws/install/absl:/workspaces/isaac_ros-dev/install/qcar2_autonomy:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble'), ('TF_AUTOTUNE_THRESHOLD', '2')]), 'shell': False}
+[0.086938] (magic_enum) StdoutLine: {'line': b'-- The CXX compiler identification is GNU 9.4.0\n'}
+[0.091398] (magic_enum) StdoutLine: {'line': b'-- Detecting CXX compiler ABI info\n'}
+[0.099727] (-) TimerEvent: {}
+[0.142750] (magic_enum) StdoutLine: {'line': b'-- Detecting CXX compiler ABI info - done\n'}
+[0.147866] (magic_enum) StdoutLine: {'line': b'-- Check for working CXX compiler: /usr/bin/c++ - skipped\n'}
+[0.148031] (magic_enum) StdoutLine: {'line': b'-- Detecting CXX compile features\n'}
+[0.148309] (magic_enum) StdoutLine: {'line': b'-- Detecting CXX compile features - done\n'}
+[0.151498] (magic_enum) StdoutLine: {'line': b'-- Performing Test HAS_CPP20_FLAG\n'}
+[0.165173] (magic_enum) StdoutLine: {'line': b'-- Performing Test HAS_CPP20_FLAG - Failed\n'}
+[0.165543] (magic_enum) StdoutLine: {'line': b'-- Performing Test HAS_CPP23_FLAG\n'}
+[0.179380] (magic_enum) StdoutLine: {'line': b'-- Performing Test HAS_CPP23_FLAG - Failed\n'}
+[0.184406] (magic_enum) StdoutLine: {'line': b'-- Configuring done\n'}
+[0.192346] (magic_enum) StdoutLine: {'line': b'-- Generating done\n'}
+[0.192896] (magic_enum) StdoutLine: {'line': b'-- Build files have been written to: /workspaces/isaac_ros-dev/build/magic_enum\n'}
+[0.194436] (magic_enum) CommandEnded: {'returncode': 0}
+[0.195182] (magic_enum) JobProgress: {'identifier': 'magic_enum', 'progress': 'build'}
+[0.195794] (magic_enum) Command: {'cmd': ['/usr/bin/cmake', '--build', '/workspaces/isaac_ros-dev/build/magic_enum', '--', '-j20', '-l20'], 'cwd': '/workspaces/isaac_ros-dev/build/magic_enum', 'env': OrderedDict([('DALI_BUILD', '5838886'), ('LIBRARY_PATH', '/usr/local/cuda/lib64/stubs:'), ('NVIDIA_CTK_LIBCUDA_DIR', '/usr/lib/x86_64-linux-gnu'), ('PYTHONWARNINGS', 'ignore:::setuptools.command.install,ignore:::setuptools.command.easy_install,ignore:::pkg_resources'), ('USER', 'quanser'), ('TF_ADJUST_SATURATION_FUSED', '1'), ('CUSOLVER_VERSION', '11.4.1.48'), ('HOSTNAME', 'quanser-ground-station-1'), ('CUTENSOR_VERSION', '1.6.1.5'), ('SHLVL', '2'), ('LD_LIBRARY_PATH', '/workspaces/isaac_ros-dev/install/qcar2_interfaces/lib:/workspace/cartographer_ws/install/pcl_ros/lib:/workspace/cartographer_ws/install/cartographer_rviz/lib:/workspace/cartographer_ws/install/cartographer_ros/lib:/workspace/cartographer_ws/install/pcl_msgs/lib:/workspace/cartographer_ws/install/isaac_ros_tensor_list_interfaces/lib:/workspace/cartographer_ws/install/isaac_ros_pointcloud_interfaces/lib:/workspace/cartographer_ws/install/isaac_ros_nova_interfaces/lib:/workspace/cartographer_ws/install/isaac_ros_nitros_bridge_interfaces/lib:/workspace/cartographer_ws/install/isaac_ros_common/lib:/workspace/cartographer_ws/install/isaac_ros_bi3d_interfaces/lib:/workspace/cartographer_ws/install/isaac_ros_apriltag_interfaces/lib:/workspace/cartographer_ws/install/control_msgs/lib:/workspace/cartographer_ws/install/cartographer_ros_msgs/lib:/opt/ros/humble/opt/rviz_ogre_vendor/lib:/opt/ros/humble/lib/x86_64-linux-gnu:/opt/ros/humble/lib:/opt/tritonserver/backends/onnxruntime:/usr/local/cuda/compat/lib:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/opt/tritonserver/lib'), ('HOME', '/home/admin'), ('NVIDIA_TRITON_SERVER_VERSION', '22.09'), ('OLDPWD', '/workspaces/isaac_ros-dev'), ('CUDA_CACHE_DISABLE', '1'), ('ROS_PYTHON_VERSION', '3'), ('USER_UID', '1000'), ('ENV', '/etc/shinit_v2'), ('RDMACORE_VERSION', '36.0'), ('NVJPEG_VERSION', '11.9.0.86'), ('NVIDIA_BUILD_ID', '44909143'), ('CUDA_VERSION', '11.8.0.062'), ('CUBLAS_VERSION', '11.11.3.6'), ('NSIGHT_SYSTEMS_VERSION', '2022.3.1.43'), ('COLCON_PREFIX_PATH', '/workspaces/isaac_ros-dev/install:/workspace/cartographer_ws/install'), ('ROS_DISTRO', 'humble'), ('OPAL_PREFIX', '/opt/hpcx/ompi'), ('NVIDIA_REQUIRE_CUDA', 'cuda>=9.0'), ('TRT_VERSION', '8.5.0.12'), ('GDRCOPY_VERSION', '2.3'), ('_', '/usr/bin/colcon'), ('ROS_VERSION', '2'), ('PKG_CONFIG_PATH', '/workspace/cartographer_ws/install/cartographer/lib/x86_64-linux-gnu/pkgconfig:/workspace/cartographer_ws/install/cartographer/lib/pkgconfig'), ('NVIDIA_DRIVER_CAPABILITIES', 'all'), ('POLYGRAPHY_VERSION', '0.38.0'), ('CURAND_VERSION', '10.3.0.86'), ('MOFED_VERSION', '5.4-rdmacore36.0'), ('USERNAME', 'admin'), ('TERM', 'xterm'), ('ROS_LOCALHOST_ONLY', '0'), ('PATH', '/workspace/cartographer_ws/install/cartographer/bin:/opt/ros/humble/bin:/opt/tritonserver/bin:/usr/local/mpi/bin:/usr/local/nvidia/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/ucx/bin:/opt/nvidia/tao'), ('FASTRTPS_DEFAULT_PROFILES_FILE', '/usr/local/share/middleware_profiles/rtps_udp_profile.xml'), ('CUDA_DRIVER_VERSION', '520.61.03'), ('_CUDA_COMPAT_STATUS', 'System has unsupported display driver / cuda driver combination (CUDA_ERROR_SYSTEM_DRIVER_MISMATCH) cuInit()=803'), ('DISPLAY', ':1'), ('NVIDIA_PRODUCT_NAME', 'Triton Server'), ('LANG', 'en_US.UTF-8'), ('RMW_IMPLEMENTATION', 'rmw_fastrtps_cpp'), ('NPP_VERSION', '11.8.0.86'), ('ROS_ROOT', '/opt/ros/humble'), ('CUFFT_VERSION', '10.9.0.58'), ('TF_ENABLE_WINOGRAD_NONFUSED', '1'), ('AMENT_PREFIX_PATH', '/workspaces/isaac_ros-dev/install/qcar2_nodes:/workspaces/isaac_ros-dev/install/qcar2_autonomy:/workspaces/isaac_ros-dev/install/qcar2_interfaces:/workspace/cartographer_ws/install/perception_pcl:/workspace/cartographer_ws/install/pcl_ros:/workspace/cartographer_ws/install/cartographer_rviz:/workspace/cartographer_ws/install/cartographer_ros:/workspace/cartographer_ws/install/pcl_conversions:/workspace/cartographer_ws/install/pcl_msgs:/workspace/cartographer_ws/install/isaac_ros_test:/workspace/cartographer_ws/install/isaac_ros_tensor_list_interfaces:/workspace/cartographer_ws/install/isaac_ros_pointcloud_interfaces:/workspace/cartographer_ws/install/isaac_ros_nova_interfaces:/workspace/cartographer_ws/install/isaac_ros_nitros_bridge_interfaces:/workspace/cartographer_ws/install/isaac_ros_common:/workspace/cartographer_ws/install/isaac_ros_bi3d_interfaces:/workspace/cartographer_ws/install/isaac_ros_apriltag_interfaces:/workspace/cartographer_ws/install/control_msgs:/workspace/cartographer_ws/install/cartographer_ros_msgs:/opt/ros/humble'), ('CUDNN_VERSION', '8.6.0.163'), ('NSIGHT_COMPUTE_VERSION', '2022.3.0.22'), ('DALI_VERSION', '1.17.0'), ('DEBIAN_FRONTEND', 'noninteractive'), ('SHELL', '/bin/bash'), ('DCGM_VERSION', '2.2.9'), ('OPENMPI_VERSION', '4.1.4'), ('TRTOSS_VERSION', ''), ('OMPI_MCA_coll_hcoll_enable', '0'), ('CUSPARSE_VERSION', '11.7.5.86'), ('TRITON_SERVER_GPU_ENABLED', '1'), ('TRITON_SERVER_VERSION', '2.26.0'), ('BASH_ENV', '/etc/bash.bashrc'), ('PWD', '/workspaces/isaac_ros-dev/build/magic_enum'), ('PYTHONPATH', '/workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/python3.8/site-packages:/workspaces/isaac_ros-dev/install/qcar2_interfaces/lib/python3.8/site-packages:/workspace/cartographer_ws/install/pcl_msgs/lib/python3.8/site-packages:/workspace/cartographer_ws/build/isaac_ros_test:/workspace/cartographer_ws/install/isaac_ros_test/lib/python3.8/site-packages:/workspace/cartographer_ws/install/isaac_ros_tensor_list_interfaces/lib/python3.8/site-packages:/workspace/cartographer_ws/install/isaac_ros_pointcloud_interfaces/lib/python3.8/site-packages:/workspace/cartographer_ws/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages:/workspace/cartographer_ws/install/isaac_ros_nitros_bridge_interfaces/lib/python3.8/site-packages:/workspace/cartographer_ws/install/isaac_ros_bi3d_interfaces/lib/python3.8/site-packages:/workspace/cartographer_ws/install/isaac_ros_apriltag_interfaces/lib/python3.8/site-packages:/workspace/cartographer_ws/install/control_msgs/lib/python3.8/site-packages:/workspace/cartographer_ws/install/cartographer_ros_msgs/lib/python3.8/site-packages:/opt/ros/humble/lib/python3.8/site-packages:/home/Quanser/0_libraries/python'), ('_CUDA_COMPAT_PATH', '/usr/local/cuda/compat'), ('TRITON_SERVER_USER', 'triton-server'), ('TF_ADJUST_HUE_FUSED', '1'), ('NVIDIA_VISIBLE_DEVICES', 'void'), ('NCCL_VERSION', '2.15.1'), ('USER_GID', '1000'), ('COLCON', '1'), ('OPENUCX_VERSION', '1.14.0'), ('HPCX_VERSION', '2.12.1a0'), ('SHARP_COLL_ENABLE_CUDA', '0'), ('CMAKE_PREFIX_PATH', '/workspaces/isaac_ros-dev/install/qcar2_nodes:/workspaces/isaac_ros-dev/install/qcar2_interfaces:/workspace/cartographer_ws/install/perception_pcl:/workspace/cartographer_ws/install/pcl_ros:/workspace/cartographer_ws/install/cartographer_rviz:/workspace/cartographer_ws/install/cartographer_ros:/workspace/cartographer_ws/install/pcl_conversions:/workspace/cartographer_ws/install/pcl_msgs:/workspace/cartographer_ws/install/isaac_ros_tensor_list_interfaces:/workspace/cartographer_ws/install/isaac_ros_pointcloud_interfaces:/workspace/cartographer_ws/install/isaac_ros_nova_interfaces:/workspace/cartographer_ws/install/isaac_ros_nitros_bridge_interfaces:/workspace/cartographer_ws/install/isaac_ros_common:/workspace/cartographer_ws/install/isaac_ros_bi3d_interfaces:/workspace/cartographer_ws/install/isaac_ros_apriltag_interfaces:/workspace/cartographer_ws/install/control_msgs:/workspace/cartographer_ws/install/cartographer_ros_msgs:/workspace/cartographer_ws/install/cartographer:/workspace/cartographer_ws/install/absl:/workspaces/isaac_ros-dev/install/qcar2_autonomy:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble'), ('TF_AUTOTUNE_THRESHOLD', '2')]), 'shell': False}
+[0.199813] (-) TimerEvent: {}
+[0.217502] (magic_enum) StdoutLine: {'line': b'[  4%] \x1b[32mBuilding CXX object example/CMakeFiles/example_custom_name.dir/example_custom_name.cpp.o\x1b[0m\n'}
+[0.217870] (magic_enum) StdoutLine: {'line': b'[  8%] \x1b[32mBuilding CXX object example/CMakeFiles/enum_flag_example.dir/enum_flag_example.cpp.o\x1b[0m\n'}
+[0.217975] (magic_enum) StdoutLine: {'line': b'[ 12%] \x1b[32mBuilding CXX object example/CMakeFiles/example_containers_set.dir/example_containers_set.cpp.o\x1b[0m\n'}
+[0.218269] (magic_enum) StdoutLine: {'line': b'[ 16%] \x1b[32mBuilding CXX object example/CMakeFiles/example_switch.dir/example_switch.cpp.o\x1b[0m\n'}
+[0.218562] (magic_enum) StdoutLine: {'line': b'[ 20%] \x1b[32mBuilding CXX object test/CMakeFiles/test-cpp17.dir/test.cpp.o\x1b[0m\n'}
+[0.218683] (magic_enum) StdoutLine: {'line': b'[ 25%] \x1b[32mBuilding CXX object example/CMakeFiles/example_containers_bitset.dir/example_containers_bitset.cpp.o\x1b[0m\n'}
+[0.219024] (magic_enum) StdoutLine: {'line': b'[ 33%] \x1b[32mBuilding CXX object test/CMakeFiles/test_wchar_t-cpp17.dir/test_wchar_t.cpp.o\x1b[0m\n'}
+[0.219100] (magic_enum) StdoutLine: {'line': b'[ 33%] \x1b[32mBuilding CXX object example/CMakeFiles/example_containers_array.dir/example_containers_array.cpp.o\x1b[0m\n'}
+[0.219255] (magic_enum) StdoutLine: {'line': b'[ 41%] \x1b[32mBuilding CXX object example/CMakeFiles/example.dir/example.cpp.o\x1b[0m\n'}
+[0.219399] (magic_enum) StdoutLine: {'line': b'[ 41%] \x1b[32mBuilding CXX object test/CMakeFiles/test_containers-cpp17.dir/test_containers.cpp.o\x1b[0m\n'}
+[0.220395] (magic_enum) StdoutLine: {'line': b'[ 45%] \x1b[32mBuilding CXX object test/CMakeFiles/test_flags-cpp17.dir/test_flags.cpp.o\x1b[0m\n'}
+[0.224080] (magic_enum) StdoutLine: {'line': b'[ 50%] \x1b[32mBuilding CXX object test/CMakeFiles/test_aliases-cpp17.dir/test_aliases.cpp.o\x1b[0m\n'}
+[0.299924] (-) TimerEvent: {}
+[0.400272] (-) TimerEvent: {}
+[0.500584] (-) TimerEvent: {}
+[0.552257] (magic_enum) StdoutLine: {'line': b'[ 54%] \x1b[32m\x1b[1mLinking CXX executable enum_flag_example\x1b[0m\n'}
+[0.600707] (-) TimerEvent: {}
+[0.604432] (magic_enum) StdoutLine: {'line': b'[ 54%] Built target enum_flag_example\n'}
+[0.644659] (magic_enum) StdoutLine: {'line': b'[ 58%] \x1b[32m\x1b[1mLinking CXX executable example_containers_set\x1b[0m\n'}
+[0.677736] (magic_enum) StdoutLine: {'line': b'[ 62%] \x1b[32m\x1b[1mLinking CXX executable example\x1b[0m\n'}
+[0.700868] (-) TimerEvent: {}
+[0.724565] (magic_enum) StdoutLine: {'line': b'[ 62%] Built target example_containers_set\n'}
+[0.744443] (magic_enum) StdoutLine: {'line': b'[ 66%] \x1b[32m\x1b[1mLinking CXX executable example_containers_array\x1b[0m\n'}
+[0.744704] (magic_enum) StdoutLine: {'line': b'[ 66%] Built target example\n'}
+[0.800990] (-) TimerEvent: {}
+[0.814075] (magic_enum) StdoutLine: {'line': b'[ 70%] \x1b[32m\x1b[1mLinking CXX executable example_containers_bitset\x1b[0m\n'}
+[0.815980] (magic_enum) StdoutLine: {'line': b'[ 70%] Built target example_containers_array\n'}
+[0.828972] (magic_enum) StdoutLine: {'line': b'[ 75%] \x1b[32m\x1b[1mLinking CXX executable example_switch\x1b[0m\n'}
+[0.868525] (magic_enum) StdoutLine: {'line': b'[ 79%] \x1b[32m\x1b[1mLinking CXX executable example_custom_name\x1b[0m\n'}
+[0.870798] (magic_enum) StdoutLine: {'line': b'[ 79%] Built target example_containers_bitset\n'}
+[0.885580] (magic_enum) StdoutLine: {'line': b'[ 79%] Built target example_switch\n'}
+[0.901183] (-) TimerEvent: {}
+[0.921570] (magic_enum) StdoutLine: {'line': b'[ 79%] Built target example_custom_name\n'}
+[1.001270] (-) TimerEvent: {}
+[1.101628] (-) TimerEvent: {}
+[1.201925] (-) TimerEvent: {}
+[1.302218] (-) TimerEvent: {}
+[1.402525] (-) TimerEvent: {}
+[1.502866] (-) TimerEvent: {}
+[1.603270] (-) TimerEvent: {}
+[1.703583] (-) TimerEvent: {}
+[1.804058] (-) TimerEvent: {}
+[1.904372] (-) TimerEvent: {}
+[2.004695] (-) TimerEvent: {}
+[2.104954] (-) TimerEvent: {}
+[2.205219] (-) TimerEvent: {}
+[2.305534] (-) TimerEvent: {}
+[2.405802] (-) TimerEvent: {}
+[2.506058] (-) TimerEvent: {}
+[2.606294] (-) TimerEvent: {}
+[2.706579] (-) TimerEvent: {}
+[2.806959] (-) TimerEvent: {}
+[2.907331] (-) TimerEvent: {}
+[3.007642] (-) TimerEvent: {}
+[3.107890] (-) TimerEvent: {}
+[3.208166] (-) TimerEvent: {}
+[3.308393] (-) TimerEvent: {}
+[3.408627] (-) TimerEvent: {}
+[3.508844] (-) TimerEvent: {}
+[3.609110] (-) TimerEvent: {}
+[3.709351] (-) TimerEvent: {}
+[3.809584] (-) TimerEvent: {}
+[3.909799] (-) TimerEvent: {}
+[4.010027] (-) TimerEvent: {}
+[4.110262] (-) TimerEvent: {}
+[4.210502] (-) TimerEvent: {}
+[4.310756] (-) TimerEvent: {}
+[4.411060] (-) TimerEvent: {}
+[4.511370] (-) TimerEvent: {}
+[4.611625] (-) TimerEvent: {}
+[4.711871] (-) TimerEvent: {}
+[4.812104] (-) TimerEvent: {}
+[4.912340] (-) TimerEvent: {}
+[5.012642] (-) TimerEvent: {}
+[5.112985] (-) TimerEvent: {}
+[5.213253] (-) TimerEvent: {}
+[5.313486] (-) TimerEvent: {}
+[5.413739] (-) TimerEvent: {}
+[5.514032] (-) TimerEvent: {}
+[5.614283] (-) TimerEvent: {}
+[5.663550] (magic_enum) StdoutLine: {'line': b'[ 83%] \x1b[32m\x1b[1mLinking CXX executable test_aliases-cpp17\x1b[0m\n'}
+[5.668980] (magic_enum) StdoutLine: {'line': b'/usr/bin/c++ CMakeFiles/test_aliases-cpp17.dir/test_aliases.cpp.o -o test_aliases-cpp17 \n'}
+[5.714373] (-) TimerEvent: {}
+[5.814629] (-) TimerEvent: {}
+[5.837659] (magic_enum) StdoutLine: {'line': b'[ 83%] Built target test_aliases-cpp17\n'}
+[5.905002] (magic_enum) StdoutLine: {'line': b'[ 87%] \x1b[32m\x1b[1mLinking CXX executable test_containers-cpp17\x1b[0m\n'}
+[5.908991] (magic_enum) StdoutLine: {'line': b'/usr/bin/c++ CMakeFiles/test_containers-cpp17.dir/test_containers.cpp.o -o test_containers-cpp17 \n'}
+[5.914721] (-) TimerEvent: {}
+[6.009635] (magic_enum) StdoutLine: {'line': b'[ 91%] \x1b[32m\x1b[1mLinking CXX executable test_wchar_t-cpp17\x1b[0m\n'}
+[6.014078] (magic_enum) StdoutLine: {'line': b'/usr/bin/c++ CMakeFiles/test_wchar_t-cpp17.dir/test_wchar_t.cpp.o -o test_wchar_t-cpp17 \n'}
+[6.014772] (-) TimerEvent: {}
+[6.077394] (magic_enum) StdoutLine: {'line': b'[ 91%] Built target test_containers-cpp17\n'}
+[6.114900] (-) TimerEvent: {}
+[6.171613] (magic_enum) StdoutLine: {'line': b'[ 91%] Built target test_wchar_t-cpp17\n'}
+[6.215093] (-) TimerEvent: {}
+[6.315391] (-) TimerEvent: {}
+[6.415634] (-) TimerEvent: {}
+[6.515876] (-) TimerEvent: {}
+[6.616112] (-) TimerEvent: {}
+[6.633131] (magic_enum) StdoutLine: {'line': b'[ 95%] \x1b[32m\x1b[1mLinking CXX executable test_flags-cpp17\x1b[0m\n'}
+[6.636960] (magic_enum) StdoutLine: {'line': b'/usr/bin/c++ CMakeFiles/test_flags-cpp17.dir/test_flags.cpp.o -o test_flags-cpp17 \n'}
+[6.716225] (-) TimerEvent: {}
+[6.793143] (magic_enum) StdoutLine: {'line': b'[ 95%] Built target test_flags-cpp17\n'}
+[6.816326] (-) TimerEvent: {}
+[6.916594] (-) TimerEvent: {}
+[7.016903] (-) TimerEvent: {}
+[7.117199] (-) TimerEvent: {}
+[7.217490] (-) TimerEvent: {}
+[7.317728] (-) TimerEvent: {}
+[7.417930] (-) TimerEvent: {}
+[7.518214] (-) TimerEvent: {}
+[7.618449] (-) TimerEvent: {}
+[7.718735] (-) TimerEvent: {}
+[7.819024] (-) TimerEvent: {}
+[7.919307] (-) TimerEvent: {}
+[8.019541] (-) TimerEvent: {}
+[8.119769] (-) TimerEvent: {}
+[8.219965] (-) TimerEvent: {}
+[8.320277] (-) TimerEvent: {}
+[8.420523] (-) TimerEvent: {}
+[8.520820] (-) TimerEvent: {}
+[8.621127] (-) TimerEvent: {}
+[8.721431] (-) TimerEvent: {}
+[8.722194] (magic_enum) StdoutLine: {'line': b'[100%] \x1b[32m\x1b[1mLinking CXX executable test-cpp17\x1b[0m\n'}
+[8.726502] (magic_enum) StdoutLine: {'line': b'/usr/bin/c++ CMakeFiles/test-cpp17.dir/test.cpp.o -o test-cpp17 \n'}
+[8.821603] (-) TimerEvent: {}
+[8.888116] (magic_enum) StdoutLine: {'line': b'[100%] Built target test-cpp17\n'}
+[8.892824] (magic_enum) CommandEnded: {'returncode': 0}
+[8.921803] (-) TimerEvent: {}
+[8.938253] (magic_enum) JobProgress: {'identifier': 'magic_enum', 'progress': 'install'}
+[8.944145] (magic_enum) Command: {'cmd': ['/usr/bin/cmake', '--install', '/workspaces/isaac_ros-dev/build/magic_enum'], 'cwd': '/workspaces/isaac_ros-dev/build/magic_enum', 'env': OrderedDict([('DALI_BUILD', '5838886'), ('LIBRARY_PATH', '/usr/local/cuda/lib64/stubs:'), ('NVIDIA_CTK_LIBCUDA_DIR', '/usr/lib/x86_64-linux-gnu'), ('PYTHONWARNINGS', 'ignore:::setuptools.command.install,ignore:::setuptools.command.easy_install,ignore:::pkg_resources'), ('USER', 'quanser'), ('TF_ADJUST_SATURATION_FUSED', '1'), ('CUSOLVER_VERSION', '11.4.1.48'), ('HOSTNAME', 'quanser-ground-station-1'), ('CUTENSOR_VERSION', '1.6.1.5'), ('SHLVL', '2'), ('LD_LIBRARY_PATH', '/workspaces/isaac_ros-dev/install/qcar2_interfaces/lib:/workspace/cartographer_ws/install/pcl_ros/lib:/workspace/cartographer_ws/install/cartographer_rviz/lib:/workspace/cartographer_ws/install/cartographer_ros/lib:/workspace/cartographer_ws/install/pcl_msgs/lib:/workspace/cartographer_ws/install/isaac_ros_tensor_list_interfaces/lib:/workspace/cartographer_ws/install/isaac_ros_pointcloud_interfaces/lib:/workspace/cartographer_ws/install/isaac_ros_nova_interfaces/lib:/workspace/cartographer_ws/install/isaac_ros_nitros_bridge_interfaces/lib:/workspace/cartographer_ws/install/isaac_ros_common/lib:/workspace/cartographer_ws/install/isaac_ros_bi3d_interfaces/lib:/workspace/cartographer_ws/install/isaac_ros_apriltag_interfaces/lib:/workspace/cartographer_ws/install/control_msgs/lib:/workspace/cartographer_ws/install/cartographer_ros_msgs/lib:/opt/ros/humble/opt/rviz_ogre_vendor/lib:/opt/ros/humble/lib/x86_64-linux-gnu:/opt/ros/humble/lib:/opt/tritonserver/backends/onnxruntime:/usr/local/cuda/compat/lib:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/opt/tritonserver/lib'), ('HOME', '/home/admin'), ('NVIDIA_TRITON_SERVER_VERSION', '22.09'), ('OLDPWD', '/workspaces/isaac_ros-dev'), ('CUDA_CACHE_DISABLE', '1'), ('ROS_PYTHON_VERSION', '3'), ('USER_UID', '1000'), ('ENV', '/etc/shinit_v2'), ('RDMACORE_VERSION', '36.0'), ('NVJPEG_VERSION', '11.9.0.86'), ('NVIDIA_BUILD_ID', '44909143'), ('CUDA_VERSION', '11.8.0.062'), ('CUBLAS_VERSION', '11.11.3.6'), ('NSIGHT_SYSTEMS_VERSION', '2022.3.1.43'), ('COLCON_PREFIX_PATH', '/workspaces/isaac_ros-dev/install:/workspace/cartographer_ws/install'), ('ROS_DISTRO', 'humble'), ('OPAL_PREFIX', '/opt/hpcx/ompi'), ('NVIDIA_REQUIRE_CUDA', 'cuda>=9.0'), ('TRT_VERSION', '8.5.0.12'), ('GDRCOPY_VERSION', '2.3'), ('_', '/usr/bin/colcon'), ('ROS_VERSION', '2'), ('PKG_CONFIG_PATH', '/workspace/cartographer_ws/install/cartographer/lib/x86_64-linux-gnu/pkgconfig:/workspace/cartographer_ws/install/cartographer/lib/pkgconfig'), ('NVIDIA_DRIVER_CAPABILITIES', 'all'), ('POLYGRAPHY_VERSION', '0.38.0'), ('CURAND_VERSION', '10.3.0.86'), ('MOFED_VERSION', '5.4-rdmacore36.0'), ('USERNAME', 'admin'), ('TERM', 'xterm'), ('ROS_LOCALHOST_ONLY', '0'), ('PATH', '/workspace/cartographer_ws/install/cartographer/bin:/opt/ros/humble/bin:/opt/tritonserver/bin:/usr/local/mpi/bin:/usr/local/nvidia/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/ucx/bin:/opt/nvidia/tao'), ('FASTRTPS_DEFAULT_PROFILES_FILE', '/usr/local/share/middleware_profiles/rtps_udp_profile.xml'), ('CUDA_DRIVER_VERSION', '520.61.03'), ('_CUDA_COMPAT_STATUS', 'System has unsupported display driver / cuda driver combination (CUDA_ERROR_SYSTEM_DRIVER_MISMATCH) cuInit()=803'), ('DISPLAY', ':1'), ('NVIDIA_PRODUCT_NAME', 'Triton Server'), ('LANG', 'en_US.UTF-8'), ('RMW_IMPLEMENTATION', 'rmw_fastrtps_cpp'), ('NPP_VERSION', '11.8.0.86'), ('ROS_ROOT', '/opt/ros/humble'), ('CUFFT_VERSION', '10.9.0.58'), ('TF_ENABLE_WINOGRAD_NONFUSED', '1'), ('AMENT_PREFIX_PATH', '/workspaces/isaac_ros-dev/install/qcar2_nodes:/workspaces/isaac_ros-dev/install/qcar2_autonomy:/workspaces/isaac_ros-dev/install/qcar2_interfaces:/workspace/cartographer_ws/install/perception_pcl:/workspace/cartographer_ws/install/pcl_ros:/workspace/cartographer_ws/install/cartographer_rviz:/workspace/cartographer_ws/install/cartographer_ros:/workspace/cartographer_ws/install/pcl_conversions:/workspace/cartographer_ws/install/pcl_msgs:/workspace/cartographer_ws/install/isaac_ros_test:/workspace/cartographer_ws/install/isaac_ros_tensor_list_interfaces:/workspace/cartographer_ws/install/isaac_ros_pointcloud_interfaces:/workspace/cartographer_ws/install/isaac_ros_nova_interfaces:/workspace/cartographer_ws/install/isaac_ros_nitros_bridge_interfaces:/workspace/cartographer_ws/install/isaac_ros_common:/workspace/cartographer_ws/install/isaac_ros_bi3d_interfaces:/workspace/cartographer_ws/install/isaac_ros_apriltag_interfaces:/workspace/cartographer_ws/install/control_msgs:/workspace/cartographer_ws/install/cartographer_ros_msgs:/opt/ros/humble'), ('CUDNN_VERSION', '8.6.0.163'), ('NSIGHT_COMPUTE_VERSION', '2022.3.0.22'), ('DALI_VERSION', '1.17.0'), ('DEBIAN_FRONTEND', 'noninteractive'), ('SHELL', '/bin/bash'), ('DCGM_VERSION', '2.2.9'), ('OPENMPI_VERSION', '4.1.4'), ('TRTOSS_VERSION', ''), ('OMPI_MCA_coll_hcoll_enable', '0'), ('CUSPARSE_VERSION', '11.7.5.86'), ('TRITON_SERVER_GPU_ENABLED', '1'), ('TRITON_SERVER_VERSION', '2.26.0'), ('BASH_ENV', '/etc/bash.bashrc'), ('PWD', '/workspaces/isaac_ros-dev/build/magic_enum'), ('PYTHONPATH', '/workspaces/isaac_ros-dev/install/qcar2_autonomy/lib/python3.8/site-packages:/workspaces/isaac_ros-dev/install/qcar2_interfaces/lib/python3.8/site-packages:/workspace/cartographer_ws/install/pcl_msgs/lib/python3.8/site-packages:/workspace/cartographer_ws/build/isaac_ros_test:/workspace/cartographer_ws/install/isaac_ros_test/lib/python3.8/site-packages:/workspace/cartographer_ws/install/isaac_ros_tensor_list_interfaces/lib/python3.8/site-packages:/workspace/cartographer_ws/install/isaac_ros_pointcloud_interfaces/lib/python3.8/site-packages:/workspace/cartographer_ws/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages:/workspace/cartographer_ws/install/isaac_ros_nitros_bridge_interfaces/lib/python3.8/site-packages:/workspace/cartographer_ws/install/isaac_ros_bi3d_interfaces/lib/python3.8/site-packages:/workspace/cartographer_ws/install/isaac_ros_apriltag_interfaces/lib/python3.8/site-packages:/workspace/cartographer_ws/install/control_msgs/lib/python3.8/site-packages:/workspace/cartographer_ws/install/cartographer_ros_msgs/lib/python3.8/site-packages:/opt/ros/humble/lib/python3.8/site-packages:/home/Quanser/0_libraries/python'), ('_CUDA_COMPAT_PATH', '/usr/local/cuda/compat'), ('TRITON_SERVER_USER', 'triton-server'), ('TF_ADJUST_HUE_FUSED', '1'), ('NVIDIA_VISIBLE_DEVICES', 'void'), ('NCCL_VERSION', '2.15.1'), ('USER_GID', '1000'), ('COLCON', '1'), ('OPENUCX_VERSION', '1.14.0'), ('HPCX_VERSION', '2.12.1a0'), ('SHARP_COLL_ENABLE_CUDA', '0'), ('CMAKE_PREFIX_PATH', '/workspaces/isaac_ros-dev/install/qcar2_nodes:/workspaces/isaac_ros-dev/install/qcar2_interfaces:/workspace/cartographer_ws/install/perception_pcl:/workspace/cartographer_ws/install/pcl_ros:/workspace/cartographer_ws/install/cartographer_rviz:/workspace/cartographer_ws/install/cartographer_ros:/workspace/cartographer_ws/install/pcl_conversions:/workspace/cartographer_ws/install/pcl_msgs:/workspace/cartographer_ws/install/isaac_ros_tensor_list_interfaces:/workspace/cartographer_ws/install/isaac_ros_pointcloud_interfaces:/workspace/cartographer_ws/install/isaac_ros_nova_interfaces:/workspace/cartographer_ws/install/isaac_ros_nitros_bridge_interfaces:/workspace/cartographer_ws/install/isaac_ros_common:/workspace/cartographer_ws/install/isaac_ros_bi3d_interfaces:/workspace/cartographer_ws/install/isaac_ros_apriltag_interfaces:/workspace/cartographer_ws/install/control_msgs:/workspace/cartographer_ws/install/cartographer_ros_msgs:/workspace/cartographer_ws/install/cartographer:/workspace/cartographer_ws/install/absl:/workspaces/isaac_ros-dev/install/qcar2_autonomy:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble'), ('TF_AUTOTUNE_THRESHOLD', '2')]), 'shell': False}
+[8.948081] (magic_enum) StdoutLine: {'line': b'-- Install configuration: ""\n'}
+[8.948188] (magic_enum) StdoutLine: {'line': b'-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum\n'}
+[8.948241] (magic_enum) StdoutLine: {'line': b'-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_containers.hpp\n'}
+[8.948308] (magic_enum) StdoutLine: {'line': b'-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_fuse.hpp\n'}
+[8.948351] (magic_enum) StdoutLine: {'line': b'-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_switch.hpp\n'}
+[8.948391] (magic_enum) StdoutLine: {'line': b'-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_utility.hpp\n'}
+[8.948431] (magic_enum) StdoutLine: {'line': b'-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_iostream.hpp\n'}
+[8.948474] (magic_enum) StdoutLine: {'line': b'-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_all.hpp\n'}
+[8.948515] (magic_enum) StdoutLine: {'line': b'-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_format.hpp\n'}
+[8.948563] (magic_enum) StdoutLine: {'line': b'-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_flags.hpp\n'}
+[8.948591] (magic_enum) StdoutLine: {'line': b'-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum.hpp\n'}
+[8.948682] (magic_enum) StdoutLine: {'line': b'-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/share/cmake/magic_enum/magic_enumConfig.cmake\n'}
+[8.948730] (magic_enum) StdoutLine: {'line': b'-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/share/cmake/magic_enum/magic_enumConfigVersion.cmake\n'}
+[8.948784] (magic_enum) StdoutLine: {'line': b'-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/share/pkgconfig/magic_enum.pc\n'}
+[8.948841] (magic_enum) StdoutLine: {'line': b'-- Installing: /workspaces/isaac_ros-dev/install/magic_enum/share/magic_enum/package.xml\n'}
+[8.949685] (magic_enum) CommandEnded: {'returncode': 0}
+[9.021948] (-) TimerEvent: {}
+[9.030832] (magic_enum) JobEnded: {'identifier': 'magic_enum', 'rc': 0}
+[9.031295] (-) EventReactorShutdown: {}

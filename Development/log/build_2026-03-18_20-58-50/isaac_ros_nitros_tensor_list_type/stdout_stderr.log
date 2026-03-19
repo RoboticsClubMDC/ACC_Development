@@ -1,0 +1,37 @@
+[35m[1mConsolidate compiler generated dependencies of target isaac_ros_nitros_tensor_list_type[0m
+[ 75%] Built target isaac_ros_nitros_tensor_list_type
+[35m[1mConsolidate compiler generated dependencies of target nitros_tensor_list_forward_node[0m
+[100%] Built target nitros_tensor_list_forward_node
+-- Install configuration: "Release"
+-- Execute custom install script
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_nitros_tensor_list_type/share/isaac_ros_nitros_tensor_list_type/test/config/test_forward_node.yaml
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_nitros_tensor_list_type/include/isaac_ros_nitros_tensor_list_type/nitros_data_type.hpp
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_nitros_tensor_list_type/include/isaac_ros_nitros_tensor_list_type/nitros_tensor.hpp
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_nitros_tensor_list_type/include/isaac_ros_nitros_tensor_list_type/nitros_tensor_builder.hpp
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_nitros_tensor_list_type/include/isaac_ros_nitros_tensor_list_type/nitros_tensor_list.hpp
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_nitros_tensor_list_type/include/isaac_ros_nitros_tensor_list_type/nitros_tensor_list_builder.hpp
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_nitros_tensor_list_type/include/isaac_ros_nitros_tensor_list_type/nitros_tensor_list_view.hpp
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_nitros_tensor_list_type/include/isaac_ros_nitros_tensor_list_type/nitros_tensor_shape.hpp
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_nitros_tensor_list_type/share/isaac_ros_nitros_tensor_list_type/environment/library_path.sh
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_nitros_tensor_list_type/share/isaac_ros_nitros_tensor_list_type/environment/library_path.dsv
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_nitros_tensor_list_type/lib/libisaac_ros_nitros_tensor_list_type.so
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_nitros_tensor_list_type/lib/libnitros_tensor_list_forward_node.so
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_nitros_tensor_list_type/share/ament_index/resource_index/package_run_dependencies/isaac_ros_nitros_tensor_list_type
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_nitros_tensor_list_type/share/ament_index/resource_index/parent_prefix_path/isaac_ros_nitros_tensor_list_type
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_nitros_tensor_list_type/share/isaac_ros_nitros_tensor_list_type/environment/ament_prefix_path.sh
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_nitros_tensor_list_type/share/isaac_ros_nitros_tensor_list_type/environment/ament_prefix_path.dsv
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_nitros_tensor_list_type/share/isaac_ros_nitros_tensor_list_type/environment/path.sh
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_nitros_tensor_list_type/share/isaac_ros_nitros_tensor_list_type/environment/path.dsv
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_nitros_tensor_list_type/share/isaac_ros_nitros_tensor_list_type/local_setup.bash
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_nitros_tensor_list_type/share/isaac_ros_nitros_tensor_list_type/local_setup.sh
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_nitros_tensor_list_type/share/isaac_ros_nitros_tensor_list_type/local_setup.zsh
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_nitros_tensor_list_type/share/isaac_ros_nitros_tensor_list_type/local_setup.dsv
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_nitros_tensor_list_type/share/isaac_ros_nitros_tensor_list_type/package.dsv
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_nitros_tensor_list_type/share/ament_index/resource_index/packages/isaac_ros_nitros_tensor_list_type
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_nitros_tensor_list_type/share/ament_index/resource_index/rclcpp_components/isaac_ros_nitros_tensor_list_type
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_nitros_tensor_list_type/share/isaac_ros_nitros_tensor_list_type/cmake/ament_cmake_export_dependencies-extras.cmake
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_nitros_tensor_list_type/share/isaac_ros_nitros_tensor_list_type/cmake/ament_cmake_export_include_directories-extras.cmake
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_nitros_tensor_list_type/share/isaac_ros_nitros_tensor_list_type/cmake/ament_cmake_export_libraries-extras.cmake
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_nitros_tensor_list_type/share/isaac_ros_nitros_tensor_list_type/cmake/isaac_ros_nitros_tensor_list_typeConfig.cmake
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_nitros_tensor_list_type/share/isaac_ros_nitros_tensor_list_type/cmake/isaac_ros_nitros_tensor_list_typeConfig-version.cmake
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_nitros_tensor_list_type/share/isaac_ros_nitros_tensor_list_type/package.xml

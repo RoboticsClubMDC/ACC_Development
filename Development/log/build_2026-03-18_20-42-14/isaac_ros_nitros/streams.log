@@ -1,0 +1,80 @@
+[0.052s] Invoking command in '/workspaces/isaac_ros-dev/build/isaac_ros_nitros': AMENT_PREFIX_PATH=/workspaces/isaac_ros-dev/install/gxf_isaac_gxf_helpers:/workspaces/isaac_ros-dev/install/gxf_isaac_atlas:/workspaces/isaac_ros-dev/install/gxf_isaac_sight:/workspaces/isaac_ros-dev/install/gxf_isaac_optimizer:/workspaces/isaac_ros-dev/install/gxf_isaac_message_compositor:/workspaces/isaac_ros-dev/install/gxf_isaac_gems:/workspaces/isaac_ros-dev/install/isaac_ros_nitros_interfaces:/workspaces/isaac_ros-dev/install/isaac_ros_gxf:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/workspaces/isaac_ros-dev/install/gxf_isaac_gxf_helpers:/workspaces/isaac_ros-dev/install/gxf_isaac_atlas:/workspaces/isaac_ros-dev/install/gxf_isaac_sight:/workspaces/isaac_ros-dev/install/gxf_isaac_optimizer:/workspaces/isaac_ros-dev/install/gxf_isaac_message_compositor:/workspaces/isaac_ros-dev/install/gxf_isaac_gems:/workspaces/isaac_ros-dev/install/isaac_ros_nitros_interfaces:/workspaces/isaac_ros-dev/install/isaac_ros_gxf:/workspaces/isaac_ros-dev/install/qcar2_nodes:/workspaces/isaac_ros-dev/install/qcar2_interfaces:/workspace/cartographer_ws/install/perception_pcl:/workspace/cartographer_ws/install/pcl_ros:/workspace/cartographer_ws/install/cartographer_rviz:/workspace/cartographer_ws/install/cartographer_ros:/workspace/cartographer_ws/install/pcl_conversions:/workspace/cartographer_ws/install/pcl_msgs:/workspace/cartographer_ws/install/isaac_ros_tensor_list_interfaces:/workspace/cartographer_ws/install/isaac_ros_pointcloud_interfaces:/workspace/cartographer_ws/install/isaac_ros_nova_interfaces:/workspace/cartographer_ws/install/isaac_ros_nitros_bridge_interfaces:/workspace/cartographer_ws/install/isaac_ros_common:/workspace/cartographer_ws/install/isaac_ros_bi3d_interfaces:/workspace/cartographer_ws/install/isaac_ros_apriltag_interfaces:/workspace/cartographer_ws/install/control_msgs:/workspace/cartographer_ws/install/cartographer_ros_msgs:/workspace/cartographer_ws/install/cartographer:/workspace/cartographer_ws/install/absl:/workspaces/isaac_ros-dev/install/qcar2_autonomy:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble LD_LIBRARY_PATH=/workspaces/isaac_ros-dev/install/gxf_isaac_gxf_helpers/lib:/workspaces/isaac_ros-dev/install/gxf_isaac_atlas/lib:/workspaces/isaac_ros-dev/install/gxf_isaac_sight/lib:/workspaces/isaac_ros-dev/install/gxf_isaac_optimizer/lib:/workspaces/isaac_ros-dev/install/gxf_isaac_message_compositor/lib:/workspaces/isaac_ros-dev/install/gxf_isaac_gems/lib:/workspaces/isaac_ros-dev/install/isaac_ros_nitros_interfaces/lib:/workspaces/isaac_ros-dev/install/isaac_ros_gxf/lib:${LD_LIBRARY_PATH} PYTHONPATH=/workspaces/isaac_ros-dev/install/isaac_ros_nitros_interfaces/lib/python3.8/site-packages:${PYTHONPATH} /usr/bin/cmake /workspaces/isaac_ros-dev/ros2/src/isaac_ros_nitros/isaac_ros_nitros -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/workspaces/isaac_ros-dev/install/isaac_ros_nitros
+[0.099s] -- The C compiler identification is GNU 9.4.0
+[0.137s] -- The CXX compiler identification is GNU 9.4.0
+[0.142s] -- Detecting C compiler ABI info
+[0.185s] -- Detecting C compiler ABI info - done
+[0.190s] -- Check for working C compiler: /usr/bin/cc - skipped
+[0.190s] -- Detecting C compile features
+[0.190s] -- Detecting C compile features - done
+[0.192s] -- Detecting CXX compiler ABI info
+[0.243s] -- Detecting CXX compiler ABI info - done
+[0.247s] -- Check for working CXX compiler: /usr/bin/c++ - skipped
+[0.247s] -- Detecting CXX compile features
+[0.248s] -- Detecting CXX compile features - done
+[0.250s] -- Found ament_cmake_auto: 1.3.5 (/opt/ros/humble/share/ament_cmake_auto/cmake)
+[0.689s] -- Found Python3: /usr/bin/python3.8 (found version "3.8.10") found components: Interpreter 
+[0.728s] -- Override CMake install command with custom implementation using symlinks instead of copying resources
+[0.801s] -- Loading isaac_ros_common extras
+[0.801s] -- CMAKE_BUILD_TYPE: Release
+[0.813s] -- Looking for pthread.h
+[0.863s] -- Looking for pthread.h - found
+[0.863s] -- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+[0.911s] -- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Failed
+[0.911s] -- Looking for pthread_create in pthreads
+[0.948s] -- Looking for pthread_create in pthreads - not found
+[0.948s] -- Looking for pthread_create in pthread
+[0.993s] -- Looking for pthread_create in pthread - found
+[0.993s] -- Found Threads: TRUE  
+[1.007s] -- Found CUDA: /usr/local/cuda (found version "11.8") 
+[1.007s] -- Loading isaac_ros_common extras (modules)
+[1.049s] -- Found rosidl_generator_c: 3.1.5 (/opt/ros/humble/share/rosidl_generator_c/cmake)
+[1.054s] -- Found rosidl_adapter: 3.1.5 (/opt/ros/humble/share/rosidl_adapter/cmake)
+[1.062s] -- Found rosidl_generator_cpp: 3.1.5 (/opt/ros/humble/share/rosidl_generator_cpp/cmake)
+[1.074s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[1.090s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[1.146s] -- Found rmw_implementation_cmake: 6.1.1 (/opt/ros/humble/share/rmw_implementation_cmake/cmake)
+[1.150s] -- Found rmw_fastrtps_cpp: 6.2.4 (/opt/ros/humble/share/rmw_fastrtps_cpp/cmake)
+[1.260s] -- Found OpenSSL: /usr/lib/x86_64-linux-gnu/libcrypto.so (found version "1.1.1f")  
+[1.285s] -- Found FastRTPS: /opt/ros/humble/include  
+[1.331s] -- Using RMW implementation 'rmw_fastrtps_cpp' as default
+[1.514s] -- Loading isaac_ros_gxf extras
+[1.556s] -- Found ament_lint_auto: 0.12.8 (/opt/ros/humble/share/ament_lint_auto/cmake)
+[1.591s] -- Found launch_testing_ament_cmake: 1.0.4 (/opt/ros/humble/share/launch_testing_ament_cmake/cmake)
+[1.593s] -- Found python_cmake_module: 0.10.0 (/opt/ros/humble/share/python_cmake_module/cmake)
+[1.614s] -- Found PythonInterp: /usr/bin/python3 (found suitable version "3.8.10", minimum required is "3.6") 
+[1.617s] -- Found PythonLibs: /usr/lib/x86_64-linux-gnu/libpython3.8.so (found suitable version "3.8.10", minimum required is "3.5") 
+[1.617s] -- Using PYTHON_EXECUTABLE: /usr/bin/python3
+[1.617s] -- Using PYTHON_INCLUDE_DIRS: /usr/include/python3.8
+[1.617s] -- Using PYTHON_LIBRARIES: /usr/lib/x86_64-linux-gnu/libpython3.8.so
+[1.636s] -- Found PythonExtra: .so  
+[1.642s] -- Added test 'cppcheck' to perform static code analysis on C / C++ code
+[1.642s] -- Configured cppcheck include dirs: /workspaces/isaac_ros-dev/ros2/src/isaac_ros_nitros/isaac_ros_nitros/include
+[1.642s] -- Configured cppcheck exclude dirs and/or files: 
+[1.644s] -- Added test 'cpplint' to check C / C++ code against the Google style
+[1.644s] -- Configured cpplint exclude dirs and/or files: 
+[1.644s] -- Added test 'flake8' to check Python code syntax and style conventions
+[1.645s] -- Added test 'lint_cmake' to check CMake code style
+[1.646s] -- Added test 'pep257' to check Python code against some of the docstring style conventions in PEP 257
+[1.647s] -- Added test 'uncrustify' to check C / C++ code style
+[1.647s] -- Configured uncrustify additional arguments: 
+[1.648s] -- Added test 'xmllint' to check XML markup files
+[1.650s] -- Configuring done
+[1.654s] [31mCMake Error at /opt/ros/humble/share/ament_cmake_auto/cmake/ament_auto_add_library.cmake:66 (add_library):
+[1.654s]   Target "isaac_ros_nitros" links to target "magic_enum::magic_enum" but the
+[1.654s]   target was not found.  Perhaps a find_package() call is missing for an
+[1.654s]   IMPORTED target, or an ALIAS target is missing?
+[1.654s] Call Stack (most recent call first):
+[1.654s]   CMakeLists.txt:76 (ament_auto_add_library)
+[1.654s] 
+[1.654s] [0m
+[1.654s] [31mCMake Error at /opt/ros/humble/share/ament_cmake_auto/cmake/ament_auto_add_library.cmake:66 (add_library):
+[1.654s]   Target "nitros_empty_forward_node" links to target "magic_enum::magic_enum"
+[1.654s]   but the target was not found.  Perhaps a find_package() call is missing for
+[1.654s]   an IMPORTED target, or an ALIAS target is missing?
+[1.654s] Call Stack (most recent call first):
+[1.654s]   CMakeLists.txt:102 (ament_auto_add_library)
+[1.654s] 
+[1.654s] [0m
+[1.672s] -- Generating done
+[1.673s] [0mCMake Generate step failed.  Build files cannot be regenerated correctly.[0m
+[1.679s] Invoked command in '/workspaces/isaac_ros-dev/build/isaac_ros_nitros' returned '1': AMENT_PREFIX_PATH=/workspaces/isaac_ros-dev/install/gxf_isaac_gxf_helpers:/workspaces/isaac_ros-dev/install/gxf_isaac_atlas:/workspaces/isaac_ros-dev/install/gxf_isaac_sight:/workspaces/isaac_ros-dev/install/gxf_isaac_optimizer:/workspaces/isaac_ros-dev/install/gxf_isaac_message_compositor:/workspaces/isaac_ros-dev/install/gxf_isaac_gems:/workspaces/isaac_ros-dev/install/isaac_ros_nitros_interfaces:/workspaces/isaac_ros-dev/install/isaac_ros_gxf:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/workspaces/isaac_ros-dev/install/gxf_isaac_gxf_helpers:/workspaces/isaac_ros-dev/install/gxf_isaac_atlas:/workspaces/isaac_ros-dev/install/gxf_isaac_sight:/workspaces/isaac_ros-dev/install/gxf_isaac_optimizer:/workspaces/isaac_ros-dev/install/gxf_isaac_message_compositor:/workspaces/isaac_ros-dev/install/gxf_isaac_gems:/workspaces/isaac_ros-dev/install/isaac_ros_nitros_interfaces:/workspaces/isaac_ros-dev/install/isaac_ros_gxf:/workspaces/isaac_ros-dev/install/qcar2_nodes:/workspaces/isaac_ros-dev/install/qcar2_interfaces:/workspace/cartographer_ws/install/perception_pcl:/workspace/cartographer_ws/install/pcl_ros:/workspace/cartographer_ws/install/cartographer_rviz:/workspace/cartographer_ws/install/cartographer_ros:/workspace/cartographer_ws/install/pcl_conversions:/workspace/cartographer_ws/install/pcl_msgs:/workspace/cartographer_ws/install/isaac_ros_tensor_list_interfaces:/workspace/cartographer_ws/install/isaac_ros_pointcloud_interfaces:/workspace/cartographer_ws/install/isaac_ros_nova_interfaces:/workspace/cartographer_ws/install/isaac_ros_nitros_bridge_interfaces:/workspace/cartographer_ws/install/isaac_ros_common:/workspace/cartographer_ws/install/isaac_ros_bi3d_interfaces:/workspace/cartographer_ws/install/isaac_ros_apriltag_interfaces:/workspace/cartographer_ws/install/control_msgs:/workspace/cartographer_ws/install/cartographer_ros_msgs:/workspace/cartographer_ws/install/cartographer:/workspace/cartographer_ws/install/absl:/workspaces/isaac_ros-dev/install/qcar2_autonomy:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble LD_LIBRARY_PATH=/workspaces/isaac_ros-dev/install/gxf_isaac_gxf_helpers/lib:/workspaces/isaac_ros-dev/install/gxf_isaac_atlas/lib:/workspaces/isaac_ros-dev/install/gxf_isaac_sight/lib:/workspaces/isaac_ros-dev/install/gxf_isaac_optimizer/lib:/workspaces/isaac_ros-dev/install/gxf_isaac_message_compositor/lib:/workspaces/isaac_ros-dev/install/gxf_isaac_gems/lib:/workspaces/isaac_ros-dev/install/isaac_ros_nitros_interfaces/lib:/workspaces/isaac_ros-dev/install/isaac_ros_gxf/lib:${LD_LIBRARY_PATH} PYTHONPATH=/workspaces/isaac_ros-dev/install/isaac_ros_nitros_interfaces/lib/python3.8/site-packages:${PYTHONPATH} /usr/bin/cmake /workspaces/isaac_ros-dev/ros2/src/isaac_ros_nitros/isaac_ros_nitros -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/workspaces/isaac_ros-dev/install/isaac_ros_nitros

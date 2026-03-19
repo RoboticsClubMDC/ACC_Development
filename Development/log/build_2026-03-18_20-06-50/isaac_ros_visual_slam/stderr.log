@@ -1,0 +1,7 @@
+[31mCMake Error at /opt/ros/humble/share/ament_cmake_core/cmake/index/ament_index_get_resource.cmake:62 (message):
+  ament_index_get_resource() called with not existing resource ('cuvslam'
+  'isaac_ros_nitros')
+Call Stack (most recent call first):
+  CMakeLists.txt:37 (ament_index_get_resource)
+
+[0m

@@ -1,0 +1,5 @@
+[33mCMake Warning at CMakeLists.txt:32 (message):
+  Unsupported architecture: x86_64.  gxf_isaac_segway is only supported on
+  aarch64 platforms.
+
+[0m

@@ -1,0 +1,29 @@
+-- Install configuration: "Release"
+-- Execute custom install script
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_managed_nitros/share/isaac_ros_managed_nitros/gxf/include/isaac_ros_managed_nitros/managed_nitros_message_filters_subscriber.hpp
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_managed_nitros/share/isaac_ros_managed_nitros/gxf/include/isaac_ros_managed_nitros/managed_nitros_publisher.hpp
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_managed_nitros/share/isaac_ros_managed_nitros/gxf/include/isaac_ros_managed_nitros/managed_nitros_subscriber.hpp
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_managed_nitros/share/isaac_ros_managed_nitros/environment/library_path.sh
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_managed_nitros/share/isaac_ros_managed_nitros/environment/library_path.dsv
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_managed_nitros/include/isaac_ros_managed_nitros/managed_nitros_message_filters_subscriber.hpp
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_managed_nitros/include/isaac_ros_managed_nitros/managed_nitros_publisher.hpp
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_managed_nitros/include/isaac_ros_managed_nitros/managed_nitros_subscriber.hpp
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_managed_nitros/share/ament_index/resource_index/package_run_dependencies/isaac_ros_managed_nitros
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_managed_nitros/share/ament_index/resource_index/parent_prefix_path/isaac_ros_managed_nitros
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_managed_nitros/share/isaac_ros_managed_nitros/environment/ament_prefix_path.sh
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_managed_nitros/share/isaac_ros_managed_nitros/environment/ament_prefix_path.dsv
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_managed_nitros/share/isaac_ros_managed_nitros/environment/path.sh
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_managed_nitros/share/isaac_ros_managed_nitros/environment/path.dsv
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_managed_nitros/share/isaac_ros_managed_nitros/local_setup.bash
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_managed_nitros/share/isaac_ros_managed_nitros/local_setup.sh
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_managed_nitros/share/isaac_ros_managed_nitros/local_setup.zsh
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_managed_nitros/share/isaac_ros_managed_nitros/local_setup.dsv
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_managed_nitros/share/isaac_ros_managed_nitros/package.dsv
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_managed_nitros/share/ament_index/resource_index/packages/isaac_ros_managed_nitros
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_managed_nitros/share/isaac_ros_managed_nitros/cmake/ament_cmake_export_targets-extras.cmake
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_managed_nitros/share/isaac_ros_managed_nitros/cmake/ament_cmake_export_dependencies-extras.cmake
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_managed_nitros/share/isaac_ros_managed_nitros/cmake/ament_cmake_export_include_directories-extras.cmake
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_managed_nitros/share/isaac_ros_managed_nitros/cmake/isaac_ros_managed_nitrosConfig.cmake
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_managed_nitros/share/isaac_ros_managed_nitros/cmake/isaac_ros_managed_nitrosConfig-version.cmake
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_managed_nitros/share/isaac_ros_managed_nitros/package.xml
+-- Up-to-date: /workspaces/isaac_ros-dev/install/isaac_ros_managed_nitros/share/isaac_ros_managed_nitros/cmake/export_isaac_ros_managed_nitrosExport.cmake

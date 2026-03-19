@@ -1,0 +1,52 @@
+-- The CXX compiler identification is GNU 9.4.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Performing Test HAS_CPP20_FLAG
+-- Performing Test HAS_CPP20_FLAG - Failed
+-- Performing Test HAS_CPP23_FLAG
+-- Performing Test HAS_CPP23_FLAG - Failed
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /workspaces/isaac_ros-dev/build/magic_enum
+[35m[1mConsolidate compiler generated dependencies of target example_custom_name[0m
+[35m[1mConsolidate compiler generated dependencies of target example_containers_bitset[0m
+[35m[1mConsolidate compiler generated dependencies of target test-cpp17[0m
+[35m[1mConsolidate compiler generated dependencies of target example[0m
+[35m[1mConsolidate compiler generated dependencies of target example_containers_set[0m
+[35m[1mConsolidate compiler generated dependencies of target example_containers_array[0m
+[35m[1mConsolidate compiler generated dependencies of target test_containers-cpp17[0m
+[35m[1mConsolidate compiler generated dependencies of target test_aliases-cpp17[0m
+[35m[1mConsolidate compiler generated dependencies of target enum_flag_example[0m
+[35m[1mConsolidate compiler generated dependencies of target test_flags-cpp17[0m
+[35m[1mConsolidate compiler generated dependencies of target test_wchar_t-cpp17[0m
+[35m[1mConsolidate compiler generated dependencies of target example_switch[0m
+[  8%] Built target example
+[ 16%] Built target example_containers_array
+[ 25%] Built target example_containers_set
+[ 37%] Built target enum_flag_example
+[ 41%] Built target example_containers_bitset
+[ 50%] Built target test-cpp17
+[ 58%] Built target example_switch
+[ 66%] Built target test_containers-cpp17
+[ 75%] Built target test_wchar_t-cpp17
+[ 83%] Built target test_flags-cpp17
+[ 91%] Built target example_custom_name
+[100%] Built target test_aliases-cpp17
+-- Install configuration: ""
+-- Up-to-date: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum
+-- Up-to-date: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_containers.hpp
+-- Up-to-date: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_fuse.hpp
+-- Up-to-date: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_switch.hpp
+-- Up-to-date: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_utility.hpp
+-- Up-to-date: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_iostream.hpp
+-- Up-to-date: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_all.hpp
+-- Up-to-date: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_format.hpp
+-- Up-to-date: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum_flags.hpp
+-- Up-to-date: /workspaces/isaac_ros-dev/install/magic_enum/include/magic_enum/magic_enum.hpp
+-- Up-to-date: /workspaces/isaac_ros-dev/install/magic_enum/share/cmake/magic_enum/magic_enumConfig.cmake
+-- Up-to-date: /workspaces/isaac_ros-dev/install/magic_enum/share/cmake/magic_enum/magic_enumConfigVersion.cmake
+-- Up-to-date: /workspaces/isaac_ros-dev/install/magic_enum/share/pkgconfig/magic_enum.pc
+-- Up-to-date: /workspaces/isaac_ros-dev/install/magic_enum/share/magic_enum/package.xml

@@ -1,0 +1,25 @@
+-- Install configuration: "Release"
+-- Execute custom install script
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_atlas/share/gxf_isaac_atlas/gxf/lib/libgxf_isaac_atlas.so
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_atlas/share/gxf_isaac_atlas/gxf/include/extensions/atlas/composite_schema_server.hpp
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_atlas/share/gxf_isaac_atlas/gxf/include/extensions/atlas/pose_tree_frame.hpp
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_atlas/share/gxf_isaac_atlas/environment/library_path.sh
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_atlas/share/gxf_isaac_atlas/environment/library_path.dsv
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_atlas/share/ament_index/resource_index/package_run_dependencies/gxf_isaac_atlas
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_atlas/share/ament_index/resource_index/parent_prefix_path/gxf_isaac_atlas
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_atlas/share/gxf_isaac_atlas/environment/ament_prefix_path.sh
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_atlas/share/gxf_isaac_atlas/environment/ament_prefix_path.dsv
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_atlas/share/gxf_isaac_atlas/environment/path.sh
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_atlas/share/gxf_isaac_atlas/environment/path.dsv
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_atlas/share/gxf_isaac_atlas/local_setup.bash
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_atlas/share/gxf_isaac_atlas/local_setup.sh
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_atlas/share/gxf_isaac_atlas/local_setup.zsh
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_atlas/share/gxf_isaac_atlas/local_setup.dsv
+-- Symlinking: /workspaces/isaac_ros-dev/install/gxf_isaac_atlas/share/gxf_isaac_atlas/package.dsv
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_atlas/share/ament_index/resource_index/packages/gxf_isaac_atlas
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_atlas/share/gxf_isaac_atlas/cmake/ament_cmake_export_targets-extras.cmake
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_atlas/share/gxf_isaac_atlas/cmake/ament_cmake_export_dependencies-extras.cmake
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_atlas/share/gxf_isaac_atlas/cmake/gxf_isaac_atlasConfig.cmake
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_atlas/share/gxf_isaac_atlas/cmake/gxf_isaac_atlasConfig-version.cmake
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/gxf_isaac_atlas/share/gxf_isaac_atlas/package.xml
+-- Up-to-date: /workspaces/isaac_ros-dev/install/gxf_isaac_atlas/share/gxf_isaac_atlas/cmake/export_gxf_isaac_atlasExport.cmake

@@ -1,0 +1,17 @@
+[31mCMake Error at /opt/ros/humble/share/ament_cmake_auto/cmake/ament_auto_add_library.cmake:66 (add_library):
+  Target "isaac_ros_nitros" links to target "magic_enum::magic_enum" but the
+  target was not found.  Perhaps a find_package() call is missing for an
+  IMPORTED target, or an ALIAS target is missing?
+Call Stack (most recent call first):
+  CMakeLists.txt:76 (ament_auto_add_library)
+
+[0m
+[31mCMake Error at /opt/ros/humble/share/ament_cmake_auto/cmake/ament_auto_add_library.cmake:66 (add_library):
+  Target "nitros_empty_forward_node" links to target "magic_enum::magic_enum"
+  but the target was not found.  Perhaps a find_package() call is missing for
+  an IMPORTED target, or an ALIAS target is missing?
+Call Stack (most recent call first):
+  CMakeLists.txt:102 (ament_auto_add_library)
+
+[0m
+[0mCMake Generate step failed.  Build files cannot be regenerated correctly.[0m

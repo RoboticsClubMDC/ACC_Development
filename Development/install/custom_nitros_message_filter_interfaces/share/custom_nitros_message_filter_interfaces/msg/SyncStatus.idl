@@ -1,0 +1,23 @@
+// generated from rosidl_adapter/resource/msg.idl.em
+// with input from custom_nitros_message_filter_interfaces/msg/SyncStatus.msg
+// generated code does not contain a copyright notice
+
+#include "builtin_interfaces/msg/Time.idl"
+
+module custom_nitros_message_filter_interfaces {
+  module msg {
+    @verbatim (language="comment", text=
+      "Timestamp for this observation")
+    struct SyncStatus {
+      builtin_interfaces::msg::Time stamp;
+
+      @verbatim (language="comment", text=
+        "Boolean indicating whether all present messages shared exactly the same Timestamp")
+      boolean exact_time_match;
+
+      @verbatim (language="comment", text=
+        "Boolean array indicating whether or not each message in the synchronization set was present")
+      sequence<boolean> messages_present;
+    };
+  };
+};

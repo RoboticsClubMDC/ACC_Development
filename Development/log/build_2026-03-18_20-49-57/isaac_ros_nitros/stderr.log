@@ -1,0 +1,63 @@
+In file included from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/parameter_registrar.hpp:31[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/registrar.hpp:28[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/component.hpp:31[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/std/allocator.hpp:21[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/multimedia/video.hpp:28[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/ros2/src/isaac_ros_nitros/isaac_ros_nitros/include/isaac_ros_nitros/utils/vpi_utilities.hpp:27[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/ros2/src/isaac_ros_nitros/isaac_ros_nitros/src/utils/vpi_utilities.cpp:18[m[K:
+[01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/expected_macro.hpp:24:10:[m[K [01;31m[Kfatal error: [m[Kmagic_enum.hpp: No such file or directory
+   24 | #include [01;31m[K"magic_enum.hpp"[m[K  // NOLINT(build/include)
+      |          [01;31m[K^~~~~~~~~~~~~~~~[m[K
+compilation terminated.
+In file included from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/parameter_registrar.hpp:31[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/registrar.hpp:28[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/component.hpp:31[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/install/gxf_isaac_message_compositor/share/gxf_isaac_message_compositor/gxf/include/message_compositor/message_relay.hpp:25[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/ros2/src/isaac_ros_nitros/isaac_ros_nitros/include/isaac_ros_nitros/nitros_publisher.hpp:25[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/ros2/src/isaac_ros_nitros/isaac_ros_nitros/src/nitros_publisher.cpp:20[m[K:
+[01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/expected_macro.hpp:24:10:[m[K [01;31m[Kfatal error: [m[Kmagic_enum.hpp: No such file or directory
+   24 | #include [01;31m[K"magic_enum.hpp"[m[K  // NOLINT(build/include)
+      |          [01;31m[K^~~~~~~~~~~~~~~~[m[K
+compilation terminated.
+In file included from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/parameter_registrar.hpp:31[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/registrar.hpp:28[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/component.hpp:31[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/std/queue.hpp:21[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/std/receiver.hpp:21[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/ros2/src/isaac_ros_nitros/isaac_ros_nitros/include/isaac_ros_nitros/nitros_subscriber.hpp:28[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/ros2/src/isaac_ros_nitros/isaac_ros_nitros/src/nitros_subscriber.cpp:20[m[K:
+[01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/expected_macro.hpp:24:10:[m[K [01;31m[Kfatal error: [m[Kmagic_enum.hpp: No such file or directory
+   24 | #include [01;31m[K"magic_enum.hpp"[m[K  // NOLINT(build/include)
+      |          [01;31m[K^~~~~~~~~~~~~~~~[m[K
+compilation terminated.
+make[2]: *** [CMakeFiles/isaac_ros_nitros.dir/build.make:188: CMakeFiles/isaac_ros_nitros.dir/src/utils/vpi_utilities.cpp.o] Error 1
+make[2]: *** Waiting for unfinished jobs....
+make[2]: *** [CMakeFiles/isaac_ros_nitros.dir/build.make:146: CMakeFiles/isaac_ros_nitros.dir/src/nitros_publisher.cpp.o] Error 1
+make[2]: *** [CMakeFiles/isaac_ros_nitros.dir/build.make:160: CMakeFiles/isaac_ros_nitros.dir/src/nitros_subscriber.cpp.o] Error 1
+In file included from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/parameter_registrar.hpp:31[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/registrar.hpp:28[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/component.hpp:31[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/install/gxf_isaac_message_compositor/share/gxf_isaac_message_compositor/gxf/include/message_compositor/message_relay.hpp:25[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/ros2/src/isaac_ros_nitros/isaac_ros_nitros/include/isaac_ros_nitros/nitros_publisher.hpp:25[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/ros2/src/isaac_ros_nitros/isaac_ros_nitros/include/isaac_ros_nitros/nitros_publisher_subscriber_group.hpp:29[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/ros2/src/isaac_ros_nitros/isaac_ros_nitros/src/nitros_publisher_subscriber_group.cpp:18[m[K:
+[01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/expected_macro.hpp:24:10:[m[K [01;31m[Kfatal error: [m[Kmagic_enum.hpp: No such file or directory
+   24 | #include [01;31m[K"magic_enum.hpp"[m[K  // NOLINT(build/include)
+      |          [01;31m[K^~~~~~~~~~~~~~~~[m[K
+compilation terminated.
+make[2]: *** [CMakeFiles/isaac_ros_nitros.dir/build.make:174: CMakeFiles/isaac_ros_nitros.dir/src/nitros_publisher_subscriber_group.cpp.o] Error 1
+In file included from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/parameter_registrar.hpp:31[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/registrar.hpp:28[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/component.hpp:31[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/install/gxf_isaac_message_compositor/share/gxf_isaac_message_compositor/gxf/include/message_compositor/message_relay.hpp:25[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/ros2/src/isaac_ros_nitros/isaac_ros_nitros/include/isaac_ros_nitros/nitros_publisher.hpp:25[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/ros2/src/isaac_ros_nitros/isaac_ros_nitros/include/isaac_ros_nitros/nitros_publisher_subscriber_group.hpp:29[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/ros2/src/isaac_ros_nitros/isaac_ros_nitros/include/isaac_ros_nitros/nitros_node.hpp:31[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/ros2/src/isaac_ros_nitros/isaac_ros_nitros/src/nitros_node.cpp:26[m[K:
+[01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/expected_macro.hpp:24:10:[m[K [01;31m[Kfatal error: [m[Kmagic_enum.hpp: No such file or directory
+   24 | #include [01;31m[K"magic_enum.hpp"[m[K  // NOLINT(build/include)
+      |          [01;31m[K^~~~~~~~~~~~~~~~[m[K
+compilation terminated.
+make[2]: *** [CMakeFiles/isaac_ros_nitros.dir/build.make:76: CMakeFiles/isaac_ros_nitros.dir/src/nitros_node.cpp.o] Error 1
+make[1]: *** [CMakeFiles/Makefile2:139: CMakeFiles/isaac_ros_nitros.dir/all] Error 2
+make: *** [Makefile:146: all] Error 2

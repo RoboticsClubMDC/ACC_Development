@@ -1,0 +1,248 @@
+-- Architecture: x86_64
+-- Found ament_cmake_auto: 1.3.5 (/opt/ros/humble/share/ament_cmake_auto/cmake)
+-- Override CMake install command with custom implementation using symlinks instead of copying resources
+-- Loading isaac_ros_common extras
+-- CMAKE_BUILD_TYPE: Release
+-- Loading isaac_ros_common extras (modules)
+-- Found rosidl_generator_c: 3.1.5 (/opt/ros/humble/share/rosidl_generator_c/cmake)
+-- Found rosidl_adapter: 3.1.5 (/opt/ros/humble/share/rosidl_adapter/cmake)
+-- Found rosidl_generator_cpp: 3.1.5 (/opt/ros/humble/share/rosidl_generator_cpp/cmake)
+-- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+-- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+-- Found rmw_implementation_cmake: 6.1.1 (/opt/ros/humble/share/rmw_implementation_cmake/cmake)
+-- Found rmw_fastrtps_cpp: 6.2.4 (/opt/ros/humble/share/rmw_fastrtps_cpp/cmake)
+-- Using RMW implementation 'rmw_fastrtps_cpp' as default
+-- Found ament_lint_auto: 0.12.8 (/opt/ros/humble/share/ament_lint_auto/cmake)
+-- Added test 'cppcheck' to perform static code analysis on C / C++ code
+-- Configured cppcheck include dirs: 
+-- Configured cppcheck exclude dirs and/or files: 
+-- Added test 'cpplint' to check C / C++ code against the Google style
+-- Configured cpplint exclude dirs and/or files: 
+-- Added test 'lint_cmake' to check CMake code style
+-- Added test 'uncrustify' to check C / C++ code style
+-- Configured uncrustify additional arguments: 
+-- Added test 'xmllint' to check XML markup files
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /workspaces/isaac_ros-dev/build/isaac_ros_gxf
+[35m[1mConsolidate compiler generated dependencies of target isaac_ros_gxf[0m
+[100%] Built target isaac_ros_gxf
+-- Install configuration: "Release"
+-- Execute custom install script
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//common/assert.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//common/backtrace.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//common/byte.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//common/endian.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//common/expected.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//common/fixed_map.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//common/fixed_string.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//common/fixed_vector.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//common/iterator.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//common/logger.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//common/memory_utils.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//common/nvtx_helper.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//common/singleton.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//common/span.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//common/strong_type.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//common/type_name.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//common/type_name_gnuc.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//common/type_utils.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//common/unique_index_map.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//common/yaml_parser.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//dlpack/dlpack.h
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/app/application.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/app/arg.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/app/arg_parse.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/app/config_parser.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/app/driver.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/app/extension_manager.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/app/graph_entity.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/app/graph_utils.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/app/proxy_component.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/app/segment.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/app/worker.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/behavior_tree/constant_behavior.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/behavior_tree/entity_count_failure_repeat_controller.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/behavior_tree/parallel_behavior.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/behavior_tree/repeat_behavior.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/behavior_tree/selector_behavior.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/behavior_tree/sequence_behavior.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/behavior_tree/switch_behavior.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/behavior_tree/timer_behavior.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/core/common_expected_macro.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/core/component.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/core/entity.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/core/expected.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/core/expected_macro.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/core/filepath.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/core/gxf.h
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/core/gxf_ext.h
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/core/handle.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/core/parameter.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/core/parameter_parser.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/core/parameter_parser_std.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/core/parameter_registrar.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/core/parameter_storage.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/core/parameter_wrapper.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/core/registrar.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/core/resource.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/core/resource_manager.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/core/resource_registrar.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/core/type_registry.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/cuda/cuda_common.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/cuda/cuda_event.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/cuda/cuda_stream.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/cuda/cuda_stream_id.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/cuda/cuda_stream_pool.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/cuda/cuda_stream_sync.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/cuda/tests/test_cuda_helper.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/ipc/grpc/grpc_client.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/ipc/grpc/grpc_server.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/ipc/http/http_client.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/ipc/http/http_client_cpprest_impl.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/ipc/http/http_ipc_client.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/ipc/http/http_server.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/logger/gxf_logger.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/logger/logger.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/multimedia/audio.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/multimedia/camera.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/multimedia/video.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/network/tcp_client.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/network/tcp_client_socket.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/network/tcp_codelet.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/network/tcp_server.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/network/tcp_server_socket.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/npp/nppi_mul_c.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/npp/nppi_set.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/serialization/component_serializer.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/serialization/endpoint.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/serialization/entity_recorder.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/serialization/entity_replayer.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/serialization/entity_serializer.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/serialization/file.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/serialization/file_stream.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/serialization/serialization_buffer.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/serialization/std_component_serializer.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/serialization/std_entity_id_serializer.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/serialization/std_entity_serializer.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/serialization/tests/serialization_tester.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/serialization/tid_hash.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/allocator.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/block_memory_pool.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/clock.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/codelet.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/complex.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/component_allocator.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/component_factory.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/controller.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/cpu_thread.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/default_extension.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/dlpack_utils.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/double_buffer_receiver.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/double_buffer_transmitter.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/eos.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/event_based_scheduler.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/extension.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/extension_factory_helper.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/gems/event_list/event_list.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/gems/event_list/unique_event_list.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/gems/queue_thread/queue_thread.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/gems/staging_queue/staging_queue.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/gems/staging_queue/staging_queue_iterator.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/gems/suballocators/first_fit_allocator.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/gems/suballocators/first_fit_allocator_base.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/gems/timed_job_list/timed_job_list.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/gems/utils/time.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/gems/video_buffer/allocator.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/graph_driver.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/graph_driver_worker_common.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/graph_worker.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/greedy_scheduler.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/ipc_client.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/ipc_server.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/memory_buffer.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/metric.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/monitor.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/multi_thread_scheduler.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/network_context.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/new_component_allocator.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/queue.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/receiver.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/resources.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/scheduler.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/scheduling_condition.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/scheduling_term.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/scheduling_terms.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/system.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/tensor.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/timestamp.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/topic.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/transmitter.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/unbounded_allocator.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/vault.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/std/yaml_file_loader.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/stream/stream_nvsci.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/stream/stream_nvscisync.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/stream/stream_sync_id.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/stream/tests/test_gxf_stream_sync_cuda_helper.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/ucx/ucx_common.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/ucx/ucx_component_serializer.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/ucx/ucx_context.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/ucx/ucx_entity_serializer.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/ucx/ucx_receiver.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/ucx/ucx_serialization_buffer.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//gxf/ucx/ucx_transmitter.hpp
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include//third_party/LICENSE.txt
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/lib/behavior_tree/libgxf_behavior_tree.so
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/lib/core/core_pybind.so
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/lib/core/libgxf_core.so
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/lib/cuda/cuda_pybind.so
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/lib/cuda/libgxf_cuda.so
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/lib/cuda/tests/libgxf_test_cuda.so
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/lib/ipc/grpc/libgxf_grpc.so
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/lib/ipc/http/libgxf_http.so
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/lib/logger/libgxf_logger.so
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/lib/multimedia/libgxf_multimedia.so
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/lib/network/libgxf_network.so
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/lib/npp/libgxf_npp.so
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/lib/python_codelet/libgxf_python_codelet.so
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/lib/python_codelet/pycodelet.so
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/lib/sample/libgxf_sample.so
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/lib/serialization/libgxf_serialization.so
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/lib/std/allocator_pybind.so
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/lib/std/clock_pybind.so
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/lib/std/libgxf_std.so
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/lib/std/receiver_pybind.so
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/lib/std/tensor_pybind.so
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/lib/std/timestamp_pybind.so
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/lib/std/transmitter_pybind.so
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/lib/std/vault_pybind.so
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/lib/test/extensions/libgxf_test.so
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/lib/libgxf_core.so
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/lib/libgxf_logger.so
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/lib/libgxf_multimedia.so
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/lib/libgxf_cuda.so
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/ament_index/resource_index/isaac_ros_gxf_cmake_path/isaac_ros_gxf
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/environment/library_path.sh
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/environment/library_path.dsv
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/cmake/isaac_ros_gxf-extras.cmake
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/cmake/modules/FindGXF.cmake
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/ament_index/resource_index/package_run_dependencies/isaac_ros_gxf
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/ament_index/resource_index/parent_prefix_path/isaac_ros_gxf
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/environment/ament_prefix_path.sh
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/environment/ament_prefix_path.dsv
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/environment/path.sh
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/environment/path.dsv
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/local_setup.bash
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/local_setup.sh
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/local_setup.zsh
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/local_setup.dsv
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/package.dsv
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/ament_index/resource_index/packages/isaac_ros_gxf
+-- Up-to-date symlink: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/cmake/isaac_ros_gxf-extras.cmake
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/cmake/ament_cmake_export_targets-extras.cmake
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/cmake/ament_cmake_export_dependencies-extras.cmake
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/cmake/isaac_ros_gxfConfig.cmake
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/cmake/isaac_ros_gxfConfig-version.cmake
+-- Symlinking: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/package.xml
+-- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/cmake/export_isaac_ros_gxfExport.cmake

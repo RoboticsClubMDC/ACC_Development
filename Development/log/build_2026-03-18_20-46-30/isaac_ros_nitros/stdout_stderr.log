@@ -1,0 +1,134 @@
+-- The C compiler identification is GNU 9.4.0
+-- The CXX compiler identification is GNU 9.4.0
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Found ament_cmake_auto: 1.3.5 (/opt/ros/humble/share/ament_cmake_auto/cmake)
+-- Found Python3: /usr/bin/python3.8 (found version "3.8.10") found components: Interpreter 
+-- Override CMake install command with custom implementation using symlinks instead of copying resources
+-- Loading isaac_ros_common extras
+-- CMAKE_BUILD_TYPE: Release
+-- Looking for pthread.h
+-- Looking for pthread.h - found
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Failed
+-- Looking for pthread_create in pthreads
+-- Looking for pthread_create in pthreads - not found
+-- Looking for pthread_create in pthread
+-- Looking for pthread_create in pthread - found
+-- Found Threads: TRUE  
+-- Found CUDA: /usr/local/cuda (found version "11.8") 
+-- Loading isaac_ros_common extras (modules)
+-- Found rosidl_generator_c: 3.1.5 (/opt/ros/humble/share/rosidl_generator_c/cmake)
+-- Found rosidl_adapter: 3.1.5 (/opt/ros/humble/share/rosidl_adapter/cmake)
+-- Found rosidl_generator_cpp: 3.1.5 (/opt/ros/humble/share/rosidl_generator_cpp/cmake)
+-- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+-- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+-- Found rmw_implementation_cmake: 6.1.1 (/opt/ros/humble/share/rmw_implementation_cmake/cmake)
+-- Found rmw_fastrtps_cpp: 6.2.4 (/opt/ros/humble/share/rmw_fastrtps_cpp/cmake)
+-- Found OpenSSL: /usr/lib/x86_64-linux-gnu/libcrypto.so (found version "1.1.1f")  
+-- Found FastRTPS: /opt/ros/humble/include  
+-- Using RMW implementation 'rmw_fastrtps_cpp' as default
+-- Loading isaac_ros_gxf extras
+-- Found ament_lint_auto: 0.12.8 (/opt/ros/humble/share/ament_lint_auto/cmake)
+-- Found launch_testing_ament_cmake: 1.0.4 (/opt/ros/humble/share/launch_testing_ament_cmake/cmake)
+-- Found python_cmake_module: 0.10.0 (/opt/ros/humble/share/python_cmake_module/cmake)
+-- Found PythonInterp: /usr/bin/python3 (found suitable version "3.8.10", minimum required is "3.6") 
+-- Found PythonLibs: /usr/lib/x86_64-linux-gnu/libpython3.8.so (found suitable version "3.8.10", minimum required is "3.5") 
+-- Using PYTHON_EXECUTABLE: /usr/bin/python3
+-- Using PYTHON_INCLUDE_DIRS: /usr/include/python3.8
+-- Using PYTHON_LIBRARIES: /usr/lib/x86_64-linux-gnu/libpython3.8.so
+-- Found PythonExtra: .so  
+-- Added test 'cppcheck' to perform static code analysis on C / C++ code
+-- Configured cppcheck include dirs: /workspaces/isaac_ros-dev/ros2/src/isaac_ros_nitros/isaac_ros_nitros/include
+-- Configured cppcheck exclude dirs and/or files: 
+-- Added test 'cpplint' to check C / C++ code against the Google style
+-- Configured cpplint exclude dirs and/or files: 
+-- Added test 'flake8' to check Python code syntax and style conventions
+-- Added test 'lint_cmake' to check CMake code style
+-- Added test 'pep257' to check Python code against some of the docstring style conventions in PEP 257
+-- Added test 'uncrustify' to check C / C++ code style
+-- Configured uncrustify additional arguments: 
+-- Added test 'xmllint' to check XML markup files
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /workspaces/isaac_ros-dev/build/isaac_ros_nitros
+[ 25%] [32mBuilding CXX object CMakeFiles/isaac_ros_nitros.dir/src/types/nitros_type_base.cpp.o[0m
+[ 25%] [32mBuilding CXX object CMakeFiles/isaac_ros_nitros.dir/src/nitros_context.cpp.o[0m
+[ 25%] [32mBuilding CXX object CMakeFiles/isaac_ros_nitros.dir/src/types/type_adapter_nitros_context.cpp.o[0m
+[ 33%] [32mBuilding CXX object CMakeFiles/isaac_ros_nitros.dir/src/nitros_node.cpp.o[0m
+[ 41%] [32mBuilding CXX object CMakeFiles/isaac_ros_nitros.dir/src/nitros_subscriber.cpp.o[0m
+[ 50%] [32mBuilding CXX object CMakeFiles/isaac_ros_nitros.dir/src/nitros_publisher_subscriber_group.cpp.o[0m
+[ 58%] [32mBuilding CXX object CMakeFiles/isaac_ros_nitros.dir/src/utils/vpi_utilities.cpp.o[0m
+[ 66%] [32mBuilding CXX object CMakeFiles/isaac_ros_nitros.dir/src/types/nitros_empty.cpp.o[0m
+[ 75%] [32mBuilding CXX object CMakeFiles/isaac_ros_nitros.dir/src/nitros_publisher.cpp.o[0m
+In file included from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/parameter_registrar.hpp:31[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/registrar.hpp:28[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/component.hpp:31[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/std/queue.hpp:21[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/std/receiver.hpp:21[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/ros2/src/isaac_ros_nitros/isaac_ros_nitros/include/isaac_ros_nitros/nitros_subscriber.hpp:28[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/ros2/src/isaac_ros_nitros/isaac_ros_nitros/src/nitros_subscriber.cpp:20[m[K:
+[01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/expected_macro.hpp:24:10:[m[K [01;31m[Kfatal error: [m[Kmagic_enum.hpp: No such file or directory
+   24 | #include [01;31m[K"magic_enum.hpp"[m[K  // NOLINT(build/include)
+      |          [01;31m[K^~~~~~~~~~~~~~~~[m[K
+compilation terminated.
+make[2]: *** [CMakeFiles/isaac_ros_nitros.dir/build.make:160: CMakeFiles/isaac_ros_nitros.dir/src/nitros_subscriber.cpp.o] Error 1
+make[2]: *** Waiting for unfinished jobs....
+In file included from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/parameter_registrar.hpp:31[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/registrar.hpp:28[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/component.hpp:31[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/install/gxf_isaac_message_compositor/share/gxf_isaac_message_compositor/gxf/include/message_compositor/message_relay.hpp:25[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/ros2/src/isaac_ros_nitros/isaac_ros_nitros/include/isaac_ros_nitros/nitros_publisher.hpp:25[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/ros2/src/isaac_ros_nitros/isaac_ros_nitros/include/isaac_ros_nitros/nitros_publisher_subscriber_group.hpp:29[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/ros2/src/isaac_ros_nitros/isaac_ros_nitros/src/nitros_publisher_subscriber_group.cpp:18[m[K:
+[01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/expected_macro.hpp:24:10:[m[K [01;31m[Kfatal error: [m[Kmagic_enum.hpp: No such file or directory
+   24 | #include [01;31m[K"magic_enum.hpp"[m[K  // NOLINT(build/include)
+      |          [01;31m[K^~~~~~~~~~~~~~~~[m[K
+compilation terminated.
+make[2]: *** [CMakeFiles/isaac_ros_nitros.dir/build.make:174: CMakeFiles/isaac_ros_nitros.dir/src/nitros_publisher_subscriber_group.cpp.o] Error 1
+In file included from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/parameter_registrar.hpp:31[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/registrar.hpp:28[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/component.hpp:31[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/std/allocator.hpp:21[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/multimedia/video.hpp:28[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/ros2/src/isaac_ros_nitros/isaac_ros_nitros/include/isaac_ros_nitros/utils/vpi_utilities.hpp:27[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/ros2/src/isaac_ros_nitros/isaac_ros_nitros/src/utils/vpi_utilities.cpp:18[m[K:
+[01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/expected_macro.hpp:24:10:[m[K [01;31m[Kfatal error: [m[Kmagic_enum.hpp: No such file or directory
+   24 | #include [01;31m[K"magic_enum.hpp"[m[K  // NOLINT(build/include)
+      |          [01;31m[K^~~~~~~~~~~~~~~~[m[K
+compilation terminated.
+make[2]: *** [CMakeFiles/isaac_ros_nitros.dir/build.make:188: CMakeFiles/isaac_ros_nitros.dir/src/utils/vpi_utilities.cpp.o] Error 1
+In file included from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/parameter_registrar.hpp:31[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/registrar.hpp:28[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/component.hpp:31[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/install/gxf_isaac_message_compositor/share/gxf_isaac_message_compositor/gxf/include/message_compositor/message_relay.hpp:25[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/ros2/src/isaac_ros_nitros/isaac_ros_nitros/include/isaac_ros_nitros/nitros_publisher.hpp:25[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/ros2/src/isaac_ros_nitros/isaac_ros_nitros/src/nitros_publisher.cpp:20[m[K:
+[01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/expected_macro.hpp:24:10:[m[K [01;31m[Kfatal error: [m[Kmagic_enum.hpp: No such file or directory
+   24 | #include [01;31m[K"magic_enum.hpp"[m[K  // NOLINT(build/include)
+      |          [01;31m[K^~~~~~~~~~~~~~~~[m[K
+compilation terminated.
+make[2]: *** [CMakeFiles/isaac_ros_nitros.dir/build.make:146: CMakeFiles/isaac_ros_nitros.dir/src/nitros_publisher.cpp.o] Error 1
+In file included from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/parameter_registrar.hpp:31[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/registrar.hpp:28[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/component.hpp:31[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/install/gxf_isaac_message_compositor/share/gxf_isaac_message_compositor/gxf/include/message_compositor/message_relay.hpp:25[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/ros2/src/isaac_ros_nitros/isaac_ros_nitros/include/isaac_ros_nitros/nitros_publisher.hpp:25[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/ros2/src/isaac_ros_nitros/isaac_ros_nitros/include/isaac_ros_nitros/nitros_publisher_subscriber_group.hpp:29[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/ros2/src/isaac_ros_nitros/isaac_ros_nitros/include/isaac_ros_nitros/nitros_node.hpp:31[m[K,
+                 from [01m[K/workspaces/isaac_ros-dev/ros2/src/isaac_ros_nitros/isaac_ros_nitros/src/nitros_node.cpp:26[m[K:
+[01m[K/workspaces/isaac_ros-dev/install/isaac_ros_gxf/share/isaac_ros_gxf/gxf/include/gxf/core/expected_macro.hpp:24:10:[m[K [01;31m[Kfatal error: [m[Kmagic_enum.hpp: No such file or directory
+   24 | #include [01;31m[K"magic_enum.hpp"[m[K  // NOLINT(build/include)
+      |          [01;31m[K^~~~~~~~~~~~~~~~[m[K
+compilation terminated.
+make[2]: *** [CMakeFiles/isaac_ros_nitros.dir/build.make:76: CMakeFiles/isaac_ros_nitros.dir/src/nitros_node.cpp.o] Error 1
+make[1]: *** [CMakeFiles/Makefile2:139: CMakeFiles/isaac_ros_nitros.dir/all] Error 2
+make: *** [Makefile:146: all] Error 2
