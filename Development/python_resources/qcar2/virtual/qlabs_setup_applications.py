@@ -21,7 +21,7 @@ import time
 
 def setup(
         initialPosition=[-0.031, 1.311, 0.000],
-        initialOrientation=[0, 0, -np.pi/2],
+        initialOrientation=[0, 0, -np.pi/2 + 8*np.pi/180],
         rtModel=rtmodels.QCAR2
     ):
 

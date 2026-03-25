@@ -101,7 +101,7 @@ class PathFollower(Node):
     def __init__(self):
         super().__init__('path_follower')
 
-        self.declare_parameter('node_values', [0, 8, 10])
+        self.declare_parameter('node_values', [0, 14, 20, 10])
         self.waypoints = list(self.get_parameter('node_values').get_parameter_value().integer_array_value)
 
         self.declare_parameter('desired_speed', [0.4])

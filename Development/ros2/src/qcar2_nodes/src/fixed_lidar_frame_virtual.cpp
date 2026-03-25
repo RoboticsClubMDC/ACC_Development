@@ -1,4 +1,5 @@
 #include <chrono>
+#include <cmath>
 #include <functional>
 #include <memory>
 
@@ -34,7 +35,7 @@ private:
     t.transform.translation.z = 0.0;
 
     tf2::Quaternion q;
-    q.setRPY(0.0, 0.0, 3.1415/2*0);
+    q.setRPY(0.0, 0.0, 0.0);
 
     t.transform.rotation.x = q.x();
     t.transform.rotation.y = q.y();
