@@ -24,6 +24,8 @@ setup(
     entry_points={
         'console_scripts': [
             'path_follower = autonomy.nav_to_pose:main',
+            'manual_drive = autonomy.manual_drive:main',
+            'path_teacher = autonomy.path_teacher:main',
             'traffic_system_detector=autonomy.traffic_system_detector:main',
             'lane_detection=autonomy.lane_detection:main',
             'yolo_detector=autonomy.yolo_detector:main',

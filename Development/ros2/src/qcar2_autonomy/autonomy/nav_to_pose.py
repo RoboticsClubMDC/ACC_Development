@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 
-from hal.products.mats import SDCSRoadMap
+from pathlib import Path as FsPath
+
 from pal.utilities.math import wrap_to_pi
 
 import time
@@ -21,6 +22,8 @@ from geometry_msgs.msg import Twist, PoseStamped
 from sensor_msgs.msg import Imu, JointState
 from rcl_interfaces.msg import SetParametersResult
 from std_msgs.msg import Bool, Float32
+
+from autonomy.recorded_map_utils import find_latest_recording_map, load_recording_map
 
 
 class QcarEKF:
@@ -103,6 +106,9 @@ class PathFollower(Node):
 
         self.declare_parameter('node_values', [0, 8, 10])
         self.waypoints = list(self.get_parameter('node_values').get_parameter_value().integer_array_value)
+        self.declare_parameter('use_recorded_map', True)
+        self.use_recorded_map = self.get_parameter(
+            'use_recorded_map').get_parameter_value().bool_value
 
         self.declare_parameter('desired_speed', [0.4])
         self.desired_speed = list(self.get_parameter('desired_speed').get_parameter_value().double_array_value)
@@ -112,7 +118,7 @@ class PathFollower(Node):
 
         self.scale = 1.0
 
-        self.declare_parameter('rotation_offset', [83.0])
+        self.declare_parameter('rotation_offset', [0.0])
         self.rotation_offset = list(self.get_parameter('rotation_offset').get_parameter_value().double_array_value)
 
         self.declare_parameter('translation_offset', [0.0, 0.0])
@@ -160,12 +166,14 @@ class PathFollower(Node):
         self.timer = self.create_timer(self.dt, self.tf_timer)
         self.translation = [0, 0, 0]
         self.rotation = [0, 0, 0]
-        self.wp = SDCSRoadMap().generate_path(self.waypoints) * self.scale
+        self.recorded_nodes = []
+        self.recorded_map_path = None
+        self._wp_in_ros_frame = False
+        self.wp = self._load_starting_waypoints()
         self.N = len(self.wp[0, :])
         self.wpi = 0
         self.wp_prior = []
         self.current_steering = 0
-        self._wp_in_ros_frame = False
 
         self.stanley_delta = 0.0
         self.stanley_trust = 0.0
@@ -207,6 +215,54 @@ class PathFollower(Node):
         self.get_logger().info(
             f'PathFollower ready | PURE PURSUIT BASELINE | '
             f'stanley_blend={self.stanley_blend} trust_min={self.stanley_trust_min}')
+
+    def _load_starting_waypoints(self):
+        if not self.use_recorded_map:
+            raise RuntimeError('PathFollower requires use_recorded_map=true')
+
+        wp = self._load_waypoints_from_recorded_map()
+        if wp is None:
+            raise RuntimeError('Failed to load waypoints from recorded map')
+
+        self.get_logger().info('Loaded waypoints from recorded map')
+        return wp
+
+    def _load_waypoints_from_recorded_map(self):
+        latest_map = find_latest_recording_map()
+        if latest_map is None:
+            self.get_logger().warn('No recording map found in qcar2_autonomy/recording_maps')
+            return None
+
+        data = load_recording_map(latest_map)
+        nodes = data.get('nodes', [])
+        if not nodes:
+            self.get_logger().warn(f'Recorded map {latest_map} has no nodes')
+            return None
+
+        self.recorded_nodes = nodes
+        self.recorded_map_path = str(latest_map)
+        wp = self._build_full_recorded_route()
+        if wp is None:
+            return None
+
+        self._wp_in_ros_frame = True
+        self.get_logger().info(
+            f'Using full recorded route from {FsPath(latest_map).name} '
+            f'with {len(nodes)} saved points')
+        return wp
+
+    def _build_full_recorded_route(self):
+        if not self.recorded_nodes:
+            return None
+
+        route_points = []
+        for node in self.recorded_nodes:
+            route_points.append((float(node['x']), float(node['y'])))
+
+        if not route_points:
+            return None
+
+        return np.array(route_points, dtype=float).T
 
     def _cmd_waypoints_cb(self, msg: Path):
         if not msg.poses:
@@ -253,7 +309,16 @@ class PathFollower(Node):
         for param in params:
             if param.name == 'node_values' and param.type_ == param.Type.INTEGER_ARRAY:
                 self.waypoints = list(param.value)
-                self.wp = SDCSRoadMap().generate_path(self.waypoints) * 0.975
+                if not self.use_recorded_map:
+                    self.get_logger().error('use_recorded_map=false is not supported')
+                    return SetParametersResult(successful=False)
+
+                wp = self._load_waypoints_from_recorded_map()
+                if wp is None:
+                    self.get_logger().error('Failed to load waypoints from recorded map')
+                    return SetParametersResult(successful=False)
+
+                self.wp = wp
                 self.N = len(self.wp[0, :])
                 self.wpi = 0
                 self.previous_steering_value = 0
@@ -333,24 +398,27 @@ class PathFollower(Node):
     def imu_callback(self, msg):
         self.gyroscope = [msg.angular_velocity.x, msg.angular_velocity.y, msg.angular_velocity.z]
 
+    def _waypoint_in_map_frame(self, wp_xy):
+        if self._wp_in_ros_frame:
+            return np.array(wp_xy, dtype=float)
+
+        angle_offset = self.rotation_offset[0]
+        r_qlabs_ros = np.array([
+            [np.cos(-angle_offset * np.pi / 180), -np.sin(-angle_offset * np.pi / 180)],
+            [np.sin(-angle_offset * np.pi / 180),  np.cos(-angle_offset * np.pi / 180)]
+        ])
+        t = np.array([self.translation_offset[0], self.translation_offset[1]])
+        return (np.array(wp_xy, dtype=float) + t) @ r_qlabs_ros
+
     def path_publisher(self):
         path_msg = Path()
         path_msg.header.stamp = self.get_clock().now().to_msg()
         path_msg.header.frame_id = 'map'
-        for i in range(self.wpi):
+        for i in range(self.N):
             if i >= self.N:
                 i = self.N - 1
             pose = PoseStamped()
-            angle_offset = self.rotation_offset[0]
-            R_QLabs_ROS = np.array([
-                [np.cos(-angle_offset * np.pi / 180), -np.sin(-angle_offset * np.pi / 180)],
-                [np.sin(-angle_offset * np.pi / 180),  np.cos(-angle_offset * np.pi / 180)]
-            ])
-            t = np.array([self.translation_offset[0], self.translation_offset[1]])
-            if self._wp_in_ros_frame:
-                wp_1_mod = np.array([self.wp[0, i], self.wp[1, i]])
-            else:
-                wp_1_mod = ([self.wp[0, i], self.wp[1, i]] + t) @ R_QLabs_ROS
+            wp_1_mod = self._waypoint_in_map_frame(self.wp[:, i])
             pose.header.stamp = self.get_clock().now().to_msg()
             pose.header.frame_id = 'map'
             pose.pose.position.x = wp_1_mod[0]
@@ -367,23 +435,12 @@ class PathFollower(Node):
         self.t_plot = time.time() - self.t0
         self.ekf_filter_timer()
 
-        if round(self.t_plot) % 2 == 0:
-            self.path_publisher()
+        self.path_publisher()
 
         try:
             if not self.path_complete:
                 wp_1 = np.array(self.wp[:, self.wpi])
-
-                angle_offset = self.rotation_offset[0]
-                R_QLabs_ROS = np.array([
-                    [np.cos(-angle_offset * np.pi / 180), -np.sin(-angle_offset * np.pi / 180)],
-                    [np.sin(-angle_offset * np.pi / 180),  np.cos(-angle_offset * np.pi / 180)]
-                ])
-                t = np.array([self.translation_offset[0], self.translation_offset[1]])
-                if self._wp_in_ros_frame:
-                    wp_1_mod = wp_1
-                else:
-                    wp_1_mod = (wp_1 + t) @ R_QLabs_ROS
+                wp_1_mod = self._waypoint_in_map_frame(wp_1)
 
                 L = 0.256
 
@@ -421,7 +478,7 @@ class PathFollower(Node):
                     speed_command = min(speed_command, 0.2)
 
                 wp_final = np.array(self.wp[:, -1])
-                wp_final_mod = wp_final if self._wp_in_ros_frame else (wp_final + t) @ R_QLabs_ROS
+                wp_final_mod = self._waypoint_in_map_frame(wp_final)
                 dist_to_final = np.linalg.norm([p[0] - wp_final_mod[0],
                                                 p[1] - wp_final_mod[1]])
                 if dist_to_final < 0.25:
