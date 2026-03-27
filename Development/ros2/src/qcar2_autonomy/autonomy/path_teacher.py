@@ -25,7 +25,7 @@ class PathTeacher(Node):
         self.declare_parameter('global_frame', 'map')
         self.declare_parameter('robot_frame', 'base_link')
         self.declare_parameter('sample_period', 0.10)
-        self.declare_parameter('node_interval_sec', 3.0)
+        self.declare_parameter('node_interval_sec', 1.0)
         self.declare_parameter('min_node_spacing_m', 0.10)
         self.declare_parameter('min_node_yaw_change_rad', 0.20)
         self.declare_parameter('path_topic', '/taught_path')
@@ -91,6 +91,7 @@ class PathTeacher(Node):
         self.get_logger().info(
             'PathTeacher ready. '
             f'Saving nodes every {self.node_interval_sec:.1f}s to {self.save_path} | '
+            f'frame={self.global_frame} | '
             f'min_spacing={self.min_node_spacing_m:.2f}m '
             f'min_yaw={self.min_node_yaw_change_rad:.2f}rad')
         self.get_logger().info(

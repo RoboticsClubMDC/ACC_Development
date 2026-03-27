@@ -43,10 +43,21 @@ def get_recording_maps_dir():
     return maps_dir
 
 
-def find_latest_recording_map():
+def find_latest_recording_map(frame_id=None):
     maps_dir = get_recording_maps_dir()
     json_files = sorted(maps_dir.glob('*.json'), key=lambda p: p.stat().st_mtime)
-    return json_files[-1] if json_files else None
+    if frame_id is None:
+        return json_files[-1] if json_files else None
+
+    for path in reversed(json_files):
+        try:
+            payload = load_recording_map(path)
+        except json.JSONDecodeError:
+            continue
+        if payload.get('frame_id') == frame_id:
+            return path
+
+    return None
 
 
 def load_recording_map(path):

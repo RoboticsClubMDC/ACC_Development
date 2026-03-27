@@ -9,7 +9,10 @@ def generate_launch_description():
         package='qcar2_autonomy',
         executable='path_follower',
         name='path_follower',
-        parameters=[{'visualize_pose': [True]}], 
+        parameters=[{
+            'visualize_pose': [True],
+            'route_frame': 'map',
+        }], 
     )
 
     traffic_system_detector = Node(
@@ -22,6 +25,9 @@ def generate_launch_description():
     package='qcar2_autonomy',
     executable='trip_planner',
     name='trip_planner',
+    parameters=[{
+        'route_frame': 'map',
+    }],
     # parameters=[{
     #     'taxi_node': [10],
     #     'trip_nodes': [2, 4, 14, 20, 22, 10],

@@ -112,6 +112,9 @@ class PathFollower(Node):
 
         self.declare_parameter('node_values', [0, 8, 10])
         self.waypoints = list(self.get_parameter('node_values').get_parameter_value().integer_array_value)
+        self.declare_parameter('route_frame', 'map')
+        self.route_frame = self.get_parameter(
+            'route_frame').get_parameter_value().string_value
         self.declare_parameter('use_recorded_map', True)
         self.use_recorded_map = self.get_parameter(
             'use_recorded_map').get_parameter_value().bool_value
@@ -231,6 +234,7 @@ class PathFollower(Node):
 
         self.get_logger().info(
             f'PathFollower ready | PURE PURSUIT BASELINE | '
+            f'route_frame={self.route_frame} | '
             f'stanley_blend={self.stanley_blend} trust_min={self.stanley_trust_min}')
 
     def _load_starting_waypoints(self):
@@ -245,12 +249,20 @@ class PathFollower(Node):
         return wp
 
     def _load_waypoints_from_recorded_map(self):
-        latest_map = find_latest_recording_map()
+        latest_map = find_latest_recording_map(frame_id=self.route_frame)
         if latest_map is None:
-            self.get_logger().warn('No recording map found in qcar2_autonomy/recording_maps')
+            self.get_logger().warn(
+                f'No recording map found in qcar2_autonomy/recording_maps '
+                f'for frame_id={self.route_frame}')
             return None
 
         data = load_recording_map(latest_map)
+        frame_id = data.get('frame_id', '')
+        if frame_id != self.route_frame:
+            self.get_logger().error(
+                f'Recorded map frame mismatch: file={frame_id} '
+                f'expected={self.route_frame}')
+            return None
         nodes = data.get('nodes', [])
         if not nodes:
             self.get_logger().warn(f'Recorded map {latest_map} has no nodes')
@@ -453,7 +465,7 @@ class PathFollower(Node):
     def imu_callback(self, msg):
         self.gyroscope = [msg.angular_velocity.x, msg.angular_velocity.y, msg.angular_velocity.z]
 
-    def _waypoint_in_map_frame(self, wp_xy):
+    def _waypoint_in_route_frame(self, wp_xy):
         if self._wp_in_ros_frame:
             return np.array(wp_xy, dtype=float)
 
@@ -468,7 +480,7 @@ class PathFollower(Node):
     def path_publisher(self):
         path_msg = Path()
         path_msg.header.stamp = self.get_clock().now().to_msg()
-        path_msg.header.frame_id = 'map'
+        path_msg.header.frame_id = self.route_frame
         marker_msg = Marker()
         marker_msg.header = path_msg.header
         marker_msg.ns = 'planned_path'
@@ -483,7 +495,7 @@ class PathFollower(Node):
         marker_msg.pose.orientation.w = 1.0
         for i in range(self.N):
             pose = PoseStamped()
-            wp_1_mod = self._waypoint_in_map_frame(self.wp[:, i])
+            wp_1_mod = self._waypoint_in_route_frame(self.wp[:, i])
             pose.header = path_msg.header
             pose.pose.position.x = wp_1_mod[0]
             pose.pose.position.y = wp_1_mod[1]
@@ -496,11 +508,47 @@ class PathFollower(Node):
         self.path_publisher_topic.publish(path_msg)
         self.path_marker_publisher.publish(marker_msg)
 
+    def _update_progress_index(self, robot_xy, max_step=25):
+        if self.N <= 1:
+            return
+
+        robot_xy = np.array(robot_xy, dtype=float)
+        steps = 0
+
+        while self.wpi < self.N - 1 and steps < max_step:
+            wp_current = self._waypoint_in_route_frame(self.wp[:, self.wpi])
+            wp_next = self._waypoint_in_route_frame(self.wp[:, self.wpi + 1])
+
+            dist_current = float(np.linalg.norm(wp_current - robot_xy))
+            dist_next = float(np.linalg.norm(wp_next - robot_xy))
+
+            if dist_next <= dist_current:
+                self.wpi += 1
+                steps += 1
+            else:
+                break
+
+    def _select_lookahead_index(self, robot_xy, lookahead_dist):
+        if self.N <= 0:
+            return 0
+
+        robot_xy = np.array(robot_xy, dtype=float)
+        lookahead_dist = max(float(lookahead_dist), 0.05)
+
+        target_idx = int(np.clip(self.wpi, 0, self.N - 1))
+        while target_idx < self.N - 1:
+            wp_route = self._waypoint_in_route_frame(self.wp[:, target_idx])
+            dist = float(np.linalg.norm(wp_route - robot_xy))
+            if dist >= lookahead_dist:
+                break
+            target_idx += 1
+
+        return target_idx
+
     def path_planner(self):
         max_speed = 1.5
         enable = 1
         speed_command = self.desired_speed[0]
-        skip_index = 1
 
         self.t_plot = time.time() - self.t0
         self.ekf_filter_timer()
@@ -509,9 +557,6 @@ class PathFollower(Node):
 
         try:
             if not self.path_complete:
-                wp_1 = np.array(self.wp[:, self.wpi])
-                wp_1_mod = self._waypoint_in_map_frame(wp_1)
-
                 L = 0.256
 
                 th = self.qcar2_ekf.xHat[2, 0]
@@ -524,6 +569,15 @@ class PathFollower(Node):
                     p = [0, 0]
                     th = 0
 
+                robot_xy = np.array(p, dtype=float)
+                v_eff = max(self.qcar2_measurred_speed, 0.05)
+                lookahead_dist = max(v_eff * 1.7, 0.30)
+
+                self._update_progress_index(robot_xy)
+                target_idx = self._select_lookahead_index(robot_xy, lookahead_dist)
+                wp_1 = np.array(self.wp[:, target_idx])
+                wp_1_mod = self._waypoint_in_route_frame(wp_1)
+
                 v = [wp_1_mod[0] - p[0], wp_1_mod[1] - p[1]]
                 Rot = np.array([[np.cos(th), -np.sin(th)], [np.sin(th), np.cos(th)]])
                 v_car = v @ Rot
@@ -535,20 +589,11 @@ class PathFollower(Node):
 
                 dist = np.linalg.norm([p[0] - wp_1_mod[0], p[1] - wp_1_mod[1]])
 
-                v_eff = max(self.qcar2_measurred_speed, 0.05)
-                lookahead_dist = max(v_eff * 1.7, 0.30)
-
-                if dist < lookahead_dist:
-                    if self.wpi < self.N - 1:
-                        self.wpi += skip_index
-
-                self.wpi = np.clip(self.wpi, 0, self.N - 1)
-
-                if self.wpi > self.N - 100:
+                if target_idx > self.N - 100:
                     speed_command = min(speed_command, 0.2)
 
                 wp_final = np.array(self.wp[:, -1])
-                wp_final_mod = self._waypoint_in_map_frame(wp_final)
+                wp_final_mod = self._waypoint_in_route_frame(wp_final)
                 dist_to_final = np.linalg.norm([p[0] - wp_final_mod[0],
                                                 p[1] - wp_final_mod[1]])
                 if dist_to_final < 0.25:
@@ -585,7 +630,7 @@ class PathFollower(Node):
 
                 if int(self.t_plot * 5) != int((self.t_plot - self.dt) * 5):
                     self.get_logger().info(
-                        f"wpi={self.wpi} dist={dist:.2f} "
+                        f"progress_idx={self.wpi} target_idx={target_idx} dist={dist:.2f} "
                         f"pp={pp_delta_damped:.3f} "
                         f"steering={steering:.3f} "
                         f"v={speed_command:.2f}")
@@ -615,7 +660,7 @@ class PathFollower(Node):
         self.path_status_publisher.publish(msg)
 
     def tf_timer(self):
-        from_frame_rel = 'map'
+        from_frame_rel = self.route_frame
         to_frame_rel = self.target_frame
         try:
             t = self.tf_buffer.lookup_transform(from_frame_rel, to_frame_rel, rclpy.time.Time())
@@ -629,7 +674,7 @@ class PathFollower(Node):
 
             pose_msg = PoseStamped()
             pose_msg.header.stamp = self.get_clock().now().to_msg()
-            pose_msg.header.frame_id = 'map'
+            pose_msg.header.frame_id = self.route_frame
             pose_msg.pose.position.x = float(self.translation.x)
             pose_msg.pose.position.y = float(self.translation.y)
             pose_msg.pose.orientation.x = t.transform.rotation.x

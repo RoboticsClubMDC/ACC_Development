@@ -17,7 +17,8 @@ def generate_launch_description():
         name='path_teacher',
         output='screen',
         parameters=[{
-            'node_interval_sec': 3.0,
+            'global_frame': 'map',
+            'node_interval_sec': 1.0,
             'min_node_spacing_m': 0.10,
             'min_node_yaw_change_rad': 0.20,
         }],

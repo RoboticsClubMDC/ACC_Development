@@ -42,6 +42,7 @@ class TripPlanner(Node):
         else:
             self.get_logger().info('connected to qcar2_hardware.')
 
+        self.declare_parameter('route_frame',        'map')
         self.declare_parameter('hub_xy',             [0.0, 0.0])
         self.declare_parameter('pickup_xy',          [0.125, 4.395])
         self.declare_parameter('dropoff_xy',         [-0.905, 0.800])
@@ -49,7 +50,9 @@ class TripPlanner(Node):
         self.declare_parameter('recorded_min_node_spacing_m', 0.10)
         self.declare_parameter('recorded_min_yaw_change_rad', 0.20)
         self.declare_parameter('generated_waypoint_spacing_m', 0.03)
+        self.declare_parameter('goal_on_route_tolerance_m', 0.12)
 
+        self.route_frame        = self.get_parameter('route_frame').get_parameter_value().string_value
         self.hub_xy             = list(self.get_parameter('hub_xy').get_parameter_value().double_array_value)
         self.pickup_xy          = list(self.get_parameter('pickup_xy').get_parameter_value().double_array_value)
         self.dropoff_xy         = list(self.get_parameter('dropoff_xy').get_parameter_value().double_array_value)
@@ -60,11 +63,15 @@ class TripPlanner(Node):
             self.get_parameter('recorded_min_yaw_change_rad').get_parameter_value().double_value)
         self.generated_waypoint_spacing_m = float(
             self.get_parameter('generated_waypoint_spacing_m').get_parameter_value().double_value)
+        self.goal_on_route_tolerance_m = float(
+            self.get_parameter('goal_on_route_tolerance_m').get_parameter_value().double_value)
 
         self.add_on_set_parameters_callback(self.parameter_update_callback)
 
-        self.get_logger().info(f'Hub in map frame: {self.hub_xy}')
+        self.get_logger().info(f'Route frame: {self.route_frame}')
+        self.get_logger().info(f'Hub in {self.route_frame} frame: {self.hub_xy}')
         self.recorded_points = np.zeros((2, 0), dtype=float)
+        self.recorded_waypoints = np.zeros((2, 0), dtype=float)
         self.recorded_nodes = []
         self.recorded_map_path = None
         self.recorded_loop = False
@@ -108,16 +115,20 @@ class TripPlanner(Node):
         self.robot_pose = msg
 
     def parameter_update_callback(self, params):
+        goal_param_changed = False
         for p in params:
             if p.name == 'pickup_xy' and p.type_ == p.Type.DOUBLE_ARRAY:
                 self.pickup_xy = list(p.value)
                 self.get_logger().info(f'pickup_xy updated: {self.pickup_xy}')
+                goal_param_changed = True
             elif p.name == 'dropoff_xy' and p.type_ == p.Type.DOUBLE_ARRAY:
                 self.dropoff_xy = list(p.value)
                 self.get_logger().info(f'dropoff_xy updated: {self.dropoff_xy}')
+                goal_param_changed = True
             elif p.name == 'hub_xy' and p.type_ == p.Type.DOUBLE_ARRAY:
                 self.hub_xy = list(p.value)
                 self.get_logger().info(f'hub_xy updated: {self.hub_xy}')
+                goal_param_changed = True
             elif p.name == 'stop_seconds' and p.type_ == p.Type.DOUBLE_ARRAY:
                 self.stop_seconds = float(list(p.value)[0])
             elif p.name == 'recorded_min_node_spacing_m' and p.type_ == p.Type.DOUBLE:
@@ -128,21 +139,50 @@ class TripPlanner(Node):
                 self._load_recorded_map()
             elif p.name == 'generated_waypoint_spacing_m' and p.type_ == p.Type.DOUBLE:
                 self.generated_waypoint_spacing_m = float(p.value)
+                self._load_recorded_map()
+            elif p.name == 'goal_on_route_tolerance_m' and p.type_ == p.Type.DOUBLE:
+                self.goal_on_route_tolerance_m = float(p.value)
 
         if self.ready_for_rides and self.mission_stage == MissionStage.IDLE:
             self.new_ride_requested = True
+        elif goal_param_changed:
+            self._replan_active_goal()
 
         return SetParametersResult(successful=True)
 
+    def _replan_active_goal(self):
+        if self.robot_pose is None:
+            return
+
+        if not self.startup_done:
+            ok = self._send_path_to(self.hub_xy, label='HUB (updated)')
+            if ok:
+                self._startup_path_sent = True
+            return
+
+        if self.mission_stage == MissionStage.TO_PICKUP:
+            self._send_path_to(self.pickup_xy, label='PICKUP (updated)')
+        elif self.mission_stage == MissionStage.TO_DROPOFF:
+            self._send_path_to(self.dropoff_xy, label='DROPOFF (updated)')
+        elif self.mission_stage == MissionStage.TO_HUB:
+            self._send_path_to(self.hub_xy, label='HUB (updated)')
+
     def _load_recorded_map(self):
-        latest_map = find_latest_recording_map()
+        latest_map = find_latest_recording_map(frame_id=self.route_frame)
         if latest_map is None:
-            self.get_logger().error('No recorded map found for trip planner')
+            self.get_logger().error(
+                f'No recorded map found for trip planner in frame_id={self.route_frame}')
             return False
 
         data = load_recording_map(latest_map)
+        frame_id = data.get('frame_id', '')
+        if frame_id != self.route_frame:
+            self.get_logger().error(
+                f'Recorded map frame mismatch: file={frame_id} '
+                f'expected={self.route_frame}')
+            return False
         nodes = data.get('nodes', [])
-        filtered_nodes, control_points, _ = build_waypoint_path_from_nodes(
+        filtered_nodes, control_points, dense_waypoints = build_waypoint_path_from_nodes(
             nodes,
             min_node_spacing=self.recorded_min_node_spacing_m,
             min_yaw_change=self.recorded_min_yaw_change_rad,
@@ -150,24 +190,26 @@ class TripPlanner(Node):
         )
         self.recorded_nodes = filtered_nodes
         self.recorded_points = control_points
+        self.recorded_waypoints = dense_waypoints
         self.recorded_map_path = str(latest_map)
-        if self.recorded_points.shape[1] < 2:
+        if self.recorded_points.shape[1] < 2 or self.recorded_waypoints.shape[1] < 2:
             self.get_logger().error('Recorded map has too few points for planning')
             return False
 
-        first = self.recorded_points[:, 0]
-        last = self.recorded_points[:, -1]
+        first = self.recorded_waypoints[:, 0]
+        last = self.recorded_waypoints[:, -1]
         self.recorded_loop = float(np.linalg.norm(first - last)) < 0.75
         self.get_logger().info(
             f'Loaded recorded map for planner: {latest_map.name} '
             f'raw_nodes={len(nodes)} control_nodes={self.recorded_points.shape[1]} '
+            f'dense_waypoints={self.recorded_waypoints.shape[1]} '
             f'loop={self.recorded_loop}')
         return True
 
     def _map_path_to_ros(self, wp_2xn):
         path_msg = Path()
         path_msg.header.stamp    = self.get_clock().now().to_msg()
-        path_msg.header.frame_id = 'map'
+        path_msg.header.frame_id = self.route_frame
         for i in range(wp_2xn.shape[1]):
             pt   = wp_2xn[:, i]
             pose = PoseStamped()
@@ -180,7 +222,7 @@ class TripPlanner(Node):
     def _plan_to_xy(self, goal_xy):
         if self.robot_pose is None:
             return None
-        if self.recorded_points.shape[1] < 2 and not self._load_recorded_map():
+        if self.recorded_waypoints.shape[1] < 2 and not self._load_recorded_map():
             return None
 
         rx = float(self.robot_pose.pose.position.x)
@@ -188,14 +230,19 @@ class TripPlanner(Node):
         cur = np.array([rx, ry], dtype=float)
         goal = np.array([float(goal_xy[0]), float(goal_xy[1])], dtype=float)
 
-        start_idx = closest_recorded_node_index(self.recorded_points, cur)
-        goal_idx = closest_recorded_node_index(self.recorded_points, goal)
+        start_idx = closest_recorded_node_index(self.recorded_waypoints, cur)
+        goal_idx = closest_recorded_node_index(self.recorded_waypoints, goal)
         if start_idx is None or goal_idx is None:
             self.get_logger().error('Failed to find nearest recorded nodes')
             return None
 
+        start_nearest = self.recorded_waypoints[:, start_idx]
+        goal_nearest = self.recorded_waypoints[:, goal_idx]
+        start_route_dist = float(np.linalg.norm(start_nearest - cur))
+        goal_route_dist = float(np.linalg.norm(goal_nearest - goal))
+
         route = build_dense_recorded_segment(
-            self.recorded_points,
+            self.recorded_waypoints,
             start_idx,
             goal_idx,
             spacing=self.generated_waypoint_spacing_m,
@@ -204,14 +251,26 @@ class TripPlanner(Node):
         if route.shape[1] == 0:
             return None
 
-        if np.linalg.norm(route[:, 0] - cur) > 0.05:
-            route = np.hstack([cur.reshape(2, 1), route])
-        if np.linalg.norm(route[:, -1] - goal) > 0.05:
+        # Keep planned paths on the recorded route. Only append the exact goal if it
+        # already lies very close to the route; otherwise the old behavior created a
+        # misleading straight-line tail off the mapped path.
+        if goal_route_dist <= self.goal_on_route_tolerance_m and np.linalg.norm(route[:, -1] - goal) > 0.05:
             route = np.hstack([route, goal.reshape(2, 1)])
+        elif goal_route_dist > self.goal_on_route_tolerance_m:
+            self.get_logger().warn(
+                f'Goal ({goal[0]:.2f}, {goal[1]:.2f}) is {goal_route_dist:.2f}m off the recorded route; '
+                'ending path at nearest recorded waypoint instead of appending a straight segment')
+
+        if start_route_dist > 0.25:
+            self.get_logger().warn(
+                f'Robot start pose is {start_route_dist:.2f}m from the recorded route; '
+                'controller will converge to the first planned waypoint from off-route')
 
         self.get_logger().info(
             f'Planner route start_idx={start_idx} goal_idx={goal_idx} '
-            f'pts={route.shape[1]} goal=({goal[0]:.2f},{goal[1]:.2f})')
+            f'pts={route.shape[1]} goal=({goal[0]:.2f},{goal[1]:.2f}) '
+            f'start_route_dist={start_route_dist:.2f} goal_route_dist={goal_route_dist:.2f} '
+            f'using_dense_route={self.recorded_waypoints.shape[1]}')
         return route
 
     def _send_path_to(self, goal_xy, label=''):

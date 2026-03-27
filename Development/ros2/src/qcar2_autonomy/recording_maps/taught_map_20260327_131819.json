@@ -1,0 +1,17 @@
+{
+  "map_name": "taught_map",
+  "frame_id": "odom",
+  "node_interval_sec": 3.0,
+  "saved_at": "2026-03-27T13:18:24.674060",
+  "node_count": 1,
+  "nodes": [
+    {
+      "index": 0,
+      "node_id": 0,
+      "x": -0.1,
+      "y": 0.0,
+      "yaw": 0.0,
+      "stamp_sec": 1774631904.673713
+    }
+  ]
+}
