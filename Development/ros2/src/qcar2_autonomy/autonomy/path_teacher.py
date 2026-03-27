@@ -9,6 +9,7 @@ from geometry_msgs.msg import Point, PoseStamped
 from nav_msgs.msg import Path
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
+from std_msgs.msg import Bool
 from tf2_ros import TransformException
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
@@ -24,13 +25,16 @@ class PathTeacher(Node):
         self.declare_parameter('global_frame', 'map')
         self.declare_parameter('robot_frame', 'base_link')
         self.declare_parameter('sample_period', 0.10)
-        self.declare_parameter('node_interval_sec', 1.0)
+        self.declare_parameter('node_interval_sec', 3.0)
+        self.declare_parameter('min_node_spacing_m', 0.10)
+        self.declare_parameter('min_node_yaw_change_rad', 0.20)
         self.declare_parameter('path_topic', '/taught_path')
         self.declare_parameter('line_marker_topic', '/taught_path_marker')
         self.declare_parameter('node_marker_topic', '/taught_nodes_marker')
         self.declare_parameter('line_marker_width', 0.08)
         self.declare_parameter('node_marker_size', 0.14)
         self.declare_parameter('map_name', 'taught_map')
+        self.declare_parameter('mapping_enabled', True)
 
         self.global_frame = self.get_parameter(
             'global_frame').get_parameter_value().string_value
@@ -40,6 +44,10 @@ class PathTeacher(Node):
             'sample_period').get_parameter_value().double_value)
         self.node_interval_sec = float(self.get_parameter(
             'node_interval_sec').get_parameter_value().double_value)
+        self.min_node_spacing_m = float(self.get_parameter(
+            'min_node_spacing_m').get_parameter_value().double_value)
+        self.min_node_yaw_change_rad = float(self.get_parameter(
+            'min_node_yaw_change_rad').get_parameter_value().double_value)
         self.path_topic = self.get_parameter(
             'path_topic').get_parameter_value().string_value
         self.line_marker_topic = self.get_parameter(
@@ -52,6 +60,8 @@ class PathTeacher(Node):
             'node_marker_size').get_parameter_value().double_value)
         self.map_name = self.get_parameter(
             'map_name').get_parameter_value().string_value
+        self.mapping_enabled = self.get_parameter(
+            'mapping_enabled').get_parameter_value().bool_value
 
         self.save_directory = get_recording_maps_dir()
         self.save_directory.mkdir(parents=True, exist_ok=True)
@@ -64,6 +74,7 @@ class PathTeacher(Node):
         self.path_pub = self.create_publisher(Path, self.path_topic, qos)
         self.line_marker_pub = self.create_publisher(Marker, self.line_marker_topic, qos)
         self.node_marker_pub = self.create_publisher(Marker, self.node_marker_topic, qos)
+        self.create_subscription(Bool, '/mapping_enable', self._mapping_enable_cb, 2)
 
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
@@ -79,7 +90,21 @@ class PathTeacher(Node):
         self.timer = self.create_timer(self.sample_period, self._timer_cb)
         self.get_logger().info(
             'PathTeacher ready. '
-            f'Saving nodes every {self.node_interval_sec:.1f}s to {self.save_path}')
+            f'Saving nodes every {self.node_interval_sec:.1f}s to {self.save_path} | '
+            f'min_spacing={self.min_node_spacing_m:.2f}m '
+            f'min_yaw={self.min_node_yaw_change_rad:.2f}rad')
+        self.get_logger().info(
+            'Pause/resume recording with /mapping_enable '
+            '(false=pause, true=resume)')
+
+    def _mapping_enable_cb(self, msg: Bool):
+        enabled = bool(msg.data)
+        if enabled == self.mapping_enabled:
+            return
+        self.mapping_enabled = enabled
+        self.last_record_time = None if enabled else self.last_record_time
+        state = 'resumed' if enabled else 'paused'
+        self.get_logger().warn(f'Mapping {state}')
 
     def _make_versioned_save_path(self):
         stamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -119,6 +144,8 @@ class PathTeacher(Node):
         return marker
 
     def _timer_cb(self):
+        if not self.mapping_enabled:
+            return
         transform = self._lookup_robot_transform()
         if transform is None:
             return
@@ -129,6 +156,10 @@ class PathTeacher(Node):
             return
 
         if now_sec - self.last_record_time >= self.node_interval_sec:
+            if not self._should_record_node(transform):
+                self.get_logger().debug(
+                    'Skipped node save because movement/yaw change was too small')
+                return
             self._record_node(transform, now_sec)
 
     def _lookup_robot_transform(self):
@@ -142,7 +173,7 @@ class PathTeacher(Node):
                 f'Could not transform {self.robot_frame} into {self.global_frame}: {ex}')
             return None
 
-    def _record_node(self, transform, now_sec):
+    def _transform_to_xy_yaw(self, transform):
         x = float(transform.transform.translation.x)
         y = float(transform.transform.translation.y)
 
@@ -153,6 +184,28 @@ class PathTeacher(Node):
         yaw = math.atan2(
             2.0 * (qw * qz + qx * qy),
             1.0 - 2.0 * (qy * qy + qz * qz))
+
+        return x, y, yaw
+
+    def _should_record_node(self, transform):
+        if not self.saved_nodes:
+            return True
+
+        x, y, yaw = self._transform_to_xy_yaw(transform)
+        last = self.saved_nodes[-1]
+        dx = x - float(last['x'])
+        dy = y - float(last['y'])
+        dist = math.hypot(dx, dy)
+        yaw_delta = abs(math.atan2(
+            math.sin(yaw - float(last['yaw'])),
+            math.cos(yaw - float(last['yaw']))))
+        return (
+            dist >= self.min_node_spacing_m or
+            yaw_delta >= self.min_node_yaw_change_rad
+        )
+
+    def _record_node(self, transform, now_sec):
+        x, y, yaw = self._transform_to_xy_yaw(transform)
 
         stamp = self.get_clock().now().to_msg()
 
@@ -191,7 +244,8 @@ class PathTeacher(Node):
         self._write_map_file()
 
         self.get_logger().info(
-            f'saved node {node_index}: x={x:.2f}, y={y:.2f}, yaw={yaw:.2f}')
+            f'saved node {node_index}: x={x:.2f}, y={y:.2f}, yaw={yaw:.2f} '
+            f'file={self.save_path.name}')
 
     def _write_map_file(self):
         payload = {

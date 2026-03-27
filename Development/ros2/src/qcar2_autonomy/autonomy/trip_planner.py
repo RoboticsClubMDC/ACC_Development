@@ -13,8 +13,13 @@ from rcl_interfaces.srv import SetParameters
 from rcl_interfaces.msg import Parameter, SetParametersResult
 from rclpy.parameter import ParameterType
 
-from hal.products.mats import SDCSRoadMap
-
+from autonomy.recorded_map_utils import (
+    build_dense_recorded_segment,
+    build_waypoint_path_from_nodes,
+    closest_recorded_node_index,
+    find_latest_recording_map,
+    load_recording_map,
+)
 
 class MissionStage(Enum):
     IDLE           = 0
@@ -30,8 +35,6 @@ class TripPlanner(Node):
     def __init__(self):
         super().__init__('trip_planner')
 
-        self.roadmap = SDCSRoadMap()
-
         self.qcar_hardware_client = self.create_client(SetParameters, '/qcar2_hardware/set_parameters')
         if not self.qcar_hardware_client.wait_for_service(timeout_sec=2.0):
             self.get_logger().warn('qcar2_hardware LED service not available — LEDs disabled')
@@ -39,24 +42,33 @@ class TripPlanner(Node):
         else:
             self.get_logger().info('connected to qcar2_hardware.')
 
-        self.declare_parameter('taxi_node',          [10])
+        self.declare_parameter('hub_xy',             [0.0, 0.0])
         self.declare_parameter('pickup_xy',          [0.125, 4.395])
         self.declare_parameter('dropoff_xy',         [-0.905, 0.800])
         self.declare_parameter('stop_seconds',       [3.0])
-        self.declare_parameter('rotation_offset',    [82.0])
-        self.declare_parameter('translation_offset', [0.0, 0.0])
+        self.declare_parameter('recorded_min_node_spacing_m', 0.10)
+        self.declare_parameter('recorded_min_yaw_change_rad', 0.20)
+        self.declare_parameter('generated_waypoint_spacing_m', 0.03)
 
-        self.taxi_node          = int(list(self.get_parameter('taxi_node').get_parameter_value().integer_array_value)[0])
+        self.hub_xy             = list(self.get_parameter('hub_xy').get_parameter_value().double_array_value)
         self.pickup_xy          = list(self.get_parameter('pickup_xy').get_parameter_value().double_array_value)
         self.dropoff_xy         = list(self.get_parameter('dropoff_xy').get_parameter_value().double_array_value)
         self.stop_seconds       = float(list(self.get_parameter('stop_seconds').get_parameter_value().double_array_value)[0])
-        self.rotation_offset    = list(self.get_parameter('rotation_offset').get_parameter_value().double_array_value)
-        self.translation_offset = list(self.get_parameter('translation_offset').get_parameter_value().double_array_value)
+        self.recorded_min_node_spacing_m = float(
+            self.get_parameter('recorded_min_node_spacing_m').get_parameter_value().double_value)
+        self.recorded_min_yaw_change_rad = float(
+            self.get_parameter('recorded_min_yaw_change_rad').get_parameter_value().double_value)
+        self.generated_waypoint_spacing_m = float(
+            self.get_parameter('generated_waypoint_spacing_m').get_parameter_value().double_value)
 
         self.add_on_set_parameters_callback(self.parameter_update_callback)
 
-        self.hub_xy = list(self._get_node_xy(self.taxi_node))
-        self.get_logger().info(f'Hub at node {self.taxi_node}: {self.hub_xy}')
+        self.get_logger().info(f'Hub in map frame: {self.hub_xy}')
+        self.recorded_points = np.zeros((2, 0), dtype=float)
+        self.recorded_nodes = []
+        self.recorded_map_path = None
+        self.recorded_loop = False
+        self._load_recorded_map()
 
         self.LED_GREEN   = 1
         self.LED_BLUE    = 2
@@ -103,38 +115,61 @@ class TripPlanner(Node):
             elif p.name == 'dropoff_xy' and p.type_ == p.Type.DOUBLE_ARRAY:
                 self.dropoff_xy = list(p.value)
                 self.get_logger().info(f'dropoff_xy updated: {self.dropoff_xy}')
+            elif p.name == 'hub_xy' and p.type_ == p.Type.DOUBLE_ARRAY:
+                self.hub_xy = list(p.value)
+                self.get_logger().info(f'hub_xy updated: {self.hub_xy}')
             elif p.name == 'stop_seconds' and p.type_ == p.Type.DOUBLE_ARRAY:
                 self.stop_seconds = float(list(p.value)[0])
-            elif p.name == 'rotation_offset' and p.type_ == p.Type.DOUBLE_ARRAY:
-                self.rotation_offset = list(p.value)
-            elif p.name == 'translation_offset' and p.type_ == p.Type.DOUBLE_ARRAY:
-                self.translation_offset = list(p.value)
+            elif p.name == 'recorded_min_node_spacing_m' and p.type_ == p.Type.DOUBLE:
+                self.recorded_min_node_spacing_m = float(p.value)
+                self._load_recorded_map()
+            elif p.name == 'recorded_min_yaw_change_rad' and p.type_ == p.Type.DOUBLE:
+                self.recorded_min_yaw_change_rad = float(p.value)
+                self._load_recorded_map()
+            elif p.name == 'generated_waypoint_spacing_m' and p.type_ == p.Type.DOUBLE:
+                self.generated_waypoint_spacing_m = float(p.value)
 
         if self.ready_for_rides and self.mission_stage == MissionStage.IDLE:
             self.new_ride_requested = True
 
         return SetParametersResult(successful=True)
 
-    def _rot_matrix(self):
-        angle = float(self.rotation_offset[0]) * np.pi / 180.0
-        return np.array([
-            [np.cos(-angle), -np.sin(-angle)],
-            [np.sin(-angle),  np.cos(-angle)]
-        ])
+    def _load_recorded_map(self):
+        latest_map = find_latest_recording_map()
+        if latest_map is None:
+            self.get_logger().error('No recorded map found for trip planner')
+            return False
 
-    def _ros_to_qlabs(self, x, y):
-        R_mat = self._rot_matrix()
-        t     = np.array(self.translation_offset)
-        return tuple((np.array([float(x), float(y)]) @ R_mat.T) - t)
+        data = load_recording_map(latest_map)
+        nodes = data.get('nodes', [])
+        filtered_nodes, control_points, _ = build_waypoint_path_from_nodes(
+            nodes,
+            min_node_spacing=self.recorded_min_node_spacing_m,
+            min_yaw_change=self.recorded_min_yaw_change_rad,
+            waypoint_spacing=self.generated_waypoint_spacing_m,
+        )
+        self.recorded_nodes = filtered_nodes
+        self.recorded_points = control_points
+        self.recorded_map_path = str(latest_map)
+        if self.recorded_points.shape[1] < 2:
+            self.get_logger().error('Recorded map has too few points for planning')
+            return False
 
-    def _qlabs_path_to_ros(self, wp_2xn):
-        R_mat   = self._rot_matrix()
-        t_off   = np.array(self.translation_offset)
+        first = self.recorded_points[:, 0]
+        last = self.recorded_points[:, -1]
+        self.recorded_loop = float(np.linalg.norm(first - last)) < 0.75
+        self.get_logger().info(
+            f'Loaded recorded map for planner: {latest_map.name} '
+            f'raw_nodes={len(nodes)} control_nodes={self.recorded_points.shape[1]} '
+            f'loop={self.recorded_loop}')
+        return True
+
+    def _map_path_to_ros(self, wp_2xn):
         path_msg = Path()
         path_msg.header.stamp    = self.get_clock().now().to_msg()
         path_msg.header.frame_id = 'map'
         for i in range(wp_2xn.shape[1]):
-            pt   = (wp_2xn[:, i] + t_off) @ R_mat
+            pt   = wp_2xn[:, i]
             pose = PoseStamped()
             pose.header = path_msg.header
             pose.pose.position.x = float(pt[0])
@@ -142,71 +177,48 @@ class TripPlanner(Node):
             path_msg.poses.append(pose)
         return path_msg
 
-    def _get_node_xy(self, node_id):
-        if hasattr(self.roadmap, 'get_node_pose'):
-            pose = np.array(self.roadmap.get_node_pose(node_id)).reshape(-1)
-        else:
-            pose = np.array(self.roadmap.nodes[node_id].pose).reshape(-1)
-        return float(pose[0]), float(pose[1])
-
-    def _node_count(self):
-        if hasattr(self.roadmap, 'nodes'):
-            try:
-                return len(self.roadmap.nodes)
-            except Exception:
-                pass
-        if hasattr(self.roadmap, 'get_node_pose'):
-            i = 0
-            while True:
-                try:
-                    self.roadmap.get_node_pose(i)
-                    i += 1
-                    if i > 1000:
-                        return i
-                except Exception:
-                    return i
-        return 0
-
-    def _closest_node(self, x, y):
-        best_i, best_d = 0, float('inf')
-        for i in range(self._node_count()):
-            try:
-                nx, ny = self._get_node_xy(i)
-                d = (nx - x) ** 2 + (ny - y) ** 2
-                if d < best_d:
-                    best_d = d
-                    best_i = i
-            except Exception:
-                continue
-        return best_i
-
     def _plan_to_xy(self, goal_xy):
         if self.robot_pose is None:
             return None
-
-        rx, ry   = float(self.robot_pose.pose.position.x), float(self.robot_pose.pose.position.y)
-        px_q, py_q = self._ros_to_qlabs(rx, ry)
-
-        start_node = self._closest_node(px_q, py_q)
-        goal_node  = self._closest_node(float(goal_xy[0]), float(goal_xy[1]))
-
-        if hasattr(self.roadmap, 'find_shortest_path'):
-            base = self.roadmap.find_shortest_path(start_node, goal_node)
-        else:
-            base = self.roadmap.generate_path([start_node, goal_node])
-
-        if base is None or np.size(base) == 0:
-            self.get_logger().error(f'No path from node {start_node} to {goal_node}')
+        if self.recorded_points.shape[1] < 2 and not self._load_recorded_map():
             return None
 
-        goal_col = np.array(goal_xy).reshape(2, 1)
-        return np.hstack([np.array(base), goal_col])
+        rx = float(self.robot_pose.pose.position.x)
+        ry = float(self.robot_pose.pose.position.y)
+        cur = np.array([rx, ry], dtype=float)
+        goal = np.array([float(goal_xy[0]), float(goal_xy[1])], dtype=float)
+
+        start_idx = closest_recorded_node_index(self.recorded_points, cur)
+        goal_idx = closest_recorded_node_index(self.recorded_points, goal)
+        if start_idx is None or goal_idx is None:
+            self.get_logger().error('Failed to find nearest recorded nodes')
+            return None
+
+        route = build_dense_recorded_segment(
+            self.recorded_points,
+            start_idx,
+            goal_idx,
+            spacing=self.generated_waypoint_spacing_m,
+            closed_loop=self.recorded_loop,
+        )
+        if route.shape[1] == 0:
+            return None
+
+        if np.linalg.norm(route[:, 0] - cur) > 0.05:
+            route = np.hstack([cur.reshape(2, 1), route])
+        if np.linalg.norm(route[:, -1] - goal) > 0.05:
+            route = np.hstack([route, goal.reshape(2, 1)])
+
+        self.get_logger().info(
+            f'Planner route start_idx={start_idx} goal_idx={goal_idx} '
+            f'pts={route.shape[1]} goal=({goal[0]:.2f},{goal[1]:.2f})')
+        return route
 
     def _send_path_to(self, goal_xy, label=''):
         wp = self._plan_to_xy(goal_xy)
         if wp is None:
             return False
-        self.waypoints_pub.publish(self._qlabs_path_to_ros(wp))
+        self.waypoints_pub.publish(self._map_path_to_ros(wp))
         self.get_logger().info(f'Path published -> {label} ({goal_xy[0]:.2f}, {goal_xy[1]:.2f})')
         return True
 
@@ -215,9 +227,7 @@ class TripPlanner(Node):
             return self._send_path_to(goal_xy, label)
 
         rx, ry = float(self.robot_pose.pose.position.x), float(self.robot_pose.pose.position.y)
-        R_mat  = self._rot_matrix()
-        t      = np.array(self.translation_offset)
-        cur_q  = np.array([rx, ry]) @ R_mat.T - t
+        cur_q  = np.array([rx, ry])
         goal_q = np.array([float(goal_xy[0]), float(goal_xy[1])])
 
         dist = float(np.linalg.norm(cur_q - goal_q))
@@ -226,7 +236,7 @@ class TripPlanner(Node):
             return True
 
         wp = np.stack([cur_q, goal_q], axis=1)
-        self.waypoints_pub.publish(self._qlabs_path_to_ros(wp))
+        self.waypoints_pub.publish(self._map_path_to_ros(wp))
         self.get_logger().info(f'Snap path -> {label} ({goal_xy[0]:.2f}, {goal_xy[1]:.2f}) dist={dist:.3f}m')
         return True
 

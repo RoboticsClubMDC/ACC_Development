@@ -12,18 +12,24 @@ from pal.utilities.scope import MultiScope
 
 from rclpy.duration import Duration
 import rclpy
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import Point, PoseStamped
 from rclpy.node import Node
 from nav_msgs.msg import Path
 from tf2_ros import TransformException
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
-from geometry_msgs.msg import Twist, PoseStamped
+from geometry_msgs.msg import Twist
 from sensor_msgs.msg import Imu, JointState
 from rcl_interfaces.msg import SetParametersResult
 from std_msgs.msg import Bool, Float32
+from visualization_msgs.msg import Marker
 
-from autonomy.recorded_map_utils import find_latest_recording_map, load_recording_map
+from autonomy.recorded_map_utils import (
+    build_waypoint_path_from_nodes,
+    densify_polyline,
+    find_latest_recording_map,
+    load_recording_map,
+)
 
 
 class QcarEKF:
@@ -109,6 +115,15 @@ class PathFollower(Node):
         self.declare_parameter('use_recorded_map', True)
         self.use_recorded_map = self.get_parameter(
             'use_recorded_map').get_parameter_value().bool_value
+        self.declare_parameter('recorded_min_node_spacing_m', 0.10)
+        self.recorded_min_node_spacing_m = float(
+            self.get_parameter('recorded_min_node_spacing_m').get_parameter_value().double_value)
+        self.declare_parameter('recorded_min_yaw_change_rad', 0.20)
+        self.recorded_min_yaw_change_rad = float(
+            self.get_parameter('recorded_min_yaw_change_rad').get_parameter_value().double_value)
+        self.declare_parameter('generated_waypoint_spacing_m', 0.03)
+        self.generated_waypoint_spacing_m = float(
+            self.get_parameter('generated_waypoint_spacing_m').get_parameter_value().double_value)
 
         self.declare_parameter('desired_speed', [0.4])
         self.desired_speed = list(self.get_parameter('desired_speed').get_parameter_value().double_array_value)
@@ -169,6 +184,7 @@ class PathFollower(Node):
         self.recorded_nodes = []
         self.recorded_map_path = None
         self._wp_in_ros_frame = False
+        self._raw_recorded_node_count = 0
         self.wp = self._load_starting_waypoints()
         self.N = len(self.wp[0, :])
         self.wpi = 0
@@ -197,6 +213,7 @@ class PathFollower(Node):
         self.gyroscope = [0, 0, 0]
 
         self.path_publisher_topic  = self.create_publisher(Path, '/planned_path', 1)
+        self.path_marker_publisher = self.create_publisher(Marker, '/planned_path_marker', 1)
         self.path_status_publisher = self.create_publisher(Bool, '/path_status', 1)
         self.robot_pose_publisher  = self.create_publisher(PoseStamped, '/robot_pose', 10)
 
@@ -239,30 +256,38 @@ class PathFollower(Node):
             self.get_logger().warn(f'Recorded map {latest_map} has no nodes')
             return None
 
-        self.recorded_nodes = nodes
+        self._raw_recorded_node_count = len(nodes)
         self.recorded_map_path = str(latest_map)
-        wp = self._build_full_recorded_route()
+        filtered_nodes, _, wp = build_waypoint_path_from_nodes(
+            nodes,
+            min_node_spacing=self.recorded_min_node_spacing_m,
+            min_yaw_change=self.recorded_min_yaw_change_rad,
+            waypoint_spacing=self.generated_waypoint_spacing_m,
+        )
+        self.recorded_nodes = filtered_nodes
         if wp is None:
             return None
 
         self._wp_in_ros_frame = True
         self.get_logger().info(
             f'Using full recorded route from {FsPath(latest_map).name} '
-            f'with {len(nodes)} saved points')
+            f'raw_nodes={len(nodes)} control_nodes={len(filtered_nodes)} '
+            f'generated_waypoints={wp.shape[1]} spacing={self.generated_waypoint_spacing_m:.2f}m '
+            f'first=({filtered_nodes[0]["x"]:.2f},{filtered_nodes[0]["y"]:.2f}) '
+            f'last=({filtered_nodes[-1]["x"]:.2f},{filtered_nodes[-1]["y"]:.2f})')
         return wp
 
     def _build_full_recorded_route(self):
         if not self.recorded_nodes:
             return None
 
-        route_points = []
-        for node in self.recorded_nodes:
-            route_points.append((float(node['x']), float(node['y'])))
-
-        if not route_points:
-            return None
-
-        return np.array(route_points, dtype=float).T
+        _, _, dense_waypoints = build_waypoint_path_from_nodes(
+            self.recorded_nodes,
+            min_node_spacing=0.0,
+            min_yaw_change=0.0,
+            waypoint_spacing=self.generated_waypoint_spacing_m,
+        )
+        return dense_waypoints if dense_waypoints.shape[1] > 0 else None
 
     def _cmd_waypoints_cb(self, msg: Path):
         if not msg.poses:
@@ -270,13 +295,16 @@ class PathFollower(Node):
             return
         xs = [p.pose.position.x for p in msg.poses]
         ys = [p.pose.position.y for p in msg.poses]
-        self.wp              = np.array([xs, ys])
+        raw_wp = np.array([xs, ys], dtype=float)
+        self.wp = densify_polyline(raw_wp, spacing=self.generated_waypoint_spacing_m)
         self.N               = self.wp.shape[1]
         self.wpi             = 0
         self.path_complete   = False
         self.path_execute_flag = True
         self._wp_in_ros_frame = True
-        self.get_logger().info(f'/cmd_waypoints received N={self.N}')
+        self.get_logger().warn(
+            f'/cmd_waypoints overwrote self.wp raw={len(xs)} dense={self.N} '
+            f'first=({xs[0]:.2f},{ys[0]:.2f}) last=({xs[-1]:.2f},{ys[-1]:.2f})')
 
     def _stanley_delta_cb(self, msg: Float32):
         self.stanley_delta = float(msg.data)
@@ -331,6 +359,33 @@ class PathFollower(Node):
                 self.rotation_offset = list(param.value)
             elif param.name == 'translation_offset' and param.type_ == param.Type.DOUBLE_ARRAY:
                 self.translation_offset = list(param.value)
+            elif param.name == 'recorded_min_node_spacing_m' and param.type_ == param.Type.DOUBLE:
+                self.recorded_min_node_spacing_m = float(param.value)
+                wp = self._load_waypoints_from_recorded_map()
+                if wp is not None:
+                    self.wp = wp
+                    self.N = self.wp.shape[1]
+                    self.wpi = 0
+                    self.path_complete = False
+            elif param.name == 'recorded_min_yaw_change_rad' and param.type_ == param.Type.DOUBLE:
+                self.recorded_min_yaw_change_rad = float(param.value)
+                wp = self._load_waypoints_from_recorded_map()
+                if wp is not None:
+                    self.wp = wp
+                    self.N = self.wp.shape[1]
+                    self.wpi = 0
+                    self.path_complete = False
+            elif param.name == 'generated_waypoint_spacing_m' and param.type_ == param.Type.DOUBLE:
+                self.generated_waypoint_spacing_m = float(param.value)
+                if self._wp_in_ros_frame and self.recorded_map_path is not None:
+                    wp = self._load_waypoints_from_recorded_map()
+                    if wp is not None:
+                        self.wp = wp
+                        self.N = self.wp.shape[1]
+                        self.wpi = 0
+                        self.path_complete = False
+                self.get_logger().info(
+                    f'generated_waypoint_spacing_m updated: {self.generated_waypoint_spacing_m:.2f}m')
             elif param.name == 'start_path' and param.type_ == param.Type.BOOL_ARRAY:
                 self.path_execute_flag = list(param.value)[0]
                 self.get_logger().info('path status changed!')
@@ -414,17 +469,32 @@ class PathFollower(Node):
         path_msg = Path()
         path_msg.header.stamp = self.get_clock().now().to_msg()
         path_msg.header.frame_id = 'map'
+        marker_msg = Marker()
+        marker_msg.header = path_msg.header
+        marker_msg.ns = 'planned_path'
+        marker_msg.id = 0
+        marker_msg.type = Marker.LINE_STRIP
+        marker_msg.action = Marker.ADD
+        marker_msg.scale.x = 0.12
+        marker_msg.color.a = 1.0
+        marker_msg.color.r = 1.0
+        marker_msg.color.g = 0.1
+        marker_msg.color.b = 1.0
+        marker_msg.pose.orientation.w = 1.0
         for i in range(self.N):
-            if i >= self.N:
-                i = self.N - 1
             pose = PoseStamped()
             wp_1_mod = self._waypoint_in_map_frame(self.wp[:, i])
-            pose.header.stamp = self.get_clock().now().to_msg()
-            pose.header.frame_id = 'map'
+            pose.header = path_msg.header
             pose.pose.position.x = wp_1_mod[0]
             pose.pose.position.y = wp_1_mod[1]
             path_msg.poses.append(pose)
+            point = Point()
+            point.x = float(wp_1_mod[0])
+            point.y = float(wp_1_mod[1])
+            point.z = 0.0
+            marker_msg.points.append(point)
         self.path_publisher_topic.publish(path_msg)
+        self.path_marker_publisher.publish(marker_msg)
 
     def path_planner(self):
         max_speed = 1.5
