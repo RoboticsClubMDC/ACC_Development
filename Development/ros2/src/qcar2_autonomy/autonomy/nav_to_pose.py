@@ -217,6 +217,8 @@ class PathFollower(Node):
 
         self.path_publisher_topic  = self.create_publisher(Path, '/planned_path', 1)
         self.path_marker_publisher = self.create_publisher(Marker, '/planned_path_marker', 1)
+        self.path_nodes_marker_publisher = self.create_publisher(Marker, '/planned_path_nodes', 1)
+        self.target_waypoint_marker_publisher = self.create_publisher(Marker, '/planned_target_waypoint', 1)
         self.path_status_publisher = self.create_publisher(Bool, '/path_status', 1)
         self.robot_pose_publisher  = self.create_publisher(PoseStamped, '/robot_pose', 10)
 
@@ -307,15 +309,14 @@ class PathFollower(Node):
             return
         xs = [p.pose.position.x for p in msg.poses]
         ys = [p.pose.position.y for p in msg.poses]
-        raw_wp = np.array([xs, ys], dtype=float)
-        self.wp = densify_polyline(raw_wp, spacing=self.generated_waypoint_spacing_m)
+        self.wp = np.array([xs, ys], dtype=float)
         self.N               = self.wp.shape[1]
         self.wpi             = 0
         self.path_complete   = False
         self.path_execute_flag = True
         self._wp_in_ros_frame = True
         self.get_logger().warn(
-            f'/cmd_waypoints overwrote self.wp raw={len(xs)} dense={self.N} '
+            f'/cmd_waypoints overwrote self.wp raw={len(xs)} kept={self.N} '
             f'first=({xs[0]:.2f},{ys[0]:.2f}) last=({xs[-1]:.2f},{ys[-1]:.2f})')
 
     def _stanley_delta_cb(self, msg: Float32):
@@ -493,6 +494,20 @@ class PathFollower(Node):
         marker_msg.color.g = 0.1
         marker_msg.color.b = 1.0
         marker_msg.pose.orientation.w = 1.0
+        nodes_marker = Marker()
+        nodes_marker.header = path_msg.header
+        nodes_marker.ns = 'planned_path_nodes'
+        nodes_marker.id = 1
+        nodes_marker.type = Marker.SPHERE_LIST
+        nodes_marker.action = Marker.ADD
+        nodes_marker.scale.x = 0.08
+        nodes_marker.scale.y = 0.08
+        nodes_marker.scale.z = 0.08
+        nodes_marker.color.a = 1.0
+        nodes_marker.color.r = 0.0
+        nodes_marker.color.g = 0.9
+        nodes_marker.color.b = 1.0
+        nodes_marker.pose.orientation.w = 1.0
         for i in range(self.N):
             pose = PoseStamped()
             wp_1_mod = self._waypoint_in_route_frame(self.wp[:, i])
@@ -505,8 +520,31 @@ class PathFollower(Node):
             point.y = float(wp_1_mod[1])
             point.z = 0.0
             marker_msg.points.append(point)
+            nodes_marker.points.append(point)
         self.path_publisher_topic.publish(path_msg)
         self.path_marker_publisher.publish(marker_msg)
+        self.path_nodes_marker_publisher.publish(nodes_marker)
+
+    def _publish_target_waypoint_marker(self, wp_xy):
+        marker = Marker()
+        marker.header.stamp = self.get_clock().now().to_msg()
+        marker.header.frame_id = self.route_frame
+        marker.ns = 'planned_target_waypoint'
+        marker.id = 0
+        marker.type = Marker.SPHERE
+        marker.action = Marker.ADD
+        marker.scale.x = 0.16
+        marker.scale.y = 0.16
+        marker.scale.z = 0.16
+        marker.color.a = 1.0
+        marker.color.r = 1.0
+        marker.color.g = 0.85
+        marker.color.b = 0.0
+        marker.pose.orientation.w = 1.0
+        marker.pose.position.x = float(wp_xy[0])
+        marker.pose.position.y = float(wp_xy[1])
+        marker.pose.position.z = 0.0
+        self.target_waypoint_marker_publisher.publish(marker)
 
     def _update_progress_index(self, robot_xy, max_step=25):
         if self.N <= 1:
@@ -577,6 +615,7 @@ class PathFollower(Node):
                 target_idx = self._select_lookahead_index(robot_xy, lookahead_dist)
                 wp_1 = np.array(self.wp[:, target_idx])
                 wp_1_mod = self._waypoint_in_route_frame(wp_1)
+                self._publish_target_waypoint_marker(wp_1_mod)
 
                 v = [wp_1_mod[0] - p[0], wp_1_mod[1] - p[1]]
                 Rot = np.array([[np.cos(th), -np.sin(th)], [np.sin(th), np.cos(th)]])

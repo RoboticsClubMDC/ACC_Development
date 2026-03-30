@@ -6,12 +6,13 @@ from enum import Enum
 
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import Point, PoseStamped
 from nav_msgs.msg import Path
 from std_msgs.msg import Bool
 from rcl_interfaces.srv import SetParameters
 from rcl_interfaces.msg import Parameter, SetParametersResult
 from rclpy.parameter import ParameterType
+from visualization_msgs.msg import Marker
 
 from autonomy.recorded_map_utils import (
     build_dense_recorded_segment,
@@ -98,12 +99,87 @@ class TripPlanner(Node):
         self._last_led     = None
 
         self.waypoints_pub = self.create_publisher(Path, '/cmd_waypoints', 1)
+        self.raw_nodes_marker_pub = self.create_publisher(Marker, '/planner/raw_recorded_nodes', 1)
+        self.control_nodes_marker_pub = self.create_publisher(Marker, '/planner/control_nodes', 1)
+        self.dense_route_marker_pub = self.create_publisher(Marker, '/planner/dense_recorded_route', 1)
+        self.active_route_marker_pub = self.create_publisher(Marker, '/planner/active_route_nodes', 1)
 
         self.create_subscription(Bool,        '/path_status',  self.path_status_callback,  10)
         self.create_subscription(PoseStamped, '/robot_pose',   self.robot_pose_callback,   10)
 
         self._set_led(self.LED_MAGENTA)
         self.create_timer(0.1, self.loop)
+
+    def _make_points_marker(self, ns, marker_id, rgb, scale=0.08):
+        marker = Marker()
+        marker.header.frame_id = self.route_frame
+        marker.ns = ns
+        marker.id = marker_id
+        marker.type = Marker.SPHERE_LIST
+        marker.action = Marker.ADD
+        marker.scale.x = scale
+        marker.scale.y = scale
+        marker.scale.z = scale
+        marker.color.a = 1.0
+        marker.color.r = float(rgb[0])
+        marker.color.g = float(rgb[1])
+        marker.color.b = float(rgb[2])
+        marker.pose.orientation.w = 1.0
+        return marker
+
+    def _make_line_marker(self, ns, marker_id, rgb, width=0.04):
+        marker = Marker()
+        marker.header.frame_id = self.route_frame
+        marker.ns = ns
+        marker.id = marker_id
+        marker.type = Marker.LINE_STRIP
+        marker.action = Marker.ADD
+        marker.scale.x = width
+        marker.color.a = 1.0
+        marker.color.r = float(rgb[0])
+        marker.color.g = float(rgb[1])
+        marker.color.b = float(rgb[2])
+        marker.pose.orientation.w = 1.0
+        return marker
+
+    def _marker_points_from_xy(self, points_2xn):
+        pts = []
+        if points_2xn.size == 0:
+            return pts
+        for i in range(points_2xn.shape[1]):
+            p = Point()
+            p.x = float(points_2xn[0, i])
+            p.y = float(points_2xn[1, i])
+            p.z = 0.0
+            pts.append(p)
+        return pts
+
+    def _publish_debug_markers(self, raw_nodes=None, control_points=None, dense_waypoints=None, active_route=None):
+        stamp = self.get_clock().now().to_msg()
+
+        if raw_nodes is not None:
+            marker = self._make_points_marker('planner_raw_recorded_nodes', 0, (1.0, 1.0, 0.0), scale=0.09)
+            marker.header.stamp = stamp
+            marker.points = self._marker_points_from_xy(raw_nodes)
+            self.raw_nodes_marker_pub.publish(marker)
+
+        if control_points is not None:
+            marker = self._make_points_marker('planner_control_nodes', 1, (0.0, 1.0, 1.0), scale=0.10)
+            marker.header.stamp = stamp
+            marker.points = self._marker_points_from_xy(control_points)
+            self.control_nodes_marker_pub.publish(marker)
+
+        if dense_waypoints is not None:
+            marker = self._make_line_marker('planner_dense_recorded_route', 2, (0.1, 1.0, 0.1), width=0.03)
+            marker.header.stamp = stamp
+            marker.points = self._marker_points_from_xy(dense_waypoints)
+            self.dense_route_marker_pub.publish(marker)
+
+        if active_route is not None:
+            marker = self._make_points_marker('planner_active_route_nodes', 3, (0.1, 0.4, 1.0), scale=0.11)
+            marker.header.stamp = stamp
+            marker.points = self._marker_points_from_xy(active_route)
+            self.active_route_marker_pub.publish(marker)
 
     def path_status_callback(self, msg):
         prev = self.path_status
@@ -188,6 +264,13 @@ class TripPlanner(Node):
             min_yaw_change=self.recorded_min_yaw_change_rad,
             waypoint_spacing=self.generated_waypoint_spacing_m,
         )
+        raw_points = np.zeros((2, 0), dtype=float)
+        if nodes:
+            raw_points = np.array(
+                [[float(node['x']) for node in nodes],
+                 [float(node['y']) for node in nodes]],
+                dtype=float,
+            )
         self.recorded_nodes = filtered_nodes
         self.recorded_points = control_points
         self.recorded_waypoints = dense_waypoints
@@ -204,6 +287,11 @@ class TripPlanner(Node):
             f'raw_nodes={len(nodes)} control_nodes={self.recorded_points.shape[1]} '
             f'dense_waypoints={self.recorded_waypoints.shape[1]} '
             f'loop={self.recorded_loop}')
+        self._publish_debug_markers(
+            raw_nodes=raw_points,
+            control_points=self.recorded_points,
+            dense_waypoints=self.recorded_waypoints,
+        )
         return True
 
     def _map_path_to_ros(self, wp_2xn):
@@ -278,6 +366,7 @@ class TripPlanner(Node):
         if wp is None:
             return False
         self.waypoints_pub.publish(self._map_path_to_ros(wp))
+        self._publish_debug_markers(active_route=wp)
         self.get_logger().info(f'Path published -> {label} ({goal_xy[0]:.2f}, {goal_xy[1]:.2f})')
         return True
 
