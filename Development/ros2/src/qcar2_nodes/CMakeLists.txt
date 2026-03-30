@@ -55,6 +55,11 @@ target_include_directories(rgbd PUBLIC /usr/include/opencv4)
 target_link_libraries(rgbd cv_bridge::cv_bridge image_transport::image_transport opencv_imgcodecs -lquanser_media -lquanser_runtime -lquanser_common)
 ament_target_dependencies(rgbd rclcpp cv_bridge image_transport OpenCV std_msgs sensor_msgs)
 
+add_executable(rgbd_get_meters_probe src/rgbd_get_meters_probe.cpp)
+target_include_directories(rgbd_get_meters_probe PUBLIC /usr/include/opencv4)
+target_link_libraries(rgbd_get_meters_probe cv_bridge::cv_bridge image_transport::image_transport opencv_imgcodecs -lquanser_media -lquanser_runtime -lquanser_common)
+ament_target_dependencies(rgbd_get_meters_probe rclcpp cv_bridge image_transport OpenCV std_msgs sensor_msgs)
+
 add_executable(lidar src/lidar.cpp)
 target_link_libraries(lidar -lquanser_devices -lquanser_communications -lquanser_runtime -lquanser_common)
 ament_target_dependencies(lidar rclcpp sensor_msgs)
@@ -99,6 +104,9 @@ install(TARGETS qcar2_hardware
   DESTINATION lib/${PROJECT_NAME})
 
 install(TARGETS rgbd
+  DESTINATION lib/${PROJECT_NAME})
+
+install(TARGETS rgbd_get_meters_probe
   DESTINATION lib/${PROJECT_NAME})
 
 install(TARGETS lidar

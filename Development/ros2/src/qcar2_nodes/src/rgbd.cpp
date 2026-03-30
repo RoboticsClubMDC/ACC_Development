@@ -126,19 +126,35 @@ class RGBD: public rclcpp::Node
 
         param_desc.description = "The requested frame width of the RGB stream. Only certain combinations of frame_width_rgb, frame_height_rgb, and frame_rate parameters can be used. Refer to the following Additional constraints for details.";
         param_desc.additional_constraints = "Possible values:\n\t320 x 180 @???\n\t320 x 240 @???\n\t424 x 240 @???\n\t640 x 360 @???\n\t640 x 480 @???\n\t848 x 480 @???\n\t960 x 540 @???\n\t1280 x 720 @???\n\t1920 x 1080 @???";
-        this->declare_parameter("frame_width_rgb", 1280, param_desc);
+        // CHANGED: Default resolution set to 640x480 (from 1280x720) for VO testing
+        // Reason: 640x480 matches the intrinsics calibration data we're testing,
+        // reduces bandwidth/CPU load, and provides sufficient features for VO.
+        // To use different resolution, set via ROS parameter at launch.
+        this->declare_parameter("frame_width_rgb", 640, param_desc);
 
         param_desc.description = "The requested frame height of the RGB stream. Only certain combinations of frame_width_rgb, frame_height_rgb, and frame_rate parameters can be used. Refer to the following Additional constraints for details.";
         param_desc.additional_constraints = "Possible values:\n\t320 x 180 @???\n\t320 x 240 @???\n\t424 x 240 @???\n\t640 x 360 @???\n\t640 x 480 @???\n\t848 x 480 @???\n\t960 x 540 @???\n\t1280 x 720 @???\n\t1920 x 1080 @???";
-        this->declare_parameter("frame_height_rgb", 720, param_desc);
+        // CHANGED: Default resolution set to 640x480 (from 1280x720) for VO testing
+        // Reason: 640x480 matches the intrinsics calibration data we're testing,
+        // reduces bandwidth/CPU load, and provides sufficient features for VO.
+        // To use different resolution, set via ROS parameter at launch.
+        this->declare_parameter("frame_height_rgb", 480, param_desc);
 
         param_desc.description = "The requested frame width of the Depth stream. Only certain combinations of frame_width_depth, frame_height_depth, and frame_rate parameters can be used. Refer to the following Additional constraints for details.";
         param_desc.additional_constraints = "Possible values:\n\t256 x 144 @???\n\t848 x 100 @???\n\t424 x 240 @???\n\t480 x 270 @???\n\t640 x 360 @???\n\t640 x 480 @???\n\t848 x 480 @???\n\t1280 x 720 @???";
-        this->declare_parameter("frame_width_depth", 1280, param_desc);
+        // CHANGED: Default resolution set to 640x480 (from 1280x720) for VO testing
+        // Reason: 640x480 matches the intrinsics calibration data we're testing,
+        // reduces bandwidth/CPU load, and provides sufficient features for VO.
+        // To use different resolution, set via ROS parameter at launch.
+        this->declare_parameter("frame_width_depth", 640, param_desc);
 
         param_desc.description = "The requested frame height of the Depth stream. Only certain combinations of frame_width_depth, frame_height_depth, and frame_rate parameters can be used. Refer to the following Additional constraints for details.";
         param_desc.additional_constraints = "Possible values:\n\t256 x 144 @???\n\t848 x 100 @???\n\t424 x 240 @???\n\t480 x 270 @???\n\t640 x 360 @???\n\t640 x 480 @???\n\t848 x 480 @???\n\t1280 x 720 @???";
-        this->declare_parameter("frame_height_depth", 720, param_desc);
+        // CHANGED: Default resolution set to 640x480 (from 1280x720) for VO testing
+        // Reason: 640x480 matches the intrinsics calibration data we're testing,
+        // reduces bandwidth/CPU load, and provides sufficient features for VO.
+        // To use different resolution, set via ROS parameter at launch.
+        this->declare_parameter("frame_height_depth", 480, param_desc);
 
         param_desc.description = "The requested frame rate of the CSI camera. Only certain combinations of frame_width_rgb, frame_height_rgb, and frame_rate parameters can be used. Refer to the following Additional constraints for details.";
         param_desc.additional_constraints = "Possible values:\n\t640 x 400 @210.0\n\t640 x 480 @180.0\n\t1280 x 720 @130.0\n\t1280 x 800 @120.0";
@@ -393,10 +409,14 @@ class RGBD: public rclcpp::Node
 
 
         std::string camera_identifier = " ";
-        t_uint32 frame_width_rgb = 1280;
-        t_uint32 frame_height_rgb = 720;
-        t_uint32 frame_width_depth = 1280;
-        t_uint32 frame_height_depth = 720;
+        // CHANGED: Default resolution set to 640x480 (from 1280x720) for VO testing
+        // Reason: 640x480 matches the intrinsics calibration data we're testing,
+        // reduces bandwidth/CPU load, and provides sufficient features for VO.
+        // To use different resolution, set via ROS parameter at launch.
+        t_uint32 frame_width_rgb = 640;
+        t_uint32 frame_height_rgb = 480;
+        t_uint32 frame_width_depth = 640;
+        t_uint32 frame_height_depth = 480;
         t_double frame_rate_param = 30.0;
 
         t_uint8  *buffer_rgb;

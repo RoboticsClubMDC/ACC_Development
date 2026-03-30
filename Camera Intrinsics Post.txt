@@ -1,0 +1,270 @@
+Camera Intrinsics Post calibration (no distortion)
+
+Depth 256x144
+fx = 641.263793945312
+fy = 641.263793945312
+cx = 134.70556640625
+cy = 67.9455261230469
+distortion = Brown Conrady
+coeffs = [0, 0, 0, 0, 0]
+
+Depth 424x240
+fx = 212.41862487793
+fy = 212.41862487793
+cx = 214.221221923828
+cy = 118.656951904297
+distortion = Brown Conrady
+coeffs = [0, 0, 0, 0, 0]
+
+Depth 480x270
+fx = 240.473922729492
+fy = 240.473922729492
+cx = 242.514587402344
+cy = 133.416412353516
+distortion = Brown Conrady
+coeffs = [0, 0, 0, 0, 0]
+
+Depth 640x360
+fx = 320.631896972656
+fy = 320.631896972656
+cx = 323.352783203125
+cy = 177.972763061523
+distortion = Brown Conrady
+coeffs = [0, 0, 0, 0, 0]
+
+Depth 640x480
+fx = 384.758270263672
+fy = 384.758270263672
+cx = 324.023345947266
+cy = 237.567321777344
+distortion = Brown Conrady
+coeffs = [0, 0, 0, 0, 0]
+
+Depth 848x100
+fx = 424.837249755859
+fy = 424.837249755859
+cx = 428.442443847656
+cy = 47.3139038085938
+distortion = Brown Conrady
+coeffs = [0, 0, 0, 0, 0]
+
+Depth 848x480
+fx = 424.837249755859
+fy = 424.837249755859
+cx = 428.442443847656
+cy = 237.313903808594
+distortion = Brown Conrady
+coeffs = [0, 0, 0, 0, 0]
+
+Depth 1280x720
+fx = 641.263793945312
+fy = 641.263793945312
+cx = 646.70556640625
+cy = 355.945526123047
+distortion = Brown Conrady
+coeffs = [0, 0, 0, 0, 0]
+
+
+Color 320x180
+fx = 227.74772644043
+fy = 227.754409790039
+cx = 161.856323242188
+cy = 93.70068359375
+distortion = Inverse Brown Conrady
+coeffs = [0, 0, 0, 0, 0]
+
+Color 320x240
+fx = 303.663635253906
+fy = 303.672546386719
+cx = 162.475112915039
+cy = 124.93424987793
+distortion = Inverse Brown Conrady
+coeffs = [0, 0, 0, 0, 0]
+
+Color 424x240
+fx = 303.663604736328
+fy = 303.672546386719
+cx = 214.47509765625
+cy = 124.93424987793
+distortion = Inverse Brown Conrady
+coeffs = [0, 0, 0, 0, 0]
+
+Color 640x360
+fx = 455.495452880859
+fy = 455.508819580078
+cx = 323.712646484375
+cy = 187.4013671875
+distortion = Inverse Brown Conrady
+coeffs = [0, 0, 0, 0, 0]
+
+Color 640x480
+fx = 607.327270507812
+fy = 607.345092773438
+cx = 324.950225830078
+cy = 249.868499755859
+distortion = Inverse Brown Conrady
+coeffs = [0, 0, 0, 0, 0]
+
+Color 848x480
+fx = 607.327209472656
+fy = 607.345092773438
+cx = 428.9501953125
+cy = 249.868499755859
+distortion = Inverse Brown Conrady
+coeffs = [0, 0, 0, 0, 0]
+
+Color 960x540
+fx = 683.2431640625
+fy = 683.263244628906
+cx = 485.568969726562
+cy = 281.10205078125
+distortion = Inverse Brown Conrady
+coeffs = [0, 0, 0, 0, 0]
+
+Color 1280x720
+fx = 910.990905761719
+fy = 911.017639160156
+cx = 647.42529296875
+cy = 374.802734375
+distortion = Inverse Brown Conrady
+coeffs = [0, 0, 0, 0, 0]
+
+Color 1920x1080
+fx = 1366.486328125
+fy = 1366.52648925781
+cx = 971.137939453125
+cy = 562.2041015625
+distortion = Inverse Brown Conrady
+coeffs = [0, 0, 0, 0, 0]
+
+
+
+Infrared 1 424x240
+fx = 212.41862487793
+fy = 212.41862487793
+cx = 214.221221923828
+cy = 118.656951904297
+distortion = Brown Conrady
+coeffs = [0, 0, 0, 0, 0]
+
+Infrared 1 480x270
+fx = 240.473922729492
+fy = 240.473922729492
+cx = 242.514587402344
+cy = 133.416412353516
+distortion = Brown Conrady
+coeffs = [0, 0, 0, 0, 0]
+
+Infrared 1 640x360
+fx = 320.631896972656
+fy = 320.631896972656
+cx = 323.352783203125
+cy = 177.972763061523
+distortion = Brown Conrady
+coeffs = [0, 0, 0, 0, 0]
+
+Infrared 1 640x480
+fx = 384.758270263672
+fy = 384.758270263672
+cx = 324.023345947266
+cy = 237.567321777344
+distortion = Brown Conrady
+coeffs = [0, 0, 0, 0, 0]
+
+Infrared 1 848x100
+fx = 424.837249755859
+fy = 424.837249755859
+cx = 428.442443847656
+cy = 47.3139038085938
+distortion = Brown Conrady
+coeffs = [0, 0, 0, 0, 0]
+
+Infrared 1 848x480
+fx = 424.837249755859
+fy = 424.837249755859
+cx = 428.442443847656
+cy = 237.313903808594
+distortion = Brown Conrady
+coeffs = [0, 0, 0, 0, 0]
+
+Infrared 1 1280x720
+fx = 641.263793945312
+fy = 641.263793945312
+cx = 646.70556640625
+cy = 355.945526123047
+distortion = Brown Conrady
+coeffs = [0, 0, 0, 0, 0]
+
+Infrared 1 1280x800
+fx = 641.263793945312
+fy = 641.263793945312
+cx = 646.70556640625
+cy = 395.945526123047
+distortion = Brown Conrady
+coeffs = [0, 0, 0, 0, 0]
+
+
+
+Infrared 2 424x240
+fx = 212.41862487793
+fy = 212.41862487793
+cx = 214.221221923828
+cy = 118.656951904297
+distortion = Brown Conrady
+coeffs = [0, 0, 0, 0, 0]
+
+Infrared 2 480x270
+fx = 240.473922729492
+fy = 240.473922729492
+cx = 242.514587402344
+cy = 133.416412353516
+distortion = Brown Conrady
+coeffs = [0, 0, 0, 0, 0]
+
+Infrared 2 640x360
+fx = 320.631896972656
+fy = 320.631896972656
+cx = 323.352783203125
+cy = 177.972763061523
+distortion = Brown Conrady
+coeffs = [0, 0, 0, 0, 0]
+
+Infrared 2 640x480
+fx = 384.758270263672
+fy = 384.758270263672
+cx = 324.023345947266
+cy = 237.567321777344
+distortion = Brown Conrady
+coeffs = [0, 0, 0, 0, 0]
+
+Infrared 2 848x100
+fx = 424.837249755859
+fy = 424.837249755859
+cx = 428.442443847656
+cy = 47.3139038085938
+distortion = Brown Conrady
+coeffs = [0, 0, 0, 0, 0]
+
+Infrared 2 848x480
+fx = 424.837249755859
+fy = 424.837249755859
+cx = 428.442443847656
+cy = 237.313903808594
+distortion = Brown Conrady
+coeffs = [0, 0, 0, 0, 0]
+
+Infrared 2 1280x720
+fx = 641.263793945312
+fy = 641.263793945312
+cx = 646.70556640625
+cy = 355.945526123047
+distortion = Brown Conrady
+coeffs = [0, 0, 0, 0, 0]
+
+Infrared 2 1280x800
+fx = 641.263793945312
+fy = 641.263793945312
+cx = 646.70556640625
+cy = 395.945526123047
+distortion = Brown Conrady
+coeffs = [0, 0, 0, 0, 0]
