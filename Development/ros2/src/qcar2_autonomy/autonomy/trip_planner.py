@@ -107,7 +107,8 @@ class TripPlanner(Node):
         self.create_subscription(Bool,        '/path_status',  self.path_status_callback,  10)
         self.create_subscription(PoseStamped, '/robot_pose',   self.robot_pose_callback,   10)
 
-        self._set_led(self.LED_MAGENTA)
+        # Startup begins by driving to the hub, so do not show the idle/ready color yet.
+        self._set_led(self.LED_ORANGE)
         self.create_timer(0.1, self.loop)
 
     def _make_points_marker(self, ns, marker_id, rgb, scale=0.08):
@@ -307,6 +308,24 @@ class TripPlanner(Node):
             path_msg.poses.append(pose)
         return path_msg
 
+    def _attach_exact_endpoint(self, route, point_xy, prepend=False, replace_thresh=0.05):
+        point_xy = np.array(point_xy, dtype=float).reshape(2)
+        point_col = point_xy.reshape(2, 1)
+        if route.size == 0:
+            return point_col
+
+        endpoint = route[:, 0] if prepend else route[:, -1]
+        if float(np.linalg.norm(endpoint - point_xy)) <= float(replace_thresh):
+            if prepend:
+                route[:, 0] = point_xy
+            else:
+                route[:, -1] = point_xy
+            return route
+
+        if prepend:
+            return np.hstack([point_col, route])
+        return np.hstack([route, point_col])
+
     def _plan_to_xy(self, goal_xy):
         if self.robot_pose is None:
             return None
@@ -339,20 +358,20 @@ class TripPlanner(Node):
         if route.shape[1] == 0:
             return None
 
-        # Keep planned paths on the recorded route. Only append the exact goal if it
-        # already lies very close to the route; otherwise the old behavior created a
-        # misleading straight-line tail off the mapped path.
-        if goal_route_dist <= self.goal_on_route_tolerance_m and np.linalg.norm(route[:, -1] - goal) > 0.05:
-            route = np.hstack([route, goal.reshape(2, 1)])
-        elif goal_route_dist > self.goal_on_route_tolerance_m:
+        # The recorded map is only a guide corridor. The actual current pose and
+        # requested goal remain the true endpoints of the planned path.
+        if goal_route_dist > self.goal_on_route_tolerance_m:
             self.get_logger().warn(
                 f'Goal ({goal[0]:.2f}, {goal[1]:.2f}) is {goal_route_dist:.2f}m off the recorded route; '
-                'ending path at nearest recorded waypoint instead of appending a straight segment')
+                'keeping the recorded route as a guide, then appending the exact goal coordinate')
 
         if start_route_dist > 0.25:
             self.get_logger().warn(
                 f'Robot start pose is {start_route_dist:.2f}m from the recorded route; '
-                'controller will converge to the first planned waypoint from off-route')
+                'prepending the exact current pose before joining the recorded route')
+
+        route = self._attach_exact_endpoint(route, cur, prepend=True)
+        route = self._attach_exact_endpoint(route, goal, prepend=False)
 
         self.get_logger().info(
             f'Planner route start_idx={start_idx} goal_idx={goal_idx} '
@@ -414,6 +433,7 @@ class TripPlanner(Node):
                 ok = self._send_path_to(self.hub_xy, label='HUB (startup)')
                 if ok:
                     self._startup_path_sent = True
+                    self._set_led(self.LED_ORANGE)
                 return
             if self._path_completed_event:
                 self._path_completed_event = False

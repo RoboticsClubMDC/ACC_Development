@@ -3,6 +3,12 @@ import subprocess
 from launch import LaunchDescription
 from launch_ros.actions import Node
 
+
+# SDCS big-map, right-hand traffic node 10.
+# We keep using the recorded map only as route geometry in this same frame.
+SDCS_TAXI_HUB_XY = [-1.28205, -0.45991]
+
+
 def generate_launch_description():
 
     path_follower = Node(
@@ -27,6 +33,7 @@ def generate_launch_description():
     name='trip_planner',
     parameters=[{
         'route_frame': 'map',
+        'hub_xy': SDCS_TAXI_HUB_XY,
     }],
     # parameters=[{
     #     'taxi_node': [10],
