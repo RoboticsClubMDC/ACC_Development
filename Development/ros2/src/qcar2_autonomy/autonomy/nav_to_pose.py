@@ -1,7 +1,5 @@
 #! /usr/bin/env python3
 
-from pathlib import Path as FsPath
-
 from pal.utilities.math import wrap_to_pi
 
 import time
@@ -23,14 +21,6 @@ from sensor_msgs.msg import Imu, JointState
 from rcl_interfaces.msg import SetParametersResult
 from std_msgs.msg import Bool, Float32
 from visualization_msgs.msg import Marker
-
-from autonomy.recorded_map_utils import (
-    build_waypoint_path_from_nodes,
-    densify_polyline,
-    find_latest_recording_map,
-    load_recording_map,
-)
-
 
 class QcarEKF:
 
@@ -143,7 +133,9 @@ class PathFollower(Node):
         self.translation_offset = list(self.get_parameter('translation_offset').get_parameter_value().double_array_value)
 
         self.declare_parameter('start_path', [True])
-        self.path_execute_flag = list(self.get_parameter('start_path').get_parameter_value().bool_array_value)[0]
+        self.start_path_requested = list(
+            self.get_parameter('start_path').get_parameter_value().bool_array_value)[0]
+        self.path_execute_flag = False
 
         self.declare_parameter('mission_pickup_xy',  [0.0, 0.0])
         self.declare_parameter('mission_dropoff_xy', [0.0, 0.0])
@@ -184,12 +176,9 @@ class PathFollower(Node):
         self.timer = self.create_timer(self.dt, self.tf_timer)
         self.translation = [0, 0, 0]
         self.rotation = [0, 0, 0]
-        self.recorded_nodes = []
-        self.recorded_map_path = None
         self._wp_in_ros_frame = False
-        self._raw_recorded_node_count = 0
-        self.wp = self._load_starting_waypoints()
-        self.N = len(self.wp[0, :])
+        self.wp = np.zeros((2, 0), dtype=float)
+        self.N = 0
         self.wpi = 0
         self.wp_prior = []
         self.current_steering = 0
@@ -239,70 +228,6 @@ class PathFollower(Node):
             f'route_frame={self.route_frame} | '
             f'stanley_blend={self.stanley_blend} trust_min={self.stanley_trust_min}')
 
-    def _load_starting_waypoints(self):
-        if not self.use_recorded_map:
-            raise RuntimeError('PathFollower requires use_recorded_map=true')
-
-        wp = self._load_waypoints_from_recorded_map()
-        if wp is None:
-            raise RuntimeError('Failed to load waypoints from recorded map')
-
-        self.get_logger().info('Loaded waypoints from recorded map')
-        return wp
-
-    def _load_waypoints_from_recorded_map(self):
-        latest_map = find_latest_recording_map(frame_id=self.route_frame)
-        if latest_map is None:
-            self.get_logger().warn(
-                f'No recording map found in qcar2_autonomy/recording_maps '
-                f'for frame_id={self.route_frame}')
-            return None
-
-        data = load_recording_map(latest_map)
-        frame_id = data.get('frame_id', '')
-        if frame_id != self.route_frame:
-            self.get_logger().error(
-                f'Recorded map frame mismatch: file={frame_id} '
-                f'expected={self.route_frame}')
-            return None
-        nodes = data.get('nodes', [])
-        if not nodes:
-            self.get_logger().warn(f'Recorded map {latest_map} has no nodes')
-            return None
-
-        self._raw_recorded_node_count = len(nodes)
-        self.recorded_map_path = str(latest_map)
-        filtered_nodes, _, wp = build_waypoint_path_from_nodes(
-            nodes,
-            min_node_spacing=self.recorded_min_node_spacing_m,
-            min_yaw_change=self.recorded_min_yaw_change_rad,
-            waypoint_spacing=self.generated_waypoint_spacing_m,
-        )
-        self.recorded_nodes = filtered_nodes
-        if wp is None:
-            return None
-
-        self._wp_in_ros_frame = True
-        self.get_logger().info(
-            f'Using full recorded route from {FsPath(latest_map).name} '
-            f'raw_nodes={len(nodes)} control_nodes={len(filtered_nodes)} '
-            f'generated_waypoints={wp.shape[1]} spacing={self.generated_waypoint_spacing_m:.2f}m '
-            f'first=({filtered_nodes[0]["x"]:.2f},{filtered_nodes[0]["y"]:.2f}) '
-            f'last=({filtered_nodes[-1]["x"]:.2f},{filtered_nodes[-1]["y"]:.2f})')
-        return wp
-
-    def _build_full_recorded_route(self):
-        if not self.recorded_nodes:
-            return None
-
-        _, _, dense_waypoints = build_waypoint_path_from_nodes(
-            self.recorded_nodes,
-            min_node_spacing=0.0,
-            min_yaw_change=0.0,
-            waypoint_spacing=self.generated_waypoint_spacing_m,
-        )
-        return dense_waypoints if dense_waypoints.shape[1] > 0 else None
-
     def _cmd_waypoints_cb(self, msg: Path):
         if not msg.poses:
             self.get_logger().warn('/cmd_waypoints empty — ignoring')
@@ -313,7 +238,7 @@ class PathFollower(Node):
         self.N               = self.wp.shape[1]
         self.wpi             = 0
         self.path_complete   = False
-        self.path_execute_flag = True
+        self.path_execute_flag = self.start_path_requested
         self._wp_in_ros_frame = True
         self.get_logger().warn(
             f'/cmd_waypoints overwrote self.wp raw={len(xs)} kept={self.N} '
@@ -350,21 +275,8 @@ class PathFollower(Node):
         for param in params:
             if param.name == 'node_values' and param.type_ == param.Type.INTEGER_ARRAY:
                 self.waypoints = list(param.value)
-                if not self.use_recorded_map:
-                    self.get_logger().error('use_recorded_map=false is not supported')
-                    return SetParametersResult(successful=False)
-
-                wp = self._load_waypoints_from_recorded_map()
-                if wp is None:
-                    self.get_logger().error('Failed to load waypoints from recorded map')
-                    return SetParametersResult(successful=False)
-
-                self.wp = wp
-                self.N = len(self.wp[0, :])
-                self.wpi = 0
-                self.previous_steering_value = 0
-                self.path_complete = False
-                self.get_logger().info('nodes updated!')
+                self.get_logger().warn(
+                    'node_values updated, but path_follower is planner-driven and will wait for /cmd_waypoints')
             elif param.name == 'desired_speed' and param.type_ == param.Type.DOUBLE_ARRAY:
                 self.desired_speed = list(param.value)
                 self.get_logger().info('new desired speed...')
@@ -374,33 +286,15 @@ class PathFollower(Node):
                 self.translation_offset = list(param.value)
             elif param.name == 'recorded_min_node_spacing_m' and param.type_ == param.Type.DOUBLE:
                 self.recorded_min_node_spacing_m = float(param.value)
-                wp = self._load_waypoints_from_recorded_map()
-                if wp is not None:
-                    self.wp = wp
-                    self.N = self.wp.shape[1]
-                    self.wpi = 0
-                    self.path_complete = False
             elif param.name == 'recorded_min_yaw_change_rad' and param.type_ == param.Type.DOUBLE:
                 self.recorded_min_yaw_change_rad = float(param.value)
-                wp = self._load_waypoints_from_recorded_map()
-                if wp is not None:
-                    self.wp = wp
-                    self.N = self.wp.shape[1]
-                    self.wpi = 0
-                    self.path_complete = False
             elif param.name == 'generated_waypoint_spacing_m' and param.type_ == param.Type.DOUBLE:
                 self.generated_waypoint_spacing_m = float(param.value)
-                if self._wp_in_ros_frame and self.recorded_map_path is not None:
-                    wp = self._load_waypoints_from_recorded_map()
-                    if wp is not None:
-                        self.wp = wp
-                        self.N = self.wp.shape[1]
-                        self.wpi = 0
-                        self.path_complete = False
                 self.get_logger().info(
                     f'generated_waypoint_spacing_m updated: {self.generated_waypoint_spacing_m:.2f}m')
             elif param.name == 'start_path' and param.type_ == param.Type.BOOL_ARRAY:
-                self.path_execute_flag = list(param.value)[0]
+                self.start_path_requested = list(param.value)[0]
+                self.path_execute_flag = self.start_path_requested and self.N > 0 and not self.path_complete
                 self.get_logger().info('path status changed!')
             elif param.name == 'stanley_blend' or param.name == 'stanley_trust_min':
                 self.get_logger().warn(f'{param.name} is hardcoded — ignoring')
@@ -508,6 +402,13 @@ class PathFollower(Node):
         nodes_marker.color.g = 0.9
         nodes_marker.color.b = 1.0
         nodes_marker.pose.orientation.w = 1.0
+        if self.N <= 0:
+            marker_msg.action = Marker.DELETE
+            nodes_marker.action = Marker.DELETE
+            self.path_publisher_topic.publish(path_msg)
+            self.path_marker_publisher.publish(marker_msg)
+            self.path_nodes_marker_publisher.publish(nodes_marker)
+            return
         for i in range(self.N):
             pose = PoseStamped()
             wp_1_mod = self._waypoint_in_route_frame(self.wp[:, i])
@@ -544,6 +445,15 @@ class PathFollower(Node):
         marker.pose.position.x = float(wp_xy[0])
         marker.pose.position.y = float(wp_xy[1])
         marker.pose.position.z = 0.0
+        self.target_waypoint_marker_publisher.publish(marker)
+
+    def _clear_target_waypoint_marker(self):
+        marker = Marker()
+        marker.header.stamp = self.get_clock().now().to_msg()
+        marker.header.frame_id = self.route_frame
+        marker.ns = 'planned_target_waypoint'
+        marker.id = 0
+        marker.action = Marker.DELETE
         self.target_waypoint_marker_publisher.publish(marker)
 
     def _update_progress_index(self, robot_xy, max_step=25):
@@ -592,6 +502,13 @@ class PathFollower(Node):
         self.ekf_filter_timer()
 
         self.path_publisher()
+
+        if self.N <= 0:
+            self.current_steering = 0.0
+            self._clear_target_waypoint_marker()
+            self.nav_command(0.0, 0.0)
+            self.path_status()
+            return
 
         try:
             if not self.path_complete:

@@ -22,6 +22,11 @@ from autonomy.recorded_map_utils import (
     load_recording_map,
 )
 
+
+# SDCS big-map, right-hand traffic node 10 (taxi hub) expressed in map coordinates.
+DEFAULT_TAXI_HUB_XY = [-1.28205, -0.45991]
+
+
 class MissionStage(Enum):
     IDLE           = 0
     TO_PICKUP      = 1
@@ -44,7 +49,7 @@ class TripPlanner(Node):
             self.get_logger().info('connected to qcar2_hardware.')
 
         self.declare_parameter('route_frame',        'map')
-        self.declare_parameter('hub_xy',             [0.0, 0.0])
+        self.declare_parameter('hub_xy',             DEFAULT_TAXI_HUB_XY)
         self.declare_parameter('pickup_xy',          [0.125, 4.395])
         self.declare_parameter('dropoff_xy',         [-0.905, 0.800])
         self.declare_parameter('stop_seconds',       [3.0])
@@ -76,7 +81,6 @@ class TripPlanner(Node):
         self.recorded_nodes = []
         self.recorded_map_path = None
         self.recorded_loop = False
-        self._load_recorded_map()
 
         self.LED_GREEN   = 1
         self.LED_BLUE    = 2
@@ -103,6 +107,8 @@ class TripPlanner(Node):
         self.control_nodes_marker_pub = self.create_publisher(Marker, '/planner/control_nodes', 1)
         self.dense_route_marker_pub = self.create_publisher(Marker, '/planner/dense_recorded_route', 1)
         self.active_route_marker_pub = self.create_publisher(Marker, '/planner/active_route_nodes', 1)
+
+        self._load_recorded_map()
 
         self.create_subscription(Bool,        '/path_status',  self.path_status_callback,  10)
         self.create_subscription(PoseStamped, '/robot_pose',   self.robot_pose_callback,   10)
