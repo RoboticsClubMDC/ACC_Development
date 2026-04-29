@@ -1,24 +1,261 @@
-For docker with qlabs and setup scenario:
+ACC_Development Easy Start
+Physical VO first, Virtual later
+
+Last updated: 2026-04-29
+
+==================================================
+0) Fresh Remote Session (QCar2) - always first
+==================================================
+# From default terminal after remote desktop login
+source /opt/ros/humble/setup.bash
+export PYTHONPATH=$PYTHONPATH:/usr/local/lib/python3.8/dist-packages
+export ROS_DOMAIN_ID=67
+cd ~/ros2
+
+# If workspace already built
+source install/setup.bash
+
+# If this is a fresh reset and install/ is missing
+mkdir -p ~/ros2
+cp -r -u ~/Documents/ACC_Development/Development/ros2/src ~/ros2/
+cd ~/ros2
+colcon build
+source install/setup.bash
+
+
+==================================================
+0.5) Git Branch Safety (always use Gabriel)
+==================================================
+Purpose:
+- Make sure you are working on your branch before editing/testing.
+- Keep your branch updated and push changes at end of day.
+
+A) Check/switch/update branch at start of session
+cd /home/$USER/Documents/ACC_Development
+git fetch origin
+git checkout Gabriel
+git pull --ff-only origin Gabriel
+git status -sb
+
+Expected branch line:
+- ## Gabriel...origin/Gabriel
+
+B) Quick branch check any time
+cd /home/$USER/Documents/ACC_Development
+git branch --show-current
+
+C) End-of-day push (only if you made changes)
+cd /home/$USER/Documents/ACC_Development
+git status
+git add <files_you_changed>
+git commit -m "<short message about today's work>"
+git push origin Gabriel
+
+If there is nothing to commit:
+- git commit will say "nothing to commit" (that is fine).
+
+
+==================================================
+1) Physical VO - Pre-flight Calibration Snapshot
+==================================================
+Purpose:
+- Capture RealSense intrinsics/extrinsics/depth-unit state for this test day.
+
+Does car need to be at mat center?
+- No. This is camera hardware calibration info, independent of car XY position.
+- Car can be anywhere safe and stationary.
+
+Commands:
+mkdir -p ~/vo_calib_logs
+rs-enumerate-devices -c > ~/vo_calib_logs/realsense_calib_$(date +%F_%H%M%S).txt
+rs-enumerate-devices -o > ~/vo_calib_logs/realsense_options_$(date +%F_%H%M%S).txt
+
+
+==================================================
+1.5) Physical VO - Recommended Daily Order (from scratch)
+==================================================
+Use this order each day:
+1. Step 0
+2. Step 0.5A + 0.5B
+3. Step 1
+4. Optional: Step 4 first (probe-only check)
+5. Step 2 or Step 3
+6. Step 5 (safe shutdown)
+7. Step 0.5C only if you actually changed files
+
+Note:
+- Doing Step 4 before Step 2/3 can save time if you only want to verify probe behavior first.
+
+
+==================================================
+2) Physical VO - Controlled Manual Test (recommended first)
+==================================================
+When to use:
+- First validation after boot.
+- Slow and controlled movement checks.
+
+Important launch fact:
+- qcar2_manual_cartographer_launch.py includes qcar2_manual_drive_launch.py.
+- That means it launches manual drive stack + cartographer together.
+
+A) Terminal 1 - base + cartographer (includes rgbd)
+source /opt/ros/humble/setup.bash
+export PYTHONPATH=$PYTHONPATH:/usr/local/lib/python3.8/dist-packages
+export ROS_DOMAIN_ID=67
+cd ~/ros2
+source install/setup.bash
+ros2 launch qcar2_nodes qcar2_manual_cartographer_launch.py
+
+B) Terminal 2 - VO node in physical mode
+source /opt/ros/humble/setup.bash
+export ROS_DOMAIN_ID=67
+cd ~/ros2
+source install/setup.bash
+ros2 run qcar2_autonomy vo_node --ros-args -p camera_mode:=physical -p alignment_mode:=auto -p depth_scale:=0.0
+
+C) Terminal 3 - VO diagnostics
+source /opt/ros/humble/setup.bash
+export ROS_DOMAIN_ID=67
+cd ~/ros2
+source install/setup.bash
+ros2 topic echo /vo/fault_status
+
+D) Optional health checks
+ros2 topic hz /camera/color_image
+ros2 topic hz /camera/depth_image
+ros2 node list
+
+Movement sequence (controlled):
+1. Static hold 30-60 s
+2. Slow straight
+3. Gentle turns
+4. Moderate speed only if diagnostics look stable
+
+Does car need to be on mat center for this section?
+- Prefer yes for repeatability, but not mandatory for node startup.
+
+
+==================================================
+3) Physical VO - Full Scenario Run (when ready)
+==================================================
+When to use:
+- After controlled test passes.
+- You want planner/autonomy behavior with VO monitoring.
+
+Recommended practical pattern for VO on physical:
+- Keep using qcar2_manual_cartographer_launch.py for reliable rgbd + cartographer path.
+- Then start autonomy planner separately.
+
+A) Terminal 1 (same as Section 2A)
+ros2 launch qcar2_nodes qcar2_manual_cartographer_launch.py
+
+B) Terminal 2 - planner/autonomy
+source /opt/ros/humble/setup.bash
+export ROS_DOMAIN_ID=67
+cd ~/ros2
+source install/setup.bash
+ros2 launch qcar2_autonomy autonomy_planner_launch.py
+
+C) Terminal 3 - VO physical
+source /opt/ros/humble/setup.bash
+export ROS_DOMAIN_ID=67
+cd ~/ros2
+source install/setup.bash
+ros2 run qcar2_autonomy vo_node --ros-args -p camera_mode:=physical -p alignment_mode:=auto -p depth_scale:=0.0
+
+D) Terminal 4 - readings
+source /opt/ros/humble/setup.bash
+export ROS_DOMAIN_ID=67
+cd ~/ros2
+source install/setup.bash
+ros2 topic echo /vo/fault_status
+
+Note:
+- If you switch to different physical bringup files, confirm /camera/color_image and /camera/depth_image are alive before running VO.
+
+
+==================================================
+4) Physical Depth Probe (optional, isolated)
+==================================================
+Purpose:
+- Validate depth conversion path (raw vs meters) separately.
+
+Strict isolation rule:
+- Run probe alone for camera stream ownership.
+- Stop cartographer/manual launch and normal rgbd first.
+
+If you want probe-only validation, run only these after sourcing:
+source /opt/ros/humble/setup.bash
+export ROS_DOMAIN_ID=67
+cd ~/ros2
+source install/setup.bash
+ros2 run qcar2_nodes rgbd_get_meters_probe --ros-args -p device_type:=physical -p frame_width_depth:=640 -p frame_height_depth:=480 -p frame_rate:=30.0
+
+Optional monitor terminal:
+ros2 topic echo /camera/depth_probe_status
+
+Does car need to be on mat?
+- Not required. Car should be stationary and safe.
+
+If rgbd_get_meters_probe fails:
+1. Check stream conflict (another node still owning camera).
+2. Use rs-enumerate-devices logs as calibration source of truth.
+3. Continue physical VO with:
+   - camera_mode:=physical
+   - depth_scale:=0.0 (use mode default)
+4. Re-run controlled sequence in Section 2 and evaluate /vo/fault_status.
+
+
+==================================================
+5) Safe Shutdown Before Closing Remote Desktop
+==================================================
+In each terminal, press Ctrl+C and wait for prompt return.
+
+Recommended stop order:
+1. /vo/fault_status echo
+2. vo_node
+3. planner/autonomy (if running)
+4. cartographer/base bringup
+
+Optional final check:
+ros2 node list
+
+If something is stuck, graceful cleanup command:
+pkill -f 'vo_redundancy_monitor_depth|rgbd_get_meters_probe|cartographer_node|qcar2_hardware|rgbd|lidar|csi|joystick_command'
+
+After processes stop, it is safe to disconnect remote desktop.
+
+
+==================================================
+6) Virtual Workflow (reference only)
+==================================================
+Use this only when you are intentionally testing virtual/QLabs.
+
+A) Terminal A: QLabs container
 cd /home/$USER/Documents/ACC_Development/docker/virtual_qcar2
 sudo docker run --rm -it --network host --name virtual-qcar2 quanser/virtual-qcar2 bash
 
-Once in docker:
+Inside QLabs container:
 cd /home/qcar2_scripts/python
-python3 Base_Scenarios_Python/Setup_Competition_Map.py && clear
+python3 Base_Scenarios_Python/Setup_Competition_Map.py
 
-Ros container:
+B) Terminal B: dev container
 cd /home/$USER/Documents/ACC_Development/isaac_ros_common
-./scripts/run_dev.sh  /home/$USER/Documents/ACC_Development/Development
+./scripts/run_dev.sh /home/$USER/Documents/ACC_Development/Development
 
-colcon build && . install/setup.bash && export ROS_DOMAIN_ID=67 && ros2 launch qcar2_nodes qcar2_cartographer_virtual_launch.py
- install/setup.bash && ros2 launch qcar2_nodes qcar2_cartographer_virtual_launch.py 
+Inside dev container:
+colcon build
+. install/setup.bash
+export ROS_DOMAIN_ID=67
+ros2 launch qcar2_nodes qcar2_cartographer_virtual_launch.py
 
+C) Terminal C: VO
+. install/setup.bash
+export ROS_DOMAIN_ID=67
+ros2 run qcar2_autonomy vo_node
 
-. install/setup.bash && export ROS_DOMAIN_ID=67 && ros2 run qcar2_autonomy vo_node
-. install/setup.bash && ros2 run qcar2_autonomy vo_node
-
-. install/setup.bash && export ROS_DOMAIN_ID=67 && ros2 run qcar2_autonomy vo_debug
-. install/setup.bash && run qcar2_autonomy vo_debug
-
-colcon build --packages-select qcar2_autonomy && . install/setup.bash && export ROS_DOMAIN_ID=67 && ros2 launch qcar2_autonomy autonomy_planner_launch.py
-colcon build --packages-select qcar2_autonomy && . install/setup.bash && ros2 launch qcar2_autonomy autonomy_planner_launch.py
+D) Terminal D: autonomy planner (optional)
+colcon build --packages-select qcar2_autonomy
+. install/setup.bash
+export ROS_DOMAIN_ID=67
+ros2 launch qcar2_autonomy autonomy_planner_launch.py
