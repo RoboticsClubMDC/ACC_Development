@@ -837,3 +837,691 @@ Checkpoint acknowledged before power cycle.
 - Included keyboard-drive integration files and today’s repo-local calibration/probe artifacts.
 - Excluded build/runtime artifacts (`install/`, `log/`, `Development/ros2/src/install`, `Development/ros2/src/log`).
 - Push to `origin/Gabriel` requested so restart can proceed from Step 0 after power-on.
+
+====================================================================
+Turn 18 - User
+====================================================================
+OKay I just awnted to make sure you dont have to write that prompt I just gave you in VO conversation log, begin from this one:
+
+Okay so what can we conclude from the /vo/fault_status and vo_node terminal outputs? What are we looking at? How did the Inertial VO do? What are some things to keep in mind given the outputs and the current code that might need to be changed or improved?
+
+====================================================================
+Turn 18 - Assistant
+====================================================================
+Conclusions from TEST 1 Physical (`/vo/fault_status` + `vo_node`):
+
+1. What you are looking at
+- `state`: monitor decision (`init`, `warming`, `agree`, `vo_suspect`, `odom_suspect`)
+- `rho`: translation disagreement magnitude between VO and Cartographer over the evaluation window
+- `w`: VO quality weight built from confidence/inliers/spread gates
+- `vo(...)` vs `ct(...)`: VO pose and Cartographer pose
+- `dx dy dpsi`: per-frame VO delta estimated from the camera pipeline
+- `inl sp`: inlier count and inlier pixel spread (feature quality/coverage)
+
+2. What we can conclude from this run
+- `TEST 1 Physical` had 1061 status lines: `agree=513`, `vo_suspect=451`, `warming=78`, `init=19`.
+- Strong periods were very solid: `agree` frames averaged `inl=264` and `w=0.708`.
+- Weaker periods were conservatively flagged: `vo_suspect` frames averaged `inl=84`, `w=0.400`, with 28 zero-inlier frames.
+- Early static segment looked excellent (`rho` around `0.005-0.026`, inliers around `350-430`), which confirms the camera/depth pipeline is producing usable measurements.
+- Overall: VO is working and informative, but reliability still varies with motion and scene quality.
+
+3. How "Inertial VO" did
+- In the current code this is not true IMU-fused VIO yet.
+- Frame motion deltas come from camera processing (ORB + BF matching + RANSAC + SVD) in `visual_odometry.py`.
+- Cartographer is used for comparison and periodic anchoring/re-anchoring in `vo_node.py`; it is not copied into VO every frame.
+- So today this is best described as camera VO with Cartographer-referenced anchoring.
+
+4. Keep in mind / likely improvements
+- `turn_gate_deg=5` is strict for real turns and can force suspect states even when visual tracking is decent.
+- Quality gating is very sensitive to `spread_bad/spread_good` and `min_vo_weight`; physical tuning likely needs adjustment from current defaults.
+- Physical mode still warns about placeholder depth path/alignment defaults; moving to a validated metric depth publication path will reduce uncertainty.
+- Add a reason code in `fault_status` (for example `low_inliers`, `low_spread`, `turn_gate`, `invalid`) so each suspect event is immediately explainable.
+- If you want true Inertial-Visual Odometry next, add IMU fusion as an assist path while keeping pure-camera VO available for redundancy independence.
+
+====================================================================
+Turn 19 - User
+====================================================================
+OKay one thing I want you to tell me is if we are currently anchoring and how frequently, because remember if we just anchor and anchor every milisecond then it defeats the purpose this is no longer a redundancy and we are simply depending on Cartographer still because VO is not really having any independence when it comes to okay let me see where the camera tells me I am instead if we re-anchor every single agree then the VO is telling me what the cartographer is telling me. Current code as I understand is Inertial VO because our vo_psi=cart_psi because we concluded in the virtual that the vo_psi estimate was not properly or accurate whatsoever.
+
+After you tell me this then we discuss what else we could improve
+
+====================================================================
+Turn 19 - Assistant
+====================================================================
+Short answer:
+- Yes, anchoring is active.
+- No, it is not every frame or every "agree".
+
+Current anchoring policy in code:
+1. One initial hard anchor:
+- On first valid frame, VO resets to Cartographer pose via:
+  `self.vo.reset(self.cart_x, self.cart_y, self.cart_psi)`.
+
+2. Later soft re-anchors:
+- Re-anchor is attempted only after `n_consecutive` agrees (default 3),
+  but an actual soft reset is allowed only if BOTH gates pass:
+  - cooldown: at least `reanchor_cooldown_s = 8.0` seconds since last anchor
+  - motion: at least `reanchor_min_dist = 0.25` m from last anchor point
+- If both pass, it runs:
+  `self.vo.soft_reset(self.cart_x, self.cart_y, self.cart_psi)`
+  and enters warmup.
+
+What this means in practice:
+- The absolute fastest possible re-anchor rate is once every 8 seconds
+  (not milliseconds), and only with enough moved distance.
+- Between anchors, `vo_psi` evolves from camera-estimated `dpsi` integration,
+  not from per-frame Cartographer overwrite.
+
+From your TEST 1 Physical log:
+- `warming` segments: 9 total.
+- `agree -> warming` transitions: 7.
+- This indicates roughly 7 soft re-anchors during that logged run
+  (plus startup-related warmup), not continuous frame-by-frame anchoring.
+
+Important nuance for independence:
+- You are right that each anchor resets VO global pose/yaw to Cartographer.
+- So global VO frame is not fully independent over long duration.
+- But frame-to-frame motion deltas still come from camera VO between anchors.
+
+If strict redundancy independence is the goal:
+- Best next change is to keep a parallel `VO_raw` stream with re-anchor disabled,
+  and optionally keep current anchored stream as `VO_stabilized`.
+- Then compare `VO_raw` vs Cartographer for true redundancy decisions.
+
+====================================================================
+Turn 20 - User
+====================================================================
+OKay I get what you are saying, first thing we are going to do is until we find some other way of actually of estimated psi with our VO algorithm, maybe if we lookg intoieve a better reading estimate from VO alone, but right now you can see that it is very innacurate, and so what we will do is that we will force vo_psi to be the same as cart_psi.
+
+One thing I just noticede actuall is that the VO_readings.txt cahnged massively I mean I had a lot more readings from the virtual tests in there but now I only have 1 virtuall test and 1 physical (the current one), these recondings will keep stacking for the physical in order to see if we improved or not so dont even touch VO_reading.txt unless I tell you to, or if there is a limit on the lines or information a .txt file can have let me know and we will just create more or something because It will be useful to have a full history.
+
+OKay, besides that I was looking throughly at the actual readings and it doesnt seem as accurate as I thought, I mean the re-anchoring was literally hard carrying my opinion but there seems to be some consistent parts on VO readings in comparison to Cart readings which is good for example if we look at how we change from lines 2221 to 2255 we can see that both are changing in the same manner which means they are accurately detecting the change on the y axis only, changes like these is what I want you to prioritize because is as if we correct VO readings to the "correct" position estimates (in this case cartographer is way more viable so we will assume it gives us these "correct" position estimates) and so from there we need to see if the changes made by VO and Cartographer stay consistent once re anchor happens  and just how fast the deviation starts to happen. I want you to always keep in mind to look for lines and changes such as these and not only for y but for x as well.
+
+I also wanted to ask about the alignment being off I mean for the physical the alignment is already provided to us so I do not understand why we would make Alignment=off when having it ON will help us for accurate radings between depth<->color conversion if I am not wrong.
+
+One thing I did not do was do step 0 and step 4 before running but I dont think that is super bad, but I will keep that in mind next time before I start the vo_node or any test that requires the car moving.
+
+I want to start getting a bit strict with the agreement policy since we are getting close to the competition and I want to see just how truly viable our VO is, I also think that I might have to start printing some timer as well because I would like to see okay in this span of time I am just going straight then in this span of time I am turning and so and so, but i dont know, I think later on when we design a mapping with the VO estimates we can really see what is going on at each instance and how it compares to the path that cartographer is mapping,
+
+anyways tell me what you think, no need to change anything just yet we are just thinking right now
+
+====================================================================
+Turn 20 - Assistant
+====================================================================
+Confirmed and aligned with your direction.
+
+1) VO_readings handling
+- I did NOT edit `VO_readings.txt` in this pass.
+- I will not touch it unless you explicitly tell me to.
+- Current size is small (`~178 KB`, `2975` lines), so there is no practical text-file limit concern right now.
+- We can keep full history in one file for now; if it grows large later, we can archive by date without losing history.
+
+2) Your line-window observation is correct (2221-2255)
+- The Y-axis tracking is strong in this window:
+  - VO y change: `-0.97 -> -0.70` (`+0.270`)
+  - Cart y change: `-0.97 -> -0.72` (`+0.250`)
+  - Y direction agreement across consecutive steps: `14/17`.
+- X-axis consistency is weak in this same window:
+  - VO x change: `1.07 -> 1.12` (`+0.050`)
+  - Cart x change: `1.10 -> 1.07` (`-0.030`)
+  - X direction agreement across consecutive steps: `1/17`.
+- So your reading is exactly right: prioritize per-axis delta consistency, not just absolute pose closeness.
+
+3) Forcing `vo_psi = cart_psi` for now
+- For competition reliability, this is a valid tactical move.
+- But it removes yaw redundancy independence.
+- Best practice while doing this: still log/store `vo_psi_raw` and `dpsi_raw` before override so we can keep improving true camera yaw later.
+
+4) Why physical alignment is currently OFF in this code
+- In code, physical alignment matrix is still a placeholder identity:
+  - `PHYSICAL_ALIGNMENT_M = np.eye(3)`
+- Physical mode default explicitly sets `use_alignment=False` pending validated physical warp.
+- If alignment is turned ON without a validated physical warp, pipeline uses RGB intrinsics for backprojection after warp; with a placeholder/incorrect warp this can be worse than using raw depth grid with depth intrinsics.
+- That is why current default is OFF (safety against false registration), not because alignment is useless in principle.
+
+5) Step 0 / Step 4 skipped this run
+- Not catastrophic.
+- For stricter testing, it is still better to run them before movement so each run starts with a known depth/calibration snapshot.
+
+6) Strict policy direction (no code changes yet)
+- I agree with tightening policy now.
+- For each re-anchor interval, track:
+  - `axis sign agreement` (X and Y separately),
+  - `delta magnitude ratio` (|VOΔ| / |CartΔ| per axis),
+  - `drift growth rate` in meters/sec after anchor,
+  - `time-to-threshold` (how long until |VO-Cart| exceeds 0.10m, 0.20m).
+- Your timer/phase idea is excellent: label segments as `straight` vs `turn` so we can evaluate where VO fails first.
+
+No code/runtime changes were made in this step.
+
+====================================================================
+Turn 21 - User
+====================================================================
+I mean dont just look at the segments that I tell you but instead look for every segment that looks like the one I told you for future runs, because I think they will be the most valuable in determining if our VO is really accurate or not, segments like that and the segments at the very start are key. Also keep in mind that the car something is only moving in one axis instead of two and thus those segments can be valuable in understanding if the position estimate for our VO is accurate as well.
+
+Okay so it is official that we will do vo_psi = cart_psi.
+
+For the alignment remember since we actually have camera_info basically now that we are booting directly into the Qcar2 we can make sure we use the right alignment so if that is provided to us then I think we should definetely use it so please try to find it. I allow you to look at the files and use terminal to look for such information NOT RUNNING ANYTHING THAT MIGHT MAKE THE CAR MOVE OR MAKE A NODE RUN OF COURSE, IF YOU DO NEED TO RUN SOMETHING LIKE THAT THEN LET ME KNOW FIRST.
+
+Actually for the sign match I did notice that at the very start the vo_psi was -180 instead of 180 i dont know why we even start at 180 if I am honest but I think the sign switch is because I literally did a sign switch because of how we go from camera frame to car frame.. But yes I agree to your overall implementation of the strict policy direction.
+
+Before doing any changes please think about if the changes are really the best we could do and always keep thinking in better ways we could change it.
+
+Also I think I might have to take a look at vo_terminal_dashboard because it is a more friendly way to see the actual readings., so if you are going to do any updates for vo fault_status also make them for vo terminal dashboard
+
+====================================================================
+Turn 21 - Assistant
+====================================================================
+Read-only audit completed (no ROS node launches, no hardware-motion commands).
+
+Decisions confirmed:
+1. Future runs will be analyzed automatically for high-value windows:
+- startup stability segments,
+- one-axis-dominant motion segments,
+- and re-anchor-to-drift windows.
+
+2. `vo_psi = cart_psi` is accepted as the official short-term competition policy.
+
+Alignment/camera-info findings from codebase:
+1. Current `rgbd` node publishes only image topics:
+- `camera/color_image`
+- `camera/depth_image`
+No `CameraInfo` publishers exist in `rgbd.cpp` at this time.
+
+2. Repository-wide search found no `sensor_msgs/msg/CameraInfo` publishing path
+in active source.
+
+3. Physical alignment in VO remains explicitly placeholder/off by default:
+- `PHYSICAL_ALIGNMENT_M = np.eye(3)`
+- physical mode default `use_alignment=False`
+- `alignment_mode=auto` in `vo_node.py` resolves to OFF for physical.
+
+4. RealSense calibration artifacts already contain valid per-resolution
+intrinsics and stream-to-stream extrinsics:
+- intrinsics for depth/color 640x480 are present,
+- extrinsics `Depth -> Color` and `Color -> Depth` rotation/translation are
+present in `vo_calib_logs/realsense_calib_2026-04-30_121711.txt`.
+
+Interpretation:
+- You are right to want alignment ON in principle.
+- Right now, code is OFF because active VO path uses a placeholder physical
+homography, not a validated physical depth-to-color mapping pipeline.
+
+About `-180` vs `180` at startup:
+- That is normal angle wrapping behavior at the ±pi boundary.
+- `-180` and `180` represent the same yaw.
+- The sign flip there is not itself an accuracy failure.
+
+Dashboard note:
+- Agreed: any future `/vo/fault_status` format change must be mirrored in
+`vo_terminal_dashboard.py` in the same pass.
+- Also noted that dashboard parser currently expects key-value fields that do
+not fully match the active compact `fault_status` string format, so we should
+update both together.
+
+No VO runtime code changed in this pass.
+
+====================================================================
+Turn 22 - User
+====================================================================
+OKay all good, so you were the one that actually found those camera information that including the intrinsics and extrinsics and what not so you can do the same to find the actual alignment between depth and color or they might already be in the  calibration file, but anyways I dont know what what you mean by the current runtime path is conservative because it still uses placeholder physical warp, if it is a warp be did comment it out because if there is a warp that is given directly by the hardware where you find the instrinsics and what not we shoulld be using that no matter what, if I am wrong please explain why. 
+
+For that anglle warp it wont matter too much since we are going to force vo_psi = cart_psi so for now lets not focus on that.
+
+
+====================================================================
+Turn 22 - Assistant
+====================================================================
+You are asking exactly the right question.
+
+Short answer:
+- Yes, we already have the real hardware geometry (intrinsics + extrinsics).
+- No, we should not blindly turn ON the current warp path as-is.
+
+Why:
+1. What we actually have today
+- Calibration file already contains real depth<->color extrinsics and 640x480
+  intrinsics (Depth->Color and Color->Depth transforms are present).
+- Quanser video3d API also exposes direct runtime calls for this:
+  - `video3d_stream_get_camera_intrinsics(...)`
+  - `video3d_stream_get_extrinsics(...)`
+  - `video3d_stream_get_depth_scale(...)`
+
+2. Why current runtime path is called “conservative”
+- Current physical alignment matrix in code is still placeholder identity:
+  `PHYSICAL_ALIGNMENT_M = np.eye(3)`.
+- Physical default keeps alignment OFF intentionally.
+- If we force alignment ON with that placeholder, code applies a 2D warp and
+  then uses RGB intrinsics for backprojection on a potentially misregistered
+  depth grid, which can make VO worse than the current fallback.
+
+3. Important geometry detail (key reason)
+- True depth->color alignment is depth-dependent (3D reprojection), not a
+  single fixed homography for all pixels/distances.
+- A fixed 3x3 warp can be an approximation for limited conditions, but is not
+  the mathematically correct general alignment for D435 stereo+RGB geometry.
+
+4. Best practice from here
+- Use the hardware intrinsics/extrinsics/depth-scale we already have.
+- Implement/validate proper depth-dependent reprojection (or equivalent
+  hardware-backed aligned depth path) before enabling alignment in VO.
+- Then alignment ON becomes correct and beneficial.
+
+So your instinct is correct (use hardware geometry), and the only caution is
+how we apply it: proper 3D reprojection path, not placeholder 2D warp.
+
+====================================================================
+Turn 23 - User
+====================================================================
+Wait what the VO physical part is still 2D homography warp only?! No, I thought I changed it so that we use the depth camera instead of forcing Z=0 because if we actually use the depth camera then we can use Z although Z will still not change, using it will allow us to use the depth camera for better movement estimation when it comes to objects like stop-signs or traffic signs like we can get a better estimation of movement by looking at things like that if I am not wrong. Look at how the Virtual VO is implemented I mean we literally have it meant for 3D I thought I had left physical implementation similarly.
+
+Man there is a lot to change for physical then, I think you understand what I want to do and go ahead and start making changes man, take the virtual implementation as reference OF COURSE DO NOT USE THE SAME THING BECAUSE VIRTUAL IMPLEMENTATION HAS UNIQUE THINGS IMPLEMENTED JUST FOR QLABS/VIRTUAL ENVIRONMENT THAT DO NOT TAKE PLACE IN THE PHYSICAL QCAR2 RUNS.
+
+====================================================================
+Turn 23 - Assistant
+====================================================================
+Implemented code changes (no runtime ROS/hardware node launches):
+
+1) Physical depth alignment upgraded to true projective path
+- File: `autonomy/visual_odometry.py`
+- Added physical Depth->Color extrinsic transform constant from saved
+  RealSense calibration snapshot.
+- Added `alignment_model` selection:
+  - virtual: `homography`
+  - physical: `projective`
+- Added projective alignment implementation:
+  `_align_depth_projective(...)`
+  which backprojects depth pixels with depth intrinsics, transforms points to
+  color frame via depth->color extrinsics, projects onto color pixels, and
+  uses a z-buffer rule (nearest depth per pixel).
+- Physical defaults now enable alignment with projective mode.
+- Kept legacy homography constant for backward compatibility in virtual path.
+
+2) Official policy wired: force `vo_psi = cart_psi`
+- File: `autonomy/vo_node.py`
+- Added parameter `force_cart_yaw` (default `True`).
+- On each VO tick, when enabled:
+  - sets engine heading to cart yaw before update,
+  - runs VO update,
+  - pins resulting VO yaw to cart yaw,
+  - keeps engine heading pinned after update.
+- This preserves camera-based translation estimation while enforcing trusted
+  yaw for competition-phase robustness.
+
+3) Dashboard updated for current fault string format
+- File: `autonomy/vo_terminal_dashboard.py`
+- Added parser for current compact `/vo/fault_status` string format:
+  `state rho w | vo(...) ct(...) | dx dy dpsi inl sp`.
+- Kept legacy key-value fallback parser.
+- Updated displayed summary fields to match available compact diagnostics.
+
+4) Validation
+- Ran local syntax checks (`python3 -m py_compile`) on changed Python files.
+- Ran an offline sanity instantiation test for `DepthProjector` alignment
+  methods only (no ROS node, no hardware movement command).
+
+Clarification retained:
+- Physical VO was already depth-based (not Z=0 homography VO).
+- The main gap fixed here was physical depth->color alignment behavior
+  (placeholder warp replaced by projective alignment path).
+
+====================================================================
+Turn 24 - User
+====================================================================
+OKay now just to finish for today, yuo only changed the physical pipeline and it wont affect virtual testing yes? After answering that, please do a quick summary on how you changed the physical pipeline and what we should expect from those changes, should the performance be better or what?
+
+====================================================================
+Turn 24 - Assistant
+====================================================================
+Short answer:
+- Mostly yes, but not 100%.
+
+What is physical-only:
+- The new projective depth->color alignment path is used for physical mode.
+- Virtual mode still uses its homography alignment path.
+
+What can also affect virtual:
+- `force_cart_yaw` was added with default `True` in `vo_node.py` and is not
+  currently restricted to physical mode, so virtual VO heading can also be
+  pinned to Cartographer unless that parameter is disabled.
+- Dashboard parser update is global (format parsing only, not VO math).
+
+Physical pipeline summary of changes:
+1) Replaced placeholder-style physical alignment behavior with projective
+   depth->color reprojection in `visual_odometry.py`.
+2) Added physical Depth->Color extrinsics from calibration logs and used them in
+   runtime alignment.
+3) Set official yaw policy in `vo_node.py`: `vo_psi = cart_psi` via
+   `force_cart_yaw` (default ON).
+4) Updated `vo_terminal_dashboard.py` so it correctly parses the current compact
+   `/vo/fault_status` output.
+
+What to expect:
+- Yaw: should look immediately stable by design (because it is pinned).
+- Translation quality: should improve in physical runs, especially for features
+  off the ground plane (signs/walls), because depth-color correspondence is now
+  geometry-based instead of placeholder behavior.
+- Better consistency is expected in one-axis windows and startup segments, but
+  exact gain must be verified with a fresh physical run and the strict segment
+  metrics we defined.
+
+====================================================================
+Turn 25 - User
+====================================================================
+Look just make sure you are really reading everything like every file that I have that has to do with Visual odometry and make sure what is being implemented for physical and virtual, but of course physical mainly because i am noticing you didnt even know physical was not using pure homography, and now you are saying that virtual using old homography alignment path which it doesnt it uses also a 3D implementation where Z is not forces to 0 and we indeed use the depth camera and we also try to perform and alignment/warp.
+
+Read this and mak the changes to conversation log, AND I MEAN REALLY READ AND GIVE A VERY DETAILED EXPLANATION IN CONVERSATION LOG OF WHAT IS IT THAT THE VISUAL ODOMETRY THAT IS CURRENTLY IMPLEMENTED DOES, BECAUSE IF I DO ANEW CONVERSATION I WANT IT TO READ THAT AND UNDERSTAND EVERYTHING ABOUT THE EVERY FILE THAT HAS TO DO WITH VISUAL ODOMETRY THAT I HAVE IN MY BRANCH
+
+====================================================================
+Turn 25 - Assistant
+====================================================================
+Full VO audit completed. I read the active VO pipeline files, VO support tools, launch files, camera source files, package entrypoints, and legacy VO files in your branch. Below is a strict "what is active now" explanation so a new conversation can reconstruct the system accurately.
+
+--------------------------------------------------------------------
+A) Scope of files reviewed
+--------------------------------------------------------------------
+Core active VO pipeline:
+- `Development/ros2/src/qcar2_autonomy/autonomy/visual_odometry.py`
+- `Development/ros2/src/qcar2_autonomy/autonomy/vo_node.py`
+
+VO output/monitor tooling:
+- `Development/ros2/src/qcar2_autonomy/autonomy/vo_terminal_dashboard.py`
+- `Development/ros2/src/qcar2_autonomy/autonomy/vo_supervisor.py`
+- `Development/ros2/src/qcar2_autonomy/autonomy/vo_live_plot.py`
+- `Development/ros2/src/qcar2_autonomy/autonomy/vo_capture.py`
+
+Camera/depth producers and probe:
+- `Development/ros2/src/qcar2_nodes/src/rgbd.cpp`
+- `Development/ros2/src/qcar2_nodes/src/rgbd_get_meters_probe.cpp`
+
+Launch/runtime wiring relevant to VO testing:
+- `Development/ros2/src/qcar2_nodes/launch/qcar2_launch.py`
+- `Development/ros2/src/qcar2_nodes/launch/qcar2_virtual_launch.py`
+- `Development/ros2/src/qcar2_nodes/launch/qcar2_manual_drive_launch.py`
+- `Development/ros2/src/qcar2_nodes/launch/qcar2_keyboard_drive_launch.py`
+- `Development/ros2/src/qcar2_nodes/launch/qcar2_cartographer_launch.py`
+- `Development/ros2/src/qcar2_nodes/launch/qcar2_cartographer_virtual_launch.py`
+- `Development/ros2/src/qcar2_nodes/launch/qcar2_manual_cartographer_launch.py`
+- `Development/ros2/src/qcar2_nodes/launch/qcar2_keyboard_cartographer_launch.py`
+
+Control/helper used during physical VO runs:
+- `Development/ros2/src/qcar2_autonomy/autonomy/manual_drive.py`
+
+Package entrypoint and build wiring:
+- `Development/ros2/src/qcar2_autonomy/setup.py`
+- `Development/ros2/src/qcar2_nodes/CMakeLists.txt`
+
+Legacy/archived VO files:
+- `Development/ros2/src/qcar2_autonomy/autonomy/visual_odometry_old.py`
+- `Development/ros2/src/qcar2_autonomy/autonomy/vo_node_old.py`
+- `Development/ros2/src/qcar2_autonomy/autonomy/nav_to_pose_old.py`
+
+--------------------------------------------------------------------
+B) Active end-to-end runtime path (current implementation)
+--------------------------------------------------------------------
+For both physical and virtual, the active VO path is:
+1. `rgbd` node publishes:
+   - `/camera/color_image` (BGR8)
+   - `/camera/depth_image` (MONO16 raw uint16)
+2. `vo_node` subscribes to those topics.
+3. `vo_node` calls `VisualOdometryDepth` from `visual_odometry.py`.
+4. `VisualOdometryDepth`:
+   - ORB feature detect/match
+   - depth alignment stage
+   - 3D backprojection to body frame
+   - 2D rigid motion solve with RANSAC + SVD
+   - pose accumulation
+5. `vo_node` compares VO pose vs Cartographer TF (`map -> base_link`) and publishes `/vo/fault_status` plus numeric VO diagnostics topics.
+
+Important correction:
+- Active physical VO is NOT Z=0 homography-only odometry.
+- Active virtual VO is also NOT old Z=0 homography-only odometry.
+- Both active modes are depth-based 3D feature backprojection pipelines; they differ mainly in calibration tables and alignment model used before backprojection.
+
+--------------------------------------------------------------------
+C) `visual_odometry.py` (exact behavior)
+--------------------------------------------------------------------
+This is the VO math engine. It contains two classes:
+1) `DepthProjector`
+2) `VisualOdometryDepth`
+
+C1) `DepthProjector` responsibilities
+- Holds mode-specific intrinsics, extrinsics, depth scaling, and alignment settings.
+- Converts raw MONO16 depth + pixel coordinates into 3D points in vehicle body frame.
+
+C2) Mode-specific calibration tables
+Virtual mode defaults include:
+- RGB intrinsics (fx/fy/cx/cy) from your virtual FAQ table.
+- Depth intrinsics from virtual table.
+- `VIRTUAL_DEPTH_SCALE_UINT16 = 15707.0`.
+- Virtual camera-to-body extrinsic transform (`VIRTUAL_T_CAM2BODY`).
+- Virtual depth-to-color homography matrix (`VIRTUAL_ALIGNMENT_M`).
+
+Physical mode defaults include:
+- Calibrated RGB intrinsics (post calibration values).
+- Calibrated depth intrinsics (post calibration values).
+- `PHYSICAL_DEPTH_SCALE_UINT16 = 1000.0` placeholder currently in code.
+- Physical camera-to-body transform (`PHYSICAL_T_CAM2BODY`) in meters.
+- Physical depth->color 4x4 extrinsic transform (`PHYSICAL_T_DEPTH_TO_COLOR`) from calibration snapshot.
+- Physical alignment model set to projective (not homography).
+
+C3) Alignment model used by each mode
+- Virtual: `alignment_model='homography'` via `warpPerspective`.
+- Physical: `alignment_model='projective'` via depth->color 3D reprojection.
+
+C4) Physical projective alignment details (`_align_depth_projective`)
+For each valid depth pixel:
+1. Backproject depth pixel to depth-camera 3D using depth intrinsics.
+2. Transform depth-camera 3D point into color-camera frame using depth->color extrinsics.
+3. Reproject into color image pixel coordinates using RGB intrinsics.
+4. Rasterize with a z-buffer strategy (nearest point wins per color pixel).
+
+This is depth-dependent alignment, not a single global 2D warp. That is why it is physically more correct for D435 geometry.
+
+C5) 3D point generation for motion estimation (`pixels_to_3d_body`)
+Given matched feature pixels:
+- Samples aligned depth at those pixels.
+- Backprojects to camera rays.
+- Uses:
+  - `K_rgb_inv` if alignment ON (depth now in color grid)
+  - `K_depth_inv` if alignment OFF fallback
+- Transforms to body frame with `R_cam2body, t_cam2body`.
+- Returns Nx3 body-frame points and validity mask.
+
+C6) `VisualOdometryDepth.update` algorithm
+Per frame:
+1. Optional undistortion.
+2. ORB detect+compute on color image.
+3. Align raw depth and convert to mode units.
+4. Match current descriptors to previous with BFMatcher + Lowe ratio.
+5. Backproject matched pixels (prev frame and current frame) to 3D body points.
+6. Keep correspondences where both frames have valid depth.
+7. Use only XY components (body-frame planar motion estimate) from those 3D points.
+8. Estimate rigid transform with `_ransac_motion`:
+   - 2-point random samples
+   - SVD Procrustes solve
+   - inlier test under residual threshold
+   - refit on best inliers
+9. Extract `(dx, dy, dpsi)` from best rigid transform.
+10. Apply safety gates (`max_translation`, `max_rotation_deg`, `max_dt`).
+11. Optional sign flip (`negate_deltas`) to convert feature-motion sign to vehicle-motion sign.
+12. Accumulate pose in map frame via current heading.
+13. Store diagnostics:
+   - inlier count
+   - confidence
+   - inlier spread (from inlier pixel distribution)
+
+Key point:
+- Motion is not forced by Cartographer here. Translation increments come from camera feature/depth geometry and RANSAC/SVD.
+
+--------------------------------------------------------------------
+D) `vo_node.py` (runtime monitor + policy layer)
+--------------------------------------------------------------------
+This node wraps the engine and adds redundancy logic against Cartographer.
+
+D1) Inputs
+- `/camera/color_image`
+- `/camera/depth_image`
+- TF lookup `map -> base_link` for cart pose
+
+D2) Key VO parameters
+- ORB/RANSAC params (n_features, match_ratio, ransac_threshold, min_inliers)
+- safety bounds (max_translation, max_rotation_deg)
+- `camera_mode` (`virtual` or `physical`)
+- `depth_scale` (0.0 means use mode default from `visual_odometry.py`)
+- `alignment_mode` (`auto|on|off`)
+- `force_cart_yaw` (currently default `True`)
+
+D3) Yaw policy currently active
+When `force_cart_yaw=True`:
+- before VO update: engine heading is pinned to cart yaw
+- after VO update: output yaw is pinned to cart yaw again
+
+Effect:
+- VO translation (`dx,dy`) still comes from camera/depth motion solve.
+- VO heading independence is intentionally disabled for now.
+
+D4) Fault/health logic
+`vo_node` builds a time window and compares displacement between anchor and latest:
+- cart displacement vector vs vo displacement vector
+- residual magnitude `rho`
+- VO validity/quality gates (valid flag, confidence, inliers)
+- extra weight combining confidence, inliers, spread
+- turn gate by cart yaw change
+
+States evolve with `n_consecutive` confirmations:
+- `init`
+- `warming`
+- `agree`
+- `vo_suspect`
+- `odom_suspect`
+
+D5) Re-anchor policy (`_try_reanchor`)
+Re-anchor is not every frame. It is gated by:
+- cooldown: `reanchor_cooldown_s`
+- min traveled distance from last re-anchor: `reanchor_min_dist`
+- only triggered from confirmed `agree`
+
+So yes, there is anchoring, but not continuous per-frame anchoring.
+
+D6) Published outputs
+- compact string: `/vo/fault_status`
+- numeric topics: rho, weight, healthy, state_id, vo/cart poses, frame deltas, inliers, confidence, spread
+
+--------------------------------------------------------------------
+E) `rgbd.cpp` and depth data truth for VO
+--------------------------------------------------------------------
+`rgbd.cpp` is the live depth producer used by VO runs.
+
+What it does:
+- Opens Quanser video3d color and depth streams.
+- Publishes:
+  - `/camera/color_image` as BGR8
+  - `/camera/depth_image` as MONO16
+- Defaults currently set to 640x480 at 30 FPS.
+
+Critical limitation currently relevant to VO calibration:
+- `rgbd.cpp` does not publish `CameraInfo` topics in active code.
+- `rgbd.cpp` also does not publish metric 32FC1 depth for VO; VO consumes MONO16 raw and applies `depth_scale` logic from `visual_odometry.py`.
+
+--------------------------------------------------------------------
+F) `rgbd_get_meters_probe.cpp` (calibration probe utility)
+--------------------------------------------------------------------
+This probe is separate from normal `rgbd` runtime. It opens depth stream directly and publishes:
+- `/camera/depth_image_probe_raw` (MONO16)
+- `/camera/depth_image_probe_meters` (32FC1 meters via API)
+- `/camera/depth_probe_status` (status string with sample values and ratio checks)
+
+Purpose:
+- Measure how raw MONO16 maps to real meters in your runtime path.
+- Validate or tune physical depth scale assumptions.
+
+This probe is where your earlier `raw` vs `meters_api` evidence came from.
+
+--------------------------------------------------------------------
+G) Dashboard/supervisor/plot/capture files
+--------------------------------------------------------------------
+G1) `vo_terminal_dashboard.py`
+- Subscribes to `/vo/fault_status`.
+- Parses compact string format with regex.
+- Prints a human-readable block with VO/cart pose and delta diagnostics.
+
+G2) `vo_supervisor.py`
+- Intended Part-3 decision layer.
+- Maps VO state/healthy signals into operational modes (NORMAL, ODOM_FAULT, etc.).
+- Publishes `stop_advised` and trust level.
+
+Important integration note:
+- `vo_node.py` publishes `Int32`/`Float64` on some topics while `vo_supervisor.py` subscribes as `UInt8`/`Float32`.
+- If used together as-is, type mismatch needs correction to guarantee compatibility.
+
+G3) `vo_live_plot.py`
+- Live matplotlib plotter for `/vo/delta_trans`, `/vo/vo_weight`, and supervisor trust.
+- Visualization only; does not change VO behavior.
+
+G4) `vo_capture.py`
+- Simple clean logger for `/vo/fault_status` without noisy timeout stack traces.
+- Data capture helper only.
+
+--------------------------------------------------------------------
+H) Launch and driving wiring relevant to VO tests
+--------------------------------------------------------------------
+H1) Physical stacks
+- `qcar2_launch.py`: includes hardware + rgbd + joystick command node.
+- `qcar2_manual_drive_launch.py`: hardware + rgbd + nav2 converter (no joystick command node).
+- `qcar2_keyboard_drive_launch.py`: similar keyboard-compatible physical base stack.
+- cartographer variants wrap the base stack and add cartographer nodes.
+
+H2) Virtual stack
+- `qcar2_virtual_launch.py`: starts virtual-device nodes, including virtual rgbd with virtual params.
+
+H3) Manual keyboard control
+- `manual_drive.py` publishes WASD `Twist` commands to `/cmd_vel_nav` with conservative default speeds.
+- This drives through converter path in keyboard/manual launch stacks.
+
+--------------------------------------------------------------------
+I) Legacy files status (what is not active)
+--------------------------------------------------------------------
+- `visual_odometry_old.py` and `vo_node_old.py` are fully commented archival code (not active runtime).
+- They document prior homography/ground-plane and earlier VO monitor iterations.
+- Active runtime entrypoint from `setup.py` points to:
+  - `vo_node=autonomy.vo_node:main`
+  - not `vo_node_old`.
+
+So current behavior is governed by `visual_odometry.py` + `vo_node.py`, not the old files.
+
+--------------------------------------------------------------------
+J) Physical vs virtual: exact current difference summary
+--------------------------------------------------------------------
+Common in both:
+- ORB + descriptor matching
+- depth-assisted 3D feature backprojection
+- RANSAC + SVD motion estimation
+- same VO node monitor logic and re-anchor policy framework
+
+Virtual-specific:
+- virtual intrinsics/depth scale/extrinsics table
+- homography alignment model
+- QLabs unit assumptions and conversion metadata
+
+Physical-specific:
+- physical calibrated intrinsics/extrinsics tables
+- projective depth->color alignment model
+- physical depth range and unit assumptions
+- current physical depth raw divisor remains placeholder constant unless overridden/measured
+
+Policy that affects both unless toggled:
+- `force_cart_yaw=True` (default) pins VO yaw to Cartographer yaw.
+
+--------------------------------------------------------------------
+K) Direct correction to the misunderstanding (explicit)
+--------------------------------------------------------------------
+Your statement is correct:
+- The active VO implementation is depth-based 3D in both physical and virtual; it is not the old pure Z=0 homography-only method.
+
+The part that still needs continued validation is not "whether it is 3D" but:
+1. Physical raw-depth-to-meters scaling certainty in the active MONO16 runtime path.
+2. Quantitative drift behavior under motion segments (startup, 1-axis motion, turns).
+3. Yaw independence, which is intentionally disabled right now by policy (`force_cart_yaw=True`).
+
+That is the exact current system status after full file audit.

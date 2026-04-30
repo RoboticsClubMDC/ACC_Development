@@ -346,3 +346,258 @@ Verification performed:
     - `autonomy/manual_drive.py`
     - `qcar2_keyboard_drive_launch.py`
     - `qcar2_keyboard_cartographer_launch.py`
+
+## 2026-04-30 (TEST 1 Physical output analysis, read-only)
+
+Scope of this pass:
+- Analyze `TEST 1 Physical` terminal output in `VO_readings.txt`.
+- Confirm what `/vo/fault_status` indicates about current VO behavior.
+- No runtime command execution, no VO code changes.
+
+Data source:
+- `Development/ros2/src/qcar2_autonomy/VO_readings.txt`
+  section marker: `TEST 1 Physical`.
+
+Observed monitor-state distribution (1061 status lines):
+- `agree`: 513
+- `vo_suspect`: 451
+- `warming`: 78
+- `init`: 19
+
+Quality snapshots:
+- Overall averages:
+  - inliers: `178.90`
+  - weight (`w`): `0.512`
+  - disagreement (`rho`): `0.083`
+- `agree` frames:
+  - average inliers: `264.22`
+  - average weight: `0.708`
+- `vo_suspect` frames:
+  - average inliers: `83.72`
+  - average weight: `0.400`
+  - average rho: `0.140`
+  - zero-inlier frames: `28`
+
+Interpretation:
+- VO camera tracking is functioning and often strong (high inliers/high weight
+  periods with low `rho`).
+- During harder segments, quality gates correctly down-weight VO and move state
+  to `vo_suspect`.
+- Current monitor behavior is conservative rather than failing open.
+
+Important architectural note:
+- This run is not yet IMU-fused VIO.
+- VO frame deltas come from camera processing in `visual_odometry.py`
+  (ORB + matching + RANSAC + SVD).
+- Cartographer is used for monitor comparison and periodic anchoring/re-anchor
+  in `vo_node.py`, not as a per-frame overwrite of VO.
+
+Likely next tuning items (no changes made in this pass):
+- Revisit `turn_gate_deg` (default 5 deg) for physical turning behavior.
+- Re-tune `spread_bad`, `spread_good`, and `min_vo_weight` for physical scenes.
+- Improve fault-status observability by logging suspect reason codes.
+- Continue physical depth/alignment hardening toward fully validated metric
+  depth path.
+
+## 2026-04-30 (anchoring frequency audit, read-only)
+
+Scope of this pass:
+- Answer whether VO is currently re-anchoring and how often.
+- Use code inspection + `TEST 1 Physical` log evidence.
+- No code/runtime changes.
+
+Code behavior confirmed:
+- Initial anchor occurs once on first valid frame via:
+  `self.vo.reset(self.cart_x, self.cart_y, self.cart_psi)`.
+- Soft re-anchor attempts happen only after consecutive `agree` decisions,
+  then `_try_reanchor(...)` enforces both gates:
+  - `reanchor_cooldown_s = 8.0`
+  - `reanchor_min_dist = 0.25 m`
+- If both gates pass, VO performs:
+  `self.vo.soft_reset(self.cart_x, self.cart_y, self.cart_psi)`
+  then enters warmup (`warmup_after_reanchor_s = 1.0`).
+
+Practical implication:
+- Re-anchoring is not per-frame and cannot happen every millisecond.
+- Absolute upper bound is one re-anchor per 8 seconds, and only after moving
+  at least 0.25 m since the last anchor.
+- Between anchors, motion integration (`dx, dy, dpsi`) remains camera-driven.
+
+`TEST 1 Physical` evidence summary:
+- `warming` lines: 78
+- `warming` segments: 9
+- `agree -> warming` transitions: 7
+
+Interpretation:
+- The run shows occasional soft re-anchors, not continuous frame-by-frame
+  Cartographer overwriting.
+- However, each anchor does re-pin global VO pose/yaw to Cartographer, so the
+  anchored VO stream is not fully independent over long time horizons.
+
+Potential follow-up (not implemented in this pass):
+- Add a `reanchor_enabled` parameter and expose two streams:
+  - `VO_raw` (no re-anchor, strict redundancy)
+  - `VO_stabilized` (current anchored behavior)
+
+## 2026-04-30 (axis-consistency inspection, read-only)
+
+Scope of this pass:
+- Read-only interpretation of user-highlighted `TEST 1 Physical` slice.
+- No code edits and no runtime execution.
+
+User-highlighted window:
+- `VO_readings.txt` lines 2221-2255.
+
+Computed observations:
+- Net motion in this slice:
+  - VO:  `Δx=+0.050`, `Δy=+0.270`
+  - Cart:`Δx=-0.030`, `Δy=+0.250`
+- Consecutive-step sign agreement:
+  - X axis: `1/17`
+  - Y axis: `14/17`
+
+Interpretation:
+- Y-direction change is consistently tracked in this interval.
+- X-direction consistency is weak in the same interval.
+- This supports axis-wise evaluation as a primary metric, not just absolute
+  pose closeness.
+
+Policy note (discussion only, not implemented):
+- Short-term competition strategy may force `vo_psi = cart_psi` for stability,
+  while preserving raw camera yaw diagnostics (`vo_psi_raw`, `dpsi_raw`) for
+  continued VO-only improvement work.
+
+## 2026-04-30 (alignment source audit + policy confirmation, read-only)
+
+Scope of this pass:
+- Read-only search for physical alignment/camera-info sources in active code.
+- Confirm user policy decisions for upcoming iterations.
+- No runtime node execution and no VO code modifications.
+
+Policy confirmations from discussion:
+- Future analyses should auto-detect high-value windows (startup stability,
+  one-axis-dominant motion, and post-anchor drift windows), not only
+  user-pointed line ranges.
+- Short-term competition policy set: force `vo_psi = cart_psi`.
+
+Codebase findings:
+- `qcar2_nodes/src/rgbd.cpp` currently publishes image topics only:
+  `camera/color_image`, `camera/depth_image`.
+- No `sensor_msgs/msg/CameraInfo` publisher path found in active source.
+- In `visual_odometry.py` physical alignment remains placeholder:
+  `PHYSICAL_ALIGNMENT_M = np.eye(3)` and physical default `use_alignment=False`.
+- In `vo_node.py`, `alignment_mode=auto` resolves to alignment OFF for
+  physical mode.
+
+Calibration artifacts findings:
+- `vo_calib_logs/realsense_calib_2026-04-30_121711.txt` contains:
+  - 640x480 depth intrinsics,
+  - 640x480 color intrinsics,
+  - stream extrinsics (`Depth -> Color`, `Color -> Depth`) with rotation and
+    translation.
+- This confirms physical geometry is available in saved artifacts, but is not
+  yet wired as a validated runtime alignment path inside current VO code.
+
+Angle-sign clarification:
+- `-180` and `180` yaw at startup are equivalent wrapped angles (same heading);
+  this boundary flip is expected representation behavior.
+
+Dashboard compatibility note:
+- Future `/vo/fault_status` format updates should be mirrored in
+  `vo_terminal_dashboard.py` in the same pass to keep diagnostics coherent.
+
+## 2026-04-30 (hardware alignment clarification, read-only)
+
+Scope of this pass:
+- Clarify whether hardware-provided geometry should be used immediately.
+- Distinguish available calibration data from active VO alignment behavior.
+- No code/runtime changes.
+
+Findings:
+- Hardware geometry is available in saved calibration artifacts:
+  - depth/color intrinsics (640x480),
+  - depth<->color extrinsics.
+- Quanser video3d API header exposes runtime accessors:
+  - `video3d_stream_get_camera_intrinsics(...)`
+  - `video3d_stream_get_extrinsics(...)`
+  - `video3d_stream_get_depth_scale(...)`
+- Active VO physical alignment path remains placeholder:
+  `PHYSICAL_ALIGNMENT_M = np.eye(3)` with physical default `use_alignment=False`.
+
+Clarification:
+- The caution is not "do not use hardware geometry".
+- The caution is "do not enable placeholder 2D warp as if it were true
+  physical alignment".
+- True depth->color alignment is depth-dependent 3D reprojection, not a single
+  global homography for all distances.
+
+Recommended direction (discussion only):
+- Keep placeholder warp disabled until the VO path applies validated
+  depth-dependent reprojection (or equivalent aligned-depth output) using real
+  intrinsics/extrinsics/depth-scale.
+
+## 2026-04-30 (physical alignment + yaw policy implementation)
+
+Scope of this pass:
+- Implement physical depth->color alignment improvements in VO path.
+- Apply official short-term yaw policy (`vo_psi = cart_psi`).
+- Update terminal dashboard parsing for current compact fault-status format.
+- No ROS runtime node launches or hardware-motion commands executed.
+
+Code changes made:
+
+1) `autonomy/visual_odometry.py`
+- Added physical `Depth -> Color` extrinsic transform constant from the saved
+  RealSense calibration snapshot.
+- Added alignment model selection:
+  - virtual: homography alignment (`alignment_M`)
+  - physical: projective depth->color reprojection
+- Implemented `_align_depth_projective(...)`:
+  - backprojects depth pixels with depth intrinsics,
+  - transforms depth-camera points to color-camera frame,
+  - projects to color pixels,
+  - z-buffer resolves collisions with nearest depth.
+- Physical mode defaults now set:
+  - `use_alignment=True`
+  - `alignment_model='projective'`
+
+2) `autonomy/vo_node.py`
+- Added parameter `force_cart_yaw` (default `True`).
+- In `_vo_tick`, when enabled:
+  - injects cart yaw before VO update,
+  - pins output VO yaw to cart yaw after update,
+  - keeps internal VO heading pinned to cart yaw.
+- Result: competition-phase heading stabilization while retaining camera-based
+  translation estimation.
+
+3) `autonomy/vo_terminal_dashboard.py`
+- Added regex parser for current compact `/vo/fault_status` format:
+  `state rho w | vo(...) ct(...) | dx dy dpsi inl sp`.
+- Kept legacy key-value fallback parsing.
+- Updated dashboard summary to display state, rho, weight, drift,
+  inliers, and spread from the compact message.
+
+Validation:
+- `python3 -m py_compile` passed for:
+  - `autonomy/visual_odometry.py`
+  - `autonomy/vo_node.py`
+  - `autonomy/vo_terminal_dashboard.py`
+- Offline sanity check run for `DepthProjector` alignment methods only.
+
+Notes:
+- This pass did not edit `VO_readings.txt`.
+- Physical VO remained depth-based throughout; this pass specifically replaced
+  placeholder-style physical alignment behavior with a projective path.
+
+## 2026-04-30 (end-of-day clarification: virtual impact)
+
+Scope:
+- Clarified whether latest pipeline changes are physical-only.
+- No additional source edits in this pass.
+
+Clarification:
+- Physical alignment changes are mode-specific (projective path for physical).
+- Virtual alignment path remains homography-based.
+- `force_cart_yaw` default is currently global in `vo_node.py`; therefore,
+  virtual runs can also have yaw pinned unless the parameter is disabled.
+- Dashboard parser change is global but diagnostic-only (no VO math impact).

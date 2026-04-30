@@ -9,6 +9,7 @@ SETUP.PY:  'vo_dashboard=autonomy.vo_terminal_dashboard:main'
 """
 
 import math
+import re
 import time
 
 import rclpy
@@ -39,6 +40,14 @@ def _deg(a):
 
 
 class Dashboard(Node):
+    _COMPACT_RE = re.compile(
+        r'^(?P<state>\w+)\s+rho=(?P<rho>[-0-9.]+)\s+w=(?P<w>[-0-9.]+)\s+\|\s+'
+        r'vo\((?P<vo_x>[-0-9.]+),(?P<vo_y>[-0-9.]+),(?P<vo_psi_deg>[-0-9.]+)\)\s+'
+        r'ct\((?P<ct_x>[-0-9.]+),(?P<ct_y>[-0-9.]+),(?P<ct_psi_deg>[-0-9.]+)\)\s+\|\s+'
+        r'dx=(?P<dx>[-0-9.]+)\s+dy=(?P<dy>[-0-9.]+)\s+dpsi=(?P<dpsi_deg>[-0-9.]+)\s+'
+        r'inl=(?P<inl>\d+)\s+sp=(?P<sp>[-0-9.]+)$'
+    )
+
     def __init__(self):
         super().__init__('vo_dashboard')
         self._data = {}
@@ -52,12 +61,37 @@ class Dashboard(Node):
             'VO Dashboard v3 started (1.5s interval)')
 
     def _cb(self, msg):
+        text = msg.data.strip()
         d = {}
-        for part in msg.data.split():
-            if '=' not in part:
-                continue
-            k, v = part.split('=', 1)
-            d[k] = v
+
+        # Preferred path: parse current compact fault_status string.
+        m = self._COMPACT_RE.match(text)
+        if m:
+            g = m.groupdict()
+            d = {
+                'state': g['state'],
+                'rho': float(g['rho']),
+                'w': float(g['w']),
+                'vo_x': float(g['vo_x']),
+                'vo_y': float(g['vo_y']),
+                'vo_psi': math.radians(float(g['vo_psi_deg'])),
+                'cart_x': float(g['ct_x']),
+                'cart_y': float(g['ct_y']),
+                'cart_psi': math.radians(float(g['ct_psi_deg'])),
+                'dx': float(g['dx']),
+                'dy': float(g['dy']),
+                'dpsi': math.radians(float(g['dpsi_deg'])),
+                'inliers': int(g['inl']),
+                'spread': float(g['sp']),
+            }
+        else:
+            # Fallback: legacy key=value parser.
+            for part in text.split():
+                if '=' not in part:
+                    continue
+                k, v = part.split('=', 1)
+                d[k] = v
+
         self._data = d
         self._last_rx = time.time()
 
@@ -69,13 +103,11 @@ class Dashboard(Node):
 
         self._block_num += 1
 
-        flag = _s(d, 'flag', 'init')
-        healthy = _s(d, 'healthy', 'True')
-        decision = _s(d, 'decision', '')
-        reason = _s(d, 'reason', '')
-
-        vo_conf = _f(d, 'vo_conf')
+        state = _s(d, 'state', _s(d, 'flag', 'init'))
         inliers = _i(d, 'inliers')
+        spread = _f(d, 'spread')
+        rho = _f(d, 'rho')
+        weight = _f(d, 'w')
 
         vo_x = _f(d, 'vo_x')
         vo_y = _f(d, 'vo_y')
@@ -88,12 +120,8 @@ class Dashboard(Node):
         dx = _f(d, 'dx')
         dy = _f(d, 'dy')
         dpsi = _f(d, 'dpsi')
-
-        dt_trans = _f(d, 'delta_trans')
-        dt_yaw = _f(d, 'delta_yaw')
         vo_speed = _f(d, 'vo_speed')
         vo_dist = _f(d, 'vo_dist')
-        reanchors = _i(d, 'reanchors')
 
         drift = math.sqrt(
             (vo_x - cart_x)**2 + (vo_y - cart_y)**2)
@@ -126,14 +154,9 @@ class Dashboard(Node):
         print(f'  {"dist":8s} {vo_dist:+12.4f}m')
 
         print(f'  ---')
-        print(f'  Window: dt={dt_trans:.4f}m [DECISION]  '
-              f'dyaw={dt_yaw:.2f}dg [diag-only]')
+        print(f'  State: {state}  rho={rho:.3f}m  weight={weight:.2f}')
         print(f'  Drift: {drift:.4f}m  PsiErr: {psi_err:.2f}dg')
-        print(f'  Flag: {flag}  Healthy: {healthy}  '
-              f'Reanchors: {reanchors}')
-        print(f'  Conf: {vo_conf:.3f}  Inliers: {inliers}  '
-              f'Reason: {reason}')
-        print(f'  Decision: {decision}')
+        print(f'  Inliers: {inliers}  Spread: {spread:.1f}')
         print(sep)
 
 

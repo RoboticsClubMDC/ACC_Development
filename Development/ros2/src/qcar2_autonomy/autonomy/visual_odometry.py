@@ -26,7 +26,9 @@ class DepthProjector:
     """Converts pixel (u,v) + depth to 3D vehicle-frame coordinates.
 
     Pipeline:
-        1. Warp depth image using alignment matrix M (depth → color pixel space)
+        1. Align depth to color pixels
+           - virtual: homography warp
+           - physical: projective depth->color reprojection
         2. Look up aligned depth at color pixel (u,v)
         3. Backproject using the active intrinsics:
            - RGB K_inv when depth has been aligned to color space
@@ -122,8 +124,22 @@ class DepthProjector:
         [ 0,  0,  0,  1.00]
     ], dtype=np.float64)
 
-    # Placeholder retained in code until the physical RGB-depth alignment
-    # is implemented and validated for this ROS pipeline.
+    # Physical depth->color extrinsics from RealSense calibration snapshot
+    # (Depth -> Color, 640x480 profile family):
+    # Rotation:
+    #   0.999925   0.0122108   1.18136e-05
+    #  -0.0122108  0.999925    0.000544984
+    #  -5.15798e-06 -0.000545088 1
+    # Translation (meters):
+    #   [0.0148963882, -0.0002293478, 0.0004778]
+    PHYSICAL_T_DEPTH_TO_COLOR = np.array([
+        [0.999925,   0.0122108,   1.18136e-05,   0.0148963881656528],
+        [-0.0122108, 0.999925,    0.000544984, -0.000229347773711197],
+        [-5.15798e-06, -0.000545088, 1.0,       0.000477800000226125],
+        [0.0,        0.0,         0.0,          1.0]
+    ], dtype=np.float64)
+
+    # Legacy homography placeholder kept only for backwards compatibility.
     PHYSICAL_ALIGNMENT_M = np.eye(3, dtype=np.float64)
 
     # Backwards-compatibility aliases still point to the virtual table.
@@ -166,6 +182,7 @@ class DepthProjector:
             depth_scale: Raw UINT16 divisor override. If omitted, uses the
                 mode-specific default for virtual or physical runs.
             alignment_M: 3x3 depth-to-color alignment homography
+                (used by virtual mode)
             T_cam2body: 4x4 camera-to-body extrinsic transform
             use_alignment: If True, warp depth before lookup. If omitted, uses
                 the mode-specific default (`True` virtual, `False` physical).
@@ -201,10 +218,11 @@ class DepthProjector:
                 'depth_max': 8.0,
                 'depth_units_label': 'meters',
                 'physical_m_per_unit': 1.0,
-                # Until physical RGB-depth alignment is validated, default to
-                # the raw depth grid instead of pretending the placeholder
-                # identity homography is a real registration.
-                'use_alignment': False,
+                # Physical mode now defaults to projective alignment using
+                # depth intrinsics + depth->color extrinsics.
+                'use_alignment': True,
+                'alignment_model': 'projective',
+                'T_depth_to_color': self.PHYSICAL_T_DEPTH_TO_COLOR,
             }
         else:
             mode_defaults = {
@@ -224,6 +242,8 @@ class DepthProjector:
                 'depth_units_label': 'QLabs units',
                 'physical_m_per_unit': 0.1,
                 'use_alignment': True,
+                'alignment_model': 'homography',
+                'T_depth_to_color': np.eye(4, dtype=np.float64),
             }
 
         # RGB intrinsics: mode-specific defaults unless explicitly overridden.
@@ -258,6 +278,11 @@ class DepthProjector:
                               else bool(use_alignment))
         self.alignment_M = alignment_M if alignment_M is not None \
             else mode_defaults['alignment_M'].copy()
+        self.alignment_model = mode_defaults.get('alignment_model', 'homography')
+        self.T_depth_to_color = mode_defaults.get(
+            'T_depth_to_color', np.eye(4, dtype=np.float64)).copy()
+        self.R_depth_to_color = self.T_depth_to_color[:3, :3]
+        self.t_depth_to_color = self.T_depth_to_color[:3, 3]
 
         # Extrinsics: camera → body
         self.T_cam2body = T_cam2body if T_cam2body is not None \
@@ -282,6 +307,11 @@ class DepthProjector:
                 (img_width, img_height), cv2.CV_32FC1
             )
 
+        # Cached depth pixel grid for projective alignment.
+        self._grid_shape = None
+        self._grid_u = None
+        self._grid_v = None
+
         # Depth range gates in the active mode's distance units.
         # Virtual mode uses QLabs units; physical mode uses meters.
         self.depth_min = mode_defaults['depth_min']
@@ -300,17 +330,17 @@ class DepthProjector:
                          cv2.INTER_LINEAR)
 
     def align_depth(self, depth_raw):
-        """Warp raw depth image to align with color image pixel grid.
+        """Align raw depth image to color image pixel grid.
 
         Input: depth_raw — (H, W) uint16 array from /camera/depth_image
         Output: depth_aligned — (H, W) float64, in active mode units
 
-        The alignment matrix M accounts for:
-        - Different FOVs (depth 87° vs RGB 69.4°) → ~1.44x zoom
-        - Physical sensor offset (~50mm baseline in D435 housing)
+        Alignment behavior:
+        - virtual mode: homography warp (`alignment_M`)
+        - physical mode: projective depth->color reprojection using
+          depth intrinsics + depth->color extrinsics
 
-        After alignment, depth_aligned[v, u] corresponds to color[v, u].
-        Source of M: utils.py (PIT/YOLO library) lines 163-165
+        After alignment, `depth_aligned[v, u]` corresponds to color `(u, v)`.
         """
         
         # Guard against empty or None depth frames
@@ -328,16 +358,95 @@ class DepthProjector:
         # keeps interpolation in distance space instead of raw integer space.
         depth_units = depth_raw.astype(np.float64) / self.depth_scale
 
-        if self.use_alignment:
-            depth_aligned = cv2.warpPerspective(
-                depth_units, self.alignment_M, (depth_units.shape[1], depth_units.shape[0]),
-                flags=cv2.INTER_LINEAR,
-                borderMode=cv2.BORDER_CONSTANT,
-                borderValue=0.0
-            )
-            return depth_aligned
-        else:
+        if not self.use_alignment:
             return depth_units
+
+        if self.alignment_model == 'projective':
+            return self._align_depth_projective(depth_units)
+
+        depth_aligned = cv2.warpPerspective(
+            depth_units, self.alignment_M, (depth_units.shape[1], depth_units.shape[0]),
+            flags=cv2.INTER_LINEAR,
+            borderMode=cv2.BORDER_CONSTANT,
+            borderValue=0.0
+        )
+        return depth_aligned
+
+    def _ensure_depth_grid(self, H, W):
+        """Cache flattened (u, v) depth pixel coordinates."""
+        if self._grid_shape == (H, W):
+            return
+        u = np.arange(W, dtype=np.float64)
+        v = np.arange(H, dtype=np.float64)
+        uu, vv = np.meshgrid(u, v)
+        self._grid_u = uu.ravel()
+        self._grid_v = vv.ravel()
+        self._grid_shape = (H, W)
+
+    def _align_depth_projective(self, depth_units):
+        """Align depth to color pixels via depth->color 3D reprojection."""
+        H, W = depth_units.shape[:2]
+        aligned = np.zeros((H, W), dtype=np.float64)
+        valid = (depth_units > self.depth_min) & (depth_units < self.depth_max)
+        if not np.any(valid):
+            return aligned
+
+        self._ensure_depth_grid(H, W)
+        z_flat = depth_units.ravel()
+        valid_flat = valid.ravel()
+
+        u_d = self._grid_u[valid_flat]
+        v_d = self._grid_v[valid_flat]
+        z_d = z_flat[valid_flat]
+
+        fx_d = self.K_depth[0, 0]
+        fy_d = self.K_depth[1, 1]
+        cx_d = self.K_depth[0, 2]
+        cy_d = self.K_depth[1, 2]
+
+        # Backproject depth pixels into depth-camera 3D.
+        x_d = (u_d - cx_d) * z_d / fx_d
+        y_d = (v_d - cy_d) * z_d / fy_d
+        pts_d = np.stack([x_d, y_d, z_d], axis=1)
+
+        # Transform depth-camera points into color-camera coordinates.
+        pts_c = pts_d @ self.R_depth_to_color.T + self.t_depth_to_color
+        z_c = pts_c[:, 2]
+        valid_z = (z_c > self.depth_min) & (z_c < self.depth_max)
+        if not np.any(valid_z):
+            return aligned
+
+        pts_c = pts_c[valid_z]
+        z_c = z_c[valid_z]
+
+        fx_c = self.K_rgb[0, 0]
+        fy_c = self.K_rgb[1, 1]
+        cx_c = self.K_rgb[0, 2]
+        cy_c = self.K_rgb[1, 2]
+
+        u_c = fx_c * pts_c[:, 0] / z_c + cx_c
+        v_c = fy_c * pts_c[:, 1] / z_c + cy_c
+
+        ui = np.rint(u_c).astype(np.int32)
+        vi = np.rint(v_c).astype(np.int32)
+        inside = (ui >= 0) & (ui < W) & (vi >= 0) & (vi < H)
+        if not np.any(inside):
+            return aligned
+
+        ui = ui[inside]
+        vi = vi[inside]
+        z_c = z_c[inside]
+
+        # Z-buffer rasterization: keep nearest depth for each color pixel.
+        flat_idx = vi * W + ui
+        order = np.argsort(z_c)  # nearest first
+        idx_sorted = flat_idx[order]
+        z_sorted = z_c[order]
+        unique_idx, first_pos = np.unique(idx_sorted, return_index=True)
+
+        aligned_flat = aligned.ravel()
+        aligned_flat[unique_idx] = z_sorted[first_pos]
+        return aligned
 
     def pixels_to_3d_body(self, pixels, aligned_depth):
         """Convert Nx2 pixel coords + aligned depth image → Nx3 body-frame points.

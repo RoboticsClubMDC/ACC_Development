@@ -56,15 +56,19 @@ class VONodeDepth(Node):
         self.declare_parameter('negate_deltas', True)
         self.declare_parameter('max_translation', 0.20)
         self.declare_parameter('max_rotation_deg', 15.0)
+        # Official short-term policy for competition:
+        # use Cartographer yaw for VO heading while keeping camera-derived
+        # translation increments.
+        self.declare_parameter('force_cart_yaw', True)
 
         # Depth-specific parameters
         # `depth_scale <= 0` means "use the mode-specific default from
         # visual_odometry.py" instead of forcing the virtual divisor into
         # physical runs.
         self.declare_parameter('depth_scale', 0.0)
-        # `alignment_mode` controls whether VO should use the configured
-        # depth-to-color warp:
-        #   auto: virtual=True, physical=False
+        # `alignment_mode` controls whether VO should use depth-to-color
+        # alignment:
+        #   auto: virtual=True, physical=True (projective for physical mode)
         #   on:   always warp
         #   off:  never warp
         self.declare_parameter('alignment_mode', 'auto')
@@ -97,6 +101,7 @@ class VONodeDepth(Node):
         negate = self.get_parameter('negate_deltas').value
         max_trans = self.get_parameter('max_translation').value
         max_rot = self.get_parameter('max_rotation_deg').value
+        self.force_cart_yaw = bool(self.get_parameter('force_cart_yaw').value)
         camera_mode = self.get_parameter('camera_mode').value
         if camera_mode not in ('virtual', 'physical'):
             self.get_logger().warn(
@@ -108,7 +113,7 @@ class VONodeDepth(Node):
 
         alignment_mode = str(self.get_parameter('alignment_mode').value).strip().lower()
         if alignment_mode == 'auto':
-            use_align = (camera_mode == 'virtual')
+            use_align = True
         elif alignment_mode in ('on', 'true', '1', 'yes'):
             use_align = True
         elif alignment_mode in ('off', 'false', '0', 'no'):
@@ -159,10 +164,14 @@ class VONodeDepth(Node):
                 "Physical mode is using the placeholder MONO16 divisor from "
                 "visual_odometry.py until rgbd.cpp publishes metric depth or "
                 "a measured physical depth_scale is provided.")
-        if camera_mode == 'physical' and alignment_mode == 'auto':
+        if camera_mode == 'physical' and use_align:
+            self.get_logger().info(
+                "Physical mode depth alignment is ON "
+                "(projective depth->color path).")
+        if self.force_cart_yaw:
             self.get_logger().warn(
-                "Physical mode defaulted alignment OFF because a validated "
-                "physical RGB-depth warp is not in the active VO path yet.")
+                "force_cart_yaw is ON: VO heading will be pinned to "
+                "Cartographer yaw.")
 
         # ── State ───────────────────────────────────────────────
         self.bridge = CvBridge()
@@ -358,7 +367,17 @@ class VONodeDepth(Node):
 
         # Run VO with color + depth
         with self.vo_lock:
+            # Inject cart yaw before update so dx/dy map projection uses
+            # the trusted heading during this competition phase.
+            if self.force_cart_yaw and self.vo_anchored:
+                self.vo.pose[2] = self.cart_psi
             result = self.vo.update(img, depth, ts)
+            if self.force_cart_yaw:
+                # Keep heading pinned after update as well.
+                self.vo.pose[2] = self.cart_psi
+                pose = result['pose'].copy()
+                pose[2] = self.cart_psi
+                result['pose'] = pose
 
         # Store per-frame diagnostics (already negated inside engine)
         if result['delta_pose'] is not None:
