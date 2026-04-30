@@ -1,7 +1,7 @@
 ACC_Development Easy Start
 Physical VO first, Virtual later
 
-Last updated: 2026-04-29
+Last updated: 2026-04-30
 
 ==================================================
 0) Fresh Remote Session (QCar2) - always first
@@ -28,7 +28,7 @@ source install/setup.bash
 ==================================================
 Purpose:
 - Make sure you are working on your branch before editing/testing.
-- Keep your branch updated and push changes at end of day.
+- Keep your branch updated and push once at end of day.
 
 A) Check/switch/update branch at start of session
 cd /home/$USER/Documents/ACC_Development
@@ -54,6 +54,10 @@ git push origin Gabriel
 If there is nothing to commit:
 - git commit will say "nothing to commit" (that is fine).
 
+Push policy for this workflow:
+- Do not push repeatedly during the day.
+- Make one consolidated push to `origin/Gabriel` when finished for the day.
+
 
 ==================================================
 1) Physical VO - Pre-flight Calibration Snapshot
@@ -66,9 +70,10 @@ Does car need to be at mat center?
 - Car can be anywhere safe and stationary.
 
 Commands:
-mkdir -p ~/vo_calib_logs
-rs-enumerate-devices -c > ~/vo_calib_logs/realsense_calib_$(date +%F_%H%M%S).txt
-rs-enumerate-devices -o > ~/vo_calib_logs/realsense_options_$(date +%F_%H%M%S).txt
+cd /home/$USER/Documents/ACC_Development
+mkdir -p vo_calib_logs
+rs-enumerate-devices -c > vo_calib_logs/realsense_calib_$(date +%F_%H%M%S).txt
+rs-enumerate-devices -o > vo_calib_logs/realsense_options_$(date +%F_%H%M%S).txt
 
 
 ==================================================
@@ -130,6 +135,66 @@ Movement sequence (controlled):
 2. Slow straight
 3. Gentle turns
 4. Moderate speed only if diagnostics look stable
+
+Manual control note (important):
+- In this launch path, "manual drive" is the joystick command node, not WASD keyboard teleop.
+- Source behavior from `qcar2_nodes/src/command.cpp`:
+  - Hold `LB` to arm motion.
+  - Use `RT` for throttle (press gently for slow speed).
+  - Use left stick X (LLA) for steering.
+  - Press `A` to reverse direction.
+
+
+==================================================
+2.1) Physical VO - Keyboard Manual Drive (WASD, no controller)
+==================================================
+When to use:
+- You do not want to use the game controller.
+- You want terminal keyboard control (`w a s d`) at low speed.
+
+Launch path note:
+- Use keyboard-specific bringup so joystick command node is not active.
+- This path includes `nav2_qcar2_converter` for `/cmd_vel_nav` to motor command conversion.
+
+A) Terminal 1 - base + cartographer (keyboard path)
+source /opt/ros/humble/setup.bash
+export PYTHONPATH=$PYTHONPATH:/usr/local/lib/python3.8/dist-packages
+export ROS_DOMAIN_ID=67
+cd ~/ros2
+source install/setup.bash
+ros2 launch qcar2_nodes qcar2_keyboard_cartographer_launch.py
+
+B) Terminal 2 - VO node in physical mode
+source /opt/ros/humble/setup.bash
+export ROS_DOMAIN_ID=67
+cd ~/ros2
+source install/setup.bash
+ros2 run qcar2_autonomy vo_node --ros-args -p camera_mode:=physical -p alignment_mode:=auto -p depth_scale:=0.0
+
+C) Terminal 3 - VO diagnostics
+source /opt/ros/humble/setup.bash
+export ROS_DOMAIN_ID=67
+cd ~/ros2
+source install/setup.bash
+ros2 topic echo /vo/fault_status
+
+D) Terminal 4 - keyboard driver (slow defaults)
+source /opt/ros/humble/setup.bash
+export ROS_DOMAIN_ID=67
+cd ~/ros2
+source install/setup.bash
+ros2 run qcar2_autonomy manual_drive
+
+Keyboard controls:
+- `w`: forward
+- `s`: reverse
+- `a`: turn left in place
+- `d`: turn right in place
+- `space` or `x`: stop
+- `q`: stop and quit
+
+Optional slower/faster tuning (Terminal 4):
+ros2 run qcar2_autonomy manual_drive --ros-args -p forward_speed:=0.08 -p reverse_speed:=0.06 -p turn_rate:=0.20
 
 Does car need to be on mat center for this section?
 - Prefer yes for repeatability, but not mandatory for node startup.

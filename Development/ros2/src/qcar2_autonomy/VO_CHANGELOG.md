@@ -160,3 +160,189 @@ Why the launch changes were reverted:
   - `ros2 run qcar2_autonomy vo_node`
   - either `path_follower` or `autonomy_planner_launch.py`
   - a separate terminal tool for viewing `/vo/fault_status`
+
+## 2026-04-30
+
+Scope of this pass:
+- Physical camera pipeline validation only.
+- No motion/pose-quality testing in this pass.
+- No VO source code or launch file logic changes.
+
+Test context:
+- Car was stationary and elevated (wheels not touching mat), which is acceptable
+  for calibration/probe validation.
+- Branch state in `/home/nvidia/Documents/ACC_Development` was confirmed as
+  `Gabriel` and synchronized with `origin/Gabriel`.
+
+Sequence executed:
+1. Confirmed no active ROS/camera owners (`ros2 node list`, `ps -ef` checks).
+2. Ran pre-flight calibration snapshot:
+   - `rs-enumerate-devices -c`
+   - `rs-enumerate-devices -o`
+3. Ran isolated probe (Step 4):
+   - `ros2 run qcar2_nodes rgbd_get_meters_probe --ros-args -p device_type:=physical -p frame_width_depth:=640 -p frame_height_depth:=480 -p frame_rate:=30.0`
+4. Verified probe topics and sample telemetry:
+   - `/camera/depth_image_probe_raw`
+   - `/camera/depth_image_probe_meters`
+   - `/camera/depth_probe_status`
+
+Artifacts saved:
+- `/home/nvidia/vo_calib_logs/realsense_calib_2026-04-30_120521.txt`
+- `/home/nvidia/vo_calib_logs/realsense_options_2026-04-30_120521.txt`
+
+Key observations:
+- Physical D435 detected and streaming successfully in probe mode.
+- `Depth Units` default reported as `0.001` in the options snapshot.
+- 640x480 intrinsics were available in snapshot:
+  - Depth: `fx=384.7583`, `fy=384.7583`, `ppx=324.0233`, `ppy=237.5673`
+  - Color: `fx=607.3273`, `fy=607.3451`, `ppx=324.9502`, `ppy=249.8685`
+- Color-depth extrinsics were reported in snapshot (non-identity transform).
+- Probe status sample confirmed API-meters path:
+  - `raw=8797`, `meters_api=8.7970`, `raw_est_m=0.0560`, `est/api=0.0064`
+- Probe publish rate on `/camera/depth_image_probe_meters` was near target:
+  - observed ~`28-29 Hz` for a `30 Hz` request.
+
+Interpretation:
+- `video3d_frame_get_meters(...)` is functioning on this physical setup.
+- The old virtual estimate (`raw/(15707*0.1)`) remains strongly inconsistent
+  with physical API meters in this run, so it should not be treated as a
+  physical depth conversion truth.
+
+Follow-up intent:
+- Proceed to controlled physical stack bring-up (Section 2) only after this
+  isolated probe validation, keeping VO in `camera_mode:=physical`.
+
+## 2026-04-30 (manual rerun by user)
+
+Scope of this pass:
+- Manual user-run validation of Step 1 and Step 4.
+- Confirm behavior after accidental terminal suspend (`Ctrl+Z`).
+- No VO runtime code changes.
+
+What happened:
+- User ran Step 1 manually and saved logs in the repo-local folder:
+  - `vo_calib_logs/realsense_calib_2026-04-30_121711.txt`
+  - `vo_calib_logs/realsense_options_2026-04-30_121711.txt`
+- Probe was started successfully, then accidentally suspended with `Ctrl+Z`.
+- A second probe start failed with:
+  - `video3d_start_streaming failed: Error was returned from the underlying OS-specific layer.`
+- Root cause matched stream ownership conflict (first probe process still held
+  the depth stream).
+- After stopping the old probe process, rerun succeeded.
+
+Manual probe evidence reported by user:
+- `/camera/depth_probe_status` was visible.
+- Status sample:
+  - `frame=959 ... raw=9056 meters_api=9.0560 raw_est_m=0.0577 est/api=0.0064 ...`
+- Probe console sample included:
+  - `Depth probe opened on 0 at 640x480 @ 30.0 Hz`
+  - periodic `[GET_METERS]` frames with `meters_api` values around 8.3-9.6 m
+    in reported snippets.
+- `timeout 12s ros2 topic hz /camera/depth_image_probe_meters` showed roughly
+  `23-27 Hz` during this manual run.
+
+Important note on `ros2 topic hz` timeout:
+- The `ExternalShutdownException` seen after the timed `ros2 topic hz` command
+  is expected when `timeout` terminates the ROS CLI process.
+
+Conclusion:
+- Physical depth probe path is confirmed working.
+- Isolation requirement is confirmed operationally: only one stream owner at a
+  time for reliable probe startup.
+
+## 2026-04-30 (read-only pre-drive config audit)
+
+Scope of this pass:
+- Read-only verification of VO/camera launch readiness before physical manual
+  drive tests.
+- No ROS runtime execution and no VO algorithm code changes.
+
+Audit outcomes:
+- `qcar2_manual_cartographer_launch.py` includes
+  `qcar2_manual_drive_launch.py`, so manual stack + cartographer are launched
+  together in that path.
+- `qcar2_manual_drive_launch.py` includes the `rgbd` node, so camera topics are
+  expected in this launch path.
+- `qcar2_launch.py` still has `realsense_camera_node` commented out in its
+  `LaunchDescription`; this is important because `qcar2_cartographer_launch.py`
+  includes `qcar2_launch.py`.
+- `rgbd.cpp` defaults remain aligned with current physical VO calibration:
+  `device_type="physical"`, `640x480` for color/depth, `frame_rate=30.0`.
+- `vo_node.py` still defaults `camera_mode='virtual'`, but the active test
+  command path sets `camera_mode:=physical`, `alignment_mode:=auto`,
+  `depth_scale:=0.0` explicitly.
+- `visual_odometry.py` physical 640x480 intrinsics match current RealSense
+  snapshot values used in today’s tests.
+
+Operational implication:
+- Preferred physical VO path remains:
+  - `qcar2_manual_cartographer_launch.py`
+  - `vo_node` launched with explicit physical parameters
+- Avoid using `qcar2_cartographer_launch.py` for VO camera tests unless
+  `qcar2_launch.py` is adjusted to include `rgbd`.
+
+## 2026-04-30 (manual-drive test prep guidance)
+
+Scope of this pass:
+- Prepared operator-facing launch sequence for first physical manual-drive VO
+  check.
+- Confirmed control mapping from source without running runtime nodes.
+
+Key clarification:
+- In current manual launch path, drive control is joystick/gamepad based, not
+  WASD keyboard control.
+- `qcar2_nodes/src/command.cpp` mapping:
+  - `LB` arm enable
+  - `RT` throttle
+  - Left stick X for steering
+  - `A` toggles reverse direction
+
+Execution policy retained:
+- Runtime commands are user-executed manually.
+- Documentation/log files may be updated directly in-repo.
+
+## 2026-04-30 (WASD keyboard manual-drive integration)
+
+Scope of this pass:
+- Add keyboard-based manual drive option so physical VO tests can run without a
+  game controller.
+- Keep changes focused on launch/control plumbing; no VO algorithm math changes.
+
+Reference reviewed:
+- Physical_Arturo branch keyboard node pattern:
+  `qcar2_autonomy/autonomy/manual_drive.py`
+  (publishes `Twist` to `/cmd_vel_nav`).
+
+Changes made:
+- Added `qcar2_autonomy/autonomy/manual_drive.py` in current branch with
+  conservative defaults for first physical tests:
+  - `forward_speed=0.10`
+  - `reverse_speed=0.08`
+  - `turn_rate=0.25`
+  - publishes to `/cmd_vel_nav`
+- Added `manual_drive` console entry point to
+  `qcar2_autonomy/setup.py`.
+- Added keyboard-specific base launch:
+  - `qcar2_nodes/launch/qcar2_keyboard_drive_launch.py`
+  - Includes `lidar`, `rgbd`, `csi`, `qcar2_hardware`, and
+    `nav2_qcar2_converter`
+  - Intentionally excludes joystick `command` node
+- Added keyboard-specific cartographer launch:
+  - `qcar2_nodes/launch/qcar2_keyboard_cartographer_launch.py`
+  - Includes `qcar2_keyboard_drive_launch.py` + cartographer nodes
+- Updated `Easy_Start.txt` with a new keyboard section (2.1) and explicit
+  per-terminal commands.
+
+Why this wiring is needed:
+- `manual_drive.py` sends `Twist` on `/cmd_vel_nav`.
+- `qcar2_hardware` consumes `qcar2_motor_speed_cmd` (`MotorCommands`).
+- `nav2_qcar2_converter` bridges `/cmd_vel_nav` -> `qcar2_motor_speed_cmd`.
+- Excluding joystick command prevents controller-zero-command interference when
+  no controller is desired.
+
+Verification performed:
+- Syntax checks only (no hardware runtime execution):
+  - `python3 -m py_compile` passed for:
+    - `autonomy/manual_drive.py`
+    - `qcar2_keyboard_drive_launch.py`
+    - `qcar2_keyboard_cartographer_launch.py`
