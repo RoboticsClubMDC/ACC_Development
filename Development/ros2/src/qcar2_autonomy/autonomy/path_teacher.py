@@ -25,7 +25,7 @@ class PathTeacher(Node):
         self.declare_parameter('global_frame', 'map')
         self.declare_parameter('robot_frame', 'base_link')
         self.declare_parameter('sample_period', 0.10)
-        self.declare_parameter('node_interval_sec', 10.0)
+        self.declare_parameter('node_interval_sec', 1.0)
         self.declare_parameter('min_node_spacing_m', 0.10)
         self.declare_parameter('min_node_yaw_change_rad', 0.20)
         self.declare_parameter('path_topic', '/taught_path')
