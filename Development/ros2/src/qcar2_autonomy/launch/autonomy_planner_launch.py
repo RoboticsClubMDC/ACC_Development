@@ -4,8 +4,8 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 
 
-# SDCS big-map, right-hand traffic node 10.
-# We keep using the recorded map only as route geometry in this same frame.
+# SDCS big-map, right-hand traffic node 10 in PNG/reference coordinates.
+# trip_planner converts these goal coordinates into the live ROS map frame.
 SDCS_TAXI_HUB_XY = [-1.28205, -0.45991]
 
 
@@ -34,6 +34,7 @@ def generate_launch_description():
     parameters=[{
         'route_frame': 'map',
         'hub_xy': SDCS_TAXI_HUB_XY,
+        'goals_are_sdcs_frame': True,
     }],
     # parameters=[{
     #     'taxi_node': [10],

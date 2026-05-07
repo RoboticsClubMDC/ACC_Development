@@ -23,8 +23,14 @@ from autonomy.recorded_map_utils import (
 )
 
 
-# SDCS big-map, right-hand traffic node 10 (taxi hub) expressed in map coordinates.
+# SDCS big-map, right-hand traffic node 10 (taxi hub) expressed in PNG/reference coordinates.
 DEFAULT_TAXI_HUB_XY = [-1.28205, -0.45991]
+
+# Fitted from manually sampled ROS map coordinates for SDCS nodes 0, 2, 4, 6, 8, 10.
+# Converts SDCS PNG/reference coordinates into the live ROS map frame.
+DEFAULT_SDCS_TO_MAP_TRANSLATION = [-0.08658752363019608, -0.053780886731217004]
+DEFAULT_SDCS_TO_MAP_ROTATION_DEG = -79.63094749827502
+DEFAULT_SDCS_TO_MAP_SCALE = 1.0216993081930361
 
 
 class MissionStage(Enum):
@@ -57,6 +63,10 @@ class TripPlanner(Node):
         self.declare_parameter('recorded_min_yaw_change_rad', 0.20)
         self.declare_parameter('generated_waypoint_spacing_m', 0.03)
         self.declare_parameter('goal_on_route_tolerance_m', 0.12)
+        self.declare_parameter('goals_are_sdcs_frame', True)
+        self.declare_parameter('sdcs_to_map_translation', DEFAULT_SDCS_TO_MAP_TRANSLATION)
+        self.declare_parameter('sdcs_to_map_rotation_deg', DEFAULT_SDCS_TO_MAP_ROTATION_DEG)
+        self.declare_parameter('sdcs_to_map_scale', DEFAULT_SDCS_TO_MAP_SCALE)
 
         self.route_frame        = self.get_parameter('route_frame').get_parameter_value().string_value
         self.hub_xy             = list(self.get_parameter('hub_xy').get_parameter_value().double_array_value)
@@ -71,11 +81,27 @@ class TripPlanner(Node):
             self.get_parameter('generated_waypoint_spacing_m').get_parameter_value().double_value)
         self.goal_on_route_tolerance_m = float(
             self.get_parameter('goal_on_route_tolerance_m').get_parameter_value().double_value)
+        self.goals_are_sdcs_frame = bool(
+            self.get_parameter('goals_are_sdcs_frame').get_parameter_value().bool_value)
+        self.sdcs_to_map_translation = list(
+            self.get_parameter('sdcs_to_map_translation').get_parameter_value().double_array_value)
+        self.sdcs_to_map_rotation_deg = float(
+            self.get_parameter('sdcs_to_map_rotation_deg').get_parameter_value().double_value)
+        self.sdcs_to_map_scale = float(
+            self.get_parameter('sdcs_to_map_scale').get_parameter_value().double_value)
 
         self.add_on_set_parameters_callback(self.parameter_update_callback)
 
         self.get_logger().info(f'Route frame: {self.route_frame}')
-        self.get_logger().info(f'Hub in {self.route_frame} frame: {self.hub_xy}')
+        self.get_logger().info(
+            f'Goal input frame: {"SDCS/PNG" if self.goals_are_sdcs_frame else self.route_frame}')
+        self.get_logger().info(f'Hub input coordinate: {self.hub_xy}')
+        if self.goals_are_sdcs_frame:
+            hub_map = self._goal_to_route_frame(self.hub_xy)
+            self.get_logger().info(
+                f'SDCS->map transform: scale={self.sdcs_to_map_scale:.4f} '
+                f'rot={self.sdcs_to_map_rotation_deg:.2f}deg '
+                f't={self.sdcs_to_map_translation} | hub_map=({hub_map[0]:.2f},{hub_map[1]:.2f})')
         self.recorded_points = np.zeros((2, 0), dtype=float)
         self.recorded_waypoints = np.zeros((2, 0), dtype=float)
         self.recorded_nodes = []
@@ -225,6 +251,26 @@ class TripPlanner(Node):
                 self._load_recorded_map()
             elif p.name == 'goal_on_route_tolerance_m' and p.type_ == p.Type.DOUBLE:
                 self.goal_on_route_tolerance_m = float(p.value)
+            elif p.name == 'goals_are_sdcs_frame' and p.type_ == p.Type.BOOL:
+                self.goals_are_sdcs_frame = bool(p.value)
+                self.get_logger().info(
+                    f'goals_are_sdcs_frame updated: {self.goals_are_sdcs_frame}')
+                goal_param_changed = True
+            elif p.name == 'sdcs_to_map_translation' and p.type_ == p.Type.DOUBLE_ARRAY:
+                self.sdcs_to_map_translation = list(p.value)
+                self.get_logger().info(
+                    f'sdcs_to_map_translation updated: {self.sdcs_to_map_translation}')
+                goal_param_changed = True
+            elif p.name == 'sdcs_to_map_rotation_deg' and p.type_ == p.Type.DOUBLE:
+                self.sdcs_to_map_rotation_deg = float(p.value)
+                self.get_logger().info(
+                    f'sdcs_to_map_rotation_deg updated: {self.sdcs_to_map_rotation_deg:.2f}')
+                goal_param_changed = True
+            elif p.name == 'sdcs_to_map_scale' and p.type_ == p.Type.DOUBLE:
+                self.sdcs_to_map_scale = float(p.value)
+                self.get_logger().info(
+                    f'sdcs_to_map_scale updated: {self.sdcs_to_map_scale:.4f}')
+                goal_param_changed = True
 
         if self.ready_for_rides and self.mission_stage == MissionStage.IDLE:
             self.new_ride_requested = True
@@ -332,6 +378,19 @@ class TripPlanner(Node):
             return np.hstack([point_col, route])
         return np.hstack([route, point_col])
 
+    def _goal_to_route_frame(self, goal_xy):
+        goal = np.array([float(goal_xy[0]), float(goal_xy[1])], dtype=float)
+        if not self.goals_are_sdcs_frame:
+            return goal
+
+        angle = np.deg2rad(self.sdcs_to_map_rotation_deg)
+        rot = np.array([
+            [np.cos(angle), -np.sin(angle)],
+            [np.sin(angle),  np.cos(angle)],
+        ])
+        trans = np.array(self.sdcs_to_map_translation, dtype=float)
+        return self.sdcs_to_map_scale * (goal @ rot) + trans
+
     def _plan_to_xy(self, goal_xy):
         if self.robot_pose is None:
             return None
@@ -387,21 +446,30 @@ class TripPlanner(Node):
         return route
 
     def _send_path_to(self, goal_xy, label=''):
-        wp = self._plan_to_xy(goal_xy)
+        goal_route = self._goal_to_route_frame(goal_xy)
+        wp = self._plan_to_xy(goal_route)
         if wp is None:
             return False
         self.waypoints_pub.publish(self._map_path_to_ros(wp))
         self._publish_debug_markers(active_route=wp)
-        self.get_logger().info(f'Path published -> {label} ({goal_xy[0]:.2f}, {goal_xy[1]:.2f})')
+        if self.goals_are_sdcs_frame:
+            self.get_logger().info(
+                f'Path published -> {label} '
+                f'sdcs=({goal_xy[0]:.2f}, {goal_xy[1]:.2f}) '
+                f'map=({goal_route[0]:.2f}, {goal_route[1]:.2f})')
+        else:
+            self.get_logger().info(
+                f'Path published -> {label} ({goal_route[0]:.2f}, {goal_route[1]:.2f})')
         return True
 
     def _snap_to_exact(self, goal_xy, label=''):
+        goal_route = self._goal_to_route_frame(goal_xy)
         if self.robot_pose is None:
             return self._send_path_to(goal_xy, label)
 
         rx, ry = float(self.robot_pose.pose.position.x), float(self.robot_pose.pose.position.y)
         cur_q  = np.array([rx, ry])
-        goal_q = np.array([float(goal_xy[0]), float(goal_xy[1])])
+        goal_q = goal_route
 
         dist = float(np.linalg.norm(cur_q - goal_q))
         if dist < 0.10:
@@ -410,7 +478,8 @@ class TripPlanner(Node):
 
         wp = np.stack([cur_q, goal_q], axis=1)
         self.waypoints_pub.publish(self._map_path_to_ros(wp))
-        self.get_logger().info(f'Snap path -> {label} ({goal_xy[0]:.2f}, {goal_xy[1]:.2f}) dist={dist:.3f}m')
+        self.get_logger().info(
+            f'Snap path -> {label} ({goal_q[0]:.2f}, {goal_q[1]:.2f}) dist={dist:.3f}m')
         return True
 
     def _set_led(self, led_id: int):

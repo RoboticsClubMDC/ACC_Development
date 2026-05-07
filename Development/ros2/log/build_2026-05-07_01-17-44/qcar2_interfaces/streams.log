@@ -1,0 +1,32 @@
+[0.012s] Invoking command in '/home/arturo-noble/Documents/ACC_Development/Development/ros2/build/qcar2_interfaces': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake /home/arturo-noble/Documents/ACC_Development/Development/ros2/src/qcar2_interfaces -DCMAKE_INSTALL_PREFIX=/home/arturo-noble/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces
+[0.159s] -- The C compiler identification is GNU 13.3.0
+[0.274s] -- The CXX compiler identification is GNU 13.3.0
+[0.306s] -- Detecting C compiler ABI info
+[0.447s] -- Detecting C compiler ABI info - done
+[0.460s] -- Check for working C compiler: /usr/bin/cc - skipped
+[0.460s] -- Detecting C compile features
+[0.461s] -- Detecting C compile features - done
+[0.476s] -- Detecting CXX compiler ABI info
+[0.624s] -- Detecting CXX compiler ABI info - done
+[0.638s] -- Check for working CXX compiler: /usr/bin/c++ - skipped
+[0.638s] -- Detecting CXX compile features
+[0.638s] -- Detecting CXX compile features - done
+[0.649s] CMake Error at CMakeLists.txt:9 (find_package):
+[0.650s]   By not providing "Findament_cmake.cmake" in CMAKE_MODULE_PATH this project
+[0.650s]   has asked CMake to find a package configuration file provided by
+[0.650s]   "ament_cmake", but CMake did not find one.
+[0.650s] 
+[0.650s]   Could not find a package configuration file provided by "ament_cmake" with
+[0.650s]   any of the following names:
+[0.650s] 
+[0.650s]     ament_cmakeConfig.cmake
+[0.650s]     ament_cmake-config.cmake
+[0.651s] 
+[0.651s]   Add the installation prefix of "ament_cmake" to CMAKE_PREFIX_PATH or set
+[0.651s]   "ament_cmake_DIR" to a directory containing one of the above files.  If
+[0.651s]   "ament_cmake" provides a separate development package or SDK, be sure it
+[0.651s]   has been installed.
+[0.651s] 
+[0.651s] 
+[0.651s] -- Configuring incomplete, errors occurred!
+[0.655s] Invoked command in '/home/arturo-noble/Documents/ACC_Development/Development/ros2/build/qcar2_interfaces' returned '1': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake /home/arturo-noble/Documents/ACC_Development/Development/ros2/src/qcar2_interfaces -DCMAKE_INSTALL_PREFIX=/home/arturo-noble/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces
