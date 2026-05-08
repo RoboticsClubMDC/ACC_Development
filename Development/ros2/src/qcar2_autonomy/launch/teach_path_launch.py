@@ -18,7 +18,7 @@ def generate_launch_description():
         output='screen',
         parameters=[{
             'global_frame': 'map',
-            'node_interval_sec': 1.5,
+            'node_interval_sec': 0.5,
             'min_node_spacing_m': 0.10,
             'min_node_yaw_change_rad': 0.20,
         }],
