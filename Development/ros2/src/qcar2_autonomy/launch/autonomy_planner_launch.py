@@ -35,6 +35,9 @@ def generate_launch_description():
         'route_frame': 'map',
         'hub_xy': SDCS_TAXI_HUB_XY,
         'goals_are_sdcs_frame': True,
+        'one_way_route': True,
+        'allow_route_wrap': True,
+        'heading_aware_start': True,
     }],
     # parameters=[{
     #     'taxi_node': [10],

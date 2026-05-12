@@ -123,6 +123,31 @@ def densify_polyline(points_2xn, spacing=0.03):
     return np.array(dense_points, dtype=float).T
 
 
+def compute_path_headings(points_2xn):
+    if points_2xn.size == 0:
+        return np.array([], dtype=float)
+
+    n = points_2xn.shape[1]
+    headings = np.zeros(n, dtype=float)
+    if n < 2:
+        return headings
+
+    for idx in range(n):
+        if idx == 0:
+            delta = points_2xn[:, 1] - points_2xn[:, 0]
+        elif idx == n - 1:
+            delta = points_2xn[:, n - 1] - points_2xn[:, n - 2]
+        else:
+            delta = points_2xn[:, idx + 1] - points_2xn[:, idx - 1]
+
+        if float(np.linalg.norm(delta)) > 1e-9:
+            headings[idx] = math.atan2(float(delta[1]), float(delta[0]))
+        elif idx > 0:
+            headings[idx] = headings[idx - 1]
+
+    return headings
+
+
 def build_waypoint_path_from_nodes(
     nodes,
     min_node_spacing=0.08,
@@ -139,11 +164,29 @@ def build_waypoint_path_from_nodes(
     return filtered_nodes, control_points, dense_waypoints
 
 
-def closest_recorded_node_index(points_2xn, xy):
+def closest_recorded_node_index(
+    points_2xn,
+    xy,
+    headings=None,
+    desired_yaw=None,
+    max_heading_error=None,
+    heading_weight=0.30,
+):
     if points_2xn.size == 0:
         return None
     q = np.array(xy, dtype=float).reshape(2, 1)
     d = np.linalg.norm(points_2xn - q, axis=0)
+    if headings is not None and desired_yaw is not None:
+        headings = np.asarray(headings, dtype=float)
+        if headings.shape[0] == d.shape[0]:
+            yaw_err = np.array([abs(_wrap_to_pi(h - desired_yaw)) for h in headings])
+            score = d + float(heading_weight) * yaw_err
+            if max_heading_error is not None:
+                mask = yaw_err <= float(max_heading_error)
+                if np.any(mask):
+                    masked_score = np.where(mask, score, np.inf)
+                    return int(np.argmin(masked_score))
+            return int(np.argmin(score))
     return int(np.argmin(d))
 
 
@@ -179,6 +222,23 @@ def build_recorded_segment(points_2xn, start_idx, goal_idx, closed_loop=False):
     return wrap if path_length(wrap) < path_length(direct) else direct
 
 
+def build_directed_recorded_segment(points_2xn, start_idx, goal_idx, allow_wrap=False):
+    if points_2xn.size == 0:
+        return np.zeros((2, 0), dtype=float)
+
+    n = points_2xn.shape[1]
+    start_idx = int(np.clip(start_idx, 0, n - 1))
+    goal_idx = int(np.clip(goal_idx, 0, n - 1))
+
+    if start_idx <= goal_idx:
+        return points_2xn[:, start_idx:goal_idx + 1]
+
+    if not allow_wrap or n < 3:
+        return np.zeros((2, 0), dtype=float)
+
+    return np.hstack([points_2xn[:, start_idx:], points_2xn[:, :goal_idx + 1]])
+
+
 def build_dense_recorded_segment(
     points_2xn,
     start_idx,
@@ -191,5 +251,21 @@ def build_dense_recorded_segment(
         start_idx,
         goal_idx,
         closed_loop=closed_loop,
+    )
+    return densify_polyline(segment, spacing=spacing)
+
+
+def build_directed_dense_recorded_segment(
+    points_2xn,
+    start_idx,
+    goal_idx,
+    spacing=0.03,
+    allow_wrap=False,
+):
+    segment = build_directed_recorded_segment(
+        points_2xn,
+        start_idx,
+        goal_idx,
+        allow_wrap=allow_wrap,
     )
     return densify_polyline(segment, spacing=spacing)

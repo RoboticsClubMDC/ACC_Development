@@ -9,7 +9,7 @@ from geometry_msgs.msg import Twist
 from rclpy.node import Node
 
 
-SPEED = 0.15
+SPEED = 0.05
 TURN = 0.4
 
 

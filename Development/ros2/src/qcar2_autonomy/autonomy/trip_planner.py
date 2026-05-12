@@ -15,9 +15,11 @@ from rclpy.parameter import ParameterType
 from visualization_msgs.msg import Marker
 
 from autonomy.recorded_map_utils import (
+    build_directed_dense_recorded_segment,
     build_dense_recorded_segment,
     build_waypoint_path_from_nodes,
     closest_recorded_node_index,
+    compute_path_headings,
     find_latest_recording_map,
     load_recording_map,
 )
@@ -67,6 +69,12 @@ class TripPlanner(Node):
         self.declare_parameter('sdcs_to_map_translation', DEFAULT_SDCS_TO_MAP_TRANSLATION)
         self.declare_parameter('sdcs_to_map_rotation_deg', DEFAULT_SDCS_TO_MAP_ROTATION_DEG)
         self.declare_parameter('sdcs_to_map_scale', DEFAULT_SDCS_TO_MAP_SCALE)
+        self.declare_parameter('one_way_route', True)
+        self.declare_parameter('allow_route_wrap', True)
+        self.declare_parameter('route_wrap_gap_tolerance_m', 1.0)
+        self.declare_parameter('heading_aware_start', True)
+        self.declare_parameter('max_start_heading_error_rad', 1.5708)
+        self.declare_parameter('heading_score_weight_m_per_rad', 0.30)
 
         self.route_frame        = self.get_parameter('route_frame').get_parameter_value().string_value
         self.hub_xy             = list(self.get_parameter('hub_xy').get_parameter_value().double_array_value)
@@ -89,6 +97,18 @@ class TripPlanner(Node):
             self.get_parameter('sdcs_to_map_rotation_deg').get_parameter_value().double_value)
         self.sdcs_to_map_scale = float(
             self.get_parameter('sdcs_to_map_scale').get_parameter_value().double_value)
+        self.one_way_route = bool(
+            self.get_parameter('one_way_route').get_parameter_value().bool_value)
+        self.allow_route_wrap = bool(
+            self.get_parameter('allow_route_wrap').get_parameter_value().bool_value)
+        self.route_wrap_gap_tolerance_m = float(
+            self.get_parameter('route_wrap_gap_tolerance_m').get_parameter_value().double_value)
+        self.heading_aware_start = bool(
+            self.get_parameter('heading_aware_start').get_parameter_value().bool_value)
+        self.max_start_heading_error_rad = float(
+            self.get_parameter('max_start_heading_error_rad').get_parameter_value().double_value)
+        self.heading_score_weight_m_per_rad = float(
+            self.get_parameter('heading_score_weight_m_per_rad').get_parameter_value().double_value)
 
         self.add_on_set_parameters_callback(self.parameter_update_callback)
 
@@ -104,9 +124,11 @@ class TripPlanner(Node):
                 f't={self.sdcs_to_map_translation} | hub_map=({hub_map[0]:.2f},{hub_map[1]:.2f})')
         self.recorded_points = np.zeros((2, 0), dtype=float)
         self.recorded_waypoints = np.zeros((2, 0), dtype=float)
+        self.recorded_waypoint_yaws = np.array([], dtype=float)
         self.recorded_nodes = []
         self.recorded_map_path = None
         self.recorded_loop = False
+        self.recorded_loop_gap = float('inf')
 
         self.LED_GREEN   = 1
         self.LED_BLUE    = 2
@@ -271,6 +293,33 @@ class TripPlanner(Node):
                 self.get_logger().info(
                     f'sdcs_to_map_scale updated: {self.sdcs_to_map_scale:.4f}')
                 goal_param_changed = True
+            elif p.name == 'one_way_route' and p.type_ == p.Type.BOOL:
+                self.one_way_route = bool(p.value)
+                self.get_logger().info(f'one_way_route updated: {self.one_way_route}')
+                goal_param_changed = True
+            elif p.name == 'allow_route_wrap' and p.type_ == p.Type.BOOL:
+                self.allow_route_wrap = bool(p.value)
+                self.get_logger().info(f'allow_route_wrap updated: {self.allow_route_wrap}')
+                goal_param_changed = True
+            elif p.name == 'route_wrap_gap_tolerance_m' and p.type_ == p.Type.DOUBLE:
+                self.route_wrap_gap_tolerance_m = float(p.value)
+                self.get_logger().info(
+                    f'route_wrap_gap_tolerance_m updated: {self.route_wrap_gap_tolerance_m:.2f}')
+                goal_param_changed = True
+            elif p.name == 'heading_aware_start' and p.type_ == p.Type.BOOL:
+                self.heading_aware_start = bool(p.value)
+                self.get_logger().info(f'heading_aware_start updated: {self.heading_aware_start}')
+                goal_param_changed = True
+            elif p.name == 'max_start_heading_error_rad' and p.type_ == p.Type.DOUBLE:
+                self.max_start_heading_error_rad = float(p.value)
+                self.get_logger().info(
+                    f'max_start_heading_error_rad updated: {self.max_start_heading_error_rad:.2f}')
+                goal_param_changed = True
+            elif p.name == 'heading_score_weight_m_per_rad' and p.type_ == p.Type.DOUBLE:
+                self.heading_score_weight_m_per_rad = float(p.value)
+                self.get_logger().info(
+                    f'heading_score_weight_m_per_rad updated: {self.heading_score_weight_m_per_rad:.2f}')
+                goal_param_changed = True
 
         if self.ready_for_rides and self.mission_stage == MissionStage.IDLE:
             self.new_ride_requested = True
@@ -327,6 +376,7 @@ class TripPlanner(Node):
         self.recorded_nodes = filtered_nodes
         self.recorded_points = control_points
         self.recorded_waypoints = dense_waypoints
+        self.recorded_waypoint_yaws = compute_path_headings(self.recorded_waypoints)
         self.recorded_map_path = str(latest_map)
         if self.recorded_points.shape[1] < 2 or self.recorded_waypoints.shape[1] < 2:
             self.get_logger().error('Recorded map has too few points for planning')
@@ -334,12 +384,13 @@ class TripPlanner(Node):
 
         first = self.recorded_waypoints[:, 0]
         last = self.recorded_waypoints[:, -1]
-        self.recorded_loop = float(np.linalg.norm(first - last)) < 0.75
+        self.recorded_loop_gap = float(np.linalg.norm(first - last))
+        self.recorded_loop = self.recorded_loop_gap < 0.75
         self.get_logger().info(
             f'Loaded recorded map for planner: {latest_map.name} '
             f'raw_nodes={len(nodes)} control_nodes={self.recorded_points.shape[1]} '
             f'dense_waypoints={self.recorded_waypoints.shape[1]} '
-            f'loop={self.recorded_loop}')
+            f'loop={self.recorded_loop} loop_gap={self.recorded_loop_gap:.2f}m')
         self._publish_debug_markers(
             raw_nodes=raw_points,
             control_points=self.recorded_points,
@@ -391,6 +442,22 @@ class TripPlanner(Node):
         trans = np.array(self.sdcs_to_map_translation, dtype=float)
         return self.sdcs_to_map_scale * (goal @ rot) + trans
 
+    def _pose_yaw(self):
+        if self.robot_pose is None:
+            return None
+
+        q = self.robot_pose.pose.orientation
+        return float(np.arctan2(
+            2.0 * (q.w * q.z + q.x * q.y),
+            1.0 - 2.0 * (q.y * q.y + q.z * q.z)))
+
+    def _route_can_wrap(self):
+        if not self.allow_route_wrap:
+            return False
+        if self.recorded_loop:
+            return True
+        return self.recorded_loop_gap <= self.route_wrap_gap_tolerance_m
+
     def _plan_to_xy(self, goal_xy):
         if self.robot_pose is None:
             return None
@@ -402,7 +469,18 @@ class TripPlanner(Node):
         cur = np.array([rx, ry], dtype=float)
         goal = np.array([float(goal_xy[0]), float(goal_xy[1])], dtype=float)
 
-        start_idx = closest_recorded_node_index(self.recorded_waypoints, cur)
+        robot_yaw = self._pose_yaw()
+        if self.heading_aware_start and robot_yaw is not None:
+            start_idx = closest_recorded_node_index(
+                self.recorded_waypoints,
+                cur,
+                headings=self.recorded_waypoint_yaws,
+                desired_yaw=robot_yaw,
+                max_heading_error=self.max_start_heading_error_rad,
+                heading_weight=self.heading_score_weight_m_per_rad,
+            )
+        else:
+            start_idx = closest_recorded_node_index(self.recorded_waypoints, cur)
         goal_idx = closest_recorded_node_index(self.recorded_waypoints, goal)
         if start_idx is None or goal_idx is None:
             self.get_logger().error('Failed to find nearest recorded nodes')
@@ -413,13 +491,27 @@ class TripPlanner(Node):
         start_route_dist = float(np.linalg.norm(start_nearest - cur))
         goal_route_dist = float(np.linalg.norm(goal_nearest - goal))
 
-        route = build_dense_recorded_segment(
-            self.recorded_waypoints,
-            start_idx,
-            goal_idx,
-            spacing=self.generated_waypoint_spacing_m,
-            closed_loop=self.recorded_loop,
-        )
+        if self.one_way_route:
+            route = build_directed_dense_recorded_segment(
+                self.recorded_waypoints,
+                start_idx,
+                goal_idx,
+                spacing=self.generated_waypoint_spacing_m,
+                allow_wrap=self._route_can_wrap(),
+            )
+            if route.shape[1] == 0:
+                self.get_logger().error(
+                    f'No legal one-way route from start_idx={start_idx} to goal_idx={goal_idx}. '
+                    'The recorded route does not wrap closely enough, and reverse routing is disabled.')
+                return None
+        else:
+            route = build_dense_recorded_segment(
+                self.recorded_waypoints,
+                start_idx,
+                goal_idx,
+                spacing=self.generated_waypoint_spacing_m,
+                closed_loop=self.recorded_loop,
+            )
         if route.shape[1] == 0:
             return None
 
@@ -442,6 +534,7 @@ class TripPlanner(Node):
             f'Planner route start_idx={start_idx} goal_idx={goal_idx} '
             f'pts={route.shape[1]} goal=({goal[0]:.2f},{goal[1]:.2f}) '
             f'start_route_dist={start_route_dist:.2f} goal_route_dist={goal_route_dist:.2f} '
+            f'one_way={self.one_way_route} wrap={self._route_can_wrap()} '
             f'using_dense_route={self.recorded_waypoints.shape[1]}')
         return route
 
