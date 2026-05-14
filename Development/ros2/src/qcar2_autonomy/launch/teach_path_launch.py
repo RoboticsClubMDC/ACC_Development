@@ -3,13 +3,16 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    # manual_drive = Node(
-    #     package='qcar2_autonomy',
-    #     executable='manual_drive',
-    #     name='manual_drive',
-    #     output='screen',
-    #     emulate_tty=True,
-    # )
+    manual_drive = Node(
+        package='qcar2_autonomy',
+        executable='manual_drive',
+        name='manual_drive',
+        output='screen',
+        emulate_tty=True,
+        parameters=[{
+            'cmd_topic': '/cmd_vel_nav',
+        }],
+    )
 
     path_teacher = Node(
         package='qcar2_autonomy',
@@ -25,6 +28,6 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
-        # manual_drive,
+        manual_drive,
         path_teacher,
     ])

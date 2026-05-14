@@ -6,11 +6,12 @@ import tty
 
 import rclpy
 from geometry_msgs.msg import Twist
+from rcl_interfaces.msg import SetParametersResult
 from rclpy.node import Node
 
 
-SPEED = 0.05
-TURN = 0.4
+DEFAULT_SPEED = 0.5
+DEFAULT_TURN = 0.2
 
 
 def get_key():
@@ -27,7 +28,29 @@ def get_key():
 class ManualDrive(Node):
     def __init__(self):
         super().__init__('manual_drive')
-        self.cmd_pub = self.create_publisher(Twist, '/cmd_vel_nav', 10)
+        self.declare_parameter('speed', DEFAULT_SPEED)
+        self.declare_parameter('turn', DEFAULT_TURN)
+        self.declare_parameter('cmd_topic', '/cmd_vel_nav')
+
+        self.speed = float(self.get_parameter('speed').get_parameter_value().double_value)
+        self.turn = float(self.get_parameter('turn').get_parameter_value().double_value)
+        self.cmd_topic = self.get_parameter('cmd_topic').get_parameter_value().string_value
+
+        self.cmd_pub = self.create_publisher(Twist, self.cmd_topic, 10)
+        self.add_on_set_parameters_callback(self.parameter_update_callback)
+        self.get_logger().info(
+            f'ManualDrive ready: speed={self.speed:.3f} turn={self.turn:.3f} '
+            f'topic={self.cmd_topic}')
+
+    def parameter_update_callback(self, params):
+        for param in params:
+            if param.name == 'speed' and param.type_ in (param.Type.DOUBLE, param.Type.INTEGER):
+                self.speed = float(param.value)
+                self.get_logger().info(f'speed updated: {self.speed:.3f}')
+            elif param.name == 'turn' and param.type_ in (param.Type.DOUBLE, param.Type.INTEGER):
+                self.turn = float(param.value)
+                self.get_logger().info(f'turn updated: {self.turn:.3f}')
+        return SetParametersResult(successful=True)
 
     def publish_cmd(self, speed, turn):
         msg = Twist()
@@ -41,6 +64,7 @@ def main(args=None):
     node = ManualDrive()
 
     print('Controls: W=forward  S=back  A=left  D=right  SPACE=stop  Q=quit')
+    print(f'Using: speed={node.speed:.3f}  turn={node.turn:.3f}  topic={node.cmd_topic}')
     print('----------------------------------------------------------------')
 
     speed = 0.0
@@ -57,17 +81,17 @@ def main(args=None):
                 print('\nStopped. Bye.')
                 break
             elif key == 'w':
-                speed = SPEED
+                speed = node.speed
                 turn = 0.0
             elif key == 's':
-                speed = -SPEED
+                speed = -node.speed
                 turn = 0.0
             elif key == 'a':
-                speed = SPEED
-                turn = TURN
+                speed = node.speed
+                turn = node.turn
             elif key == 'd':
-                speed = SPEED
-                turn = -TURN
+                speed = node.speed
+                turn = -node.turn
             elif key == ' ':
                 speed = 0.0
                 turn = 0.0

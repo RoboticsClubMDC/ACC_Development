@@ -1,0 +1,81 @@
+[0.667s] Invoking command in '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/src/qcar2_autonomy': AMENT_PREFIX_PATH=/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces:${CMAKE_PREFIX_PATH} DEBUGINFOD_URLS=https://debuginfod.ubuntu.com LD_LIBRARY_PATH=/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages:/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/qcar2_autonomy build --build-base /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build install --record /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/install.log --single-version-externally-managed install_data
+[0.837s] running egg_info
+[0.837s] creating ../../build/qcar2_autonomy/qcar2_autonomy.egg-info
+[0.844s] writing ../../build/qcar2_autonomy/qcar2_autonomy.egg-info/PKG-INFO
+[0.844s] writing dependency_links to ../../build/qcar2_autonomy/qcar2_autonomy.egg-info/dependency_links.txt
+[0.844s] writing entry points to ../../build/qcar2_autonomy/qcar2_autonomy.egg-info/entry_points.txt
+[0.845s] writing requirements to ../../build/qcar2_autonomy/qcar2_autonomy.egg-info/requires.txt
+[0.845s] writing top-level names to ../../build/qcar2_autonomy/qcar2_autonomy.egg-info/top_level.txt
+[0.845s] writing manifest file '../../build/qcar2_autonomy/qcar2_autonomy.egg-info/SOURCES.txt'
+[0.863s] reading manifest file '../../build/qcar2_autonomy/qcar2_autonomy.egg-info/SOURCES.txt'
+[0.864s] writing manifest file '../../build/qcar2_autonomy/qcar2_autonomy.egg-info/SOURCES.txt'
+[0.864s] running build
+[0.864s] running build_py
+[0.864s] creating /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build
+[0.864s] creating /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib
+[0.864s] creating /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy
+[0.864s] copying autonomy/sidewalk_detection.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy
+[0.865s] copying autonomy/path_teacher.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy
+[0.866s] copying autonomy/lane_detection.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy
+[0.867s] copying autonomy/lane_stanley_node.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy
+[0.867s] copying autonomy/stanley_live_plot.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy
+[0.867s] copying autonomy/__init__.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy
+[0.867s] copying autonomy/trip_planner.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy
+[0.868s] copying autonomy/manual_drive.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy
+[0.868s] copying autonomy/yolo_detector.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy
+[0.868s] copying autonomy/nav_to_pose.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy
+[0.868s] copying autonomy/lane_keeping.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy
+[0.868s] copying autonomy/recorded_map_utils.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy
+[0.869s] running install
+[0.877s] running install_lib
+[0.903s] creating /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy
+[0.903s] copying /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy/sidewalk_detection.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy
+[0.904s] copying /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy/path_teacher.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy
+[0.904s] copying /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy/lane_detection.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy
+[0.904s] copying /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy/lane_stanley_node.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy
+[0.904s] copying /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy/stanley_live_plot.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy
+[0.905s] copying /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy/__init__.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy
+[0.905s] copying /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy/trip_planner.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy
+[0.905s] copying /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy/manual_drive.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy
+[0.905s] copying /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy/yolo_detector.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy
+[0.905s] copying /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy/nav_to_pose.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy
+[0.906s] copying /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy/lane_keeping.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy
+[0.906s] copying /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy/recorded_map_utils.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy
+[0.906s] byte-compiling /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy/sidewalk_detection.py to sidewalk_detection.cpython-312.pyc
+[0.910s] byte-compiling /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy/path_teacher.py to path_teacher.cpython-312.pyc
+[0.914s] byte-compiling /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy/lane_detection.py to lane_detection.cpython-312.pyc
+[0.916s] byte-compiling /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy/lane_stanley_node.py to lane_stanley_node.cpython-312.pyc
+[0.917s] byte-compiling /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy/stanley_live_plot.py to stanley_live_plot.cpython-312.pyc
+[0.918s] byte-compiling /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy/__init__.py to __init__.cpython-312.pyc
+[0.918s] byte-compiling /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy/trip_planner.py to trip_planner.cpython-312.pyc
+[0.921s] byte-compiling /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy/manual_drive.py to manual_drive.cpython-312.pyc
+[0.922s] byte-compiling /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy/yolo_detector.py to yolo_detector.cpython-312.pyc
+[0.923s] byte-compiling /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy/nav_to_pose.py to nav_to_pose.cpython-312.pyc
+[0.928s] byte-compiling /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy/lane_keeping.py to lane_keeping.cpython-312.pyc
+[0.929s] byte-compiling /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy/recorded_map_utils.py to recorded_map_utils.cpython-312.pyc
+[0.930s] running install_data
+[0.930s] creating /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/share/ament_index
+[0.930s] creating /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/share/ament_index/resource_index
+[0.930s] creating /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/share/ament_index/resource_index/packages
+[0.930s] copying resource/qcar2_autonomy -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/share/ament_index/resource_index/packages
+[0.930s] copying package.xml -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/share/qcar2_autonomy
+[0.930s] creating /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/share/qcar2_autonomy/launch
+[0.930s] copying launch/teach_path_launch.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/share/qcar2_autonomy/launch
+[0.931s] copying launch/autonomy_planner_launch.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/share/qcar2_autonomy/launch
+[0.931s] running install_egg_info
+[0.941s] Copying ../../build/qcar2_autonomy/qcar2_autonomy.egg-info to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/qcar2_autonomy-0.0.0-py3.12.egg-info
+[0.941s] running install_scripts
+[1.017s] Installing bev_csi_node script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+[1.017s] Installing bev_csi_seg script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+[1.017s] Installing lane_detection script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+[1.017s] Installing lane_stanley_node script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+[1.017s] Installing manual_drive script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+[1.017s] Installing path_follower script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+[1.018s] Installing path_teacher script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+[1.018s] Installing sidewalk_detection script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+[1.018s] Installing stanley_live_plot script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+[1.018s] Installing traffic_system_detector script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+[1.018s] Installing trip_planner script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+[1.018s] Installing yolo_detector script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+[1.018s] writing list of installed files to '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/install.log'
+[1.048s] Invoked command in '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/src/qcar2_autonomy' returned '0': AMENT_PREFIX_PATH=/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces:${CMAKE_PREFIX_PATH} DEBUGINFOD_URLS=https://debuginfod.ubuntu.com LD_LIBRARY_PATH=/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages:/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/qcar2_autonomy build --build-base /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build install --record /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/install.log --single-version-externally-managed install_data
