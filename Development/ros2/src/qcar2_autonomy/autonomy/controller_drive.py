@@ -310,7 +310,7 @@ class ControllerDrive(Node):
 
         # ── Parameters ───────────────────────────────────────────────────────
         self.declare_parameter('cmd_topic',             '/cmd_vel_nav')
-        self.declare_parameter('max_speed',             0.5)    # m/s
+        self.declare_parameter('max_speed',             0.06)    # m/s
         self.declare_parameter('max_turn',              0.4)    # rad/s
         self.declare_parameter('deadzone',              0.08)
         self.declare_parameter('publish_hz',            30.0)
