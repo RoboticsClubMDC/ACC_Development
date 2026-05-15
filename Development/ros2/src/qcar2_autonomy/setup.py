@@ -35,6 +35,7 @@ setup(
             'lane_stanley_node=autonomy.lane_stanley_node:main',
             'sidewalk_detection=autonomy.sidewalk_detection:main',
             'bev_csi_seg=autonomy.bev_csi_seg:main',
+            'controller_drive=autonomy.controller_drive:main',
 
         ],
     },

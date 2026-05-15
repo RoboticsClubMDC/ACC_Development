@@ -1,0 +1,222 @@
+[0.117s] DEBUG:colcon:Command line arguments: ['/usr/bin/colcon', 'build']
+[0.117s] DEBUG:colcon:Parsed command line arguments: Namespace(log_base=None, log_level=None, verb_name='build', build_base='build', install_base='install', merge_install=False, symlink_install=False, test_result_base=None, continue_on_error=False, executor='parallel', parallel_workers=20, event_handlers=None, ignore_user_meta=False, metas=['./colcon.meta'], base_paths=['.'], packages_ignore=None, packages_ignore_regex=None, paths=None, packages_up_to=None, packages_up_to_regex=None, packages_above=None, packages_above_and_dependencies=None, packages_above_depth=None, packages_select_by_dep=None, packages_skip_by_dep=None, packages_skip_up_to=None, packages_select_build_failed=False, packages_skip_build_finished=False, packages_select_test_failures=False, packages_skip_test_passed=False, packages_select=None, packages_skip=None, packages_select_regex=None, packages_skip_regex=None, packages_start=None, packages_end=None, cmake_args=None, cmake_target=None, cmake_target_skip_unavailable=False, cmake_clean_cache=False, cmake_clean_first=False, cmake_force_configure=False, ament_cmake_args=None, catkin_cmake_args=None, catkin_skip_building_tests=False, verb_parser=<colcon_defaults.argument_parser.defaults.DefaultArgumentsDecorator object at 0x7503192242f0>, verb_extension=<colcon_core.verb.build.BuildVerb object at 0x750319224350>, main=<bound method BuildVerb.main of <colcon_core.verb.build.BuildVerb object at 0x750319224350>>)
+[0.165s] Level 1:colcon.colcon_core.package_discovery:discover_packages(colcon_meta) check parameters
+[0.165s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) check parameters
+[0.165s] Level 1:colcon.colcon_core.package_discovery:discover_packages(ignore) check parameters
+[0.165s] Level 1:colcon.colcon_core.package_discovery:discover_packages(path) check parameters
+[0.165s] Level 1:colcon.colcon_core.package_discovery:discover_packages(colcon_meta) discover
+[0.165s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) discover
+[0.165s] INFO:colcon.colcon_core.package_discovery:Crawling recursively for packages in '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2'
+[0.166s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['ignore', 'ignore_ament_install']
+[0.166s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'ignore'
+[0.166s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'ignore_ament_install'
+[0.166s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['colcon_pkg']
+[0.166s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'colcon_pkg'
+[0.166s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['colcon_meta']
+[0.166s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'colcon_meta'
+[0.166s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['ros']
+[0.166s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'ros'
+[0.201s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['cmake', 'python']
+[0.201s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'cmake'
+[0.201s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'python'
+[0.202s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['python_setup_py']
+[0.202s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'python_setup_py'
+[0.202s] Level 1:colcon.colcon_core.package_identification:_identify(build) by extensions ['ignore', 'ignore_ament_install']
+[0.202s] Level 1:colcon.colcon_core.package_identification:_identify(build) by extension 'ignore'
+[0.202s] Level 1:colcon.colcon_core.package_identification:_identify(build) ignored
+[0.202s] Level 1:colcon.colcon_core.package_identification:_identify(install) by extensions ['ignore', 'ignore_ament_install']
+[0.202s] Level 1:colcon.colcon_core.package_identification:_identify(install) by extension 'ignore'
+[0.202s] Level 1:colcon.colcon_core.package_identification:_identify(install) ignored
+[0.202s] Level 1:colcon.colcon_core.package_identification:_identify(log) by extensions ['ignore', 'ignore_ament_install']
+[0.203s] Level 1:colcon.colcon_core.package_identification:_identify(log) by extension 'ignore'
+[0.203s] Level 1:colcon.colcon_core.package_identification:_identify(log) ignored
+[0.203s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extensions ['ignore', 'ignore_ament_install']
+[0.203s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extension 'ignore'
+[0.203s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extension 'ignore_ament_install'
+[0.203s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extensions ['colcon_pkg']
+[0.203s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extension 'colcon_pkg'
+[0.203s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extensions ['colcon_meta']
+[0.203s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extension 'colcon_meta'
+[0.203s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extensions ['ros']
+[0.203s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extension 'ros'
+[0.203s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extensions ['cmake', 'python']
+[0.203s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extension 'cmake'
+[0.203s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extension 'python'
+[0.203s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extensions ['python_setup_py']
+[0.203s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extension 'python_setup_py'
+[0.203s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_autonomy) by extensions ['ignore', 'ignore_ament_install']
+[0.203s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_autonomy) by extension 'ignore'
+[0.203s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_autonomy) by extension 'ignore_ament_install'
+[0.203s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_autonomy) by extensions ['colcon_pkg']
+[0.203s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_autonomy) by extension 'colcon_pkg'
+[0.204s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_autonomy) by extensions ['colcon_meta']
+[0.204s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_autonomy) by extension 'colcon_meta'
+[0.204s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_autonomy) by extensions ['ros']
+[0.204s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_autonomy) by extension 'ros'
+[0.207s] DEBUG:colcon.colcon_core.package_identification:Package 'src/qcar2_autonomy' with type 'ros.ament_python' and name 'qcar2_autonomy'
+[0.208s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_interfaces) by extensions ['ignore', 'ignore_ament_install']
+[0.208s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_interfaces) by extension 'ignore'
+[0.208s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_interfaces) by extension 'ignore_ament_install'
+[0.208s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_interfaces) by extensions ['colcon_pkg']
+[0.208s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_interfaces) by extension 'colcon_pkg'
+[0.208s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_interfaces) by extensions ['colcon_meta']
+[0.208s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_interfaces) by extension 'colcon_meta'
+[0.208s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_interfaces) by extensions ['ros']
+[0.208s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_interfaces) by extension 'ros'
+[0.209s] DEBUG:colcon.colcon_core.package_identification:Package 'src/qcar2_interfaces' with type 'ros.ament_cmake' and name 'qcar2_interfaces'
+[0.209s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_nodes) by extensions ['ignore', 'ignore_ament_install']
+[0.209s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_nodes) by extension 'ignore'
+[0.209s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_nodes) by extension 'ignore_ament_install'
+[0.209s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_nodes) by extensions ['colcon_pkg']
+[0.209s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_nodes) by extension 'colcon_pkg'
+[0.209s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_nodes) by extensions ['colcon_meta']
+[0.209s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_nodes) by extension 'colcon_meta'
+[0.209s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_nodes) by extensions ['ros']
+[0.209s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_nodes) by extension 'ros'
+[0.210s] DEBUG:colcon.colcon_core.package_identification:Package 'src/qcar2_nodes' with type 'ros.ament_cmake' and name 'qcar2_nodes'
+[0.210s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) using defaults
+[0.212s] Level 1:colcon.colcon_core.package_discovery:discover_packages(ignore) discover
+[0.212s] Level 1:colcon.colcon_core.package_discovery:discover_packages(ignore) using defaults
+[0.212s] Level 1:colcon.colcon_core.package_discovery:discover_packages(path) discover
+[0.212s] Level 1:colcon.colcon_core.package_discovery:discover_packages(path) using defaults
+[0.235s] Level 5:colcon.colcon_core.verb:set package 'qcar2_interfaces' build argument 'cmake_args' from command line to 'None'
+[0.235s] Level 5:colcon.colcon_core.verb:set package 'qcar2_interfaces' build argument 'cmake_target' from command line to 'None'
+[0.235s] Level 5:colcon.colcon_core.verb:set package 'qcar2_interfaces' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[0.235s] Level 5:colcon.colcon_core.verb:set package 'qcar2_interfaces' build argument 'cmake_clean_cache' from command line to 'False'
+[0.235s] Level 5:colcon.colcon_core.verb:set package 'qcar2_interfaces' build argument 'cmake_clean_first' from command line to 'False'
+[0.235s] Level 5:colcon.colcon_core.verb:set package 'qcar2_interfaces' build argument 'cmake_force_configure' from command line to 'False'
+[0.235s] Level 5:colcon.colcon_core.verb:set package 'qcar2_interfaces' build argument 'ament_cmake_args' from command line to 'None'
+[0.235s] Level 5:colcon.colcon_core.verb:set package 'qcar2_interfaces' build argument 'catkin_cmake_args' from command line to 'None'
+[0.235s] Level 5:colcon.colcon_core.verb:set package 'qcar2_interfaces' build argument 'catkin_skip_building_tests' from command line to 'False'
+[0.235s] DEBUG:colcon.colcon_core.verb:Building package 'qcar2_interfaces' with the following arguments: {'ament_cmake_args': None, 'build_base': '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_interfaces', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces', 'merge_install': False, 'path': '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/src/qcar2_interfaces', 'symlink_install': False, 'test_result_base': None}
+[0.235s] Level 5:colcon.colcon_core.verb:set package 'qcar2_autonomy' build argument 'cmake_args' from command line to 'None'
+[0.236s] Level 5:colcon.colcon_core.verb:set package 'qcar2_autonomy' build argument 'cmake_target' from command line to 'None'
+[0.236s] Level 5:colcon.colcon_core.verb:set package 'qcar2_autonomy' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[0.236s] Level 5:colcon.colcon_core.verb:set package 'qcar2_autonomy' build argument 'cmake_clean_cache' from command line to 'False'
+[0.236s] Level 5:colcon.colcon_core.verb:set package 'qcar2_autonomy' build argument 'cmake_clean_first' from command line to 'False'
+[0.236s] Level 5:colcon.colcon_core.verb:set package 'qcar2_autonomy' build argument 'cmake_force_configure' from command line to 'False'
+[0.236s] Level 5:colcon.colcon_core.verb:set package 'qcar2_autonomy' build argument 'ament_cmake_args' from command line to 'None'
+[0.236s] Level 5:colcon.colcon_core.verb:set package 'qcar2_autonomy' build argument 'catkin_cmake_args' from command line to 'None'
+[0.236s] Level 5:colcon.colcon_core.verb:set package 'qcar2_autonomy' build argument 'catkin_skip_building_tests' from command line to 'False'
+[0.236s] DEBUG:colcon.colcon_core.verb:Building package 'qcar2_autonomy' with the following arguments: {'ament_cmake_args': None, 'build_base': '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy', 'merge_install': False, 'path': '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/src/qcar2_autonomy', 'symlink_install': False, 'test_result_base': None}
+[0.236s] Level 5:colcon.colcon_core.verb:set package 'qcar2_nodes' build argument 'cmake_args' from command line to 'None'
+[0.236s] Level 5:colcon.colcon_core.verb:set package 'qcar2_nodes' build argument 'cmake_target' from command line to 'None'
+[0.236s] Level 5:colcon.colcon_core.verb:set package 'qcar2_nodes' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[0.236s] Level 5:colcon.colcon_core.verb:set package 'qcar2_nodes' build argument 'cmake_clean_cache' from command line to 'False'
+[0.236s] Level 5:colcon.colcon_core.verb:set package 'qcar2_nodes' build argument 'cmake_clean_first' from command line to 'False'
+[0.236s] Level 5:colcon.colcon_core.verb:set package 'qcar2_nodes' build argument 'cmake_force_configure' from command line to 'False'
+[0.236s] Level 5:colcon.colcon_core.verb:set package 'qcar2_nodes' build argument 'ament_cmake_args' from command line to 'None'
+[0.236s] Level 5:colcon.colcon_core.verb:set package 'qcar2_nodes' build argument 'catkin_cmake_args' from command line to 'None'
+[0.236s] Level 5:colcon.colcon_core.verb:set package 'qcar2_nodes' build argument 'catkin_skip_building_tests' from command line to 'False'
+[0.236s] DEBUG:colcon.colcon_core.verb:Building package 'qcar2_nodes' with the following arguments: {'ament_cmake_args': None, 'build_base': '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_nodes', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_nodes', 'merge_install': False, 'path': '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/src/qcar2_nodes', 'symlink_install': False, 'test_result_base': None}
+[0.236s] INFO:colcon.colcon_core.executor:Executing jobs using 'parallel' executor
+[0.238s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:run_until_complete
+[0.238s] INFO:colcon.colcon_ros.task.ament_cmake.build:Building ROS package in '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/src/qcar2_interfaces' with build type 'ament_cmake'
+[0.239s] INFO:colcon.colcon_cmake.task.cmake.build:Building CMake package in '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/src/qcar2_interfaces'
+[0.241s] INFO:colcon.colcon_core.plugin_system:Skipping extension 'colcon_core.shell.bat': Not used on non-Windows systems
+[0.241s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[0.254s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_interfaces': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy:/opt/ros/kilted DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_interfaces -- -j20 -l20
+[0.756s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_interfaces' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy:/opt/ros/kilted DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_interfaces -- -j20 -l20
+[0.774s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_interfaces': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy:/opt/ros/kilted DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_interfaces
+[0.870s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(qcar2_interfaces)
+[0.871s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_interfaces' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy:/opt/ros/kilted DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_interfaces
+[0.874s] Level 1:colcon.colcon_core.environment:checking '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces' for CMake module files
+[0.875s] Level 1:colcon.colcon_core.environment:checking '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces' for CMake config files
+[0.876s] Level 1:colcon.colcon_core.shell:create_environment_hook('qcar2_interfaces', 'cmake_prefix_path')
+[0.876s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/hook/cmake_prefix_path.dsv'
+[0.877s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/hook/cmake_prefix_path.sh'
+[0.878s] Level 1:colcon.colcon_core.environment:checking '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/lib'
+[0.878s] Level 1:colcon.colcon_core.shell:create_environment_hook('qcar2_interfaces', 'ld_library_path_lib')
+[0.878s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/hook/ld_library_path_lib.dsv'
+[0.879s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/hook/ld_library_path_lib.sh'
+[0.879s] Level 1:colcon.colcon_core.environment:checking '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/bin'
+[0.879s] Level 1:colcon.colcon_core.environment:checking '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/lib/pkgconfig/qcar2_interfaces.pc'
+[0.881s] Level 1:colcon.colcon_core.environment:checking '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/lib/python3.12/site-packages'
+[0.881s] Level 1:colcon.colcon_core.shell:create_environment_hook('qcar2_interfaces', 'pythonpath')
+[0.882s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/hook/pythonpath.dsv'
+[0.882s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/hook/pythonpath.sh'
+[0.883s] Level 1:colcon.colcon_core.environment:checking '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/bin'
+[0.883s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/package.dsv'
+[0.884s] INFO:colcon.colcon_core.shell:Creating package script '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/package.sh'
+[0.885s] INFO:colcon.colcon_core.shell:Creating package script '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/package.bash'
+[0.886s] INFO:colcon.colcon_core.shell:Creating package script '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/package.zsh'
+[0.886s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/share/colcon-core/packages/qcar2_interfaces)
+[0.887s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(qcar2_interfaces)
+[0.887s] Level 1:colcon.colcon_core.environment:checking '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces' for CMake module files
+[0.888s] Level 1:colcon.colcon_core.environment:checking '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces' for CMake config files
+[0.889s] Level 1:colcon.colcon_core.shell:create_environment_hook('qcar2_interfaces', 'cmake_prefix_path')
+[0.889s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/hook/cmake_prefix_path.dsv'
+[0.890s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/hook/cmake_prefix_path.sh'
+[0.891s] Level 1:colcon.colcon_core.environment:checking '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/lib'
+[0.891s] Level 1:colcon.colcon_core.shell:create_environment_hook('qcar2_interfaces', 'ld_library_path_lib')
+[0.892s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/hook/ld_library_path_lib.dsv'
+[0.892s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/hook/ld_library_path_lib.sh'
+[0.893s] Level 1:colcon.colcon_core.environment:checking '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/bin'
+[0.893s] Level 1:colcon.colcon_core.environment:checking '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/lib/pkgconfig/qcar2_interfaces.pc'
+[0.894s] Level 1:colcon.colcon_core.environment:checking '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/lib/python3.12/site-packages'
+[0.894s] Level 1:colcon.colcon_core.shell:create_environment_hook('qcar2_interfaces', 'pythonpath')
+[0.894s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/hook/pythonpath.dsv'
+[0.895s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/hook/pythonpath.sh'
+[0.896s] Level 1:colcon.colcon_core.environment:checking '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/bin'
+[0.896s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/package.dsv'
+[0.897s] INFO:colcon.colcon_core.shell:Creating package script '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/package.sh'
+[0.897s] INFO:colcon.colcon_core.shell:Creating package script '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/package.bash'
+[0.898s] INFO:colcon.colcon_core.shell:Creating package script '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/package.zsh'
+[0.898s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/share/colcon-core/packages/qcar2_interfaces)
+[0.899s] INFO:colcon.colcon_ros.task.ament_python.build:Building ROS package in '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/src/qcar2_autonomy' with build type 'ament_python'
+[0.899s] Level 1:colcon.colcon_core.shell:create_environment_hook('qcar2_autonomy', 'ament_prefix_path')
+[0.899s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/share/qcar2_autonomy/hook/ament_prefix_path.dsv'
+[0.900s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/share/qcar2_autonomy/hook/ament_prefix_path.sh'
+[0.901s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[0.905s] INFO:colcon.colcon_ros.task.ament_cmake.build:Building ROS package in '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/src/qcar2_nodes' with build type 'ament_cmake'
+[0.905s] INFO:colcon.colcon_cmake.task.cmake.build:Building CMake package in '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/src/qcar2_nodes'
+[0.905s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[1.144s] INFO:colcon.colcon_core.task.python.build:Building Python package in '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/src/qcar2_autonomy'
+[1.144s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[1.150s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_nodes': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy:/opt/ros/kilted DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/lib/python3.12/site-packages:/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages:/opt/ros/kilted/lib/python3.12/site-packages /usr/bin/cmake /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/src/qcar2_nodes -DCMAKE_INSTALL_PREFIX=/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_nodes
+[1.577s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/src/qcar2_autonomy': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages:/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/lib/python3.12/site-packages:/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages:/opt/ros/kilted/lib/python3.12/site-packages /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/qcar2_autonomy build --build-base /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build install --record /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/install.log --single-version-externally-managed install_data
+[1.853s] Level 1:colcon.colcon_core.environment:checking '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy' for CMake module files
+[1.853s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/src/qcar2_autonomy' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages:/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/lib/python3.12/site-packages:/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages:/opt/ros/kilted/lib/python3.12/site-packages /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/qcar2_autonomy build --build-base /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build install --record /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/install.log --single-version-externally-managed install_data
+[1.854s] Level 1:colcon.colcon_core.environment:checking '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy' for CMake config files
+[1.854s] Level 1:colcon.colcon_core.environment:checking '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib'
+[1.854s] Level 1:colcon.colcon_core.environment:checking '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/bin'
+[1.854s] Level 1:colcon.colcon_core.environment:checking '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/pkgconfig/qcar2_autonomy.pc'
+[1.854s] Level 1:colcon.colcon_core.environment:checking '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages'
+[1.854s] Level 1:colcon.colcon_core.shell:create_environment_hook('qcar2_autonomy', 'pythonpath')
+[1.855s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/share/qcar2_autonomy/hook/pythonpath.dsv'
+[1.855s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/share/qcar2_autonomy/hook/pythonpath.sh'
+[1.855s] Level 1:colcon.colcon_core.environment:checking '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/bin'
+[1.855s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(qcar2_autonomy)
+[1.855s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/share/qcar2_autonomy/package.dsv'
+[1.856s] INFO:colcon.colcon_core.shell:Creating package script '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/share/qcar2_autonomy/package.sh'
+[1.856s] INFO:colcon.colcon_core.shell:Creating package script '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/share/qcar2_autonomy/package.bash'
+[1.856s] INFO:colcon.colcon_core.shell:Creating package script '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/share/qcar2_autonomy/package.zsh'
+[1.856s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/share/colcon-core/packages/qcar2_autonomy)
+[2.223s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_nodes' returned '1': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy:/opt/ros/kilted DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces/lib/python3.12/site-packages:/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages:/opt/ros/kilted/lib/python3.12/site-packages /usr/bin/cmake /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/src/qcar2_nodes -DCMAKE_INSTALL_PREFIX=/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_nodes
+[2.238s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(qcar2_nodes)
+[2.239s] Level 1:colcon.colcon_core.environment:checking '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_nodes' for CMake module files
+[2.240s] Level 1:colcon.colcon_core.environment:checking '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_nodes' for CMake config files
+[2.240s] Level 1:colcon.colcon_core.environment:checking '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_nodes/bin'
+[2.240s] Level 1:colcon.colcon_core.environment:checking '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_nodes/lib/pkgconfig/qcar2_nodes.pc'
+[2.240s] Level 1:colcon.colcon_core.environment:checking '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_nodes/lib/python3.12/site-packages'
+[2.240s] Level 1:colcon.colcon_core.environment:checking '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_nodes/bin'
+[2.241s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/package.dsv'
+[2.241s] INFO:colcon.colcon_core.shell:Creating package script '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/package.sh'
+[2.241s] INFO:colcon.colcon_core.shell:Creating package script '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/package.bash'
+[2.241s] INFO:colcon.colcon_core.shell:Creating package script '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/package.zsh'
+[2.241s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_nodes/share/colcon-core/packages/qcar2_nodes)
+[2.252s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:closing loop
+[2.252s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:loop closed
+[2.252s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:run_until_complete finished with '1'
+[2.252s] DEBUG:colcon.colcon_core.event_reactor:joining thread
+[2.255s] INFO:colcon.colcon_core.plugin_system:Skipping extension 'colcon_notification.desktop_notification.terminal_notifier': Not used on non-Darwin systems
+[2.255s] INFO:colcon.colcon_core.plugin_system:Skipping extension 'colcon_notification.desktop_notification.win32': Not used on non-Windows systems
+[2.255s] INFO:colcon.colcon_notification.desktop_notification:Sending desktop notification using 'notify2'
+[2.273s] DEBUG:colcon.colcon_core.event_reactor:joined thread
+[2.274s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/local_setup.sh'
+[2.274s] INFO:colcon.colcon_core.shell:Creating prefix util module '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/_local_setup_util_sh.py'
+[2.275s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/setup.sh'
+[2.275s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/local_setup.bash'
+[2.276s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/setup.bash'
+[2.276s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/local_setup.zsh'
+[2.276s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/setup.zsh'
