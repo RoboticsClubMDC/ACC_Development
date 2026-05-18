@@ -23,6 +23,7 @@ from rcl_interfaces.msg import SetParametersResult
 from std_msgs.msg import Bool, Float32
 
 
+
 class QcarEKF:
 
     def __init__(self, x0, P0, Q, R):
@@ -100,7 +101,7 @@ class PathFollower(Node):
 
     def __init__(self):
         super().__init__('path_follower')
-
+        self.get_logger().info("BP00 TEST: THIS IS THE FILE ROS IS RUNNING")
         self.declare_parameter('node_values', [0, 8, 10])
         self.waypoints = list(self.get_parameter('node_values').get_parameter_value().integer_array_value)
 

@@ -36,7 +36,24 @@ try:
 
         # Get aligned RGB and Depth images
         QCarImg.read()
-            
+        
+        print("QCarImg attributes:", QCarImg.__dict__.keys())
+        print("RGB type:", type(QCarImg.rgb))
+        print("Depth type:", type(QCarImg.depth))
+
+        print("RGB shape:", QCarImg.rgb.shape)
+        print("RGB dtype:", QCarImg.rgb.dtype)
+
+        print("Depth shape:", QCarImg.depth.shape)
+        print("Depth dtype:", QCarImg.depth.dtype)
+
+        print("Depth min:", QCarImg.depth.min())
+        print("Depth max:", QCarImg.depth.max())
+
+        h, w = QCarImg.depth.shape[:2]
+        print("Center depth:", QCarImg.depth[h//2, w//2])
+
+
         rgbProcessed = myYolo.pre_process(QCarImg.rgb)
         predecion = myYolo.predict(inputImg = rgbProcessed,
                                    classes = [2,9,11],

@@ -1,5 +1,5 @@
 For docker with qlabs and setup scenario:
-cd /home/$USER/Documents/ACC_Development/docker/virtual_qcar2
+cd /home/$USER/Documents/GitHub/ACC_Development/docker/virtual_qcar2
 sudo docker run --rm -it --network host --name virtual-qcar2 quanser/virtual-qcar2 bash
 
 Once in docker:
@@ -7,8 +7,8 @@ cd /home/qcar2_scripts/python
 python3 Base_Scenarios_Python/Setup_Competition_Map.py && clear
 
 Ros container:
-cd /home/$USER/Documents/ACC_Development/isaac_ros_common
-./scripts/run_dev.sh  /home/$USER/Documents/ACC_Development/Development
+cd /home/$USER/Documents/GitHub/ACC_Development/isaac_ros_common
+./scripts/run_dev.sh  /home/$USER/Documents/GitHub/ACC_Development/Development
 
 #colcon buid:
 colcon build && . install/setup.bash && export ROS_DOMAIN_ID=69 && clear

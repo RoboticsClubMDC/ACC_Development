@@ -34,6 +34,7 @@ setup(
             'sidewalk_detection=autonomy.sidewalk_detection:main',
             'bev_csi_seg=autonomy.bev_csi_seg:main',
             'teleop_csi=autonomy.teleop_csi:main',
+            'roadmap_alignment_node = autonomy.LCroadmap_alignment_node:main',
 
         ],
     },
