@@ -1,0 +1,48 @@
+running egg_info
+writing ../../build/qcar2_autonomy/qcar2_autonomy.egg-info/PKG-INFO
+writing dependency_links to ../../build/qcar2_autonomy/qcar2_autonomy.egg-info/dependency_links.txt
+writing entry points to ../../build/qcar2_autonomy/qcar2_autonomy.egg-info/entry_points.txt
+writing requirements to ../../build/qcar2_autonomy/qcar2_autonomy.egg-info/requires.txt
+writing top-level names to ../../build/qcar2_autonomy/qcar2_autonomy.egg-info/top_level.txt
+reading manifest file '../../build/qcar2_autonomy/qcar2_autonomy.egg-info/SOURCES.txt'
+writing manifest file '../../build/qcar2_autonomy/qcar2_autonomy.egg-info/SOURCES.txt'
+running build
+running build_py
+copying autonomy/path_teacher.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy
+copying autonomy/controller_drive.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy
+copying autonomy/sdcs_graph_planner.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy
+copying autonomy/trip_planner.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy
+copying autonomy/manual_drive.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy
+running install
+running install_lib
+copying /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy/path_teacher.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy
+copying /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy/controller_drive.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy
+copying /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy/sdcs_graph_planner.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy
+copying /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy/trip_planner.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy
+copying /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy/manual_drive.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy
+byte-compiling /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy/path_teacher.py to path_teacher.cpython-312.pyc
+byte-compiling /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy/controller_drive.py to controller_drive.cpython-312.pyc
+byte-compiling /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy/sdcs_graph_planner.py to sdcs_graph_planner.cpython-312.pyc
+byte-compiling /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy/trip_planner.py to trip_planner.cpython-312.pyc
+byte-compiling /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/autonomy/manual_drive.py to manual_drive.cpython-312.pyc
+running install_data
+copying launch/teach_path_launch.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/share/qcar2_autonomy/launch
+copying launch/controller_drive_launch.py -> /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/share/qcar2_autonomy/launch
+running install_egg_info
+removing '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/qcar2_autonomy-0.0.0-py3.12.egg-info' (and everything under it)
+Copying ../../build/qcar2_autonomy/qcar2_autonomy.egg-info to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/qcar2_autonomy-0.0.0-py3.12.egg-info
+running install_scripts
+Installing bev_csi_node script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+Installing bev_csi_seg script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+Installing controller_drive script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+Installing lane_detection script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+Installing lane_stanley_node script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+Installing manual_drive script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+Installing path_follower script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+Installing path_teacher script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+Installing sidewalk_detection script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+Installing stanley_live_plot script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+Installing traffic_system_detector script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+Installing trip_planner script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+Installing yolo_detector script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+writing list of installed files to '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy/install.log'

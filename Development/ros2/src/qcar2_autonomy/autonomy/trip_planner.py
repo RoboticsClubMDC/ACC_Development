@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import math
 import time
 import numpy as np
 from enum import Enum
@@ -15,14 +16,13 @@ from rclpy.parameter import ParameterType
 from visualization_msgs.msg import Marker
 
 from autonomy.recorded_map_utils import (
-    build_directed_dense_recorded_segment,
-    build_dense_recorded_segment,
     build_waypoint_path_from_nodes,
-    closest_recorded_node_index,
     compute_path_headings,
     find_latest_recording_map,
     load_recording_map,
 )
+from autonomy.recorded_graph_planner import RecordedMapGraphPlanner
+from autonomy.sdcs_graph_planner import SDCSGraphPlanner
 
 
 # SDCS big-map, right-hand traffic node 10 (taxi hub) expressed in PNG/reference coordinates.
@@ -110,18 +110,35 @@ class TripPlanner(Node):
         self.heading_score_weight_m_per_rad = float(
             self.get_parameter('heading_score_weight_m_per_rad').get_parameter_value().double_value)
 
+        # Node-ID goals: -1 means "snap to nearest node from xy coords"
+        self.declare_parameter('hub_node_id',     10)
+        self.declare_parameter('pickup_node_id',  -1)
+        self.declare_parameter('dropoff_node_id', -1)
+        self.hub_node_id     = int(self.get_parameter('hub_node_id').get_parameter_value().integer_value)
+        self.pickup_node_id  = int(self.get_parameter('pickup_node_id').get_parameter_value().integer_value)
+        self.dropoff_node_id = int(self.get_parameter('dropoff_node_id').get_parameter_value().integer_value)
+
         self.add_on_set_parameters_callback(self.parameter_update_callback)
+
+        # Pre-convert SDCS goal coords → map frame once at startup
+        self.hub_xy_map     = self._goal_to_route_frame(self.hub_xy)
+        self.pickup_xy_map  = self._goal_to_route_frame(self.pickup_xy)
+        self.dropoff_xy_map = self._goal_to_route_frame(self.dropoff_xy)
 
         self.get_logger().info(f'Route frame: {self.route_frame}')
         self.get_logger().info(
             f'Goal input frame: {"SDCS/PNG" if self.goals_are_sdcs_frame else self.route_frame}')
-        self.get_logger().info(f'Hub input coordinate: {self.hub_xy}')
-        if self.goals_are_sdcs_frame:
-            hub_map = self._goal_to_route_frame(self.hub_xy)
-            self.get_logger().info(
-                f'SDCS->map transform: scale={self.sdcs_to_map_scale:.4f} '
-                f'rot={self.sdcs_to_map_rotation_deg:.2f}deg '
-                f't={self.sdcs_to_map_translation} | hub_map=({hub_map[0]:.2f},{hub_map[1]:.2f})')
+        self.get_logger().info(
+            f'SDCS->map: scale={self.sdcs_to_map_scale:.4f} '
+            f'rot={self.sdcs_to_map_rotation_deg:.2f}° '
+            f't={self.sdcs_to_map_translation}')
+        self.get_logger().info(
+            f'Goals (map): hub=({self.hub_xy_map[0]:.3f},{self.hub_xy_map[1]:.3f}) '
+            f'hub_node={self.hub_node_id} | '
+            f'pickup=({self.pickup_xy_map[0]:.3f},{self.pickup_xy_map[1]:.3f}) '
+            f'pickup_node={self.pickup_node_id} | '
+            f'dropoff=({self.dropoff_xy_map[0]:.3f},{self.dropoff_xy_map[1]:.3f}) '
+            f'dropoff_node={self.dropoff_node_id}')
         self.recorded_points = np.zeros((2, 0), dtype=float)
         self.recorded_waypoints = np.zeros((2, 0), dtype=float)
         self.recorded_waypoint_yaws = np.array([], dtype=float)
@@ -129,7 +146,7 @@ class TripPlanner(Node):
         self.recorded_map_path = None
         self.recorded_loop = False
         self.recorded_loop_gap = float('inf')
-
+        self.graph_planner = None
         self.LED_GREEN   = 1
         self.LED_BLUE    = 2
         self.LED_MAGENTA = 5
@@ -157,6 +174,7 @@ class TripPlanner(Node):
         self.active_route_marker_pub = self.create_publisher(Marker, '/planner/active_route_nodes', 1)
 
         self._load_recorded_map()
+        self._build_graph_planner()
 
         self.create_subscription(Bool,        '/path_status',  self.path_status_callback,  10)
         self.create_subscription(PoseStamped, '/robot_pose',   self.robot_pose_callback,   10)
@@ -245,32 +263,89 @@ class TripPlanner(Node):
     def robot_pose_callback(self, msg: PoseStamped):
         self.robot_pose = msg
 
+    def _recompute_map_goals(self):
+        self.hub_xy_map     = self._goal_to_route_frame(self.hub_xy)
+        self.pickup_xy_map  = self._goal_to_route_frame(self.pickup_xy)
+        self.dropoff_xy_map = self._goal_to_route_frame(self.dropoff_xy)
+
+    def _build_graph_planner(self):
+        if self.recorded_waypoints.shape[1] < 2:
+            self.graph_planner = None
+            self.get_logger().error('Cannot build recorded graph: no recorded waypoints loaded')
+            return False
+
+        rot_rad = math.radians(self.sdcs_to_map_rotation_deg)
+        rough_graph = SDCSGraphPlanner(
+            waypoint_spacing=self.generated_waypoint_spacing_m,
+            scale=self.sdcs_to_map_scale,
+            rot_rad=rot_rad,
+            translation=self.sdcs_to_map_translation,
+        )
+        self.graph_planner = RecordedMapGraphPlanner(
+            self.recorded_waypoints,
+            rough_graph,
+        )
+        edge_count = sum(len(edges) for edges in self.graph_planner._adj)
+        missing_count = len(getattr(self.graph_planner, '_missing_edges', []))
+        self.get_logger().info(
+            f'RecordedMapGraphPlanner ready: source={self.recorded_map_path} '
+            f'nodes={len(self.graph_planner._adj)} edges={edge_count} '
+            f'missing_edges={missing_count} route_points={self.recorded_waypoints.shape[1]}')
+        if edge_count == 0:
+            self.get_logger().error('Recorded graph has no valid edges')
+            return False
+        return True
+
     def parameter_update_callback(self, params):
         goal_param_changed = False
         for p in params:
             if p.name == 'pickup_xy' and p.type_ == p.Type.DOUBLE_ARRAY:
                 self.pickup_xy = list(p.value)
-                self.get_logger().info(f'pickup_xy updated: {self.pickup_xy}')
+                self.pickup_xy_map = self._goal_to_route_frame(self.pickup_xy)
+                self.get_logger().info(
+                    f'pickup_xy updated: {self.pickup_xy} '
+                    f'map=({self.pickup_xy_map[0]:.3f},{self.pickup_xy_map[1]:.3f})')
                 goal_param_changed = True
             elif p.name == 'dropoff_xy' and p.type_ == p.Type.DOUBLE_ARRAY:
                 self.dropoff_xy = list(p.value)
-                self.get_logger().info(f'dropoff_xy updated: {self.dropoff_xy}')
+                self.dropoff_xy_map = self._goal_to_route_frame(self.dropoff_xy)
+                self.get_logger().info(
+                    f'dropoff_xy updated: {self.dropoff_xy} '
+                    f'map=({self.dropoff_xy_map[0]:.3f},{self.dropoff_xy_map[1]:.3f})')
                 goal_param_changed = True
             elif p.name == 'hub_xy' and p.type_ == p.Type.DOUBLE_ARRAY:
                 self.hub_xy = list(p.value)
-                self.get_logger().info(f'hub_xy updated: {self.hub_xy}')
+                self.hub_xy_map = self._goal_to_route_frame(self.hub_xy)
+                self.get_logger().info(
+                    f'hub_xy updated: {self.hub_xy} '
+                    f'map=({self.hub_xy_map[0]:.3f},{self.hub_xy_map[1]:.3f})')
+                goal_param_changed = True
+            elif p.name == 'hub_node_id' and p.type_ == p.Type.INTEGER:
+                self.hub_node_id = int(p.value)
+                self.get_logger().info(f'hub_node_id updated: {self.hub_node_id}')
+                goal_param_changed = True
+            elif p.name == 'pickup_node_id' and p.type_ == p.Type.INTEGER:
+                self.pickup_node_id = int(p.value)
+                self.get_logger().info(f'pickup_node_id updated: {self.pickup_node_id}')
+                goal_param_changed = True
+            elif p.name == 'dropoff_node_id' and p.type_ == p.Type.INTEGER:
+                self.dropoff_node_id = int(p.value)
+                self.get_logger().info(f'dropoff_node_id updated: {self.dropoff_node_id}')
                 goal_param_changed = True
             elif p.name == 'stop_seconds' and p.type_ == p.Type.DOUBLE_ARRAY:
                 self.stop_seconds = float(list(p.value)[0])
             elif p.name == 'recorded_min_node_spacing_m' and p.type_ == p.Type.DOUBLE:
                 self.recorded_min_node_spacing_m = float(p.value)
                 self._load_recorded_map()
+                self._build_graph_planner()
             elif p.name == 'recorded_min_yaw_change_rad' and p.type_ == p.Type.DOUBLE:
                 self.recorded_min_yaw_change_rad = float(p.value)
                 self._load_recorded_map()
+                self._build_graph_planner()
             elif p.name == 'generated_waypoint_spacing_m' and p.type_ == p.Type.DOUBLE:
                 self.generated_waypoint_spacing_m = float(p.value)
                 self._load_recorded_map()
+                self._build_graph_planner()
             elif p.name == 'goal_on_route_tolerance_m' and p.type_ == p.Type.DOUBLE:
                 self.goal_on_route_tolerance_m = float(p.value)
             elif p.name == 'goals_are_sdcs_frame' and p.type_ == p.Type.BOOL:
@@ -282,16 +357,22 @@ class TripPlanner(Node):
                 self.sdcs_to_map_translation = list(p.value)
                 self.get_logger().info(
                     f'sdcs_to_map_translation updated: {self.sdcs_to_map_translation}')
+                self._recompute_map_goals()
+                self._build_graph_planner()
                 goal_param_changed = True
             elif p.name == 'sdcs_to_map_rotation_deg' and p.type_ == p.Type.DOUBLE:
                 self.sdcs_to_map_rotation_deg = float(p.value)
                 self.get_logger().info(
                     f'sdcs_to_map_rotation_deg updated: {self.sdcs_to_map_rotation_deg:.2f}')
+                self._recompute_map_goals()
+                self._build_graph_planner()
                 goal_param_changed = True
             elif p.name == 'sdcs_to_map_scale' and p.type_ == p.Type.DOUBLE:
                 self.sdcs_to_map_scale = float(p.value)
                 self.get_logger().info(
                     f'sdcs_to_map_scale updated: {self.sdcs_to_map_scale:.4f}')
+                self._recompute_map_goals()
+                self._build_graph_planner()
                 goal_param_changed = True
             elif p.name == 'one_way_route' and p.type_ == p.Type.BOOL:
                 self.one_way_route = bool(p.value)
@@ -333,17 +414,21 @@ class TripPlanner(Node):
             return
 
         if not self.startup_done:
-            ok = self._send_path_to(self.hub_xy, label='HUB (updated)')
+            ok = self._send_path_to(self.hub_xy_map, label='HUB (updated)',
+                                    goal_node_id=self.hub_node_id)
             if ok:
                 self._startup_path_sent = True
             return
 
         if self.mission_stage == MissionStage.TO_PICKUP:
-            self._send_path_to(self.pickup_xy, label='PICKUP (updated)')
+            self._send_path_to(self.pickup_xy_map, label='PICKUP (updated)',
+                               goal_node_id=self.pickup_node_id)
         elif self.mission_stage == MissionStage.TO_DROPOFF:
-            self._send_path_to(self.dropoff_xy, label='DROPOFF (updated)')
+            self._send_path_to(self.dropoff_xy_map, label='DROPOFF (updated)',
+                               goal_node_id=self.dropoff_node_id)
         elif self.mission_stage == MissionStage.TO_HUB:
-            self._send_path_to(self.hub_xy, label='HUB (updated)')
+            self._send_path_to(self.hub_xy_map, label='HUB (updated)',
+                               goal_node_id=self.hub_node_id)
 
     def _load_recorded_map(self):
         latest_map = find_latest_recording_map(frame_id=self.route_frame)
@@ -458,113 +543,132 @@ class TripPlanner(Node):
             return True
         return self.recorded_loop_gap <= self.route_wrap_gap_tolerance_m
 
-    def _plan_to_xy(self, goal_xy):
+    def _plan_to_xy(self, goal_xy_map, goal_node_id: int = -1):
+        """
+        Plan a route from current robot pose to goal_xy_map (map frame).
+        If goal_node_id >= 0, that node is used directly — no snapping needed.
+        Everything works in map frame; no SDCS transform at query time.
+        """
         if self.robot_pose is None:
             return None
-        if self.recorded_waypoints.shape[1] < 2 and not self._load_recorded_map():
+        if self.graph_planner is None and not self._build_graph_planner():
             return None
 
-        rx = float(self.robot_pose.pose.position.x)
-        ry = float(self.robot_pose.pose.position.y)
-        cur = np.array([rx, ry], dtype=float)
-        goal = np.array([float(goal_xy[0]), float(goal_xy[1])], dtype=float)
-
+        rx        = float(self.robot_pose.pose.position.x)
+        ry        = float(self.robot_pose.pose.position.y)
         robot_yaw = self._pose_yaw()
+        goal      = np.asarray(goal_xy_map, dtype=float).ravel()
+
+        # Goal node: direct ID or nearest-position snap
+        if goal_node_id >= 0:
+            goal_node = goal_node_id
+            goal_col  = self.graph_planner.node_position(goal_node_id).reshape(2, 1)
+        else:
+            goal_node, goal_dist = self.graph_planner.find_nearest_node_position_only(goal)
+            goal_col = goal.reshape(2, 1)
+            self.get_logger().debug(
+                f'Goal snapped to node {goal_node} (dist={goal_dist:.2f}m)')
+
+        # Edge-based start snap (heading-aware)
+        edge_result = None
         if self.heading_aware_start and robot_yaw is not None:
-            start_idx = closest_recorded_node_index(
-                self.recorded_waypoints,
-                cur,
-                headings=self.recorded_waypoint_yaws,
-                desired_yaw=robot_yaw,
-                max_heading_error=self.max_start_heading_error_rad,
+            edge_result = self.graph_planner.find_start_on_edge(
+                (rx, ry), robot_yaw,
                 heading_weight=self.heading_score_weight_m_per_rad,
+                max_heading_error=self.max_start_heading_error_rad,
             )
-        else:
-            start_idx = closest_recorded_node_index(self.recorded_waypoints, cur)
-        goal_idx = closest_recorded_node_index(self.recorded_waypoints, goal)
-        if start_idx is None or goal_idx is None:
-            self.get_logger().error('Failed to find nearest recorded nodes')
-            return None
 
-        start_nearest = self.recorded_waypoints[:, start_idx]
-        goal_nearest = self.recorded_waypoints[:, goal_idx]
-        start_route_dist = float(np.linalg.norm(start_nearest - cur))
-        goal_route_dist = float(np.linalg.norm(goal_nearest - goal))
+        if edge_result is not None:
+            fi, ti, proj_pt, remaining_wp, proj_dist, heading_err = edge_result
+            self.get_logger().info(
+                f'Edge snap: edge=({fi}→{ti}) proj_dist={proj_dist:.3f}m '
+                f'heading_err={math.degrees(heading_err):.1f}° '
+                f'goal_node={goal_node} robot=({rx:.2f},{ry:.2f})')
 
-        if self.one_way_route:
-            route = build_directed_dense_recorded_segment(
-                self.recorded_waypoints,
-                start_idx,
-                goal_idx,
-                spacing=self.generated_waypoint_spacing_m,
-                allow_wrap=self._route_can_wrap(),
-            )
-            if route.shape[1] == 0:
+            node_seq = self.graph_planner.astar(ti, goal_node)
+            if node_seq is None:
                 self.get_logger().error(
-                    f'No legal one-way route from start_idx={start_idx} to goal_idx={goal_idx}. '
-                    'The recorded route does not wrap closely enough, and reverse routing is disabled.')
+                    f'A* found no path from node {ti} to node {goal_node}')
                 return None
+
+            route_len = self.graph_planner.route_length_m(node_seq)
+            self.get_logger().info(
+                f'A* path: nodes={node_seq} graph_length={route_len:.2f}m')
+
+            astar_path = self.graph_planner.build_path(node_seq)
+            cols = [proj_pt]
+            if remaining_wp.shape[1] > 0:
+                cols.append(remaining_wp)
+            if astar_path.shape[1] > 0:
+                cols.append(astar_path)
+            cols.append(goal_col)
+            path = np.hstack(cols)
+
+            first5 = [(float(path[0, i]), float(path[1, i]))
+                      for i in range(min(5, path.shape[1]))]
+            self.get_logger().info(
+                f'Path ready: {path.shape[1]} waypoints | first5={first5}')
+
         else:
-            route = build_dense_recorded_segment(
-                self.recorded_waypoints,
-                start_idx,
-                goal_idx,
-                spacing=self.generated_waypoint_spacing_m,
-                closed_loop=self.recorded_loop,
-            )
-        if route.shape[1] == 0:
-            return None
+            # Fallback: node snap when all edges fail heading filter
+            if self.heading_aware_start and robot_yaw is not None:
+                start_node, start_score = self.graph_planner.find_nearest_node(
+                    (rx, ry), robot_yaw,
+                    heading_weight=self.heading_score_weight_m_per_rad,
+                    max_heading_error=self.max_start_heading_error_rad,
+                )
+            else:
+                start_node, start_score = self.graph_planner.find_nearest_node_position_only(
+                    (rx, ry))
 
-        # The recorded map is only a guide corridor. The actual current pose and
-        # requested goal remain the true endpoints of the planned path.
-        if goal_route_dist > self.goal_on_route_tolerance_m:
             self.get_logger().warn(
-                f'Goal ({goal[0]:.2f}, {goal[1]:.2f}) is {goal_route_dist:.2f}m off the recorded route; '
-                'keeping the recorded route as a guide, then appending the exact goal coordinate')
+                f'Edge snap failed — fallback to node {start_node} (score={start_score:.2f}m) '
+                f'goal_node={goal_node} robot=({rx:.2f},{ry:.2f})')
 
-        if start_route_dist > 0.25:
-            self.get_logger().warn(
-                f'Robot start pose is {start_route_dist:.2f}m from the recorded route; '
-                'prepending the exact current pose before joining the recorded route')
+            node_seq = self.graph_planner.astar(start_node, goal_node)
+            if node_seq is None:
+                self.get_logger().error(
+                    f'A* found no path from node {start_node} to node {goal_node}')
+                return None
 
-        route = self._attach_exact_endpoint(route, cur, prepend=True)
-        route = self._attach_exact_endpoint(route, goal, prepend=False)
+            route_len = self.graph_planner.route_length_m(node_seq)
+            self.get_logger().info(
+                f'A* path: nodes={node_seq} graph_length={route_len:.2f}m')
 
-        self.get_logger().info(
-            f'Planner route start_idx={start_idx} goal_idx={goal_idx} '
-            f'pts={route.shape[1]} goal=({goal[0]:.2f},{goal[1]:.2f}) '
-            f'start_route_dist={start_route_dist:.2f} goal_route_dist={goal_route_dist:.2f} '
-            f'one_way={self.one_way_route} wrap={self._route_can_wrap()} '
-            f'using_dense_route={self.recorded_waypoints.shape[1]}')
-        return route
+            path = self.graph_planner.build_path(node_seq)
+            if path.shape[1] == 0:
+                self.get_logger().error('build_path returned empty path')
+                return None
 
-    def _send_path_to(self, goal_xy, label=''):
-        goal_route = self._goal_to_route_frame(goal_xy)
-        wp = self._plan_to_xy(goal_route)
+            robot_col = np.array([[rx], [ry]])
+            path = np.hstack([robot_col, path, goal_col])
+            self.get_logger().info(f'Path ready: {path.shape[1]} waypoints')
+
+        self._publish_debug_markers(active_route=path)
+        return path
+
+    def _send_path_to(self, goal_xy_map, label='', goal_node_id: int = -1):
+        """goal_xy_map must already be in map frame."""
+        wp = self._plan_to_xy(goal_xy_map, goal_node_id)
         if wp is None:
             return False
         self.waypoints_pub.publish(self._map_path_to_ros(wp))
         self._publish_debug_markers(active_route=wp)
-        if self.goals_are_sdcs_frame:
-            self.get_logger().info(
-                f'Path published -> {label} '
-                f'sdcs=({goal_xy[0]:.2f}, {goal_xy[1]:.2f}) '
-                f'map=({goal_route[0]:.2f}, {goal_route[1]:.2f})')
-        else:
-            self.get_logger().info(
-                f'Path published -> {label} ({goal_route[0]:.2f}, {goal_route[1]:.2f})')
+        self.get_logger().info(
+            f'Path published -> {label} '
+            f'goal_map=({float(goal_xy_map[0]):.3f},{float(goal_xy_map[1]):.3f})'
+            + (f' node_id={goal_node_id}' if goal_node_id >= 0 else ''))
         return True
 
-    def _snap_to_exact(self, goal_xy, label=''):
-        goal_route = self._goal_to_route_frame(goal_xy)
+    def _snap_to_exact(self, goal_xy_map, label=''):
+        """Publish a straight two-point path to snap to an exact map-frame goal."""
         if self.robot_pose is None:
-            return self._send_path_to(goal_xy, label)
+            return self._send_path_to(goal_xy_map, label)
 
-        rx, ry = float(self.robot_pose.pose.position.x), float(self.robot_pose.pose.position.y)
-        cur_q  = np.array([rx, ry])
-        goal_q = goal_route
-
-        dist = float(np.linalg.norm(cur_q - goal_q))
+        rx, ry  = float(self.robot_pose.pose.position.x), float(self.robot_pose.pose.position.y)
+        cur_q   = np.array([rx, ry])
+        goal_q  = np.asarray(goal_xy_map, dtype=float).ravel()
+        dist    = float(np.linalg.norm(cur_q - goal_q))
         if dist < 0.10:
             self.get_logger().info(f'Already within 0.10m of {label}, no snap needed')
             return True
@@ -572,7 +676,7 @@ class TripPlanner(Node):
         wp = np.stack([cur_q, goal_q], axis=1)
         self.waypoints_pub.publish(self._map_path_to_ros(wp))
         self.get_logger().info(
-            f'Snap path -> {label} ({goal_q[0]:.2f}, {goal_q[1]:.2f}) dist={dist:.3f}m')
+            f'Snap path -> {label} ({goal_q[0]:.2f},{goal_q[1]:.2f}) dist={dist:.3f}m')
         return True
 
     def _set_led(self, led_id: int):
@@ -598,7 +702,8 @@ class TripPlanner(Node):
 
         if not self.startup_done:
             if not self._startup_path_sent:
-                ok = self._send_path_to(self.hub_xy, label='HUB (startup)')
+                ok = self._send_path_to(self.hub_xy_map, label='HUB (startup)',
+                                        goal_node_id=self.hub_node_id)
                 if ok:
                     self._startup_path_sent = True
                     self._set_led(self.LED_ORANGE)
@@ -619,21 +724,24 @@ class TripPlanner(Node):
             self.ready_for_rides    = False
             self.picked_up          = False
             self.dropped_off        = False
-            ok = self._send_path_to(self.pickup_xy, label='PICKUP')
+            ok = self._send_path_to(self.pickup_xy_map, label='PICKUP',
+                                    goal_node_id=self.pickup_node_id)
             if ok:
                 self.mission_stage = MissionStage.TO_PICKUP
                 self._set_led(self.LED_GREEN)
             return
 
         if self.mission_stage == MissionStage.WAIT_AT_PICKUP and now >= self.pause_until:
-            ok = self._send_path_to(self.dropoff_xy, label='DROPOFF')
+            ok = self._send_path_to(self.dropoff_xy_map, label='DROPOFF',
+                                    goal_node_id=self.dropoff_node_id)
             if ok:
                 self.mission_stage = MissionStage.TO_DROPOFF
                 self._set_led(self.LED_BLUE)
             return
 
         if self.mission_stage == MissionStage.WAIT_AT_DROPOFF and now >= self.pause_until:
-            ok = self._send_path_to(self.hub_xy, label='HUB')
+            ok = self._send_path_to(self.hub_xy_map, label='HUB',
+                                    goal_node_id=self.hub_node_id)
             if ok:
                 self.mission_stage = MissionStage.TO_HUB
                 self._set_led(self.LED_ORANGE)
@@ -647,7 +755,7 @@ class TripPlanner(Node):
         self._path_completed_event = False
 
         if self.mission_stage == MissionStage.TO_PICKUP:
-            self._snap_to_exact(self.pickup_xy, label='PICKUP-snap')
+            self._snap_to_exact(self.pickup_xy_map, label='PICKUP-snap')
             self.mission_stage = MissionStage.WAIT_AT_PICKUP
             self.picked_up     = True
             self._set_led(self.LED_BLUE)
@@ -655,7 +763,7 @@ class TripPlanner(Node):
             self.get_logger().info('Arrived at PICKUP.')
 
         elif self.mission_stage == MissionStage.TO_DROPOFF:
-            self._snap_to_exact(self.dropoff_xy, label='DROPOFF-snap')
+            self._snap_to_exact(self.dropoff_xy_map, label='DROPOFF-snap')
             self.mission_stage = MissionStage.WAIT_AT_DROPOFF
             self.dropped_off   = True
             self._set_led(self.LED_ORANGE)

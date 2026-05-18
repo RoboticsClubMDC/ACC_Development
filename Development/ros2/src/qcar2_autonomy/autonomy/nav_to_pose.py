@@ -145,6 +145,14 @@ class PathFollower(Node):
         self.stanley_blend     = 0.0
         self.stanley_trust_min = 999.0
 
+        self.declare_parameter('min_lookahead_m', 0.25)
+        self.min_lookahead_m = float(
+            self.get_parameter('min_lookahead_m').get_parameter_value().double_value)
+        self.declare_parameter('lookahead_gain', 1.7)
+        self.lookahead_gain = float(
+            self.get_parameter('lookahead_gain').get_parameter_value().double_value)
+        self._stall_count = 0
+
         self.add_on_set_parameters_callback(self.parameter_update_callback)
 
         self.target_frame = self.declare_parameter(
@@ -240,6 +248,7 @@ class PathFollower(Node):
         self.path_complete   = False
         self.path_execute_flag = self.start_path_requested
         self._wp_in_ros_frame = True
+        self._stall_count = 0
         self.get_logger().warn(
             f'/cmd_waypoints overwrote self.wp raw={len(xs)} kept={self.N} '
             f'first=({xs[0]:.2f},{ys[0]:.2f}) last=({xs[-1]:.2f},{ys[-1]:.2f})')
@@ -296,6 +305,12 @@ class PathFollower(Node):
                 self.start_path_requested = list(param.value)[0]
                 self.path_execute_flag = self.start_path_requested and self.N > 0 and not self.path_complete
                 self.get_logger().info('path status changed!')
+            elif param.name == 'min_lookahead_m' and param.type_ == param.Type.DOUBLE:
+                self.min_lookahead_m = float(param.value)
+                self.get_logger().info(f'min_lookahead_m updated: {self.min_lookahead_m:.3f}m')
+            elif param.name == 'lookahead_gain' and param.type_ == param.Type.DOUBLE:
+                self.lookahead_gain = float(param.value)
+                self.get_logger().info(f'lookahead_gain updated: {self.lookahead_gain:.2f}')
             elif param.name == 'stanley_blend' or param.name == 'stanley_trust_min':
                 self.get_logger().warn(f'{param.name} is hardcoded — ignoring')
             elif param.name == 'mission_pickup_xy' and param.type_ == param.Type.DOUBLE_ARRAY:
@@ -456,40 +471,40 @@ class PathFollower(Node):
         marker.action = Marker.DELETE
         self.target_waypoint_marker_publisher.publish(marker)
 
-    def _update_progress_index(self, robot_xy, max_step=25):
+    def _update_progress_index(self, robot_xy, max_step=80):
         if self.N <= 1:
             return
 
         robot_xy = np.array(robot_xy, dtype=float)
-        steps = 0
+        start_idx = int(np.clip(self.wpi, 0, self.N - 1))
+        stop_idx = min(self.N, start_idx + int(max_step) + 1)
 
-        while self.wpi < self.N - 1 and steps < max_step:
-            wp_current = self._waypoint_in_route_frame(self.wp[:, self.wpi])
-            wp_next = self._waypoint_in_route_frame(self.wp[:, self.wpi + 1])
+        best_idx = start_idx
+        best_dist = float('inf')
+        for idx in range(start_idx, stop_idx):
+            wp_route = self._waypoint_in_route_frame(self.wp[:, idx])
+            dist = float(np.linalg.norm(wp_route - robot_xy))
+            if dist < best_dist:
+                best_idx = idx
+                best_dist = dist
 
-            dist_current = float(np.linalg.norm(wp_current - robot_xy))
-            dist_next = float(np.linalg.norm(wp_next - robot_xy))
-
-            if dist_next <= dist_current:
-                self.wpi += 1
-                steps += 1
-            else:
-                break
+        if best_idx > self.wpi:
+            self.wpi = best_idx
 
     def _select_lookahead_index(self, robot_xy, lookahead_dist):
         if self.N <= 0:
             return 0
 
-        robot_xy = np.array(robot_xy, dtype=float)
         lookahead_dist = max(float(lookahead_dist), 0.05)
 
         target_idx = int(np.clip(self.wpi, 0, self.N - 1))
-        while target_idx < self.N - 1:
-            wp_route = self._waypoint_in_route_frame(self.wp[:, target_idx])
-            dist = float(np.linalg.norm(wp_route - robot_xy))
-            if dist >= lookahead_dist:
-                break
+        traveled = 0.0
+        prev_wp = self._waypoint_in_route_frame(self.wp[:, target_idx])
+        while target_idx < self.N - 1 and traveled < lookahead_dist:
             target_idx += 1
+            next_wp = self._waypoint_in_route_frame(self.wp[:, target_idx])
+            traveled += float(np.linalg.norm(next_wp - prev_wp))
+            prev_wp = next_wp
 
         return target_idx
 
@@ -526,17 +541,21 @@ class PathFollower(Node):
 
                 robot_xy = np.array(p, dtype=float)
                 v_eff = max(self.qcar2_measurred_speed, 0.05)
-                lookahead_dist = max(v_eff * 1.7, 0.30)
+                lookahead_dist = max(v_eff * self.lookahead_gain, self.min_lookahead_m)
 
+                prev_wpi = self.wpi
                 self._update_progress_index(robot_xy)
                 target_idx = self._select_lookahead_index(robot_xy, lookahead_dist)
-                wp_1 = np.array(self.wp[:, target_idx])
-                wp_1_mod = self._waypoint_in_route_frame(wp_1)
-                self._publish_target_waypoint_marker(wp_1_mod)
-
-                v = [wp_1_mod[0] - p[0], wp_1_mod[1] - p[1]]
                 Rot = np.array([[np.cos(th), -np.sin(th)], [np.sin(th), np.cos(th)]])
-                v_car = v @ Rot
+                for _ in range(40):
+                    wp_1 = np.array(self.wp[:, target_idx])
+                    wp_1_mod = self._waypoint_in_route_frame(wp_1)
+                    v = [wp_1_mod[0] - p[0], wp_1_mod[1] - p[1]]
+                    v_car = v @ Rot
+                    if v_car[0] >= 0.02 or target_idx >= self.N - 1:
+                        break
+                    target_idx += 1
+                self._publish_target_waypoint_marker(wp_1_mod)
 
                 WaypointDist = max(np.linalg.norm(v_car), 0.05)
                 psi = np.arctan2(v_car[1], v_car[0])
@@ -576,6 +595,16 @@ class PathFollower(Node):
                                          -self.max_steering_angle,
                                          self.max_steering_angle))
                 self.current_steering = steering
+
+                if abs(pp_delta_damped) >= self.max_steering_angle - 0.01 and self.wpi == prev_wpi:
+                    self._stall_count += 1
+                    if self._stall_count % 80 == 0:
+                        self.get_logger().warn(
+                            f'Steering saturated ({pp_delta_damped:.2f} rad) '
+                            f'but progress_idx stuck at {self.wpi} — '
+                            f'lookahead={lookahead_dist:.2f}m target_idx={target_idx}')
+                else:
+                    self._stall_count = 0
 
                 def f32(v):
                     m = Float32(); m.data = float(v); return m
