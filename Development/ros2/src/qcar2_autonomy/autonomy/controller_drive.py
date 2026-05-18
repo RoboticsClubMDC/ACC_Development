@@ -311,7 +311,7 @@ class ControllerDrive(Node):
         super().__init__('controller_drive')
 
         # ── Parameters ───────────────────────────────────────────────────────
-        self.declare_parameter('cmd_topic',             '/cmd_vel_nav')
+        self.declare_parameter('cmd_topic',             '/cmd_vel_raw')
         self.declare_parameter('max_speed',             0.04)    # m/s
         self.declare_parameter('max_turn',              0.4)    # rad/s
         self.declare_parameter('deadzone',              0.08)
@@ -328,6 +328,7 @@ class ControllerDrive(Node):
         self.declare_parameter('use_trigger',           True)
         self.declare_parameter('undo_button',           3)      # Y
         self.declare_parameter('node_delete_wait',      30.0)
+        self.declare_parameter('lane_assist_button',    5)      # RB
 
         p = self.get_parameter
         self.cmd_topic      = p('cmd_topic').get_parameter_value().string_value
@@ -347,9 +348,11 @@ class ControllerDrive(Node):
         self.use_trigger    = bool(p('use_trigger').get_parameter_value().bool_value)
         self.undo_btn          = int(p('undo_button').get_parameter_value().integer_value)
         self.node_delete_wait  = float(p('node_delete_wait').get_parameter_value().double_value)
+        self.lane_assist_btn   = int(p('lane_assist_button').get_parameter_value().integer_value)
 
-        self.cmd_pub  = self.create_publisher(Twist, self.cmd_topic, 10)
-        self.undo_pub = self.create_publisher(Empty, '/undo_last_node', 2)
+        self.cmd_pub        = self.create_publisher(Twist, self.cmd_topic, 10)
+        self.undo_pub       = self.create_publisher(Empty, '/undo_last_node', 2)
+        self.lane_assist_pub = self.create_publisher(Empty, '/lane_assist/toggle', 2)
 
         self._speed_out          = 0.0
         self._turn_out           = 0.0
@@ -358,6 +361,7 @@ class ControllerDrive(Node):
         self._prev_undo          = False
         self._undo_countdown     = 0.0
         self._last_countdown_sec = 0.0
+        self._prev_lane_assist   = False
 
         self._backend, backend_name = _open_best_backend(self.get_logger())
 
@@ -420,6 +424,11 @@ class ControllerDrive(Node):
             self._undo_countdown = self.node_delete_wait
             self._last_countdown_sec = math.floor(self._undo_countdown) + 1
         self._prev_undo = undo_now
+
+        lane_assist_now = self._backend.button(self.lane_assist_btn)
+        if lane_assist_now and not self._prev_lane_assist:
+            self.lane_assist_pub.publish(Empty())
+        self._prev_lane_assist = lane_assist_now
 
         if self._undo_countdown > 0.0:
             self._undo_countdown -= self._dt

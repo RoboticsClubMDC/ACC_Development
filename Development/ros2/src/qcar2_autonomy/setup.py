@@ -36,6 +36,7 @@ setup(
             'sidewalk_detection=autonomy.sidewalk_detection:main',
             'bev_csi_seg=autonomy.bev_csi_seg:main',
             'controller_drive=autonomy.controller_drive:main',
+            'lane_assist_blend=autonomy.lane_assist_blend:main',
 
         ],
     },
