@@ -11,8 +11,8 @@ def generate_launch_description():
         emulate_tty=True,
         parameters=[{
             'cmd_topic':             '/cmd_vel_nav',
-            'max_speed':             0.5,
-            'max_turn':              0.4,
+            'max_speed':             0.2,
+            'max_turn':              2.0,
             'deadzone':              0.08,
             'publish_hz':            30.0,
             'speed_slew':            1.0,

@@ -15,6 +15,7 @@ Default axis / button map (Logitech F310/F710, XInput mode, Linux):
 Backend priority: pygame → evdev → raw /dev/input/js0 (stdlib only).
 """
 
+
 import fcntl
 import math
 import os
@@ -310,7 +311,7 @@ class ControllerDrive(Node):
 
         # ── Parameters ───────────────────────────────────────────────────────
         self.declare_parameter('cmd_topic',             '/cmd_vel_nav')
-        self.declare_parameter('max_speed',             0.06)    # m/s
+        self.declare_parameter('max_speed',             0.04)    # m/s
         self.declare_parameter('max_turn',              0.4)    # rad/s
         self.declare_parameter('deadzone',              0.08)
         self.declare_parameter('publish_hz',            30.0)
