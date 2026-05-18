@@ -161,6 +161,10 @@ class PathFollower(Node):
         self.translation = [0, 0, 0]
         self.rotation = [0, 0, 0]
         self.wp = SDCSRoadMap().generate_path(self.waypoints) * self.scale
+        # -------------ADDED N_1
+        self.auto_align_start = True
+        self.auto_aligned = False
+        #----------
         self.N = len(self.wp[0, :])
         self.wpi = 0
         self.wp_prior = []
@@ -333,6 +337,92 @@ class PathFollower(Node):
     def imu_callback(self, msg):
         self.gyroscope = [msg.angular_velocity.x, msg.angular_velocity.y, msg.angular_velocity.z]
 
+
+
+#----------------Change N2 auto_align_roadmap_to_current_pose----------------
+    def auto_align_roadmap_to_current_pose(self):
+        """
+        Align SDCSRoadMap coordinates to the current Cartographer map frame.
+
+        It assumes:
+        - The QCar is physically placed at the first waypoint of the current route.
+        - Cartographer map->base_link is already available.
+        - self.wp has shape (2, N), where row 0 = x and row 1 = y.
+        """
+
+        try:
+            # Current QCar pose in Cartographer map frame
+            tf_msg = self.tf_buffer.lookup_transform(
+                'map',
+                self.target_frame,   # usually base_link
+                rclpy.time.Time()
+            )
+
+            current_xy = np.array([
+                tf_msg.transform.translation.x,
+                tf_msg.transform.translation.y
+            ])
+
+            q = tf_msg.transform.rotation
+            current_yaw = np.arctan2(
+                2.0 * (q.w * q.z + q.x * q.y),
+                1.0 - 2.0 * (q.y * q.y + q.z * q.z)
+            )
+
+            # First point of SDCSRoadMap path
+            raw_start = np.array([
+                self.wp[0, 0],
+                self.wp[1, 0]
+            ])
+
+            # Estimate ideal path heading using a point slightly ahead
+            lookahead_i = min(20, self.wp.shape[1] - 1)
+            raw_next = np.array([
+                self.wp[0, lookahead_i],
+                self.wp[1, lookahead_i]
+            ])
+
+            raw_vec = raw_next - raw_start
+            raw_heading = np.arctan2(raw_vec[1], raw_vec[0])
+
+            # Required global rotation from SDCS path frame to Cartographer map frame
+            angle_rad = np.arctan2(
+                np.sin(current_yaw - raw_heading),
+                np.cos(current_yaw - raw_heading)
+            )
+
+            angle_deg = angle_rad * 180.0 / np.pi
+
+            # Match the same rotation convention used in path_publisher/path_planner
+            R_QLabs_ROS = np.array([
+                [np.cos(-angle_deg * np.pi / 180.0), -np.sin(-angle_deg * np.pi / 180.0)],
+                [np.sin(-angle_deg * np.pi / 180.0),  np.cos(-angle_deg * np.pi / 180.0)]
+            ])
+
+            # Existing code does:
+            # wp_map = (wp_raw + translation_offset) @ R
+            # Solve:
+            # translation_offset = current_xy @ R.T - raw_start
+            translation_offset = current_xy @ R_QLabs_ROS.T - raw_start
+
+            self.rotation_offset = [float(angle_deg)]
+            self.translation_offset = [
+                float(translation_offset[0]),
+                float(translation_offset[1])
+            ]
+
+            self.get_logger().info(
+                f"Auto-aligned roadmap: rotation_offset={self.rotation_offset}, "
+                f"translation_offset={self.translation_offset}"
+            )
+
+            return True
+
+        except Exception as e:
+            self.get_logger().warn(f"Roadmap auto-align waiting for TF map->{self.target_frame}: {e}")
+            return False
+    #----------------End of auto_align_roadmap_to_current_pose----------------N2
+
     def path_publisher(self):
         path_msg = Path()
         path_msg.header.stamp = self.get_clock().now().to_msg()
@@ -366,6 +456,14 @@ class PathFollower(Node):
 
         self.t_plot = time.time() - self.t0
         self.ekf_filter_timer()
+
+        #----CHANGE N3--------------
+        if self.auto_align_start and not self.auto_aligned:
+            self.auto_aligned = self.auto_align_roadmap_to_current_pose()
+            if not self.auto_aligned:
+                return
+
+        #--END OF CHANGE N3---------------------
 
         if round(self.t_plot) % 2 == 0:
             self.path_publisher()
