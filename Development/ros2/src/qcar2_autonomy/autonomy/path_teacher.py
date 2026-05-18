@@ -9,7 +9,7 @@ from geometry_msgs.msg import Point, PoseStamped
 from nav_msgs.msg import Path
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
-from std_msgs.msg import Bool
+from std_msgs.msg import Bool, Empty
 from tf2_ros import TransformException
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
@@ -35,6 +35,7 @@ class PathTeacher(Node):
         self.declare_parameter('node_marker_size', 0.14)
         self.declare_parameter('map_name', 'taught_map')
         self.declare_parameter('mapping_enabled', True)
+        self.declare_parameter('node_delete_wait', 30.0)
 
         self.global_frame = self.get_parameter(
             'global_frame').get_parameter_value().string_value
@@ -62,6 +63,8 @@ class PathTeacher(Node):
             'map_name').get_parameter_value().string_value
         self.mapping_enabled = self.get_parameter(
             'mapping_enabled').get_parameter_value().bool_value
+        self.node_delete_wait = float(self.get_parameter(
+            'node_delete_wait').get_parameter_value().double_value)
 
         self.save_directory = get_recording_maps_dir()
         self.save_directory.mkdir(parents=True, exist_ok=True)
@@ -75,6 +78,7 @@ class PathTeacher(Node):
         self.line_marker_pub = self.create_publisher(Marker, self.line_marker_topic, qos)
         self.node_marker_pub = self.create_publisher(Marker, self.node_marker_topic, qos)
         self.create_subscription(Bool, '/mapping_enable', self._mapping_enable_cb, 2)
+        self.create_subscription(Empty, '/undo_last_node', self._undo_last_node_cb, 2)
 
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
@@ -86,6 +90,7 @@ class PathTeacher(Node):
 
         self.saved_nodes = []
         self.last_record_time = None
+        self._undo_cooldown_until = 0.0
 
         self.timer = self.create_timer(self.sample_period, self._timer_cb)
         self.get_logger().info(
@@ -97,6 +102,30 @@ class PathTeacher(Node):
         self.get_logger().info(
             'Pause/resume recording with /mapping_enable '
             '(false=pause, true=resume)')
+
+    def _undo_last_node_cb(self, _msg: Empty):
+        if not self.saved_nodes:
+            self.get_logger().warn('Undo requested but no nodes to remove')
+            return
+        removed = self.saved_nodes.pop()
+        self.path_msg.poses.pop()
+        self.line_marker_msg.points.pop()
+        self.node_marker_msg.points.pop()
+        self.last_record_time = self.saved_nodes[-1]['stamp_sec'] if self.saved_nodes else None
+        now_sec = self.get_clock().now().nanoseconds * 1e-9
+        self._undo_cooldown_until = now_sec + self.node_delete_wait
+        stamp = self.get_clock().now().to_msg()
+        self.path_msg.header.stamp = stamp
+        self.line_marker_msg.header.stamp = stamp
+        self.node_marker_msg.header.stamp = stamp
+        self.path_pub.publish(self.path_msg)
+        self.line_marker_pub.publish(self.line_marker_msg)
+        self.node_marker_pub.publish(self.node_marker_msg)
+        self._write_map_file()
+        self.get_logger().warn(
+            f'Undid node {removed["index"]}: x={removed["x"]:.2f}, y={removed["y"]:.2f} '
+            f'— {len(self.saved_nodes)} nodes remaining | '
+            f'recording paused {self.node_delete_wait:.0f}s')
 
     def _mapping_enable_cb(self, msg: Bool):
         enabled = bool(msg.data)
@@ -152,6 +181,9 @@ class PathTeacher(Node):
             return
 
         now_sec = self.get_clock().now().nanoseconds * 1e-9
+        if now_sec < self._undo_cooldown_until:
+            return
+
         if self.last_record_time is None:
             self._record_node(transform, now_sec)
             return

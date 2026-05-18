@@ -8,6 +8,7 @@ import tty
 
 import rclpy
 from geometry_msgs.msg import Twist
+from std_msgs.msg import Empty
 from rcl_interfaces.msg import SetParametersResult
 from rclpy.node import Node
 
@@ -57,6 +58,7 @@ class ManualDrive(Node):
         self.key_hold_s = float(self.get_parameter('key_hold_s').get_parameter_value().double_value)
 
         self.cmd_pub = self.create_publisher(Twist, self.cmd_topic, 10)
+        self.undo_pub = self.create_publisher(Empty, '/undo_last_node', 2)
         self.add_on_set_parameters_callback(self._on_param_update)
         self.get_logger().info(
             f'ManualDrive ready — max_speed={self.max_speed:.2f}  '
@@ -93,7 +95,7 @@ def main(args=None):
     rclpy.init(args=args)
     node = ManualDrive()
 
-    print('Controls: W=forward  S=reverse  A=left  D=right  SPACE=stop  Q=quit')
+    print('Controls: W=forward  S=reverse  A=left  D=right  SPACE=stop  Z=undo last node  Q=quit')
     print(f'max_speed={node.max_speed:.2f}  max_turn={node.max_turn:.2f}  topic={node.cmd_topic}')
     print('Hold W/S to move and A/D to steer. Release keys to coast and re-centre smoothly.')
     print('----------------------------------------------------------------')
@@ -125,6 +127,8 @@ def main(args=None):
                     break
                 elif k == ' ':
                     stop_requested = True
+                elif k == 'z':
+                    node.undo_pub.publish(Empty())
                 elif k in last_press:
                     last_press[k] = now
                     # pressing a key immediately cancels its opposite so

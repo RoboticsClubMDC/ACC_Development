@@ -25,6 +25,7 @@ import time
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
+from std_msgs.msg import Empty
 
 # ── suppress SDL display / audio init when no display is attached ────────────
 os.environ.setdefault('SDL_VIDEODRIVER', 'dummy')
@@ -325,6 +326,8 @@ class ControllerDrive(Node):
         self.declare_parameter('throttle_axis',         1)      # left stick Y (use_trigger=False)
         self.declare_parameter('trigger_axis',          5)      # right trigger (use_trigger=True)
         self.declare_parameter('use_trigger',           True)
+        self.declare_parameter('undo_button',           3)      # Y
+        self.declare_parameter('node_delete_wait',      30.0)
 
         p = self.get_parameter
         self.cmd_topic      = p('cmd_topic').get_parameter_value().string_value
@@ -342,13 +345,19 @@ class ControllerDrive(Node):
         self.throttle_ax    = int(p('throttle_axis').get_parameter_value().integer_value)
         self.trigger_ax     = int(p('trigger_axis').get_parameter_value().integer_value)
         self.use_trigger    = bool(p('use_trigger').get_parameter_value().bool_value)
+        self.undo_btn          = int(p('undo_button').get_parameter_value().integer_value)
+        self.node_delete_wait  = float(p('node_delete_wait').get_parameter_value().double_value)
 
-        self.cmd_pub = self.create_publisher(Twist, self.cmd_topic, 10)
+        self.cmd_pub  = self.create_publisher(Twist, self.cmd_topic, 10)
+        self.undo_pub = self.create_publisher(Empty, '/undo_last_node', 2)
 
-        self._speed_out = 0.0
-        self._turn_out  = 0.0
-        self._dt        = 1.0 / max(hz, 1.0)
-        self._backend   = None
+        self._speed_out          = 0.0
+        self._turn_out           = 0.0
+        self._dt                 = 1.0 / max(hz, 1.0)
+        self._backend            = None
+        self._prev_undo          = False
+        self._undo_countdown     = 0.0
+        self._last_countdown_sec = 0.0
 
         self._backend, backend_name = _open_best_backend(self.get_logger())
 
@@ -378,7 +387,8 @@ class ControllerDrive(Node):
                 f'throttle={throttle_src}  '
                 f'steer=axis{self.steer_ax}(LS-X)  '
                 f'reverse=btn{self.reverse_btn}(A)  '
-                f'stop=btn{self.stop_btn}(B)'
+                f'stop=btn{self.stop_btn}(B)  '
+                f'undo_node=btn{self.undo_btn}(Y)'
             )
         else:
             self.get_logger().error(
@@ -403,6 +413,26 @@ class ControllerDrive(Node):
             self.get_logger().warn(f'Controller read error: {e}', throttle_duration_sec=2.0)
             self._publish(0.0, 0.0)
             return
+
+        undo_now = self._backend.button(self.undo_btn)
+        if undo_now and not self._prev_undo:
+            self.undo_pub.publish(Empty())
+            self._undo_countdown = self.node_delete_wait
+            self._last_countdown_sec = math.floor(self._undo_countdown) + 1
+        self._prev_undo = undo_now
+
+        if self._undo_countdown > 0.0:
+            self._undo_countdown -= self._dt
+            remaining_sec = math.ceil(self._undo_countdown)
+            if remaining_sec < self._last_countdown_sec:
+                self._last_countdown_sec = remaining_sec
+                if remaining_sec > 0:
+                    print(f'\r  [REPOSITION] Recording resumes in {remaining_sec}s...   ',
+                          end='', flush=True)
+                else:
+                    self._undo_countdown = 0.0
+                    print('\r  [REPOSITION] Done — recording resumed.              ',
+                          flush=True)
 
         enabled = (not self.require_enable) or self._backend.button(self.enable_btn)
         stopped = self._backend.button(self.stop_btn)
