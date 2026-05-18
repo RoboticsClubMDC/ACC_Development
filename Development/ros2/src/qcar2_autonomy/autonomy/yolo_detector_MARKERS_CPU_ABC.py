@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 
+# === CHANGE A START: Docker + CPU-only compatibility setup ===
+# This block must stay before importing Quanser YOLO / torch-backed code.
+# Goal: make this node run reliably on CPU inside the ROS Docker container
+# because the RTX 5070 Ti / sm_120 is not supported by the current torch build.
 import sys
 sys.path.insert(0, "/workspaces/isaac_ros-dev/MDC_libraries/python")
 
 import os
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
+
 # Important for Docker/non-login shells:
 # Quanser pit.YOLO.utils can call os.getlogin() during import.
 os.getlogin = lambda: os.environ.get("USER", "admin")
+# === CHANGE A END ===
 
 import time
 import math
@@ -29,6 +35,7 @@ from pit.YOLO.nets import YOLOv8
 from pit.YOLO.utils import QCar2DepthAligned
 
 print("### BP00 YOLO FILE IS RUNNING ###")
+
 
 def ensure_model_exists(model_path: Path, model_url: str, logger=None):
     model_path.parent.mkdir(parents=True, exist_ok=True)
@@ -81,10 +88,15 @@ class YoloDetector(Node):
         # Useful if camera stream freezes.
         self.declare_parameter("debug_camera_only", False)
 
-        #change later to GPU, we are testing
+        # === CHANGE B START: CPU mode + marker/post-processing parameters ===
+        # device defaults to CPU because current Docker torch does not support RTX 5070 Ti sm_120.
+        # use_quanser_post_processing defaults to False because that helper still tries CUDA.
+        # marker_frame defaults to base_link because RViz can show this even before map markers exist.
         self.declare_parameter("device", "cpu")
-        self.device = self.get_parameter("device").value
-        #end of changeeeeeee
+        self.declare_parameter("use_quanser_post_processing", False)
+        self.declare_parameter("marker_frame", "base_link")
+        self.declare_parameter("marker_topic", "/yolo_3d_markers")
+        # === CHANGE B END ===
 
         self.is_physical = bool(self.get_parameter("is_physical").value)
         self.distance_scale = float(self.get_parameter("distance_scale").value)
@@ -103,6 +115,21 @@ class YoloDetector(Node):
 
         self.debug_camera_only = bool(self.get_parameter("debug_camera_only").value)
 
+        # === CHANGE B START: Read CPU/marker parameters ===
+        self.device = str(self.get_parameter("device").value).lower().strip()
+        if self.device != "cpu":
+            self.get_logger().warn(
+                f"Requested device={self.device}, but this file forces CPU mode. Using CPU."
+            )
+            self.device = "cpu"
+
+        self.use_quanser_post_processing = bool(
+            self.get_parameter("use_quanser_post_processing").value
+        )
+        self.marker_frame = str(self.get_parameter("marker_frame").value)
+        self.marker_topic = str(self.get_parameter("marker_topic").value)
+        # === CHANGE B END ===
+
         self.class_filter = self.parse_class_filter(
             str(self.get_parameter("class_filter").value)
         )
@@ -116,11 +143,11 @@ class YoloDetector(Node):
 
         self.motion_publisher = self.create_publisher(Bool, "/motion_enable", 1)
 
-        self.marker_pub = self.create_publisher(
-            MarkerArray,
-            "/semantic_yolo/markers",
-            10
-        )
+        # === CHANGE C START: Use one marker publisher only ===
+        # The previous version created marker_pub twice and overwrote the first topic.
+        # This version publishes all RViz 3D detections on one explicit MarkerArray topic.
+        self.marker_pub = self.create_publisher(MarkerArray, self.marker_topic, 10)
+        # === CHANGE C END ===
 
         # Always allow motion for this semantic test node.
         # We are not using this node for stop logic right now.
@@ -173,6 +200,14 @@ class YoloDetector(Node):
             f"K: fx={self.fx}, fy={self.fy}, cx={self.cx}, cy={self.cy}"
         )
 
+        # === CHANGE C START: Explicit marker/CPU environment logging ===
+        self.get_logger().info("YOLO forced to CPU mode.")
+        self.get_logger().info(f"use_quanser_post_processing={self.use_quanser_post_processing}")
+        self.get_logger().info(
+            f"YOLO 3D marker publisher ready: {self.marker_topic}, frame={self.marker_frame}"
+        )
+        # === CHANGE C END ===
+
         self.frame_count = 0
         self.logged_first_detection_keys = False
 
@@ -180,6 +215,32 @@ class YoloDetector(Node):
         self.timer = self.create_timer(period, self.on_timer)
 
         self.get_logger().info("yolo_detector timer started.")
+
+    # === CHANGE D START: Camera optical frame to QCar2 base_link conversion ===
+    def camera_to_base_link(self, x_c, y_c, z_c):
+        """
+        Convert RealSense camera optical-frame point to QCar2 base_link/body frame.
+
+        Camera optical frame:
+          x = left
+          y = down
+          z = forward/outward
+
+        QCar2 body/base_link frame:
+          x = forward
+          y = left
+          z = up
+
+        From the QCar2 manual realsense_to_body transform:
+          x_base = z_camera + 0.095
+          y_base = -x_camera + 0.032
+          z_base = -y_camera + 0.172
+        """
+        x_b = z_c + 0.095
+        y_b = -x_c + 0.032
+        z_b = -y_c + 0.172
+        return x_b, y_b, z_b
+    # === CHANGE D END ===
 
     def parse_class_filter(self, text):
         text = text.strip()
@@ -269,13 +330,16 @@ class YoloDetector(Node):
         try:
             rgb_processed = self.myYolo.pre_process(rgb)
 
+            # === CHANGE E START: CPU-safe YOLO prediction ===
+            # half=True can trigger CUDA-oriented behavior. Keep half=False on CPU.
             prediction = self.myYolo.predict(
                 inputImg=rgb_processed,
                 classes=self.class_filter,
                 confidence=self.confidence,
-                half=True,
+                half=False,
                 verbose=False,
             )
+            # === CHANGE E END ===
 
         except Exception as exc:
             self.get_logger().error(f"YOLO prediction failed: {exc}")
@@ -314,13 +378,19 @@ class YoloDetector(Node):
         # -------------------------
         processed_results = []
 
-        try:
-            processed_results = self.myYolo.post_processing(
-                alignedDepth=depth,
-                clippingDistance=self.max_depth,
-            )
-        except Exception as exc:
-            self.get_logger().warn(f"Quanser post_processing failed: {exc}")
+        # === CHANGE F START: Disable Quanser CUDA post-processing by default ===
+        # The fallback raw YOLO box path already gives bbox + depth + camera/base 3D point.
+        # Quanser post_processing still tries CUDA when CUDA_VISIBLE_DEVICES="", so skip it
+        # unless explicitly enabled with -p use_quanser_post_processing:=true.
+        if self.use_quanser_post_processing:
+            try:
+                processed_results = self.myYolo.post_processing(
+                    alignedDepth=depth,
+                    clippingDistance=self.max_depth,
+                )
+            except Exception as exc:
+                self.get_logger().warn(f"Quanser post_processing failed: {exc}")
+        # === CHANGE F END ===
 
         if processed_results and not self.logged_first_detection_keys:
             try:
@@ -380,18 +450,25 @@ class YoloDetector(Node):
 
             X, Y, Z = point
 
+            # === CHANGE G START: Publish markers in base_link coordinates ===
+            # X/Y/Z are camera optical-frame coordinates. RViz markers are easier to debug
+            # in base_link, so convert before marker publishing.
+            x_marker, y_marker, z_marker = self.camera_to_base_link(X, Y, Z)
+            # === CHANGE G END ===
+
             if self.frame_count % 10 == 1:
                 self.get_logger().info(
                     f"{class_name} conf={conf:.2f} "
                     f"bbox=({x1},{y1},{x2},{y2}) "
-                    f"camera_point=({X:.3f}, {Y:.3f}, {Z:.3f})"
+                    f"camera_point=({X:.3f}, {Y:.3f}, {Z:.3f}) "
+                    f"base_point=({x_marker:.3f}, {y_marker:.3f}, {z_marker:.3f})"
                 )
 
             sphere = self.make_sphere_marker(
                 marker_id,
-                X,
-                Y,
-                Z,
+                x_marker,
+                y_marker,
+                z_marker,
                 class_name,
                 conf,
             )
@@ -400,15 +477,23 @@ class YoloDetector(Node):
 
             text = self.make_text_marker(
                 marker_id,
-                X,
-                Y,
-                Z + 0.12,
+                x_marker,
+                y_marker,
+                z_marker + 0.12,
                 f"{class_name} {conf:.2f} Z={Z:.2f}m",
             )
             marker_array.markers.append(text)
             marker_id += 1
 
         self.marker_pub.publish(marker_array)
+
+        # === CHANGE G START: Throttled marker publication debug log ===
+        if self.frame_count % 20 == 1 and len(marker_array.markers) > 0:
+            self.get_logger().info(
+                f"Published {len(marker_array.markers)} RViz markers on {self.marker_topic} "
+                f"in frame {self.marker_frame}"
+            )
+        # === CHANGE G END ===
 
     def get_class_name(self, pred0, cls_id):
         try:
@@ -490,16 +575,19 @@ class YoloDetector(Node):
     def make_sphere_marker(self, marker_id, x, y, z, label, conf):
         marker = Marker()
         marker.header.stamp = self.get_clock().now().to_msg()
-        marker.header.frame_id = self.frame_id
+
+        # === CHANGE H START: Marker frame is now configurable and defaults to base_link ===
+        marker.header.frame_id = self.marker_frame
+        # === CHANGE H END ===
 
         marker.ns = "semantic_yolo_objects"
         marker.id = marker_id
         marker.type = Marker.SPHERE
         marker.action = Marker.ADD
 
-        marker.pose.position.x = x
-        marker.pose.position.y = y
-        marker.pose.position.z = z
+        marker.pose.position.x = float(x)
+        marker.pose.position.y = float(y)
+        marker.pose.position.z = float(z)
         marker.pose.orientation.w = 1.0
 
         marker.scale.x = 0.12
@@ -519,16 +607,19 @@ class YoloDetector(Node):
     def make_text_marker(self, marker_id, x, y, z, text):
         marker = Marker()
         marker.header.stamp = self.get_clock().now().to_msg()
-        marker.header.frame_id = self.frame_id
+
+        # === CHANGE H START: Marker frame is now configurable and defaults to base_link ===
+        marker.header.frame_id = self.marker_frame
+        # === CHANGE H END ===
 
         marker.ns = "semantic_yolo_labels"
         marker.id = marker_id
         marker.type = Marker.TEXT_VIEW_FACING
         marker.action = Marker.ADD
 
-        marker.pose.position.x = x
-        marker.pose.position.y = y
-        marker.pose.position.z = z
+        marker.pose.position.x = float(x)
+        marker.pose.position.y = float(y)
+        marker.pose.position.z = float(z)
         marker.pose.orientation.w = 1.0
 
         marker.scale.z = 0.12
@@ -566,7 +657,13 @@ def main(args=None):
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+
+        # === CHANGE I START: Avoid shutdown crash after Ctrl-C ===
+        # Some launch/ros2run paths already call shutdown. Guard it to avoid:
+        # RCLError: failed to shutdown: rcl_shutdown already called.
+        if rclpy.ok():
+            rclpy.shutdown()
+        # === CHANGE I END ===
 
 
 if __name__ == "__main__":

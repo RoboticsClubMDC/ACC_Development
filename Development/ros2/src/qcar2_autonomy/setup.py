@@ -26,7 +26,7 @@ setup(
             'path_follower = autonomy.nav_to_pose:main',
             'traffic_system_detector=autonomy.traffic_system_detector:main',
             'lane_detection=autonomy.lane_detection:main',
-            'yolo_detector=autonomy.yolo_detector:main',
+            'yolo_detector=autonomy.yolo_detector_MARKERS_CPU_ABC:main',
             'trip_planner=autonomy.trip_planner:main',
             'bev_csi_node=autonomy.bev_csi_node:main',
             'stanley_live_plot=autonomy.stanley_live_plot:main',
@@ -35,7 +35,7 @@ setup(
             'bev_csi_seg=autonomy.bev_csi_seg:main',
             'teleop_csi=autonomy.teleop_csi:main',
             'roadmap_alignment_node = autonomy.LCroadmap_alignment_node:main',
-
+            'controller_drive = autonomy.controller_drive:main',
         ],
     },
 )
