@@ -34,6 +34,8 @@ setup(
         'vo_node=autonomy.vo_node:main',
         'vo_supervisor=autonomy.vo_supervisor:main',
         'vo_dashboard=autonomy.vo_terminal_dashboard:main',
+        'vo_overlay=autonomy.vo_image_overlay:main',
+        'camera_bridge=autonomy.qcar2_camera_bridge:main',
         ],
     },
 )

@@ -25,6 +25,9 @@ class Nav2QCarConverter : public rclcpp::Node
     Nav2QCarConverter()
     : Node("nav2_qcar2_command_converter")
     {
+    cmd_timeout_sec_ = this->declare_parameter<double>("cmd_timeout_sec", 0.25);
+    last_nav_cmd_time_ = this->get_clock()->now();
+
     // configuring command publisher
     command_publisher_  = this->create_publisher<qcar2_interfaces::msg::MotorCommands>("qcar2_motor_speed_cmd", 1);
     // led_publisher_      = this->create_publisher<qcar2_interfaces::msg::BooleanLeds>("qcar2_led_cmd",10);
@@ -46,11 +49,24 @@ class Nav2QCarConverter : public rclcpp::Node
         void nav2_command_callback(const geometry_msgs::msg::Twist &nav2_commands){
             nav2_speed = nav2_commands.linear.x;
             nav2_steering = nav2_commands.angular.z;
+            last_nav_cmd_time_ = this->get_clock()->now();
 
         }
 
 
         void command_plublish(){
+            auto now = this->get_clock()->now();
+            double age_sec = (now - last_nav_cmd_time_).seconds();
+
+            double safe_speed = nav2_speed;
+            double safe_steering = nav2_steering;
+            if (age_sec > cmd_timeout_sec_) {
+                safe_speed = 0.0;
+                safe_steering = 0.0;
+            }
+
+            commanded_speed_ = safe_speed;
+            commanded_steering_ = safe_steering;
         
             //configure publisher for LEDS and motor commands:
             // Populate motor command  message for velocity and steering
@@ -63,8 +79,8 @@ class Nav2QCarConverter : public rclcpp::Node
             name.push_back("steering_angle");
             name.push_back("motor_throttle");
 
-            val.push_back(nav2_steering);
-            val.push_back(nav2_speed);
+            val.push_back(safe_steering);
+            val.push_back(safe_speed);
                                                             
             motor_command.motor_names = name;
             motor_command.values = val;
@@ -81,7 +97,7 @@ class Nav2QCarConverter : public rclcpp::Node
             
             
             
-            if (nav2_speed !=0) {
+            if (commanded_speed_ != 0) {
                 //set LEDs for QCar moving
                 led_values[8]= 1;
                 led_values[9]= 1;
@@ -90,19 +106,19 @@ class Nav2QCarConverter : public rclcpp::Node
                 led_values[12]= 1;
                 led_values[13]= 1;
 
-                if(nav2_steering > 0.01){
+                if(commanded_steering_ > 0.01){
                     led_values[14]= 1;
                     led_values[6]= 1;
 
                 }
-                else if(nav2_steering <-0.01){
+                else if(commanded_steering_ <-0.01){
                     led_values[15]= 1;
                     led_values[7]= 1;
 
                 }
 
             }
-            else if (nav2_speed == 0 ){
+            else if (commanded_speed_ == 0 ){
                 led_values[0] = 1;
                 led_values[1] = 1;
                 led_values[2] = 1;
@@ -150,6 +166,10 @@ class Nav2QCarConverter : public rclcpp::Node
 
         double nav2_speed = 0;
         double nav2_steering = 0;
+        double commanded_speed_ = 0.0;
+        double commanded_steering_ = 0.0;
+        rclcpp::Time last_nav_cmd_time_;
+        double cmd_timeout_sec_ = 0.25;
 
         rclcpp::TimerBase::SharedPtr timer_;
         rclcpp::TimerBase::SharedPtr timer2_;

@@ -1,10 +1,26 @@
 #! /usr/bin/env python3
 import sys
+import threading
+
 sys.path.insert(0, "/workspaces/isaac_ros-dev/MDC_libraries/python")
 
 # Quanser specific packages
 from pit.YOLO.nets import YOLOv8
-from pit.YOLO.utils import QCar2DepthAligned
+# --- 2026-05-14: camera ownership moved to qcar2_camera_bridge ---------
+# This node previously instantiated QCar2DepthAligned itself, which made
+# it a second owner of the RealSense alongside rgbd / the new bridge.
+# Under the single-owner architecture the bridge is the sole PIT client;
+# this node now subscribes to /camera/color_image and /camera/depth_image
+# (aligned 32FC1 meters from the bridge, or MONO16 raw from legacy rgbd
+# if camera_source:=rgbd is selected in the launch). YOLO inference,
+# /motion_enable, /trip_planner/qcar_state, and the stop-override logic
+# below are unchanged.
+#
+# To restore direct PIT-ownership behavior (not recommended outside
+# diagnostic runs), uncomment the import + instantiation below and
+# disable qcar2_camera_bridge in the launch file.
+# from pit.YOLO.utils import QCar2DepthAligned
+# -----------------------------------------------------------------------
 
 # Generic python packages
 import time  # Time library
@@ -14,6 +30,7 @@ import cv2
 # ROS specific packages
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
 from std_msgs.msg import Bool, UInt8   # <-- ADDED UInt8
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
@@ -33,7 +50,16 @@ class ObjectDetector(Node):
         # Additional parameters
         imageWidth  = 640
         imageHeight = 480
-        self.QCarImg = QCar2DepthAligned()
+        # --- 2026-05-14: camera ownership replaced by ROS subscribers --
+        # Original line (kept commented so the direct-PIT path can be
+        # restored quickly if needed):
+        #     self.QCarImg = QCar2DepthAligned()
+        # The replacement is two camera subscribers + a small frame
+        # buffer with thread-safe access. See _rgb_cb / _depth_cb below.
+        self._frame_lock = threading.Lock()
+        self._rgb_latest = None      # numpy.ndarray HxWx3 uint8 (bgr)
+        self._depth_latest = None    # numpy.ndarray HxW float32 meters
+        # ---------------------------------------------------------------
         self.myYolo  = YOLOv8(
                     modelPath = "./ros2/src/qcar2_autonomy/models/quanser_yolov8s-seg.pt",
                     imageHeight= imageHeight,
@@ -60,6 +86,20 @@ class ObjectDetector(Node):
         self.publish_rgb = self.create_publisher(Image,'/qcar_camera/rgb',10)
         self.publish_depth = self.create_publisher(Image,'/qcar_camera/depth',10)
 
+        # --- 2026-05-14: camera ownership replaced by ROS subscribers --
+        # Subscribe to whichever publisher is supplying camera data:
+        #   - qcar2_camera_bridge (default, physical) -> 32FC1 meters
+        #   - rgbd.cpp            (fallback)          -> MONO16 raw counts
+        # Encoding is detected per frame in _depth_cb.
+        # 2026-05-15: sensor_data QoS (BEST_EFFORT) to match the bridge
+        # publishers. Reliable QoS on Image topics half-dropped at the DDS
+        # layer; BEST_EFFORT is the correct semantics for live sensor data.
+        self.create_subscription(
+            Image, '/camera/color_image', self._rgb_cb, qos_profile_sensor_data)
+        self.create_subscription(
+            Image, '/camera/depth_image', self._depth_cb, qos_profile_sensor_data)
+        # ---------------------------------------------------------------
+
         # --- ADDED: publish qcar_state override to existing topic ---
         self.qcar_state_pub = self.create_publisher(UInt8, '/trip_planner/qcar_state', 10)
         self.stop_override_active = False
@@ -82,20 +122,63 @@ class ObjectDetector(Node):
             self.stop_override_active = False
         # --------------------------------------------------------------------------------------
 
+    # --- 2026-05-14: ROS subscriber callbacks (replace direct PIT read) ---
+    def _rgb_cb(self, msg):
+        try:
+            frame = self.bridge.imgmsg_to_cv2(msg, "bgr8")
+        except Exception as exc:
+            self.get_logger().warn(
+                f"yolo_detector RGB decode error: {exc}",
+                throttle_duration_sec=5.0)
+            return
+        with self._frame_lock:
+            self._rgb_latest = frame
+
+    def _depth_cb(self, msg):
+        """Accept either 32FC1 (aligned meters from bridge) or MONO16
+        (raw counts from rgbd.cpp). Store as float32 meters internally."""
+        enc = getattr(msg, "encoding", "") or ""
+        try:
+            if enc == "32FC1":
+                d = self.bridge.imgmsg_to_cv2(msg, "32FC1")
+                if d.ndim == 3:
+                    d = d[:, :, 0]
+                depth = d.astype(np.float32, copy=False)
+            else:
+                # Legacy MONO16: divide by RealSense depth-units default
+                # (0.001 m/unit -> divisor 1000) to get meters.
+                d = self.bridge.imgmsg_to_cv2(msg, "passthrough")
+                if d.ndim == 3:
+                    d = d[:, :, 0]
+                depth = d.astype(np.float32) / 1000.0
+        except Exception as exc:
+            self.get_logger().warn(
+                f"yolo_detector depth decode error: {exc}",
+                throttle_duration_sec=5.0)
+            return
+        with self._frame_lock:
+            self._depth_latest = depth
+    # ----------------------------------------------------------------------
+
     def on_timer(self):
-        # Get aligned RGB and Depth images and publish them
-        self.QCarImg.read()
+        # --- 2026-05-14: read frames from subscribers instead of PIT ---
+        # Original (commented; lines that drove direct PIT ownership):
+        #     self.QCarImg.read()
+        #     rgb = self.QCarImg.rgb
+        #     depth = self.QCarImg.depth
+        with self._frame_lock:
+            rgb = None if self._rgb_latest is None else self._rgb_latest.copy()
+            depth = None if self._depth_latest is None else self._depth_latest.copy()
+        if rgb is None or depth is None:
+            # Bridge / rgbd has not delivered a frame yet; skip this tick.
+            return
+        # Cache the latest frames for yolo_detect() which still references
+        # them by name (and previously accessed self.QCarImg.rgb / .depth).
+        self._current_rgb = rgb
+        self._current_depth = depth
 
-        rgb = self.QCarImg.rgb
-        depth = self.QCarImg.depth
-
-        # --- fix: force depth to float32 for 32FC1 ---
-        if depth is not None:
-            depth = np.asarray(depth)
-            if depth.ndim == 3 and depth.shape[2] == 1:
-                depth = depth[:, :, 0]
-            depth = depth.astype(np.float32, copy=False)
-
+        # depth is already float32 in meters (32FC1 path) or converted from
+        # MONO16 to meters in _depth_cb; no extra processing required.
         msg_rgb = self.bridge.cv2_to_imgmsg(rgb, "bgr8")
         msg_depth = self.bridge.cv2_to_imgmsg(depth, "32FC1")
 
@@ -130,7 +213,18 @@ class ObjectDetector(Node):
         detected = False
         delay = 0.0
 
-        rgbProcessed = self.myYolo.pre_process(self.QCarImg.rgb)
+        # --- 2026-05-14: feed YOLO from the buffered frames instead of
+        #     directly from QCar2DepthAligned. Equivalent data (aligned
+        #     RGB + 32FC1 depth in meters) sourced from the bridge.
+        # Original (commented):
+        #     rgbProcessed = self.myYolo.pre_process(self.QCarImg.rgb)
+        #     ...post_processing(alignedDepth=self.QCarImg.depth, ...)
+        rgb_for_yolo = getattr(self, "_current_rgb", None)
+        depth_for_yolo = getattr(self, "_current_depth", None)
+        if rgb_for_yolo is None or depth_for_yolo is None:
+            return delay, detected
+
+        rgbProcessed = self.myYolo.pre_process(rgb_for_yolo)
         predecion = self.myYolo.predict(inputImg = rgbProcessed,
                                     classes = [2,9,11,33],
                                     confidence = 0.3,
@@ -138,7 +232,7 @@ class ObjectDetector(Node):
                                     verbose = False
                                     )
 
-        processedResults = self.myYolo.post_processing(alignedDepth = self.QCarImg.depth,
+        processedResults = self.myYolo.post_processing(alignedDepth = depth_for_yolo,
                                                 clippingDistance = 5)
         labelName = []
         labelConf = []
@@ -182,7 +276,12 @@ class ObjectDetector(Node):
        self.motion_publisher.publish(msg)
 
     def terminate(self):
-       self.QCarImg.terminate()
+       # --- 2026-05-14: nothing to terminate; this node no longer owns
+       #     QCar2DepthAligned. The bridge (qcar2_camera_bridge) handles
+       #     runtime shutdown via its destructor.
+       # Original (commented):
+       #     self.QCarImg.terminate()
+       pass
 
 
 def main():

@@ -60,6 +60,33 @@ Push policy for this workflow:
 
 
 ==================================================
+0.6) Sync Branch Code into ~/ros2 (important)
+==================================================
+Why:
+- `vo_node` runs from `~/ros2/install`, not directly from
+  `~/Documents/ACC_Development`.
+- If `~/ros2/src` is stale, physical runs may still show old behavior
+  (e.g., `alignment_mode:=auto` -> OFF in physical, no `force_cart_yaw` pin).
+
+Run before physical testing whenever VO/autonomy code changed:
+cd /home/$USER
+rsync -a --delete \
+  /home/$USER/Documents/ACC_Development/Development/ros2/src/qcar2_autonomy/ \
+  /home/$USER/ros2/src/qcar2_autonomy/
+cd /home/$USER/ros2
+colcon build --packages-select qcar2_autonomy
+source install/setup.bash
+
+If you changed `qcar2_nodes` C++ code or launch files too:
+rsync -a --delete \
+  /home/$USER/Documents/ACC_Development/Development/ros2/src/qcar2_nodes/ \
+  /home/$USER/ros2/src/qcar2_nodes/
+cd /home/$USER/ros2
+colcon build --packages-select qcar2_nodes
+source install/setup.bash
+
+
+==================================================
 1) Physical VO - Pre-flight Calibration Snapshot
 ==================================================
 Purpose:
@@ -82,11 +109,12 @@ rs-enumerate-devices -o > vo_calib_logs/realsense_options_$(date +%F_%H%M%S).txt
 Use this order each day:
 1. Step 0
 2. Step 0.5A + 0.5B
-3. Step 1
-4. Optional: Step 4 first (probe-only check)
-5. Step 2 or Step 3
-6. Step 5 (safe shutdown)
-7. Step 0.5C only if you actually changed files
+3. Step 0.6
+4. Step 1
+5. Optional: Step 4 first (probe-only check)
+6. Step 2 or Step 3
+7. Step 5 (safe shutdown)
+8. Step 0.5C only if you actually changed files
 
 Note:
 - Doing Step 4 before Step 2/3 can save time if you only want to verify probe behavior first.
@@ -237,6 +265,35 @@ ros2 topic echo /vo/fault_status
 
 Note:
 - If you switch to different physical bringup files, confirm /camera/color_image and /camera/depth_image are alive before running VO.
+
+Recommended launch order for autonomous + VO monitoring:
+1. Physical cartographer/base
+2. VO node (physical)
+3. VO overlay image node
+4. RViz image view
+5. autonomy_planner
+
+Quick command set (5 terminals):
+
+Terminal 1:
+ros2 launch qcar2_nodes qcar2_cartographer_launch.py
+
+Terminal 2:
+ros2 run qcar2_autonomy vo_node --ros-args -p camera_mode:=physical -p alignment_mode:=auto -p depth_scale:=0.0
+
+Terminal 3:
+ros2 run qcar2_autonomy vo_overlay
+
+Terminal 4:
+rviz2
+
+Terminal 5:
+ros2 launch qcar2_autonomy autonomy_planner_launch.py
+
+RViz setup:
+- Add display type: `Image`
+- Set topic to `/vo/overlay_image`
+- The image will include camera view + live VO/Cart overlay text in the same frame.
 
 
 ==================================================

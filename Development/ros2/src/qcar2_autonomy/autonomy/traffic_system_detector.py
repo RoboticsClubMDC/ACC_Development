@@ -8,6 +8,7 @@ import cv2
 # ROS specific packages
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
 from std_msgs.msg import Bool
 from rcl_interfaces.msg import SetParametersResult
 from sensor_msgs.msg import Image
@@ -24,7 +25,10 @@ class ObjectDetector(Node):
       super().__init__('traffic_system_detector')
 
 
-      self.camera_image_subscriber = self.create_subscription(Image ,'/camera/color_image',self.image_callback, 10)
+      # 2026-05-15: sensor_data QoS so it matches the bridge publishers.
+      self.camera_image_subscriber = self.create_subscription(
+          Image, '/camera/color_image', self.image_callback,
+          qos_profile_sensor_data)
 
       self.motion_publisher = self.create_publisher(Bool,'motion_enable',10)
       self.motion_enable = True

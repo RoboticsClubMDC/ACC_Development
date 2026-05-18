@@ -168,6 +168,7 @@ class DepthProjector:
                  alignment_M=None,
                  T_cam2body=None,
                  use_alignment=None,
+                 depth_on_color_grid=None,
                  camera_mode='virtual',
                  # Distortion: disabled for QLabs (virtual pinhole camera)
                  # Enable + provide coefficients for physical D435 after
@@ -186,6 +187,13 @@ class DepthProjector:
             T_cam2body: 4x4 camera-to-body extrinsic transform
             use_alignment: If True, warp depth before lookup. If omitted, uses
                 the mode-specific default (`True` virtual, `False` physical).
+            depth_on_color_grid: True if depth pixels correspond to color
+                pixels (after software warp OR when the upstream stream is
+                already aligned, e.g. PIT QCar2DepthAligned). False if depth
+                is on the raw depth-sensor grid. Defaults to `use_alignment`.
+                This flag governs which intrinsics K_inv is used in
+                `pixels_to_3d_body` — RGB K when on color grid, depth K
+                otherwise.
             camera_mode: 'virtual' or 'physical' - selects intrinsics defaults
                 - 'virtual': Uses FAQ.md intrinsics (fx=455.2, fy=459.43, cx=308.53, cy=213.56)
                 - 'physical': Uses calibrated intrinsics from Camera Intrinsics Post.txt
@@ -218,9 +226,9 @@ class DepthProjector:
                 'depth_max': 8.0,
                 'depth_units_label': 'meters',
                 'physical_m_per_unit': 1.0,
-                # Physical mode now defaults to projective alignment using
-                # depth intrinsics + depth->color extrinsics.
-                'use_alignment': True,
+                # Physical mode defaults to alignment OFF until projective
+                # depth->color registration is explicitly requested at runtime.
+                'use_alignment': False,
                 'alignment_model': 'projective',
                 'T_depth_to_color': self.PHYSICAL_T_DEPTH_TO_COLOR,
             }
@@ -276,6 +284,12 @@ class DepthProjector:
         self.use_alignment = (mode_defaults['use_alignment']
                               if use_alignment is None
                               else bool(use_alignment))
+        # Whether depth values currently live on the color pixel grid.
+        # Default mirrors use_alignment (legacy behavior). PIT/aligned inputs
+        # set this True even though no software warp is performed.
+        self.depth_on_color_grid = (self.use_alignment
+                                    if depth_on_color_grid is None
+                                    else bool(depth_on_color_grid))
         self.alignment_M = alignment_M if alignment_M is not None \
             else mode_defaults['alignment_M'].copy()
         self.alignment_model = mode_defaults.get('alignment_model', 'homography')
@@ -332,7 +346,10 @@ class DepthProjector:
     def align_depth(self, depth_raw):
         """Align raw depth image to color image pixel grid.
 
-        Input: depth_raw — (H, W) uint16 array from /camera/depth_image
+        Input:
+            depth_raw — depth image from camera pipeline:
+                - uint16 raw counts (e.g., ROS MONO16), or
+                - float depth already in active mode units (e.g., meters)
         Output: depth_aligned — (H, W) float64, in active mode units
 
         Alignment behavior:
@@ -354,9 +371,14 @@ class DepthProjector:
         # Ensure contiguous memory layout for OpenCV warpPerspective
         depth_raw = np.ascontiguousarray(depth_raw)
         
-        # Convert raw counts to the active mode units FIRST, then warp. This
-        # keeps interpolation in distance space instead of raw integer space.
-        depth_units = depth_raw.astype(np.float64) / self.depth_scale
+        # Convert raw counts to active units for integer inputs.
+        # If the input is already floating-point depth (meters/units), keep it
+        # as-is to avoid a second scaling pass.
+        if np.issubdtype(depth_raw.dtype, np.floating):
+            depth_units = depth_raw.astype(np.float64)
+        else:
+            # Raw integer path (MONO16, etc.): divide by configured scale.
+            depth_units = depth_raw.astype(np.float64) / self.depth_scale
 
         if not self.use_alignment:
             return depth_units
@@ -462,6 +484,12 @@ class DepthProjector:
             points_body: Nx3 array of (X, Y, Z) in vehicle body frame
                 X = forward, Y = left, Z = up
             valid: N boolean mask (True where depth is usable)
+            depths: N array of the sampled camera-frame depth (range
+                along the optical axis) in the active mode units, 0
+                where the pixel was out of bounds. Step 1 uses this to
+                weight each correspondence by its depth noise — the
+                body-frame Z column of points_body is height, NOT the
+                camera range, so the range must be returned separately.
 
         Math:
             1. Look up depth d at pixel (u, v) in aligned depth image
@@ -486,7 +514,7 @@ class DepthProjector:
         valid = (depths > self.depth_min) & (depths < self.depth_max)
 
         if not np.any(valid):
-            return points_body, valid
+            return points_body, valid, depths
 
         # Backproject valid pixels to camera 3D
         pix_valid = pixels[valid].astype(np.float64)
@@ -496,10 +524,10 @@ class DepthProjector:
         p_hom = np.hstack([pix_valid, np.ones((pix_valid.shape[0], 1))])
 
         # Camera-frame 3D: P_cam = depth * K_inv @ [u, v, 1]^T
-        # If depth has been aligned to the color grid, use RGB intrinsics.
-        # If alignment is disabled, fall back to the depth intrinsics so the
-        # raw depth grid is interpreted with the correct pinhole model.
-        K_inv = self.K_rgb_inv if self.use_alignment else self.K_depth_inv
+        # If depth lives on the color pixel grid (software-aligned OR upstream
+        # pre-aligned, e.g. PIT QCar2DepthAligned), use RGB intrinsics.
+        # If depth lives on the raw depth grid, use depth intrinsics.
+        K_inv = self.K_rgb_inv if self.depth_on_color_grid else self.K_depth_inv
         rays = (K_inv @ p_hom.T).T  # Nx3 direction vectors
         P_cam = d_valid.reshape(-1, 1) * rays   # Nx3 camera-frame points
 
@@ -507,7 +535,7 @@ class DepthProjector:
         P_body = (self.R_cam2body @ P_cam.T).T + self.t_cam2body
 
         points_body[valid] = P_body
-        return points_body, valid
+        return points_body, valid, depths
 
 
 # =====================================================================
@@ -524,7 +552,7 @@ class VisualOdometryDepth:
         3. Align depth image to color space via alignment matrix M
         4. Backproject matched pixels to 3D body-frame coordinates using depth
         5. Extract (X_body, Y_body) for 2D ground-plane motion
-        6. 2-point RANSAC + SVD Procrustes to find (dx, dy, dpsi)
+        6. s-point RANSAC + SVD Procrustes to find (dx, dy, dpsi)
         7. Negate (feature motion → vehicle motion)
         8. Accumulate pose [x, y, psi] in map frame
 
@@ -540,6 +568,7 @@ class VisualOdometryDepth:
                  alignment_M=None,
                  T_cam2body=None,
                  use_alignment=None,
+                 depth_on_color_grid=None,
                  camera_mode='virtual',
                  use_undistortion=False,
                  dist_coeffs=None,
@@ -548,7 +577,11 @@ class VisualOdometryDepth:
                  min_inliers=8,
                  max_translation=0.20, max_rotation_deg=15.0,
                  max_dt=0.20,
-                 negate_deltas=True):
+                 negate_deltas=True,
+                 roi_top_fraction=0.0,
+                 ransac_sample_size=2,
+                 depth_weight_power=0.0,
+                 max_vo_feature_depth_m=0.0):
         """Initialize Visual Odometry with depth-based 3D backprojection.
 
         Args:
@@ -565,6 +598,7 @@ class VisualOdometryDepth:
             alignment_M=alignment_M,
             T_cam2body=T_cam2body,
             use_alignment=use_alignment,
+            depth_on_color_grid=depth_on_color_grid,
             camera_mode=camera_mode,
             use_undistortion=use_undistortion,
             dist_coeffs=dist_coeffs,
@@ -576,11 +610,70 @@ class VisualOdometryDepth:
         self.match_ratio = match_ratio
         self.ransac_threshold = ransac_threshold
         self.ransac_iterations = ransac_iterations
+        # 2026-05-15: RANSAC minimum-sample size. The 2D rigid transform
+        # has 3 DOF (theta, tx, ty); s=2 is the minimum geometric sample,
+        # s=3 is the over-constrained robust choice that resists locking
+        # onto a degenerate pair on low-texture / bare-wall scenes. Clamped
+        # to >= 2. Default 2 preserves the historical behavior exactly.
+        self.ransac_sample_size = max(2, int(ransac_sample_size))
         self.min_inliers = min_inliers
         self.max_translation = max_translation
         self.max_rotation = np.radians(max_rotation_deg)
         self.max_dt = max_dt
         self.negate_deltas = negate_deltas
+
+        # 2026-05-15: ORB region-of-interest mask. The top fraction of the
+        # image is excluded from feature detection. Default 0.0 = full
+        # frame (legacy behavior). Typical productive values are 0.30-0.40
+        # to exclude sky / ceiling / horizon and keep ORB focused on
+        # ground-level scene features that actually carry useful depth.
+        # Implementation note: this uses cv2.ORB.detectAndCompute's mask
+        # argument, so image dimensions and camera intrinsics are
+        # unchanged. Pixel coords reported back by ORB stay in the full
+        # (640x480) frame, so DepthProjector.pixels_to_3d_body sees the
+        # same coordinate system it did before and no intrinsics need to
+        # be rescaled.
+        self.roi_top_fraction = float(roi_top_fraction)
+        if not (0.0 <= self.roi_top_fraction < 1.0):
+            self.roi_top_fraction = 0.0
+        self._orb_mask = None  # built lazily on first frame
+
+        # 2026-05-18: Step 1 — depth-weighted Procrustes. Each matched
+        # correspondence is weighted by 1 / range**depth_weight_power
+        # before the SVD rigid fit, where `range` is the camera-frame
+        # depth (m, physical mode) of the noisier of the two endpoints.
+        # Rationale: RealSense stereo depth noise grows ~ sigma_Z ∝ Z^2,
+        # so a far bare-wall point is far noisier than a crisp near-mat
+        # point. Unweighted Procrustes weights them equally, letting the
+        # noisy far point drag x,y. Weighting de-emphasizes far points.
+        #   0.0 = OFF -> every weight 1.0 -> bit-identical to the prior
+        #         unweighted behavior (Test 6). This is the default and
+        #         the A/B control.
+        #   2.0 = gentle (treats sigma ∝ Z, weight ∝ 1/Z^2)
+        #   4.0 = full RealSense model (sigma_Z ∝ Z^2 -> weight ∝ 1/Z^4)
+        # Exposed as a default-safe ROS param so it can be A/B'd on the
+        # mat against Test 6 without a rebuild, mirroring the
+        # roi_top_fraction / ransac_sample_size pattern. Clamped to a
+        # sane [0, 8] band (8 is already extreme).
+        self.depth_weight_power = float(depth_weight_power)
+        if not (0.0 <= self.depth_weight_power <= 8.0):
+            self.depth_weight_power = 0.0
+
+        # 2026-05-18: Step 1b — HARD max-depth cutoff (operator's idea;
+        # direct Quanser precedent: pit/YOLO/nets.py post_processing
+        # zeroes any depth pixel past `clippingDistance`). A matched
+        # feature whose camera range (EITHER endpoint) exceeds this is
+        # dropped from VO motion entirely — past a few metres RealSense
+        # depth is too noisy to contribute useful geometry, so it is
+        # excluded rather than merely down-weighted. This is the hard
+        # complement to depth_weight_power's soft trust; the two compose
+        # (cutoff filters first, weighting then trusts the survivors).
+        # Value is in the ACTIVE mode's depth units (metres in physical
+        # mode). 0.0 = OFF -> no extra masking -> prior behavior
+        # (default-safe A/B control). Negative -> treated as OFF.
+        self.max_vo_feature_depth = float(max_vo_feature_depth_m)
+        if not (self.max_vo_feature_depth > 0.0):
+            self.max_vo_feature_depth = 0.0
 
         # State
         self.pose = np.array([0.0, 0.0, 0.0])  # [x, y, psi] in map frame
@@ -601,9 +694,11 @@ class VisualOdometryDepth:
 
         Args:
             color_image: BGR uint8 image from /camera/color_image
-            depth_raw: uint16 depth image from /camera/depth_image (MONO16)
-                       This is the RAW image — alignment and scaling are
-                       applied internally.
+            depth_raw: depth image for the current frame:
+                       - uint16 MONO16 raw depth (scaled internally), or
+                       - float depth already in active mode units.
+                       Alignment/registration is applied internally based on
+                       the configured projector path.
             timestamp: float, seconds
 
         Returns:
@@ -616,7 +711,20 @@ class VisualOdometryDepth:
         gray = (cv2.cvtColor(color_image, cv2.COLOR_BGR2GRAY)
                 if len(color_image.shape) == 3 else color_image.copy())
 
-        keypoints, descriptors = self.orb.detectAndCompute(gray, None)
+        # ROI mask for ORB feature detection. Built lazily and reused
+        # across frames as long as the image dimensions stay the same.
+        mask = None
+        if self.roi_top_fraction > 0.0:
+            H, W = gray.shape[:2]
+            if (self._orb_mask is None
+                    or self._orb_mask.shape[0] != H
+                    or self._orb_mask.shape[1] != W):
+                self._orb_mask = np.zeros((H, W), dtype=np.uint8)
+                y_start = int(H * self.roi_top_fraction)
+                self._orb_mask[y_start:, :] = 255
+            mask = self._orb_mask
+
+        keypoints, descriptors = self.orb.detectAndCompute(gray, mask)
 
         # Align depth to color pixel space and convert to QLabs units
         aligned_depth = self.projector.align_depth(depth_raw)
@@ -654,14 +762,24 @@ class VisualOdometryDepth:
 
         # --- Backproject matched pixels to 3D body-frame ---
         # Previous frame features use previous aligned depth
-        prev_3d, prev_valid = self.projector.pixels_to_3d_body(
+        prev_3d, prev_valid, prev_depths = self.projector.pixels_to_3d_body(
             prev_pts, self._prev_depth)
         # Current frame features use current aligned depth
-        curr_3d, curr_valid = self.projector.pixels_to_3d_body(
+        curr_3d, curr_valid, curr_depths = self.projector.pixels_to_3d_body(
             curr_pts, aligned_depth)
 
         # Both must have valid depth
         both_valid = prev_valid & curr_valid
+
+        # Step 1b: hard max-depth cutoff. Drop any correspondence whose
+        # camera range exceeds the cutoff on EITHER frame. Applied before
+        # the min_inliers gate so an over-aggressive cutoff cleanly falls
+        # through to "not enough points" (VO abstains) instead of fitting
+        # on a near-empty set. 0.0 = off -> both_valid unchanged.
+        if self.max_vo_feature_depth > 0.0:
+            within = ((prev_depths <= self.max_vo_feature_depth)
+                      & (curr_depths <= self.max_vo_feature_depth))
+            both_valid = both_valid & within
 
         if np.sum(both_valid) < self.min_inliers:
             self._store(keypoints, descriptors, aligned_depth, timestamp)
@@ -674,8 +792,30 @@ class VisualOdometryDepth:
         curr_2d = curr_3d[both_valid, :2]
         valid_prev_px = prev_pts[both_valid]  # pixel coords for spread
 
+        # Step 1: per-correspondence depth-noise weight. Use the noisier
+        # (farther) of the two endpoints so a pair is only as trustworthy
+        # as its worse observation. weight = 1 / range**power; power 0
+        # -> all-ones -> identical to the prior unweighted path. Pass
+        # weights=None in that case so the code path is literally the old
+        # one (default-safe A/B control).
+        weights = None
+        if self.depth_weight_power > 0.0:
+            pair_range = np.maximum(prev_depths[both_valid],
+                                    curr_depths[both_valid])
+            # both_valid guarantees each endpoint passed depth>depth_min,
+            # so pair_range is strictly positive; clamp anyway for safety.
+            pair_range = np.maximum(pair_range, 1e-6)
+            weights = pair_range ** (-self.depth_weight_power)
+            # Normalize so the largest weight is 1.0 (Procrustes only
+            # uses weights up to a common scale; this just keeps the
+            # numbers well-conditioned across the wide range span).
+            wmax = np.max(weights)
+            if wmax > 0.0:
+                weights = weights / wmax
+
         # --- RANSAC + SVD ---
-        dx, dy, dpsi, inlier_mask = self._ransac_motion(prev_2d, curr_2d)
+        dx, dy, dpsi, inlier_mask = self._ransac_motion(
+            prev_2d, curr_2d, weights)
 
         self.inlier_count = int(np.sum(inlier_mask))
         self.confidence = (self.inlier_count / len(matches)
@@ -744,22 +884,64 @@ class VisualOdometryDepth:
     # ---- Internal methods ----
 
     def _match(self, d1, d2):
-        """Brute-force k=2 matching + Lowe's ratio test."""
-        raw = self.matcher.knnMatch(d1, d2, k=2)
-        return [m for m, n in raw if len([m, n]) == 2
-                and m.distance < self.match_ratio * n.distance]
+        """Brute-force k=2 matching + Lowe's ratio test.
 
-    def _ransac_motion(self, pts_prev, pts_curr):
-        """2-point RANSAC with SVD Procrustes on body-frame 2D points."""
+        cv2.BFMatcher.knnMatch can return a row with fewer than 2
+        neighbors when the train set has < 2 descriptors. The old
+        ``for m, n in raw`` unpack raised ValueError on such a row;
+        the only reason it never crashed in production is the
+        descriptor-count guard in update() (>= 2 descriptors required
+        before calling _match), so the short-row case is excluded
+        upstream. This guard makes _match correct on its own and
+        keeps the live path bit-for-bit identical (every row has
+        exactly 2 entries there).
+        """
+        raw = self.matcher.knnMatch(d1, d2, k=2)
+        good = []
+        for pair in raw:
+            if len(pair) < 2:
+                continue
+            m, n = pair[0], pair[1]
+            if m.distance < self.match_ratio * n.distance:
+                good.append(m)
+        return good
+
+    def _ransac_motion(self, pts_prev, pts_curr, weights=None):
+        """s-point RANSAC with SVD Procrustes on body-frame 2D points.
+
+        Sample size s = self.ransac_sample_size (>=2). s=2 is the minimum
+        for the 3-DOF 2D rigid transform; s=3+ produces more robust
+        hypotheses on low-texture scenes at the cost of needing more
+        iterations for the same confidence (iterations are fixed here, so
+        higher s simply trades a few weak hypotheses for stronger ones).
+
+        Step 1: `weights` (M,) is the per-correspondence depth-noise
+        weight. It is applied ONLY inside the SVD Procrustes fits (the
+        minimal-sample hypothesis fit and the final inlier refit) — the
+        RANSAC inlier test stays an UNWEIGHTED geometric distance vs the
+        locked ransac_threshold, so the consensus search and its tuned
+        threshold are unchanged; only the pose recovered FROM the chosen
+        consensus set is depth-weighted. weights=None reproduces the old
+        unweighted estimator exactly.
+        """
         M = pts_prev.shape[0]
         best_inliers = np.zeros(M, dtype=bool)
         best_count, best_R, best_t = 0, np.eye(2), np.zeros(2)
 
+        s = self.ransac_sample_size
+        if M < s:
+            return best_t[0], best_t[1], 0.0, best_inliers
+
         for _ in range(self.ransac_iterations):
-            idx = np.random.choice(M, 2, replace=False)
-            if np.linalg.norm(pts_prev[idx[0]] - pts_prev[idx[1]]) < 1e-8:
+            idx = np.random.choice(M, s, replace=False)
+            # Degenerate sample guard (generalized from the old 2-pt
+            # distance check): skip if the sampled previous-frame points
+            # are effectively coincident (no spread to fit a transform).
+            if np.max(np.std(pts_prev[idx], axis=0)) < 1e-8:
                 continue
-            R_e, t_e = self._svd_rigid_2d(pts_prev[idx], pts_curr[idx])
+            w_idx = None if weights is None else weights[idx]
+            R_e, t_e = self._svd_rigid_2d(
+                pts_prev[idx], pts_curr[idx], w_idx)
             res = np.linalg.norm(
                 pts_curr - (R_e @ pts_prev.T).T - t_e, axis=1)
             inl = res < self.ransac_threshold
@@ -767,20 +949,45 @@ class VisualOdometryDepth:
             if c > best_count:
                 best_count, best_inliers, best_R, best_t = c, inl, R_e, t_e
 
-        # Refit on all inliers
-        if best_count >= 2:
+        # Refit on all inliers (depth-weighted when weights are given)
+        if best_count >= s:
+            w_in = None if weights is None else weights[best_inliers]
             best_R, best_t = self._svd_rigid_2d(
-                pts_prev[best_inliers], pts_curr[best_inliers])
+                pts_prev[best_inliers], pts_curr[best_inliers], w_in)
 
         dpsi = np.arctan2(best_R[1, 0], best_R[0, 0])
         return best_t[0], best_t[1], dpsi, best_inliers
 
     @staticmethod
-    def _svd_rigid_2d(pts_a, pts_b):
-        """SVD Procrustes: find R, t such that pts_b ≈ R @ pts_a + t."""
-        ca = np.mean(pts_a, axis=0)
-        cb = np.mean(pts_b, axis=0)
-        S = (pts_a - ca).T @ (pts_b - cb)
+    def _svd_rigid_2d(pts_a, pts_b, w=None):
+        """SVD Procrustes: find R, t such that pts_b ≈ R @ pts_a + t.
+
+        w (N,) is an optional per-point weight (Step 1 depth weighting).
+        With w=None — or any uniform weight — this is the original
+        unweighted Kabsch solve: uniform weights cancel out of the
+        normalized centroid and only scale S by a positive constant,
+        which leaves the SVD rotation/translation unchanged. So the
+        depth_weight_power=0 path is bit-identical to the prior code.
+        """
+        if w is None:
+            ca = np.mean(pts_a, axis=0)
+            cb = np.mean(pts_b, axis=0)
+            S = (pts_a - ca).T @ (pts_b - cb)
+        else:
+            w = np.asarray(w, dtype=np.float64)
+            wsum = w.sum()
+            if wsum <= 0.0 or not np.isfinite(wsum):
+                # Degenerate weights — fall back to the unweighted fit
+                # rather than producing NaNs.
+                ca = np.mean(pts_a, axis=0)
+                cb = np.mean(pts_b, axis=0)
+                S = (pts_a - ca).T @ (pts_b - cb)
+            else:
+                ca = (w[:, None] * pts_a).sum(axis=0) / wsum
+                cb = (w[:, None] * pts_b).sum(axis=0) / wsum
+                A = pts_a - ca
+                B = pts_b - cb
+                S = (w[:, None] * A).T @ B
         U, _, Vt = np.linalg.svd(S)
         d = np.linalg.det(Vt.T @ U.T)
         R = Vt.T @ np.diag([1.0, np.sign(d)]) @ U.T

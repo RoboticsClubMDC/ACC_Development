@@ -123,11 +123,14 @@ class LaneDetector(Node):
             Image, '/lane_keeping/debug_bev', 10)
 
         # ───────────── Subscriber ─────────────
+        # 2026-05-15: BEST_EFFORT to match the bridge publishers.
+        # Previous RELIABLE QoS half-dropped at the DDS layer for
+        # high-rate large Image messages.
         qos = QoSProfile(
-            reliability=ReliabilityPolicy.RELIABLE,
+            reliability=ReliabilityPolicy.BEST_EFFORT,
             durability=DurabilityPolicy.VOLATILE,
             history=HistoryPolicy.KEEP_LAST,
-            depth=10,
+            depth=5,
         )
         image_topic = self.get_parameter(
             'image_topic').get_parameter_value().string_value

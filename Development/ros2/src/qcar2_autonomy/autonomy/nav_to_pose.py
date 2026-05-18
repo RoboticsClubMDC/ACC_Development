@@ -228,7 +228,7 @@ class PathFollower(Node):
 
       self.scale = 1.0
 
-      self.declare_parameter('rotation_offset', [82.0])
+      self.declare_parameter('rotation_offset', [86.0])
       self.rotation_offset = list(self.get_parameter("rotation_offset").get_parameter_value().double_array_value)
 
       self.declare_parameter('translation_offset', [0.0,0.0])
@@ -448,8 +448,8 @@ class PathFollower(Node):
     def path_publisher(self):
         path_msg = Path()
         path_msg.header.stamp = self.get_clock().now().to_msg()
+        path_msg.header.frame_id = "map_rotated"
         # path_msg.header.frame_id = "map"
-        path_msg.header.frame_id = "map"
 
         for i in range(self.wpi):
         # for i in range(self.N):
@@ -464,7 +464,8 @@ class PathFollower(Node):
           t = np.array([self.translation_offset[0],self.translation_offset[1]])
           wp_1_mod = ([self.wp[0,i],self.wp[1,i]]+t)@R_QLabs_ROS
           pose.header.stamp = self.get_clock().now().to_msg()
-          pose.header.frame_id = "map"
+          pose.header.frame_id = "map_rotated"
+          # pose.header.frame_id = "map"
           pose.pose.position.x =wp_1_mod[0]
           pose.pose.position.y =wp_1_mod[1]
 
@@ -616,7 +617,8 @@ class PathFollower(Node):
       self.path_status_publisher.publish(msg)
 
     def tf_timer(self):
-      from_frame_rel= "map"
+      from_frame_rel= "map_rotated"
+      # from_frame_rel= "map"
       to_frame_rel = self.target_frame
 
       try:

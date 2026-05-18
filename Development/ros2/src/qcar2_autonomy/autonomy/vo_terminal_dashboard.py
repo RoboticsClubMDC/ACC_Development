@@ -45,7 +45,8 @@ class Dashboard(Node):
         r'vo\((?P<vo_x>[-0-9.]+),(?P<vo_y>[-0-9.]+),(?P<vo_psi_deg>[-0-9.]+)\)\s+'
         r'ct\((?P<ct_x>[-0-9.]+),(?P<ct_y>[-0-9.]+),(?P<ct_psi_deg>[-0-9.]+)\)\s+\|\s+'
         r'dx=(?P<dx>[-0-9.]+)\s+dy=(?P<dy>[-0-9.]+)\s+dpsi=(?P<dpsi_deg>[-0-9.]+)\s+'
-        r'inl=(?P<inl>\d+)\s+sp=(?P<sp>[-0-9.]+)$'
+        r'inl=(?P<inl>\d+)\s+sp=(?P<sp>[-0-9.]+)'
+        r'(?:\s+psi_raw=(?P<psi_raw_deg>[-0-9.]+))?$'
     )
 
     def __init__(self):
@@ -84,6 +85,8 @@ class Dashboard(Node):
                 'inliers': int(g['inl']),
                 'spread': float(g['sp']),
             }
+            if g.get('psi_raw_deg') is not None:
+                d['vo_psi_raw'] = math.radians(float(g['psi_raw_deg']))
         else:
             # Fallback: legacy key=value parser.
             for part in text.split():
@@ -150,6 +153,11 @@ class Dashboard(Node):
               f'{cart_y:+12.4f}m  {abs(vo_y-cart_y):8.4f}m')
         print(f'  {"psi":8s} {_deg(vo_psi):+11.2f}dg  '
               f'{_deg(cart_psi):+11.2f}dg  {psi_err:7.2f}dg')
+        if 'vo_psi_raw' in d:
+            vo_psi_raw = _f(d, 'vo_psi_raw')
+            psi_raw_err = abs(_deg(_wrap(vo_psi_raw - cart_psi)))
+            print(f'  {"psi_raw":8s} {_deg(vo_psi_raw):+11.2f}dg  '
+                  f'(camera-only)        {psi_raw_err:7.2f}dg')
         print(f'  {"speed":8s} {vo_speed:+12.4f}m/s')
         print(f'  {"dist":8s} {vo_dist:+12.4f}m')
 

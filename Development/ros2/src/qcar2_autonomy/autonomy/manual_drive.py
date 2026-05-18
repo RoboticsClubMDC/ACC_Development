@@ -57,8 +57,8 @@ def main(args=None):
     print("Keyboard manual drive (WASD style)")
     print("  w: forward")
     print("  s: reverse")
-    print("  a: turn left in place")
-    print("  d: turn right in place")
+    print("  a: steer left (keep current speed)")
+    print("  d: steer right (keep current speed)")
     print("  space/x: stop")
     print("  q: stop and quit")
     print(
@@ -75,7 +75,11 @@ def main(args=None):
         while rclpy.ok():
             key = get_key().lower()
 
+            # Republish current state on idle ticks so nav2_qcar_command_convert
+            # (0.25 s /cmd_vel_nav safety timeout, added 2026-05-04) does not
+            # zero throttle and steering between key presses.
             if not key:
+                node.publish_cmd(linear_x, angular_z)
                 continue
 
             if key == "q":
@@ -91,10 +95,10 @@ def main(args=None):
                 linear_x = -node.reverse_speed
                 angular_z = 0.0
             elif key == "a":
-                linear_x = 0.0
+                # Keep the currently latched speed and only steer.
                 angular_z = node.turn_rate
             elif key == "d":
-                linear_x = 0.0
+                # Keep the currently latched speed and only steer.
                 angular_z = -node.turn_rate
             elif key in (" ", "x"):
                 linear_x = 0.0
