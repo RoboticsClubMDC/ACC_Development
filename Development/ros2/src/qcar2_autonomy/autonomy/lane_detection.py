@@ -4,6 +4,8 @@ import os
 import cv2
 import numpy as np
 
+os.environ.setdefault("YOLO_CONFIG_DIR", "/tmp/Ultralytics")
+
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
@@ -13,6 +15,11 @@ from std_msgs.msg import String
 from cv_bridge import CvBridge
 
 from ultralytics import YOLO
+
+try:
+    import torch
+except Exception:
+    torch = None
 
 
 LANE = 0
@@ -55,7 +62,8 @@ class LaneDetectionNode(Node):
         self.last_lane_cx   = None
         self.last_lane_seen = 0
         self.imgsz  = imgsz
-        self.device = device
+        self.device = self._select_device(device)
+        self.get_logger().info(f"YOLO inference device: {self.device}")
 
         self.pub_overlay       = self.create_publisher(Image,  "/lane_detection/overlay",          qos_profile_sensor_data)
         self.pub_lane_selected = self.create_publisher(Image,  "/lane_detection/lane_selected",    qos_profile_sensor_data)
@@ -72,6 +80,78 @@ class LaneDetectionNode(Node):
                 return cand
         return os.path.abspath(model_path_param)
 
+    def _select_device(self, requested_device):
+        if requested_device < 0:
+            return "cpu"
+
+        if torch is None:
+            self.get_logger().warn("PyTorch is not importable; using CPU for YOLO")
+            return "cpu"
+
+        if not torch.cuda.is_available():
+            self.get_logger().warn("CUDA is not available; using CPU for YOLO")
+            return "cpu"
+
+        if requested_device >= torch.cuda.device_count():
+            self.get_logger().warn(
+                f"Requested CUDA device {requested_device}, but only "
+                f"{torch.cuda.device_count()} device(s) exist; using CPU")
+            return "cpu"
+
+        try:
+            major, minor = torch.cuda.get_device_capability(requested_device)
+            arch = f"sm_{major}{minor}"
+            supported = set(torch.cuda.get_arch_list())
+        except Exception as e:
+            self.get_logger().warn(f"Could not verify CUDA capability ({e}); using CPU")
+            return "cpu"
+
+        if supported and arch not in supported:
+            name = torch.cuda.get_device_name(requested_device)
+            self.get_logger().warn(
+                f"CUDA device {requested_device} ({name}, {arch}) is not supported by "
+                f"this PyTorch build ({sorted(supported)}); using CPU")
+            return "cpu"
+
+        return requested_device
+
+    @staticmethod
+    def _is_cuda_kernel_error(err):
+        text = str(err).lower()
+        return (
+            "no kernel image is available" in text or
+            "cuda error" in text or
+            "not compatible with the current pytorch installation" in text
+        )
+
+    def _predict(self, img_bgr):
+        try:
+            return self.model.predict(
+                img_bgr,
+                imgsz=self.imgsz,
+                device=self.device,
+                verbose=False,
+            )[0]
+        except RuntimeError as e:
+            if self.device == "cpu" or not self._is_cuda_kernel_error(e):
+                raise
+
+            self.get_logger().error(
+                f"YOLO CUDA inference failed on device={self.device}: {e}. "
+                "Falling back to CPU for lane detection.")
+            self.device = "cpu"
+            if torch is not None and torch.cuda.is_available():
+                try:
+                    torch.cuda.empty_cache()
+                except Exception:
+                    pass
+            return self.model.predict(
+                img_bgr,
+                imgsz=self.imgsz,
+                device="cpu",
+                verbose=False,
+            )[0]
+
     def image_cb(self, msg: Image):
         try:
             img_bgr = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
@@ -84,7 +164,7 @@ class LaneDetectionNode(Node):
 
         h, w = img_bgr.shape[:2]
 
-        res = self.model.predict(img_bgr, imgsz=self.imgsz, device=self.device, verbose=False)[0]
+        res = self._predict(img_bgr)
 
         union     = {LANE: np.zeros((h, w), dtype=bool)}
         dbg_lines = []
