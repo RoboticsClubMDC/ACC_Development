@@ -7,7 +7,7 @@ from enum import Enum
 
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Point, PoseStamped
+from geometry_msgs.msg import Point, PoseStamped, Twist
 from nav_msgs.msg import Path
 from std_msgs.msg import Bool
 from rcl_interfaces.srv import SetParameters
@@ -36,12 +36,13 @@ DEFAULT_SDCS_TO_MAP_SCALE = 1.0216993081930361
 
 
 class MissionStage(Enum):
-    IDLE           = 0
-    TO_PICKUP      = 1
-    WAIT_AT_PICKUP = 2
-    TO_DROPOFF     = 3
+    IDLE            = 0
+    TO_PICKUP       = 1
+    WAIT_AT_PICKUP  = 2
+    TO_DROPOFF      = 3
     WAIT_AT_DROPOFF = 4
-    TO_HUB         = 5
+    TO_HUB          = 5
+    REVERSING       = 6
 
 
 class TripPlanner(Node):
@@ -75,6 +76,9 @@ class TripPlanner(Node):
         self.declare_parameter('heading_aware_start', True)
         self.declare_parameter('max_start_heading_error_rad', 1.5708)
         self.declare_parameter('heading_score_weight_m_per_rad', 0.30)
+        self.declare_parameter('reverse_threshold_m', 1.5)
+        self.declare_parameter('reverse_speed', 0.15)
+        self.declare_parameter('dispatch_ride', False)
 
         self.route_frame        = self.get_parameter('route_frame').get_parameter_value().string_value
         self.hub_xy             = list(self.get_parameter('hub_xy').get_parameter_value().double_array_value)
@@ -109,6 +113,10 @@ class TripPlanner(Node):
             self.get_parameter('max_start_heading_error_rad').get_parameter_value().double_value)
         self.heading_score_weight_m_per_rad = float(
             self.get_parameter('heading_score_weight_m_per_rad').get_parameter_value().double_value)
+        self.reverse_threshold_m = float(
+            self.get_parameter('reverse_threshold_m').get_parameter_value().double_value)
+        self.reverse_speed = float(
+            self.get_parameter('reverse_speed').get_parameter_value().double_value)
 
         # Node-ID goals: -1 means "snap to nearest node from xy coords"
         self.declare_parameter('hub_node_id',     10)
@@ -149,6 +157,7 @@ class TripPlanner(Node):
         self.graph_planner = None
         self.LED_GREEN   = 1
         self.LED_BLUE    = 2
+        self.LED_RED     = 3
         self.LED_MAGENTA = 5
         self.LED_ORANGE  = 6
 
@@ -160,14 +169,18 @@ class TripPlanner(Node):
         self._startup_path_sent    = False
         self.ready_for_rides       = False
         self.new_ride_requested    = False
+        self._pending_dispatch     = False
 
-        self.mission_stage = MissionStage.IDLE
-        self.pause_until   = 0.0
-        self.picked_up     = False
-        self.dropped_off   = False
-        self._last_led     = None
+        self.mission_stage       = MissionStage.IDLE
+        self.pause_until         = 0.0
+        self.picked_up           = False
+        self.dropped_off         = False
+        self._last_led           = None
+        self._reverse_target     = None
+        self._reverse_next_stage = MissionStage.IDLE
 
-        self.waypoints_pub = self.create_publisher(Path, '/cmd_waypoints', 1)
+        self.waypoints_pub    = self.create_publisher(Path, '/cmd_waypoints', 1)
+        self._override_pub    = self.create_publisher(Twist, '/nav/override_cmd', 1)
         self.raw_nodes_marker_pub = self.create_publisher(Marker, '/planner/raw_recorded_nodes', 1)
         self.control_nodes_marker_pub = self.create_publisher(Marker, '/planner/control_nodes', 1)
         self.dense_route_marker_pub = self.create_publisher(Marker, '/planner/dense_recorded_route', 1)
@@ -401,11 +414,36 @@ class TripPlanner(Node):
                 self.get_logger().info(
                     f'heading_score_weight_m_per_rad updated: {self.heading_score_weight_m_per_rad:.2f}')
                 goal_param_changed = True
+            elif p.name == 'reverse_threshold_m' and p.type_ == p.Type.DOUBLE:
+                self.reverse_threshold_m = float(p.value)
+                self.get_logger().info(f'reverse_threshold_m updated: {self.reverse_threshold_m:.2f}m')
+            elif p.name == 'reverse_speed' and p.type_ == p.Type.DOUBLE:
+                self.reverse_speed = float(p.value)
+                self.get_logger().info(f'reverse_speed updated: {self.reverse_speed:.3f}m/s')
+            elif p.name == 'dispatch_ride' and p.type_ == p.Type.BOOL:
+                if bool(p.value):
+                    if self.startup_done and self.mission_stage == MissionStage.IDLE:
+                        self.new_ride_requested = True
+                        self.get_logger().info('dispatch_ride triggered: dispatching ride now')
+                    elif not self.startup_done:
+                        self._pending_dispatch = True
+                        self.get_logger().info(
+                            'dispatch_ride triggered: queued (startup not done yet)')
+                    else:
+                        self.get_logger().warn(
+                            f'dispatch_ride triggered but mission in progress: '
+                            f'stage={self.mission_stage.name}')
 
         if self.ready_for_rides and self.mission_stage == MissionStage.IDLE:
             self.new_ride_requested = True
         elif goal_param_changed:
-            self._replan_active_goal()
+            if not self.startup_done:
+                # Params changed before startup finished — remember to dispatch when ready
+                self._pending_dispatch = True
+                self.get_logger().info(
+                    'Goal params updated before startup — ride will dispatch after hub arrival')
+            else:
+                self._replan_active_goal()
 
         return SetParametersResult(successful=True)
 
@@ -694,12 +732,94 @@ class TripPlanner(Node):
         req.parameters              = [param]
         self.qcar_hardware_client.call_async(req)
 
+    def _should_reverse(self, goal_xy_map):
+        """True if goal is close and behind the robot — better to reverse than loop around."""
+        if self.robot_pose is None:
+            return False
+        rx   = float(self.robot_pose.pose.position.x)
+        ry   = float(self.robot_pose.pose.position.y)
+        goal = np.array(goal_xy_map, dtype=float)
+        dist = float(np.linalg.norm(goal - np.array([rx, ry])))
+        if dist > self.reverse_threshold_m:
+            return False
+        yaw = self._pose_yaw()
+        if yaw is None:
+            return False
+        forward  = np.array([np.cos(yaw), np.sin(yaw)])
+        to_goal  = goal - np.array([rx, ry])
+        return float(np.dot(forward, to_goal)) < 0.0
+
+    def _start_reverse(self, goal_xy_map, next_stage: MissionStage):
+        self._reverse_target     = list(goal_xy_map)
+        self._reverse_next_stage = next_stage
+        self.mission_stage       = MissionStage.REVERSING
+        self._set_led(self.LED_RED)
+        self.get_logger().info(
+            f'Reversing to ({float(goal_xy_map[0]):.3f},{float(goal_xy_map[1]):.3f}) '
+            f'→ {next_stage.name} at {self.reverse_speed:.2f}m/s')
+
+    def _handle_reversing(self):
+        """Called every loop tick while REVERSING. Publishes override cmd; transitions when done."""
+        if self.robot_pose is None or self._reverse_target is None:
+            return
+        rx   = float(self.robot_pose.pose.position.x)
+        ry   = float(self.robot_pose.pose.position.y)
+        dist = float(np.linalg.norm(
+            np.array([rx, ry]) - np.array(self._reverse_target)))
+
+        if dist < 0.20:
+            # Arrived — send stop then transition
+            self._override_pub.publish(Twist())
+            self._reverse_target = None
+            ns = self._reverse_next_stage
+            self.get_logger().info(
+                f'Reverse complete ({dist:.3f}m from target) → {ns.name}')
+            if ns == MissionStage.WAIT_AT_PICKUP:
+                self._on_arrived_pickup()
+            elif ns == MissionStage.WAIT_AT_DROPOFF:
+                self._on_arrived_dropoff()
+            else:
+                self._on_arrived_hub()
+        else:
+            cmd = Twist()
+            cmd.linear.x  = -self.reverse_speed
+            cmd.angular.z = 0.0
+            self._override_pub.publish(cmd)
+
+    def _on_arrived_pickup(self):
+        self.mission_stage = MissionStage.WAIT_AT_PICKUP
+        self.picked_up     = True
+        self._set_led(self.LED_BLUE)
+        self.pause_until   = time.time() + self.stop_seconds
+        self.get_logger().info('Arrived at PICKUP.')
+
+    def _on_arrived_dropoff(self):
+        self.mission_stage = MissionStage.WAIT_AT_DROPOFF
+        self.dropped_off   = True
+        self._set_led(self.LED_ORANGE)
+        self.pause_until   = time.time() + self.stop_seconds
+        self.get_logger().info('Arrived at DROPOFF.')
+
+    def _on_arrived_hub(self):
+        self.mission_stage   = MissionStage.IDLE
+        self.picked_up       = False
+        self.dropped_off     = False
+        self._set_led(self.LED_MAGENTA)
+        self.ready_for_rides = True
+        if self._pending_dispatch:
+            self._pending_dispatch  = False
+            self.new_ride_requested = True
+            self.get_logger().info('Pending ride dispatching now.')
+        else:
+            self.get_logger().info('Mission complete. Ready for next ride.')
+
     def loop(self):
         now = time.time()
 
         if self.robot_pose is None:
             return
 
+        # --- Startup: drive to hub once before accepting rides ---
         if not self.startup_done:
             if not self._startup_path_sent:
                 ok = self._send_path_to(self.hub_xy_map, label='HUB (startup)',
@@ -714,37 +834,58 @@ class TripPlanner(Node):
                 self.ready_for_rides = True
                 self._set_led(self.LED_MAGENTA)
                 self.get_logger().info('Startup complete. Ready for rides.')
+                if self._pending_dispatch:
+                    self._pending_dispatch  = False
+                    self.new_ride_requested = True
+                    self.get_logger().info('Pending ride dispatching now.')
+            return
+
+        # --- Reverse mode: trip_planner drives directly ---
+        if self.mission_stage == MissionStage.REVERSING:
+            self._handle_reversing()
             return
 
         if self.ready_for_rides and not self.new_ride_requested:
             return
 
+        # --- Dispatch to pickup ---
         if self.ready_for_rides and self.new_ride_requested:
             self.new_ride_requested = False
             self.ready_for_rides    = False
             self.picked_up          = False
             self.dropped_off        = False
-            ok = self._send_path_to(self.pickup_xy_map, label='PICKUP',
-                                    goal_node_id=self.pickup_node_id)
-            if ok:
-                self.mission_stage = MissionStage.TO_PICKUP
-                self._set_led(self.LED_GREEN)
+            if self._should_reverse(self.pickup_xy_map):
+                self._start_reverse(self.pickup_xy_map, MissionStage.WAIT_AT_PICKUP)
+            else:
+                ok = self._send_path_to(self.pickup_xy_map, label='PICKUP',
+                                        goal_node_id=self.pickup_node_id)
+                if ok:
+                    self.mission_stage = MissionStage.TO_PICKUP
+                    self._set_led(self.LED_GREEN)
             return
 
+        # --- Leave pickup stop ---
         if self.mission_stage == MissionStage.WAIT_AT_PICKUP and now >= self.pause_until:
-            ok = self._send_path_to(self.dropoff_xy_map, label='DROPOFF',
-                                    goal_node_id=self.dropoff_node_id)
-            if ok:
-                self.mission_stage = MissionStage.TO_DROPOFF
-                self._set_led(self.LED_BLUE)
+            if self._should_reverse(self.dropoff_xy_map):
+                self._start_reverse(self.dropoff_xy_map, MissionStage.WAIT_AT_DROPOFF)
+            else:
+                ok = self._send_path_to(self.dropoff_xy_map, label='DROPOFF',
+                                        goal_node_id=self.dropoff_node_id)
+                if ok:
+                    self.mission_stage = MissionStage.TO_DROPOFF
+                    self._set_led(self.LED_BLUE)
             return
 
+        # --- Leave dropoff stop ---
         if self.mission_stage == MissionStage.WAIT_AT_DROPOFF and now >= self.pause_until:
-            ok = self._send_path_to(self.hub_xy_map, label='HUB',
-                                    goal_node_id=self.hub_node_id)
-            if ok:
-                self.mission_stage = MissionStage.TO_HUB
-                self._set_led(self.LED_ORANGE)
+            if self._should_reverse(self.hub_xy_map):
+                self._start_reverse(self.hub_xy_map, MissionStage.IDLE)
+            else:
+                ok = self._send_path_to(self.hub_xy_map, label='HUB',
+                                        goal_node_id=self.hub_node_id)
+                if ok:
+                    self.mission_stage = MissionStage.TO_HUB
+                    self._set_led(self.LED_ORANGE)
             return
 
         if now < self.pause_until:
@@ -754,29 +895,17 @@ class TripPlanner(Node):
             return
         self._path_completed_event = False
 
+        # --- Path-following arrivals ---
         if self.mission_stage == MissionStage.TO_PICKUP:
             self._snap_to_exact(self.pickup_xy_map, label='PICKUP-snap')
-            self.mission_stage = MissionStage.WAIT_AT_PICKUP
-            self.picked_up     = True
-            self._set_led(self.LED_BLUE)
-            self.pause_until   = now + self.stop_seconds
-            self.get_logger().info('Arrived at PICKUP.')
+            self._on_arrived_pickup()
 
         elif self.mission_stage == MissionStage.TO_DROPOFF:
             self._snap_to_exact(self.dropoff_xy_map, label='DROPOFF-snap')
-            self.mission_stage = MissionStage.WAIT_AT_DROPOFF
-            self.dropped_off   = True
-            self._set_led(self.LED_ORANGE)
-            self.pause_until   = now + self.stop_seconds
-            self.get_logger().info('Arrived at DROPOFF.')
+            self._on_arrived_dropoff()
 
         elif self.mission_stage == MissionStage.TO_HUB:
-            self.mission_stage = MissionStage.IDLE
-            self.picked_up     = False
-            self.dropped_off   = False
-            self._set_led(self.LED_MAGENTA)
-            self.ready_for_rides = True
-            self.get_logger().info('Mission complete. Ready for next ride.')
+            self._on_arrived_hub()
 
 
 def main():

@@ -157,10 +157,32 @@ class PathFollower(Node):
         self.declare_parameter('lookahead_gain', 1.7)
         self.lookahead_gain = float(
             self.get_parameter('lookahead_gain').get_parameter_value().double_value)
+        self.declare_parameter('progress_search_max_step', 30)
+        self.progress_search_max_step = int(
+            self.get_parameter('progress_search_max_step').get_parameter_value().integer_value)
         self.declare_parameter('finish_progress_window', 80)
         self.finish_progress_window = int(
             self.get_parameter('finish_progress_window').get_parameter_value().integer_value)
         self._stall_count = 0
+
+        self.declare_parameter('curve_lookahead_min_m', 0.18)
+        self.curve_lookahead_min_m = float(
+            self.get_parameter('curve_lookahead_min_m').get_parameter_value().double_value)
+        self.declare_parameter('curve_lookahead_max_m', 0.70)
+        self.curve_lookahead_max_m = float(
+            self.get_parameter('curve_lookahead_max_m').get_parameter_value().double_value)
+        self.declare_parameter('curvature_lookahead_gain', 1.0)
+        self.curvature_lookahead_gain = float(
+            self.get_parameter('curvature_lookahead_gain').get_parameter_value().double_value)
+        self.declare_parameter('min_curve_speed', 0.16)
+        self.min_curve_speed = float(
+            self.get_parameter('min_curve_speed').get_parameter_value().double_value)
+        self.declare_parameter('curvature_speed_gain', 1.5)
+        self.curvature_speed_gain = float(
+            self.get_parameter('curvature_speed_gain').get_parameter_value().double_value)
+        self.declare_parameter('lateral_error_slowdown_threshold_m', 0.12)
+        self.lateral_error_slowdown_threshold_m = float(
+            self.get_parameter('lateral_error_slowdown_threshold_m').get_parameter_value().double_value)
 
         self.add_on_set_parameters_callback(self.parameter_update_callback)
 
@@ -221,6 +243,10 @@ class PathFollower(Node):
         self.imu_subscrition = self.create_subscription(
             Imu, '/qcar2_imu', self.imu_callback, 10)
         self.gyroscope = [0, 0, 0]
+
+        self._override_cmd   = None
+        self._override_stamp = -999.0
+        self.create_subscription(Twist, '/nav/override_cmd', self._override_cb, 1)
 
         self.path_publisher_topic  = self.create_publisher(Path, '/planned_path', 1)
         self.path_marker_publisher = self.create_publisher(Marker, '/planned_path_marker', 1)
@@ -329,9 +355,31 @@ class PathFollower(Node):
             elif param.name == 'lookahead_gain' and param.type_ == param.Type.DOUBLE:
                 self.lookahead_gain = float(param.value)
                 self.get_logger().info(f'lookahead_gain updated: {self.lookahead_gain:.2f}')
+            elif param.name == 'progress_search_max_step' and param.type_ == param.Type.INTEGER:
+                self.progress_search_max_step = int(param.value)
+                self.get_logger().info(
+                    f'progress_search_max_step updated: {self.progress_search_max_step}')
             elif param.name == 'finish_progress_window' and param.type_ == param.Type.INTEGER:
                 self.finish_progress_window = int(param.value)
                 self.get_logger().info(f'finish_progress_window updated: {self.finish_progress_window}')
+            elif param.name == 'curve_lookahead_min_m' and param.type_ == param.Type.DOUBLE:
+                self.curve_lookahead_min_m = float(param.value)
+                self.get_logger().info(f'curve_lookahead_min_m updated: {self.curve_lookahead_min_m:.3f}m')
+            elif param.name == 'curve_lookahead_max_m' and param.type_ == param.Type.DOUBLE:
+                self.curve_lookahead_max_m = float(param.value)
+                self.get_logger().info(f'curve_lookahead_max_m updated: {self.curve_lookahead_max_m:.3f}m')
+            elif param.name == 'curvature_lookahead_gain' and param.type_ == param.Type.DOUBLE:
+                self.curvature_lookahead_gain = float(param.value)
+                self.get_logger().info(f'curvature_lookahead_gain updated: {self.curvature_lookahead_gain:.2f}')
+            elif param.name == 'min_curve_speed' and param.type_ == param.Type.DOUBLE:
+                self.min_curve_speed = float(param.value)
+                self.get_logger().info(f'min_curve_speed updated: {self.min_curve_speed:.3f}')
+            elif param.name == 'curvature_speed_gain' and param.type_ == param.Type.DOUBLE:
+                self.curvature_speed_gain = float(param.value)
+                self.get_logger().info(f'curvature_speed_gain updated: {self.curvature_speed_gain:.2f}')
+            elif param.name == 'lateral_error_slowdown_threshold_m' and param.type_ == param.Type.DOUBLE:
+                self.lateral_error_slowdown_threshold_m = float(param.value)
+                self.get_logger().info(f'lateral_error_slowdown_threshold_m updated: {self.lateral_error_slowdown_threshold_m:.3f}m')
             elif param.name == 'stanley_blend' or param.name == 'stanley_trust_min':
                 self.get_logger().warn(f'{param.name} is hardcoded — ignoring')
             elif param.name == 'mission_pickup_xy' and param.type_ == param.Type.DOUBLE_ARRAY:
@@ -395,6 +443,10 @@ class PathFollower(Node):
 
     def imu_callback(self, msg):
         self.gyroscope = [msg.angular_velocity.x, msg.angular_velocity.y, msg.angular_velocity.z]
+
+    def _override_cb(self, msg: Twist):
+        self._override_cmd   = msg
+        self._override_stamp = time.time()
 
     def _waypoint_in_route_frame(self, wp_xy):
         if self._wp_in_ros_frame:
@@ -492,12 +544,14 @@ class PathFollower(Node):
         marker.action = Marker.DELETE
         self.target_waypoint_marker_publisher.publish(marker)
 
-    def _update_progress_index(self, robot_xy, max_step=80):
+    def _update_progress_index(self, robot_xy, max_step=None):
         if self.N <= 1:
             return
 
         robot_xy = np.array(robot_xy, dtype=float)
         start_idx = int(np.clip(self.wpi, 0, self.N - 1))
+        if max_step is None:
+            max_step = self.progress_search_max_step
         stop_idx = min(self.N, start_idx + int(max_step) + 1)
 
         best_idx = start_idx
@@ -529,6 +583,40 @@ class PathFollower(Node):
 
         return target_idx
 
+    def _estimate_local_curvature(self, progress_idx, look_pts=20):
+        """Heading-change-over-arc-length curvature estimate at progress_idx. Returns 1/m."""
+        if self.N < 3:
+            return 0.0
+        i0 = int(np.clip(progress_idx,              0, self.N - 1))
+        i1 = int(np.clip(progress_idx + look_pts // 2, 0, self.N - 1))
+        i2 = int(np.clip(progress_idx + look_pts,    0, self.N - 1))
+        if i0 == i1 or i1 == i2:
+            return 0.0
+        p0 = self._waypoint_in_route_frame(self.wp[:, i0])
+        p1 = self._waypoint_in_route_frame(self.wp[:, i1])
+        p2 = self._waypoint_in_route_frame(self.wp[:, i2])
+        h01 = np.arctan2(p1[1] - p0[1], p1[0] - p0[0])
+        h12 = np.arctan2(p2[1] - p1[1], p2[0] - p1[0])
+        arc_len = float(np.linalg.norm(p1 - p0) + np.linalg.norm(p2 - p1))
+        if arc_len < 0.01:
+            return 0.0
+        return abs(float(wrap_to_pi(h12 - h01))) / arc_len
+
+    def _compute_cross_track_error(self, robot_xy, progress_idx):
+        """Signed cross-track error to the path segment at progress_idx. Positive = left of path."""
+        if self.N < 2:
+            return 0.0
+        i0 = int(np.clip(progress_idx, 0, self.N - 2))
+        i1 = i0 + 1
+        p0 = self._waypoint_in_route_frame(self.wp[:, i0])
+        p1 = self._waypoint_in_route_frame(self.wp[:, i1])
+        seg = p1 - p0
+        seg_len = float(np.linalg.norm(seg))
+        if seg_len < 1e-6:
+            return 0.0
+        to_robot = robot_xy - p0
+        return float(seg[0] * to_robot[1] - seg[1] * to_robot[0]) / seg_len
+
     def path_planner(self):
         max_speed = 1.5
         enable = 1
@@ -538,6 +626,12 @@ class PathFollower(Node):
         self.ekf_filter_timer()
 
         self.path_publisher()
+
+        # External override: trip_planner reverse mode takes full control
+        if self._override_cmd is not None and time.time() - self._override_stamp < 0.3:
+            self.publisher.publish(self._override_cmd)
+            self.path_status()
+            return
 
         if self.N <= 0:
             self.current_steering = 0.0
@@ -563,10 +657,31 @@ class PathFollower(Node):
                 robot_xy = np.array(p, dtype=float)
 
                 v_eff = max(self.qcar2_measurred_speed, 0.05)
-                lookahead_dist = max(v_eff * self.lookahead_gain, self.min_lookahead_m)
 
                 prev_wpi = self.wpi
                 self._update_progress_index(robot_xy)
+
+                # Adaptive lookahead: velocity-based but clamped by local path curvature
+                curvature = self._estimate_local_curvature(self.wpi)
+                v_based = v_eff * self.lookahead_gain
+                curv_limit = self.curve_lookahead_max_m / (1.0 + self.curvature_lookahead_gain * curvature)
+                lookahead_dist = float(np.clip(
+                    min(v_based, curv_limit),
+                    self.curve_lookahead_min_m,
+                    self.curve_lookahead_max_m))
+
+                # Curvature-based speed: slow down into tight corners
+                curv_speed = speed_command / (1.0 + self.curvature_speed_gain * curvature)
+                speed_command = float(np.clip(curv_speed, self.min_curve_speed, speed_command))
+
+                # Cross-track error: reduce lookahead and speed when off-path
+                cte = self._compute_cross_track_error(robot_xy, self.wpi)
+                abs_cte = abs(cte)
+                if abs_cte > self.lateral_error_slowdown_threshold_m:
+                    excess = abs_cte - self.lateral_error_slowdown_threshold_m
+                    cte_factor = max(0.6, 1.0 - excess * 2.0)
+                    speed_command = max(self.min_curve_speed, speed_command * cte_factor)
+                    lookahead_dist = max(self.curve_lookahead_min_m, lookahead_dist * cte_factor)
 
                 target_idx = self._select_lookahead_index(robot_xy, lookahead_dist)
                 Rot = np.array([[np.cos(th), -np.sin(th)], [np.sin(th), np.cos(th)]])
@@ -639,10 +754,13 @@ class PathFollower(Node):
 
                 if int(self.t_plot * 5) != int((self.t_plot - self.dt) * 5):
                     self.get_logger().info(
-                        f"progress_idx={self.wpi} target_idx={target_idx} dist={dist:.2f} "
-                        f"pp={pp_delta_damped:.3f} "
-                        f"steering={steering:.3f} "
-                        f"v={speed_command:.2f}")
+                        f"progress_idx={self.wpi} target_idx={target_idx} "
+                        f"gap={target_idx - self.wpi} "
+                        f"lookahead={lookahead_dist:.3f}m "
+                        f"curv={curvature:.2f}/m "
+                        f"cte={cte:.3f}m "
+                        f"v={speed_command:.2f} "
+                        f"steering={steering:.3f}")
 
         except KeyboardInterrupt:
             speed_command = 0.0

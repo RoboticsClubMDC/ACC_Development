@@ -18,6 +18,25 @@ def generate_launch_description():
         parameters=[{
             'visualize_pose': [True],
             'route_frame':    'map',
+            'progress_search_max_step': 25,
+            'curve_lookahead_min_m':    0.18,
+            'curve_lookahead_max_m':    0.70,
+            'curvature_lookahead_gain': 1.0,
+            'min_curve_speed':          0.16,
+            'curvature_speed_gain':     1.5,
+            'lateral_error_slowdown_threshold_m': 0.12,
+        }],
+    )
+
+    recorded_map_visualizer = Node(
+        package='qcar2_autonomy',
+        executable='recorded_map_visualizer',
+        name='recorded_map_visualizer',
+        output='screen',
+        parameters=[{
+            'route_frame': 'map',
+            'line_width':  0.025,
+            'node_size':   0.08,
         }],
     )
 
@@ -83,6 +102,7 @@ def generate_launch_description():
 
     return LaunchDescription([
         path_follower,
+        recorded_map_visualizer,
         traffic_system_detector,
         trip_planner,
         bev_csi_node,
