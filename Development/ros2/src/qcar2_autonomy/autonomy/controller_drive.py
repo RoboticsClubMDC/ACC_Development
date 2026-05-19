@@ -317,7 +317,7 @@ class ControllerDrive(Node):
         self.declare_parameter('deadzone',              0.08)
         self.declare_parameter('publish_hz',            30.0)
         self.declare_parameter('speed_slew',            1.0)    # m/s per second
-        self.declare_parameter('steer_slew',            3.0)    # rad/s per second
+        self.declare_parameter('steer_slew',            12.0)   # rad/s per second
         self.declare_parameter('require_enable_button', True)
         self.declare_parameter('enable_button',         4)      # LB
         self.declare_parameter('reverse_button',        0)      # A

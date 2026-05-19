@@ -37,7 +37,7 @@ setup(
             'bev_csi_seg=autonomy.bev_csi_seg:main',
             'controller_drive=autonomy.controller_drive:main',
             'lane_assist_blend=autonomy.lane_assist_blend:main',
-
+            'auto_teach_mapper=autonomy.auto_teach_mapper:main',
         ],
     },
 )

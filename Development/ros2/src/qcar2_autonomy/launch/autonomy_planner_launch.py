@@ -17,8 +17,8 @@ def generate_launch_description():
         name='path_follower',
         parameters=[{
             'visualize_pose': [True],
-            'route_frame': 'map',
-        }], 
+            'route_frame':    'map',
+        }],
     )
 
     traffic_system_detector = Node(
@@ -45,13 +45,6 @@ def generate_launch_description():
     # }]
 )
     
-    yolo_detector = Node(
-        package='qcar2_autonomy',
-        executable='yolo_detector',
-        name='yolo_detector',
-
-    )
-
     lane_detection = Node(
         package='qcar2_autonomy',
         executable='lane_detection',
@@ -95,7 +88,6 @@ def generate_launch_description():
         bev_csi_node,
         lane_detection,
         lane_stanley_node,
-        yolo_detector,
         sidewalk_detection,
         bev_csi_seg,
         ]

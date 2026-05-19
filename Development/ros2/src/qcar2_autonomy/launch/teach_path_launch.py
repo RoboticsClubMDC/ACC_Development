@@ -16,7 +16,7 @@ def generate_launch_description():
             'deadzone':              0.08,
             'publish_hz':            30.0,
             'speed_slew':            1.0,
-            'steer_slew':            3.0,
+            'steer_slew':            12.0,
             'require_enable_button': True,
             'enable_button':         4,    # LB
             'reverse_button':        0,    # A

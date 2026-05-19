@@ -24,6 +24,7 @@ class PathTeacher(Node):
 
         self.declare_parameter('global_frame', 'map')
         self.declare_parameter('robot_frame', 'base_link')
+        self.declare_parameter('assume_start_at_origin', False)
         self.declare_parameter('sample_period', 0.10)
         self.declare_parameter('node_interval_sec', 1.0)
         self.declare_parameter('min_node_spacing_m', 0.10)
@@ -41,6 +42,8 @@ class PathTeacher(Node):
             'global_frame').get_parameter_value().string_value
         self.robot_frame = self.get_parameter(
             'robot_frame').get_parameter_value().string_value
+        self.assume_start_at_origin = bool(
+            self.get_parameter('assume_start_at_origin').get_parameter_value().bool_value)
         self.sample_period = float(self.get_parameter(
             'sample_period').get_parameter_value().double_value)
         self.node_interval_sec = float(self.get_parameter(
@@ -91,12 +94,14 @@ class PathTeacher(Node):
         self.saved_nodes = []
         self.last_record_time = None
         self._undo_cooldown_until = 0.0
+        self._origin_xy = None
 
         self.timer = self.create_timer(self.sample_period, self._timer_cb)
         self.get_logger().info(
             'PathTeacher ready. '
             f'Saving nodes every {self.node_interval_sec:.1f}s to {self.save_path} | '
             f'frame={self.global_frame} | '
+            f'assume_start_at_origin={self.assume_start_at_origin} | '
             f'min_spacing={self.min_node_spacing_m:.2f}m '
             f'min_yaw={self.min_node_yaw_change_rad:.2f}rad')
         self.get_logger().info(
@@ -209,6 +214,15 @@ class PathTeacher(Node):
     def _transform_to_xy_yaw(self, transform):
         x = float(transform.transform.translation.x)
         y = float(transform.transform.translation.y)
+
+        if self.assume_start_at_origin:
+            if self._origin_xy is None:
+                self._origin_xy = (x, y)
+                self.get_logger().warn(
+                    f'Recording origin locked to first TF pose: raw=({x:.3f},{y:.3f}) '
+                    f'-> node 0 at (0.000,0.000)')
+            x -= self._origin_xy[0]
+            y -= self._origin_xy[1]
 
         qx = float(transform.transform.rotation.x)
         qy = float(transform.transform.rotation.y)

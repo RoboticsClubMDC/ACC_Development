@@ -1,0 +1,17 @@
+{
+  "map_name": "taught_map",
+  "frame_id": "map",
+  "node_interval_sec": 0.1,
+  "saved_at": "2026-05-18T20:31:49.904165",
+  "node_count": 1,
+  "nodes": [
+    {
+      "index": 0,
+      "node_id": 0,
+      "x": 0.0,
+      "y": 0.0,
+      "yaw": -0.00899505745456929,
+      "stamp_sec": 1779150709.9030485
+    }
+  ]
+}

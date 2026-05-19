@@ -105,6 +105,9 @@ class PathFollower(Node):
         self.declare_parameter('route_frame', 'map')
         self.route_frame = self.get_parameter(
             'route_frame').get_parameter_value().string_value
+        self.declare_parameter('assume_start_at_origin', False)
+        self.assume_start_at_origin = bool(
+            self.get_parameter('assume_start_at_origin').get_parameter_value().bool_value)
         self.declare_parameter('use_recorded_map', True)
         self.use_recorded_map = self.get_parameter(
             'use_recorded_map').get_parameter_value().bool_value
@@ -120,6 +123,9 @@ class PathFollower(Node):
 
         self.declare_parameter('desired_speed', [0.4])
         self.desired_speed = list(self.get_parameter('desired_speed').get_parameter_value().double_array_value)
+        self.declare_parameter('steering_sign', 1.0)
+        self.steering_sign = float(
+            self.get_parameter('steering_sign').get_parameter_value().double_value)
 
         self.declare_parameter('visualize_pose', [True])
         self.pose_visualize_flag = True
@@ -151,6 +157,9 @@ class PathFollower(Node):
         self.declare_parameter('lookahead_gain', 1.7)
         self.lookahead_gain = float(
             self.get_parameter('lookahead_gain').get_parameter_value().double_value)
+        self.declare_parameter('finish_progress_window', 80)
+        self.finish_progress_window = int(
+            self.get_parameter('finish_progress_window').get_parameter_value().integer_value)
         self._stall_count = 0
 
         self.add_on_set_parameters_callback(self.parameter_update_callback)
@@ -184,6 +193,7 @@ class PathFollower(Node):
         self.timer = self.create_timer(self.dt, self.tf_timer)
         self.translation = [0, 0, 0]
         self.rotation = [0, 0, 0]
+        self._origin_xy = None
         self._wp_in_ros_frame = False
         self.wp = np.zeros((2, 0), dtype=float)
         self.N = 0
@@ -289,10 +299,18 @@ class PathFollower(Node):
             elif param.name == 'desired_speed' and param.type_ == param.Type.DOUBLE_ARRAY:
                 self.desired_speed = list(param.value)
                 self.get_logger().info('new desired speed...')
+            elif param.name == 'steering_sign' and param.type_ in (param.Type.DOUBLE, param.Type.INTEGER):
+                self.steering_sign = float(param.value)
+                self.get_logger().warn(f'steering_sign updated: {self.steering_sign:.1f}')
             elif param.name == 'rotation_offset' and param.type_ == param.Type.DOUBLE_ARRAY:
                 self.rotation_offset = list(param.value)
             elif param.name == 'translation_offset' and param.type_ == param.Type.DOUBLE_ARRAY:
                 self.translation_offset = list(param.value)
+            elif param.name == 'assume_start_at_origin' and param.type_ == param.Type.BOOL:
+                self.assume_start_at_origin = bool(param.value)
+                self._origin_xy = None
+                self.get_logger().warn(
+                    f'assume_start_at_origin={self.assume_start_at_origin}; origin will reset on next TF')
             elif param.name == 'recorded_min_node_spacing_m' and param.type_ == param.Type.DOUBLE:
                 self.recorded_min_node_spacing_m = float(param.value)
             elif param.name == 'recorded_min_yaw_change_rad' and param.type_ == param.Type.DOUBLE:
@@ -311,6 +329,9 @@ class PathFollower(Node):
             elif param.name == 'lookahead_gain' and param.type_ == param.Type.DOUBLE:
                 self.lookahead_gain = float(param.value)
                 self.get_logger().info(f'lookahead_gain updated: {self.lookahead_gain:.2f}')
+            elif param.name == 'finish_progress_window' and param.type_ == param.Type.INTEGER:
+                self.finish_progress_window = int(param.value)
+                self.get_logger().info(f'finish_progress_window updated: {self.finish_progress_window}')
             elif param.name == 'stanley_blend' or param.name == 'stanley_trust_min':
                 self.get_logger().warn(f'{param.name} is hardcoded — ignoring')
             elif param.name == 'mission_pickup_xy' and param.type_ == param.Type.DOUBLE_ARRAY:
@@ -540,11 +561,13 @@ class PathFollower(Node):
                     th = 0
 
                 robot_xy = np.array(p, dtype=float)
+
                 v_eff = max(self.qcar2_measurred_speed, 0.05)
                 lookahead_dist = max(v_eff * self.lookahead_gain, self.min_lookahead_m)
 
                 prev_wpi = self.wpi
                 self._update_progress_index(robot_xy)
+
                 target_idx = self._select_lookahead_index(robot_xy, lookahead_dist)
                 Rot = np.array([[np.cos(th), -np.sin(th)], [np.sin(th), np.cos(th)]])
                 for _ in range(40):
@@ -567,11 +590,12 @@ class PathFollower(Node):
                 if target_idx > self.N - 100:
                     speed_command = min(speed_command, 0.2)
 
-                wp_final = np.array(self.wp[:, -1])
-                wp_final_mod = self._waypoint_in_route_frame(wp_final)
-                dist_to_final = np.linalg.norm([p[0] - wp_final_mod[0],
-                                                p[1] - wp_final_mod[1]])
-                if dist_to_final < 0.25:
+                wp_final_mod = self._waypoint_in_route_frame(self.wp[:, -1])
+                dist_to_final = float(np.linalg.norm(np.array(p) - wp_final_mod))
+                finish_window = max(1, min(self.finish_progress_window, self.N - 1))
+                near_route_end = self.wpi >= self.N - finish_window
+
+                if near_route_end and dist_to_final < 0.25:
                     speed_command        = 0.0
                     pp_delta             = 0.0
                     self.current_steering = 0.0
@@ -581,7 +605,6 @@ class PathFollower(Node):
                 Kp_steering = 1.1
                 kd_steering = 5
                 gyro_filtered = self.apply_filter('gyro', self.gyroscope[2], self.a1, self.b1)
-
                 pp_delta_damped = np.clip(
                     Kp_steering * pp_delta - gyro_filtered * np.pi / 180 * kd_steering,
                     -self.max_steering_angle,
@@ -601,13 +624,14 @@ class PathFollower(Node):
                     if self._stall_count % 80 == 0:
                         self.get_logger().warn(
                             f'Steering saturated ({pp_delta_damped:.2f} rad) '
-                            f'but progress_idx stuck at {self.wpi} — '
-                            f'lookahead={lookahead_dist:.2f}m target_idx={target_idx}')
+                            f'progress_idx stuck at {self.wpi} '
+                            f'lookahead={lookahead_dist:.2f}m target={target_idx}')
                 else:
                     self._stall_count = 0
 
                 def f32(v):
                     m = Float32(); m.data = float(v); return m
+
                 self.pub_pp_delta.publish(f32(self.pp_delta_raw))
                 self.pub_stanley_delta.publish(f32(0.0))
                 self.pub_blended_delta.publish(f32(self.current_steering))
@@ -636,7 +660,7 @@ class PathFollower(Node):
         QCarCommands = Twist()
         QCarCommands.linear.x = enable * np.clip(
             speed_command * np.power(np.cos(self.current_steering), 2), 0.0, 0.7)
-        QCarCommands.angular.z = enable * self.current_steering
+        QCarCommands.angular.z = enable * self.steering_sign * self.current_steering
         self.publisher.publish(QCarCommands)
 
     def path_status(self):
@@ -650,6 +674,16 @@ class PathFollower(Node):
         try:
             t = self.tf_buffer.lookup_transform(from_frame_rel, to_frame_rel, rclpy.time.Time())
             self.translation = t.transform.translation
+            if self.assume_start_at_origin:
+                raw_xy = np.array([float(self.translation.x), float(self.translation.y)], dtype=float)
+                if self._origin_xy is None:
+                    self._origin_xy = raw_xy
+                    self.get_logger().warn(
+                        f'Origin locked to first TF pose: raw=({raw_xy[0]:.3f},{raw_xy[1]:.3f}) '
+                        f'-> local node 0 at (0.000,0.000)')
+                local_xy = raw_xy - self._origin_xy
+                self.translation.x = float(local_xy[0])
+                self.translation.y = float(local_xy[1])
             rotation = [t.transform.rotation.x, t.transform.rotation.y,
                         t.transform.rotation.z, t.transform.rotation.w]
             roll, pitch, self.yaw = R.from_quat(rotation).as_euler('xyz')
