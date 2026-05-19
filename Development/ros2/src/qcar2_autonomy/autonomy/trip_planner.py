@@ -78,7 +78,7 @@ class TripPlanner(Node):
         self.declare_parameter('heading_aware_start', True)
         self.declare_parameter('max_start_heading_error_rad', 1.5708)
         self.declare_parameter('heading_score_weight_m_per_rad', 0.30)
-        self.declare_parameter('reverse_threshold_m', 1.5)
+        self.declare_parameter('reverse_threshold_m', 0.30)
         self.declare_parameter('reverse_speed', 0.15)
         self.declare_parameter('dispatch_ride', False)
 
@@ -754,7 +754,8 @@ class TripPlanner(Node):
             return False
         forward  = np.array([np.cos(yaw), np.sin(yaw)])
         to_goal  = goal - np.array([rx, ry])
-        return float(np.dot(forward, to_goal)) < 0.0
+        to_goal_norm = to_goal / (np.linalg.norm(to_goal) + 1e-9)
+        return float(np.dot(forward, to_goal_norm)) < -0.7
 
     def _start_reverse(self, goal_xy_map, next_stage: MissionStage):
         self._reverse_target     = list(goal_xy_map)

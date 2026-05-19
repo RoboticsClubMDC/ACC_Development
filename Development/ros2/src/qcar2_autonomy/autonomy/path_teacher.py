@@ -3,7 +3,6 @@
 import json
 import math
 from datetime import datetime
-from pathlib import Path
 
 import rclpy
 from geometry_msgs.msg import Point, PoseStamped
@@ -16,11 +15,7 @@ from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 from visualization_msgs.msg import Marker
 
-from autonomy.recorded_map_utils import (
-    find_latest_recording_map,
-    get_recording_maps_dir,
-    load_recording_map,
-)
+from autonomy.recorded_map_utils import get_recording_maps_dir
 
 
 class PathTeacher(Node):
@@ -42,9 +37,6 @@ class PathTeacher(Node):
         self.declare_parameter('map_name', 'taught_map')
         self.declare_parameter('mapping_enabled', True)
         self.declare_parameter('node_delete_wait', 30.0)
-        self.declare_parameter('append_to_latest_map', False)
-        self.declare_parameter('append_map_path', '')
-        self.declare_parameter('append_resume_tolerance_m', 0.35)
 
         self.global_frame = self.get_parameter(
             'global_frame').get_parameter_value().string_value
@@ -76,12 +68,6 @@ class PathTeacher(Node):
             'mapping_enabled').get_parameter_value().bool_value
         self.node_delete_wait = float(self.get_parameter(
             'node_delete_wait').get_parameter_value().double_value)
-        self.append_to_latest_map = bool(self.get_parameter(
-            'append_to_latest_map').get_parameter_value().bool_value)
-        self.append_map_path = self.get_parameter(
-            'append_map_path').get_parameter_value().string_value
-        self.append_resume_tolerance_m = float(self.get_parameter(
-            'append_resume_tolerance_m').get_parameter_value().double_value)
 
         self.save_directory = get_recording_maps_dir()
         self.save_directory.mkdir(parents=True, exist_ok=True)
@@ -109,12 +95,6 @@ class PathTeacher(Node):
         self.last_record_time = None
         self._undo_cooldown_until = 0.0
         self._origin_xy = None
-        self._append_waiting_for_resume = False
-        self._append_resume_warn_time = 0.0
-        self.append_source_path = None
-
-        if self.append_to_latest_map or self.append_map_path:
-            self._load_append_map()
 
         self.timer = self.create_timer(self.sample_period, self._timer_cb)
         self.get_logger().info(
@@ -122,7 +102,6 @@ class PathTeacher(Node):
             f'Saving nodes every {self.node_interval_sec:.1f}s to {self.save_path} | '
             f'frame={self.global_frame} | '
             f'assume_start_at_origin={self.assume_start_at_origin} | '
-            f'append_to_latest_map={self.append_to_latest_map} | '
             f'min_spacing={self.min_node_spacing_m:.2f}m '
             f'min_yaw={self.min_node_yaw_change_rad:.2f}rad')
         self.get_logger().info(
@@ -199,115 +178,6 @@ class PathTeacher(Node):
         marker.pose.orientation.w = 1.0
         return marker
 
-    def _resolve_append_map_path(self):
-        if self.append_map_path:
-            return Path(self.append_map_path).expanduser()
-        return find_latest_recording_map(frame_id=self.global_frame)
-
-    def _pose_from_node(self, node, stamp):
-        pose = PoseStamped()
-        pose.header.stamp = stamp
-        pose.header.frame_id = self.global_frame
-        pose.pose.position.x = float(node['x'])
-        pose.pose.position.y = float(node['y'])
-        yaw = float(node.get('yaw', 0.0))
-        pose.pose.orientation.z = math.sin(0.5 * yaw)
-        pose.pose.orientation.w = math.cos(0.5 * yaw)
-        return pose
-
-    def _point_from_node(self, node):
-        point = Point()
-        point.x = float(node['x'])
-        point.y = float(node['y'])
-        point.z = 0.0
-        return point
-
-    def _load_append_map(self):
-        path = self._resolve_append_map_path()
-        if path is None:
-            self.get_logger().warn(
-                'append_to_latest_map requested, but no previous map was found. '
-                'Starting a fresh map instead.')
-            return False
-
-        path = Path(path).expanduser()
-        if not path.exists():
-            self.get_logger().error(f'append_map_path does not exist: {path}')
-            return False
-
-        try:
-            data = load_recording_map(path)
-        except (OSError, json.JSONDecodeError) as exc:
-            self.get_logger().error(f'Could not load append map {path}: {exc}')
-            return False
-
-        frame_id = data.get('frame_id', '')
-        if frame_id != self.global_frame:
-            self.get_logger().error(
-                f'Append map frame mismatch: file={frame_id} expected={self.global_frame}')
-            return False
-
-        nodes = data.get('nodes', [])
-        if not nodes:
-            self.get_logger().warn(f'Append map has no nodes: {path}')
-            return False
-
-        stamp = self.get_clock().now().to_msg()
-        self.path_msg.header.stamp = stamp
-        self.line_marker_msg.header.stamp = stamp
-        self.node_marker_msg.header.stamp = stamp
-
-        for idx, node in enumerate(nodes):
-            node_data = {
-                'index': idx,
-                'node_id': idx,
-                'x': float(node['x']),
-                'y': float(node['y']),
-                'yaw': float(node.get('yaw', 0.0)),
-                'stamp_sec': float(node.get('stamp_sec', 0.0)),
-            }
-            self.saved_nodes.append(node_data)
-            self.path_msg.poses.append(self._pose_from_node(node_data, stamp))
-            point = self._point_from_node(node_data)
-            self.line_marker_msg.points.append(point)
-            self.node_marker_msg.points.append(point)
-
-        self.append_source_path = path
-        self._append_waiting_for_resume = True
-        self.path_pub.publish(self.path_msg)
-        self.line_marker_pub.publish(self.line_marker_msg)
-        self.node_marker_pub.publish(self.node_marker_msg)
-        self.get_logger().warn(
-            f'Loaded {len(self.saved_nodes)} nodes from previous map: {path.name}. '
-            f'Continuation will save to {self.save_path.name}. '
-            f'Drive within {self.append_resume_tolerance_m:.2f}m of the last node to resume recording.')
-        return True
-
-    def _check_append_resume_ready(self, transform, now_sec):
-        if not self._append_waiting_for_resume:
-            return True
-        if not self.saved_nodes:
-            self._append_waiting_for_resume = False
-            return True
-
-        x, y, _yaw = self._transform_to_xy_yaw(transform)
-        last = self.saved_nodes[-1]
-        dist = math.hypot(x - float(last['x']), y - float(last['y']))
-        if dist > self.append_resume_tolerance_m:
-            if now_sec - self._append_resume_warn_time >= 2.0:
-                self._append_resume_warn_time = now_sec
-                self.get_logger().warn(
-                    f'Continue-map waiting: robot is {dist:.2f}m from last saved node. '
-                    f'Drive back within {self.append_resume_tolerance_m:.2f}m before recording resumes.')
-            return False
-
-        self._append_waiting_for_resume = False
-        self.last_record_time = now_sec
-        self.get_logger().warn(
-            f'Continue-map recording resumed near node {len(self.saved_nodes) - 1} '
-            f'(dist={dist:.2f}m).')
-        return False
-
     def _timer_cb(self):
         if not self.mapping_enabled:
             return
@@ -316,8 +186,6 @@ class PathTeacher(Node):
             return
 
         now_sec = self.get_clock().now().nanoseconds * 1e-9
-        if not self._check_append_resume_ready(transform, now_sec):
-            return
 
         if now_sec < self._undo_cooldown_until:
             return
@@ -433,7 +301,6 @@ class PathTeacher(Node):
             'frame_id': self.global_frame,
             'node_interval_sec': self.node_interval_sec,
             'saved_at': datetime.now().isoformat(),
-            'continued_from': str(self.append_source_path) if self.append_source_path else None,
             'node_count': len(self.saved_nodes),
             'nodes': self.saved_nodes,
         }
