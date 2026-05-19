@@ -1,0 +1,30 @@
+running develop
+running egg_info
+writing qcar2_autonomy.egg-info/PKG-INFO
+writing dependency_links to qcar2_autonomy.egg-info/dependency_links.txt
+writing entry points to qcar2_autonomy.egg-info/entry_points.txt
+writing requirements to qcar2_autonomy.egg-info/requires.txt
+writing top-level names to qcar2_autonomy.egg-info/top_level.txt
+reading manifest file 'qcar2_autonomy.egg-info/SOURCES.txt'
+writing manifest file 'qcar2_autonomy.egg-info/SOURCES.txt'
+running build_ext
+Creating /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.12/site-packages/qcar2-autonomy.egg-link (link to .)
+Installing auto_teach_mapper script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+Installing bev_csi_node script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+Installing bev_csi_seg script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+Installing controller_drive script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+Installing lane_assist_blend script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+Installing lane_detection script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+Installing lane_stanley_node script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+Installing manual_drive script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+Installing path_follower script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+Installing path_teacher script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+Installing recorded_map_visualizer script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+Installing sidewalk_detection script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+Installing stanley_live_plot script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+Installing traffic_system_detector script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+Installing trip_planner script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+Installing yolo_detector script to /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy
+
+Installed /home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_autonomy
+running symlink_data

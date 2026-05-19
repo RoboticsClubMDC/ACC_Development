@@ -28,6 +28,7 @@ class RecordedMapGraphPlanner:
         min_edge_length_ratio=0.35,
         max_edge_length_ratio=2.20,
         max_edge_length_slack_m=0.90,
+        allow_rough_fallback_edges=True,
     ):
         self._recorded = np.asarray(recorded_waypoints, dtype=float)
         self._rough_graph = rough_graph
@@ -38,6 +39,7 @@ class RecordedMapGraphPlanner:
         self._node_map = []
         self._node_candidates = []
         self._missing_edges = []
+        self._fallback_edges = []
 
         self._max_anchor_dist = float(max_anchor_dist)
         self._max_node_candidates = int(max_node_candidates)
@@ -45,6 +47,7 @@ class RecordedMapGraphPlanner:
         self._min_edge_length_ratio = float(min_edge_length_ratio)
         self._max_edge_length_ratio = float(max_edge_length_ratio)
         self._max_edge_length_slack_m = float(max_edge_length_slack_m)
+        self._allow_rough_fallback_edges = bool(allow_rough_fallback_edges)
 
         if self._recorded.ndim != 2 or self._recorded.shape[0] != 2 or self._recorded.shape[1] < 2:
             raise ValueError('recorded_waypoints must be a 2xN array with N >= 2')
@@ -93,6 +96,40 @@ class RecordedMapGraphPlanner:
     def _segment(self, start_idx, end_idx):
         return self._recorded[:, start_idx:end_idx + 1]
 
+    @staticmethod
+    def _polyline_length(poly):
+        if poly is None or poly.shape[1] < 2:
+            return 0.0
+        return float(np.sum(np.linalg.norm(np.diff(poly, axis=1), axis=0)))
+
+    def _rough_edge_fallback(self, fi, ti):
+        """Return rough SDCS edge geometry aligned onto recorded node anchors."""
+        rough_wp = self._rough_graph._wp.get((fi, ti))
+        if rough_wp is None:
+            return None
+
+        rough_start = self._rough_graph.node_position(fi).reshape(2, 1)
+        rough_end = self._rough_graph.node_position(ti).reshape(2, 1)
+        if rough_wp.shape[1] > 0:
+            rough_poly = np.hstack([rough_start, rough_wp, rough_end])
+        else:
+            rough_poly = np.hstack([rough_start, rough_end])
+
+        rec_start = self.node_position(fi).reshape(2, 1)
+        rec_end = self.node_position(ti).reshape(2, 1)
+        rough_len = self._polyline_length(rough_poly)
+        if rough_len < 1e-9:
+            return np.hstack([rec_start, rec_end])
+
+        seg_lens = np.linalg.norm(np.diff(rough_poly, axis=1), axis=0)
+        s = np.concatenate(([0.0], np.cumsum(seg_lens))) / rough_len
+        start_err = rec_start - rough_poly[:, :1]
+        end_err = rec_end - rough_poly[:, -1:]
+        adjusted = rough_poly + (1.0 - s.reshape(1, -1)) * start_err + s.reshape(1, -1) * end_err
+        adjusted[:, 0:1] = rec_start
+        adjusted[:, -1:] = rec_end
+        return adjusted
+
     def _choose_recorded_edge(self, fi, ti):
         rough_len = float(self._rough_graph._len.get((fi, ti), 0.0))
         best = None
@@ -120,6 +157,14 @@ class RecordedMapGraphPlanner:
         for fi, ti, _radius in SDCS_EDGES:
             chosen = self._choose_recorded_edge(fi, ti)
             if chosen is None:
+                fallback = self._rough_edge_fallback(fi, ti) if self._allow_rough_fallback_edges else None
+                if fallback is not None and fallback.shape[1] >= 2:
+                    self._wp[(fi, ti)] = fallback
+                    self._len[(fi, ti)] = self._polyline_length(fallback)
+                    self._adj[fi].append(ti)
+                    self._fallback_edges.append((fi, ti))
+                    continue
+
                 self._missing_edges.append((fi, ti))
                 continue
 

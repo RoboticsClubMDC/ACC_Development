@@ -38,11 +38,13 @@ DEFAULT_SDCS_TO_MAP_SCALE = 1.0216993081930361
 class MissionStage(Enum):
     IDLE            = 0
     TO_PICKUP       = 1
-    WAIT_AT_PICKUP  = 2
-    TO_DROPOFF      = 3
-    WAIT_AT_DROPOFF = 4
-    TO_HUB          = 5
-    REVERSING       = 6
+    SNAP_TO_PICKUP  = 2
+    WAIT_AT_PICKUP  = 3
+    TO_DROPOFF      = 4
+    SNAP_TO_DROPOFF = 5
+    WAIT_AT_DROPOFF = 6
+    TO_HUB          = 7
+    REVERSING       = 8
 
 
 class TripPlanner(Node):
@@ -300,10 +302,15 @@ class TripPlanner(Node):
         )
         edge_count = sum(len(edges) for edges in self.graph_planner._adj)
         missing_count = len(getattr(self.graph_planner, '_missing_edges', []))
+        fallback_edges = getattr(self.graph_planner, '_fallback_edges', [])
         self.get_logger().info(
             f'RecordedMapGraphPlanner ready: source={self.recorded_map_path} '
             f'nodes={len(self.graph_planner._adj)} edges={edge_count} '
-            f'missing_edges={missing_count} route_points={self.recorded_waypoints.shape[1]}')
+            f'fallback_edges={len(fallback_edges)} missing_edges={missing_count} '
+            f'route_points={self.recorded_waypoints.shape[1]}')
+        if fallback_edges:
+            self.get_logger().warn(
+                f'Using rough fallback geometry for recorded-map edges: {fallback_edges}')
         if edge_count == 0:
             self.get_logger().error('Recorded graph has no valid edges')
             return False
@@ -698,10 +705,10 @@ class TripPlanner(Node):
             + (f' node_id={goal_node_id}' if goal_node_id >= 0 else ''))
         return True
 
-    def _snap_to_exact(self, goal_xy_map, label=''):
+    def _start_snap_to_exact(self, goal_xy_map, label=''):
         """Publish a straight two-point path to snap to an exact map-frame goal."""
         if self.robot_pose is None:
-            return self._send_path_to(goal_xy_map, label)
+            return False
 
         rx, ry  = float(self.robot_pose.pose.position.x), float(self.robot_pose.pose.position.y)
         cur_q   = np.array([rx, ry])
@@ -709,7 +716,7 @@ class TripPlanner(Node):
         dist    = float(np.linalg.norm(cur_q - goal_q))
         if dist < 0.10:
             self.get_logger().info(f'Already within 0.10m of {label}, no snap needed')
-            return True
+            return False
 
         wp = np.stack([cur_q, goal_q], axis=1)
         self.waypoints_pub.publish(self._map_path_to_ros(wp))
@@ -897,11 +904,21 @@ class TripPlanner(Node):
 
         # --- Path-following arrivals ---
         if self.mission_stage == MissionStage.TO_PICKUP:
-            self._snap_to_exact(self.pickup_xy_map, label='PICKUP-snap')
+            if self._start_snap_to_exact(self.pickup_xy_map, label='PICKUP-snap'):
+                self.mission_stage = MissionStage.SNAP_TO_PICKUP
+            else:
+                self._on_arrived_pickup()
+
+        elif self.mission_stage == MissionStage.SNAP_TO_PICKUP:
             self._on_arrived_pickup()
 
         elif self.mission_stage == MissionStage.TO_DROPOFF:
-            self._snap_to_exact(self.dropoff_xy_map, label='DROPOFF-snap')
+            if self._start_snap_to_exact(self.dropoff_xy_map, label='DROPOFF-snap'):
+                self.mission_stage = MissionStage.SNAP_TO_DROPOFF
+            else:
+                self._on_arrived_dropoff()
+
+        elif self.mission_stage == MissionStage.SNAP_TO_DROPOFF:
             self._on_arrived_dropoff()
 
         elif self.mission_stage == MissionStage.TO_HUB:

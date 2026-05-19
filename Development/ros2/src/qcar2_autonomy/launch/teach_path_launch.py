@@ -39,6 +39,7 @@ def generate_launch_description():
             'node_interval_sec':        0.1,
             'min_node_spacing_m':       0.05,
             'min_node_yaw_change_rad':  0.10,
+            'line_marker_width':        0.025,
             'node_delete_wait':         30.0,
         }],
     )
