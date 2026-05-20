@@ -6,7 +6,22 @@
 # nav_to_pose/path_follower, or another way of Arturo handling car node_following behavior as a helper.
 # In case of changes please, date and sign change with a number and reason for better tracking
 # I'm not a programmer but I want to keep this organized lol.
- 
+"""
+Semantic YOLO detector node.
+
+Responsibilities:
+- Subscribe to aligned D435 RGB image.
+- Run YOLO object detection.
+- Publish annotated image for visualization.
+- Publish 2D detections as structured JSON.
+
+Downstream supposed nodes:
+- object_3d_estimator consumes detections + depth.
+- semantic_landmark_mapper stores map-frame landmarks.
+- perception_behavior_interface decides behavior.
+""" 
+
+
 import json
 import os
 import sys
@@ -66,6 +81,10 @@ class SemanticYoloDetector(Node):
         self.declare_parameter("class_filter", "2,9,11")
         self.declare_parameter("image_width", 640)
         self.declare_parameter("image_height", 480)
+        # Added 2026-05-20 15:43:50 EDT:
+        # Ignore polygon for QCar body/dead image area.
+        # YOLO should not use this image region for inference.
+        self.declare_parameter("enable_ignore_mask", True)
         self.declare_parameter("input_topic", "/perception/d435/rgb/image_raw")
         self.declare_parameter("annotated_topic", "/perception/yolo/image_annotated")
         self.declare_parameter("detections_topic", "/perception/yolo/detections_2d")
@@ -77,6 +96,26 @@ class SemanticYoloDetector(Node):
         )
         self.image_width = int(self.get_parameter("image_width").value)
         self.image_height = int(self.get_parameter("image_height").value)
+        self.enable_ignore_mask = bool(
+            self.get_parameter("enable_ignore_mask").value
+        )
+
+        self.ignore_polygons = [
+            {
+                "name": "qcar_body_ignore",
+                "points": [
+                    {"x": 405, "y": 480},
+                    {"x": 407, "y": 462},
+                    {"x": 414, "y": 448},
+                    {"x": 427, "y": 436},
+                    {"x": 442, "y": 429},
+                    {"x": 458, "y": 429},
+                    {"x": 474, "y": 442},
+                    {"x": 510, "y": 446},
+                    {"x": 536, "y": 480},
+                ],
+            }
+        ]
 
         input_topic = str(self.get_parameter("input_topic").value)
         annotated_topic = str(self.get_parameter("annotated_topic").value)
@@ -124,6 +163,70 @@ class SemanticYoloDetector(Node):
             if item:
                 output.append(int(item))
         return output
+    
+    def apply_ignore_mask(self, image):
+        """
+        Blacks out ignored image polygons before YOLO inference.
+
+        This prevents the visible QCar body/dead image area from creating false
+        detections or weak trash landmarks.
+        """
+        if not self.enable_ignore_mask:
+            return image
+
+        masked = image.copy()
+
+        for polygon in self.ignore_polygons:
+            points = polygon.get("points", [])
+            if len(points) < 3:
+                continue
+
+            pts = np.array(
+                [[int(p["x"]), int(p["y"])] for p in points],
+                dtype=np.int32,
+            )
+
+            cv2.fillPoly(masked, [pts], (0, 0, 0))
+
+        return masked
+    
+    def draw_ignore_mask_overlay(self, image):
+        """
+        Draws the ignored YOLO region on the debug annotated image.
+
+        NA means this area is intentionally not available for YOLO inference.
+        """
+        if not self.enable_ignore_mask:
+            return
+
+        for polygon in self.ignore_polygons:
+            points = polygon.get("points", [])
+            if len(points) < 3:
+                continue
+
+            pts = np.array(
+                [[int(p["x"]), int(p["y"])] for p in points],
+                dtype=np.int32,
+            )
+
+            overlay = image.copy()
+            cv2.fillPoly(overlay, [pts], (0, 0, 255))
+            cv2.addWeighted(overlay, 0.25, image, 0.75, 0, dst=image)
+            cv2.polylines(image, [pts], isClosed=True, color=(0, 0, 255), thickness=2)
+
+            center_x = int(np.mean(pts[:, 0]))
+            center_y = int(np.mean(pts[:, 1]))
+
+            cv2.putText(
+                image,
+                "NA",
+                (center_x - 18, center_y + 8),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.75,
+                (255, 255, 255),
+                2,
+                cv2.LINE_AA,
+            )
 
     def image_cb(self, msg):
     # Main image callback. Converts ROS image to OpenCV, runs YOLO,
@@ -140,7 +243,8 @@ class SemanticYoloDetector(Node):
             return
 
         try:
-            processed = self.yolo.pre_process(rgb)
+            rgb_for_yolo = self.apply_ignore_mask(rgb)
+            processed = self.yolo.pre_process(rgb_for_yolo)
             prediction = self.yolo.predict(
                 inputImg=processed,
                 classes=self.class_filter,
@@ -186,6 +290,8 @@ class SemanticYoloDetector(Node):
 
         if annotated is None or not isinstance(annotated, np.ndarray):
             return
+
+        self.draw_ignore_mask_overlay(annotated)
 
         try:
             ann_msg = self.bridge.cv2_to_imgmsg(annotated, encoding="bgr8")
@@ -268,7 +374,8 @@ class SemanticYoloDetector(Node):
 
         return str(cls_id)
 
-
+#This is just ROS2 console-script entry point.
+#maintains it alive and kills gracefully on shutdown.
 def main(args=None):
     rclpy.init(args=args)
     node = SemanticYoloDetector()

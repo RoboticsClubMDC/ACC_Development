@@ -27,3 +27,206 @@ colcon build --packages-select qcar2_autonomy && . install/setup.bash && export 
 
 Foxglove bridge (foxglove_bridge already baked into Isaac ROS image; connect Foxglove Studio on host to ws://localhost:8765):
 colcon build --packages-select qcar2_nodes && . install/setup.bash && export ROS_DOMAIN_ID=69 && ros2 launch qcar2_nodes foxglove_bridge_launch.py
+
+
+QCar2 Perception Layer start guide
+Added: 2026-05-20 09:36:26 EDT
+
+Purpose:
+This starts the new qcar2_perception layer without touching the old working qcar2_autonomy YOLO prototype.
+The perception layer currently starts:
+- semantic TF frames for D435 + CSI cameras
+- d435_aligned_source for aligned D435 RGB/depth
+- semantic_yolo_detector for 2D YOLO detections and annotated image
+
+Important:
+Do NOT run qcar2_nodes rgbd at the same time as d435_aligned_source.
+Do NOT run qcar2_autonomy yolo_detector at the same time as this new perception source while testing.
+The D435 aligned source owns the camera path for this perception stack.
+
+Build:
+cd /workspaces/isaac_ros-dev
+colcon build --packages-select qcar2_perception && . install/setup.bash && export ROS_DOMAIN_ID=69
+
+Option A - one launch command for virtual QLabs:
+ros2 launch qcar2_perception perception_core_virtual.launch.py
+
+Option B - one launch command for physical QCar2:
+ros2 launch qcar2_perception perception_core_physical.launch.py
+
+Manual start, same as the tested step-by-step flow:
+Terminal 1:
+. install/setup.bash && export ROS_DOMAIN_ID=69 && ros2 launch qcar2_perception semantic_tf_launch.py
+
+Terminal 2 virtual QLabs:
+. install/setup.bash && export ROS_DOMAIN_ID=69 && ros2 run qcar2_perception d435_aligned_source --ros-args -p is_physical:=false -p distance_scale:=0.1
+
+Terminal 2 physical QCar2:
+. install/setup.bash && export ROS_DOMAIN_ID=69 && ros2 run qcar2_perception d435_aligned_source --ros-args -p is_physical:=true -p distance_scale:=1.0
+
+Terminal 3:
+. install/setup.bash && export ROS_DOMAIN_ID=69 && ros2 run qcar2_perception semantic_yolo_detector
+
+Foxglove Studio topics:
+/perception/d435/rgb/image_raw
+/perception/d435/depth/image_rect
+/perception/d435/camera_info
+/perception/yolo/image_annotated
+/perception/yolo/detections_2d
+
+Quick terminal checks:
+ros2 topic hz /perception/d435/rgb/image_raw
+ros2 topic hz /perception/yolo/image_annotated
+ros2 topic echo /perception/yolo/detections_2d
+ros2 run tf2_ros tf2_echo base_link aligned_camera_optical_frame
+
+Expected Foxglove behavior:
+/perception/d435/rgb/image_raw shows the raw aligned D435 RGB image.
+/perception/yolo/image_annotated shows the same image with a YOLO detections count and boxes/labels when detections exist.
+/perception/yolo/detections_2d shows JSON with class_id, class_name, confidence, and bbox.
+
+Next planned perception steps:
+- object_3d_estimator: combine YOLO bbox + aligned depth + camera_info into 3D object observations
+- semantic_landmark_mapper: transform objects into Cartographer map frame and manage candidate/confirmed/stable landmarks
+- semantic_consistency_monitor: publish residuals and perception health
+
+QCar2 Perception Layer update
+Added: 2026-05-20 12:49:58 EDT
+
+Current architecture progress:
+- d435_aligned_source is working and publishes aligned RGB/depth/camera_info.
+- semantic_yolo_detector is working and publishes annotated YOLO image + 2D detections.
+- object_3d_estimator is working and publishes live volatile object markers in aligned_camera_optical_frame.
+- semantic_landmark_mapper is now part of the core launch and converts live 3D objects into map-frame semantic landmarks.
+
+New topics to watch:
+/perception/objects_3d
+/perception/object_markers
+/perception/semantic_landmarks
+/perception/semantic_landmark_markers
+
+Important for semantic landmarks:
+The semantic mapper needs the Cartographer TF chain into map.
+Run Cartographer first when testing map-frame landmarks:
+. install/setup.bash && export ROS_DOMAIN_ID=69 && ros2 launch qcar2_nodes qcar2_cartographer_virtual_launch.py
+
+Then start perception:
+. install/setup.bash && export ROS_DOMAIN_ID=69 && ros2 launch qcar2_perception perception_core_virtual.launch.py
+
+If Cartographer is not running, the live camera-frame object marker can still work, but the semantic mapper will warn that it cannot transform aligned_camera_optical_frame to map.
+
+QCar2 Perception Layer update
+Added: 2026-05-20 12:55:53 EDT
+
+Semantic consistency monitor is now part of the core launch.
+It compares confirmed/stable semantic landmarks against live D435 YOLO-depth object observations.
+It is only a monitor/warning layer; it does not move the car and does not correct Cartographer.
+
+New monitor topics:
+/perception/semantic_localization_residual
+/perception/health
+/perception/semantic_residual_markers
+
+Meaning:
+- small residual: live object agrees with the stored map landmark
+- medium residual: uncertain, trust it less
+- large residual on one object: possible bad YOLO/depth observation
+- large residual on several confirmed/stable objects: possible localization drift warning
+
+QCar2 Perception Layer update
+Added: 2026-05-20 13:46:27 EDT
+
+Marker and semantic-memory tuning:
+- Live object uncertainty is still published, but the visible object bubble is capped so far/weak detections do not become huge in Foxglove.
+- Semantic landmark markers are also visually capped.
+- Landmark status remains memory confidence: candidate, confirmed, stable.
+- Landmark visibility is now separate: visible or not_recently_seen.
+
+Important:
+A stable landmark should not become a candidate again just because it left the camera view.
+If it is not observed recently, its visibility changes, but its semantic memory status remains stable.
+
+QCar2 Perception Layer code comments
+Added: 2026-05-20 13:47:02 EDT
+
+Commented recent tuning directly in code:
+- object_3d_estimator.py now explains why max_uncertainty_radius and max_marker_radius exist.
+- semantic_landmark_mapper.py now explains why status and visibility are separate.
+
+Reason:
+Far YOLO detections can have weak/noisy depth, so uncertainty grows.
+We keep that uncertainty useful for debugging and mapping, but cap marker display size so Foxglove stays readable.
+Stable landmarks stay stable because that means long-term map confidence; visibility says whether the D435 sees them recently.
+
+QCar2 Perception Layer permanent landmarking
+Added: 2026-05-20 13:58:39 EDT
+
+Permanent landmark behavior:
+- Candidate landmarks are kept in live RAM memory so the next YOLO-depth observation has something to match.
+- Confirmed landmarks are stronger live memory, but still not saved permanently by default.
+- Stable landmarks are permanent semantic map landmarks and are saved into semantic_map.json.
+
+Current default:
+semantic_map.json saves only:
+status == stable
+
+Why:
+Candidates are useful hypotheses, but they can be false positives or noisy depth hits.
+Saving only stable landmarks keeps the permanent semantic map cleaner.
+
+Association tuning:
+- The mapper now uses XY distance for association by default.
+- association_radius is now 0.80 m in the core launches.
+
+Reason:
+Signs and objects can have noisy estimated height/depth, so full XYZ gating can split one real object into many candidates.
+XY gating makes repeated observations more likely to update the same landmark until it becomes stable.
+
+QCar2 Perception Layer session semantic map
+Added: 2026-05-20 15:42:04 EDT
+
+semantic_map.json is now treated as a session overlay, not an eternal map.
+On each core perception launch, semantic_landmark_mapper starts with an empty semantic map when reset_map_on_start is true.
+
+Meaning:
+- Cartographer map remains the localization/geometric map authority.
+- semantic_map.json stores semantic landmarks discovered during the current run.
+- Old stable semantic landmarks from a previous run are not reloaded by default.
+
+Launch default:
+reset_map_on_start: true
+
+Use reset_map_on_start: false only when intentionally testing persistent semantic memory across runs.
+
+QCar2 Perception Layer YOLO dead-zone mask
+Added: 2026-05-20 15:43:50 EDT
+
+semantic_yolo_detector now applies a pre-YOLO ignore polygon over the visible QCar body/dead image region.
+This prevents YOLO from using that region for inference and helps stop false detections from becoming trash landmarks.
+
+Debug display:
+/perception/yolo/image_annotated draws the ignored region as a red transparent polygon with "NA" in the center.
+
+Meaning:
+NA = not available for YOLO inference.
+
+QCar2 Perception Layer semantic marker topic split
+Added: 2026-05-20 16:08:30 EDT
+
+Semantic landmark markers are now split by meaning so Foxglove is easier to read.
+
+Topics:
+/perception/semantic_landmark_markers
+  Stable landmarks only. This is the semantic map overlay for the current run.
+
+/perception/semantic_hypothesis_markers
+  Candidate and confirmed landmarks. This is working memory / debug hypotheses.
+
+/perception/semantic_current_markers
+  Only landmarks currently visible to the D435 semantic pipeline.
+
+/perception/semantic_residual_markers
+  Consistency monitor residual lines only. These are not landmark memory.
+
+Meaning:
+Stable map, live hypotheses, current observations, and residual checks are separate Foxglove layers now.

@@ -1,0 +1,53 @@
+[0.587s] Invoking command in '/home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/src/qcar2_perception': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_perception/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_perception/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/qcar2_perception build --build-base /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_perception/build install --record /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_perception/install.log --single-version-externally-managed install_data
+[0.727s] running egg_info
+[0.737s] writing ../../build/qcar2_perception/qcar2_perception.egg-info/PKG-INFO
+[0.737s] writing dependency_links to ../../build/qcar2_perception/qcar2_perception.egg-info/dependency_links.txt
+[0.737s] writing entry points to ../../build/qcar2_perception/qcar2_perception.egg-info/entry_points.txt
+[0.737s] writing requirements to ../../build/qcar2_perception/qcar2_perception.egg-info/requires.txt
+[0.737s] writing top-level names to ../../build/qcar2_perception/qcar2_perception.egg-info/top_level.txt
+[0.756s] reading manifest file '../../build/qcar2_perception/qcar2_perception.egg-info/SOURCES.txt'
+[0.757s] writing manifest file '../../build/qcar2_perception/qcar2_perception.egg-info/SOURCES.txt'
+[0.758s] running build
+[0.758s] running build_py
+[0.758s] copying qcar2_perception/semantic_consistency_monitor.py -> /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_perception/build/lib/qcar2_perception
+[0.758s] copying qcar2_perception/perception_behavior_interface.py -> /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_perception/build/lib/qcar2_perception
+[0.758s] copying qcar2_perception/__init__.py -> /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_perception/build/lib/qcar2_perception
+[0.758s] copying qcar2_perception/object_3d_estimator.py -> /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_perception/build/lib/qcar2_perception
+[0.758s] copying qcar2_perception/semantic_yolo_detector.py -> /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_perception/build/lib/qcar2_perception
+[0.758s] copying qcar2_perception/d435_aligned_source.py -> /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_perception/build/lib/qcar2_perception
+[0.758s] copying qcar2_perception/semantic_landmark_mapper.py -> /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_perception/build/lib/qcar2_perception
+[0.758s] running install
+[0.761s] running install_lib
+[0.771s] copying /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_perception/build/lib/qcar2_perception/semantic_consistency_monitor.py -> /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_perception/lib/python3.12/site-packages/qcar2_perception
+[0.771s] copying /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_perception/build/lib/qcar2_perception/perception_behavior_interface.py -> /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_perception/lib/python3.12/site-packages/qcar2_perception
+[0.771s] copying /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_perception/build/lib/qcar2_perception/__init__.py -> /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_perception/lib/python3.12/site-packages/qcar2_perception
+[0.771s] copying /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_perception/build/lib/qcar2_perception/object_3d_estimator.py -> /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_perception/lib/python3.12/site-packages/qcar2_perception
+[0.771s] copying /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_perception/build/lib/qcar2_perception/semantic_yolo_detector.py -> /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_perception/lib/python3.12/site-packages/qcar2_perception
+[0.771s] copying /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_perception/build/lib/qcar2_perception/d435_aligned_source.py -> /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_perception/lib/python3.12/site-packages/qcar2_perception
+[0.771s] copying /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_perception/build/lib/qcar2_perception/semantic_landmark_mapper.py -> /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_perception/lib/python3.12/site-packages/qcar2_perception
+[0.771s] byte-compiling /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_perception/lib/python3.12/site-packages/qcar2_perception/semantic_consistency_monitor.py to semantic_consistency_monitor.cpython-312.pyc
+[0.772s] byte-compiling /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_perception/lib/python3.12/site-packages/qcar2_perception/perception_behavior_interface.py to perception_behavior_interface.cpython-312.pyc
+[0.772s] byte-compiling /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_perception/lib/python3.12/site-packages/qcar2_perception/__init__.py to __init__.cpython-312.pyc
+[0.772s] byte-compiling /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_perception/lib/python3.12/site-packages/qcar2_perception/object_3d_estimator.py to object_3d_estimator.cpython-312.pyc
+[0.774s] byte-compiling /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_perception/lib/python3.12/site-packages/qcar2_perception/semantic_yolo_detector.py to semantic_yolo_detector.cpython-312.pyc
+[0.775s] byte-compiling /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_perception/lib/python3.12/site-packages/qcar2_perception/d435_aligned_source.py to d435_aligned_source.cpython-312.pyc
+[0.776s] byte-compiling /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_perception/lib/python3.12/site-packages/qcar2_perception/semantic_landmark_mapper.py to semantic_landmark_mapper.cpython-312.pyc
+[0.776s] running install_data
+[0.776s] copying resource/qcar2_perception -> /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_perception/share/ament_index/resource_index/packages
+[0.776s] copying package.xml -> /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_perception/share/qcar2_perception
+[0.776s] copying launch/semantic_tf_launch.py -> /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_perception/share/qcar2_perception/launch
+[0.776s] copying config/perception_physical.yaml -> /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_perception/share/qcar2_perception/config
+[0.776s] copying config/perception_virtual.yaml -> /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_perception/share/qcar2_perception/config
+[0.776s] copying maps/semantic_map.json -> /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_perception/share/qcar2_perception/maps
+[0.776s] running install_egg_info
+[0.787s] removing '/home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_perception/lib/python3.12/site-packages/qcar2_perception-0.0.0-py3.12.egg-info' (and everything under it)
+[0.787s] Copying ../../build/qcar2_perception/qcar2_perception.egg-info to /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_perception/lib/python3.12/site-packages/qcar2_perception-0.0.0-py3.12.egg-info
+[0.788s] running install_scripts
+[0.853s] Installing d435_aligned_source script to /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_perception/lib/qcar2_perception
+[0.853s] Installing object_3d_estimator script to /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_perception/lib/qcar2_perception
+[0.853s] Installing perception_behavior_interface script to /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_perception/lib/qcar2_perception
+[0.853s] Installing semantic_consistency_monitor script to /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_perception/lib/qcar2_perception
+[0.853s] Installing semantic_landmark_mapper script to /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_perception/lib/qcar2_perception
+[0.853s] Installing semantic_yolo_detector script to /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_perception/lib/qcar2_perception
+[0.853s] writing list of installed files to '/home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_perception/install.log'
+[0.873s] Invoked command in '/home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/src/qcar2_perception' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_perception/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_perception/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/qcar2_perception build --build-base /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_perception/build install --record /home/bp02-ubuntu/Documents/GitHub/ACC_Development/Development/ros2/build/qcar2_perception/install.log --single-version-externally-managed install_data

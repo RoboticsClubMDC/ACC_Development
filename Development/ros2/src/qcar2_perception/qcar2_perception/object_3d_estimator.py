@@ -50,7 +50,13 @@ class Object3DEstimator(Node):
         self.declare_parameter("depth_crop_ratio", 0.5)
         self.declare_parameter("min_valid_pixels", 10)
         self.declare_parameter("min_valid_ratio", 0.10)
-        self.declare_parameter("min_quality", 0.05)
+        self.declare_parameter("min_quality", 0.0)
+        self.declare_parameter("marker_lifetime_sec", 2.0)
+
+        # Added 2026-05-20 13:47:02 EDT:
+        # Keep weak/far depth estimates useful, but prevent huge Foxglove bubbles.
+        self.declare_parameter("max_uncertainty_radius", 0.75)
+        self.declare_parameter("max_marker_radius", 0.45)
 
         self.min_depth = float(self.get_parameter("min_depth").value)
         self.max_depth = float(self.get_parameter("max_depth").value)
@@ -58,6 +64,12 @@ class Object3DEstimator(Node):
         self.min_valid_pixels = int(self.get_parameter("min_valid_pixels").value)
         self.min_valid_ratio = float(self.get_parameter("min_valid_ratio").value)
         self.min_quality = float(self.get_parameter("min_quality").value)
+        self.marker_lifetime_sec = float(
+            self.get_parameter("marker_lifetime_sec").value)
+        self.max_uncertainty_radius = float(
+            self.get_parameter("max_uncertainty_radius").value)
+        self.max_marker_radius = float(
+            self.get_parameter("max_marker_radius").value)
 
         detections_topic = str(self.get_parameter("detections_topic").value)
         depth_topic = str(self.get_parameter("depth_topic").value)
@@ -186,6 +198,7 @@ class Object3DEstimator(Node):
                 "valid_depth_ratio": estimate["valid_ratio"],
                 "depth_sigma": estimate["depth_sigma"],
                 "depth_span": estimate["depth_span"],
+                "quality_components": estimate["quality_components"],
                 "quality_score": estimate["quality_score"],
                 "uncertainty_radius": estimate["uncertainty_radius"],
             }
@@ -308,7 +321,7 @@ class Object3DEstimator(Node):
         depth_span = p90 - p10
 
         sigma_limit = max(0.015, 0.035 * z_med)
-        span_limit = max(0.040, 0.120 * z_med)
+        span_limit = max(0.040, 0.180 * z_med)
 
         q_valid = min(1.0, valid_ratio / 0.50)
         q_noise = math.exp(-((depth_sigma / max(sigma_limit, 1e-6)) ** 2))
@@ -317,7 +330,11 @@ class Object3DEstimator(Node):
 
         quality = float(q_valid * q_noise * q_span * q_range)
 
-        if quality < self.min_quality:
+        # `quality` should normally inform uncertainty and semantic-landmark
+        # weight, not erase otherwise stable object observations. Keep
+        # min_quality at 0.0 by default and only use it as an explicit debug
+        # gate when the operator asks for stricter filtering.
+        if self.min_quality > 0.0 and quality < self.min_quality:
             return None
 
         fx = float(self.camera_info.k[0])
@@ -346,6 +363,12 @@ class Object3DEstimator(Node):
             "valid_ratio": float(valid_ratio),
             "depth_sigma": float(depth_sigma),
             "depth_span": float(depth_span),
+            "quality_components": {
+                "q_valid": float(q_valid),
+                "q_noise": float(q_noise),
+                "q_span": float(q_span),
+                "q_range": float(q_range),
+            },
             "quality_score": float(quality),
             "uncertainty_radius": float(uncertainty_radius),
         }
@@ -371,14 +394,28 @@ class Object3DEstimator(Node):
         valid_penalty = 0.10 * (1.0 - min(1.0, valid_ratio))
         quality_penalty = 0.20 * (1.0 - min(1.0, quality))
 
-        return base + range_term + noise_term + span_term + valid_penalty + quality_penalty
+        radius = (
+            base
+            + range_term
+            + noise_term
+            + span_term
+            + valid_penalty
+            + quality_penalty
+        )
+
+        # This caps the reported uncertainty itself. Far objects can still be
+        # uncertain, but they should not grow without bound.
+        return min(float(self.max_uncertainty_radius), radius)
 
     def make_sphere_marker(self, marker_id, frame_id, obj):
         """
         Makes a sphere marker at the object camera-frame point.
         """
         p = obj["pose_camera"]
-        radius = obj["uncertainty_radius"]
+
+        # This caps only the visible marker size. The JSON still carries the
+        # uncertainty_radius used by mapping and debugging.
+        radius = min(float(self.max_marker_radius), obj["uncertainty_radius"])
 
         marker = Marker()
         marker.header.stamp = self.get_clock().now().to_msg()
@@ -402,9 +439,9 @@ class Object3DEstimator(Node):
         marker.color.b = 0.05
         marker.color.a = 0.85
 
-        marker.lifetime.sec = 0
-        marker.lifetime.nanosec = 500_000_000
+        self.set_marker_lifetime(marker)
         return marker
+
 
     def make_text_marker(self, marker_id, frame_id, obj):
         """
@@ -418,3 +455,47 @@ class Object3DEstimator(Node):
         marker.ns = "perception_object_labels"
         marker.id = int(marker_id)
         marker.type = Marker.TEXT_VIEW_FACING
+        marker.action = Marker.ADD
+
+        marker.pose.position.x = float(p["x"])
+        marker.pose.position.y = float(p["y"])
+        marker.pose.position.z = float(p["z"]) + 0.12
+        marker.pose.orientation.w = 1.0
+
+        marker.scale.z = 0.10
+
+        marker.color.r = 1.0
+        marker.color.g = 1.0
+        marker.color.b = 1.0
+        marker.color.a = 1.0
+
+        marker.text = (
+            f"{obj['class_name']} "
+            f"q={obj['quality_score']:.2f} "
+            f"z={obj['depth_median']:.2f}"
+        )
+
+        self.set_marker_lifetime(marker)
+        return marker
+
+    def set_marker_lifetime(self, marker):
+        lifetime = max(0.1, float(self.marker_lifetime_sec))
+        marker.lifetime.sec = int(lifetime)
+        marker.lifetime.nanosec = int((lifetime - int(lifetime)) * 1_000_000_000)
+    
+def main(args=None):
+    rclpy.init(args=args)
+    node = Object3DEstimator()
+
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
+
+
+if __name__ == "__main__":
+    main()
