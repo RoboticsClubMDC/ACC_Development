@@ -35,7 +35,7 @@ setup(
             'bev_csi_seg=autonomy.bev_csi_seg:main',
             'teleop_csi=autonomy.teleop_csi:main',
             'roadmap_alignment_node = autonomy.LCroadmap_alignment_node:main',
-            'controller_drive = autonomy.controller_drive:main',
+            'manual_drive = autonomy.manual_drive:main',
             'visual_odometry = autonomy.vo_node:main',
         ],
     },
