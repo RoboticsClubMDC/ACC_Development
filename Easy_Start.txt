@@ -24,3 +24,6 @@ colcon build --packages-select qcar2_autonomy && . install/setup.bash && export 
 
 Run YOLO
 colcon build --packages-select qcar2_autonomy && . install/setup.bash && export ROS_DOMAIN_ID=69 && ros2 run qcar2_autonomy yolo_detector && clear
+
+Foxglove bridge (foxglove_bridge already baked into Isaac ROS image; connect Foxglove Studio on host to ws://localhost:8765):
+colcon build --packages-select qcar2_nodes && . install/setup.bash && export ROS_DOMAIN_ID=69 && ros2 launch qcar2_nodes foxglove_bridge_launch.py
