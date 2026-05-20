@@ -12,4 +12,5 @@ RUN apt-get update && apt-get install -y \
 # The example here installs "pyqtgraph", which is a scientific
 # graphics and GUI Python library.
 RUN python3 -m pip install -U \
-    pyqtgraph
+    pyqtgraph \
+    ultralytics
