@@ -6532,6 +6532,51 @@ Logged in VO_CHANGELOG.md ('2026-05-21 KLT/PnP campaign — full 2x2
 result (PnP lowers invalid rate; jumps are environmental)').
 
 
+====================================================================
+Turn 135 - User
+====================================================================
+QCar battery died. Wants to push the branch to GitHub (then pull on
+Ubuntu VS Code), confirm not needing the physical car, finalize
+Easy_Start + changelog + conversation log, get the FULL roadmap (not
+just KLT/PnP), and clean up unused VO files + organize. Named for
+deletion: vo_live_plot (won't use), vo_capture (unsure what it is),
+vo_supervisor (thinks unused). KEEP yolo_detector_new (future),
+nav_to_pose, trip_planner.
+
+====================================================================
+Turn 135 - Assistant
+====================================================================
+Committed session work locally (3668383) staging only code/docs
+(excluded install/log/build/vo_calib noise). Push from the QCar
+shell FAILED (no GitHub creds in non-interactive shell) -> operator
+must push from their interactive terminal.
+
+Cleanup (verified before deleting): DELETED vo_capture.py +
+vo_live_plot.py (not entry points, no code imports, superseded).
+KEPT vo_supervisor.py and surfaced WHY: it's the act-on-faults node
+(stop_advised from /vo/healthy), a registered entry point, and core
+to the redundancy thesis + EKF roadmap -- deleting would gut the
+story and break the build. Declined the autonomy/ subfolder reorg:
+ROS2 ament_python needs the flat layout (entry points/imports), so
+subfoldering breaks the build. Updated CLAUDE.md repo layout.
+
+Logged the FULL ROADMAP in VO_CHANGELOG.md ('2026-05-21 Session
+wrap'): DONE (VSLAM A/B/C, KLT/PnP 2x2); NEAR-TERM (rate-0.5
+confirm, KLT+PnP 3D map, RANSAC/feature poster panel); MID-TERM (EKF
+variant D fusing VO+Cartographer via robot_localization w/
+vo_supervisor; RTAB-Map mapping->localization workflow for the
+practice-run pre-map; camera_bridge rgb/depth sync fix; Z-range
+mapping limit); FUTURE (object-detection map annotation, Nav2
+obstacle layer for new obstacles, resolution campaign, Cartographer
+covariance tuning).
+
+Gave migration steps: push+pull code, rsync data (small dbs/bags
+for view; +5.7 GB bag for re-runs), apt install rtabmap_ros +
+python deps, colcon build qcar2_autonomy. Made a follow-up commit
+for the cleanup + roadmap docs. Provided the push command for the
+operator's terminal (HTTPS -> GitHub username + PAT).
+
+
 
 
 

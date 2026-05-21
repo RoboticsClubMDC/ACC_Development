@@ -3,6 +3,82 @@
 This file tracks cleanup, calibration decisions, and test observations for
 the QCar2 visual odometry work.
 
+## 2026-05-21 Session wrap — cleanup, migration to Ubuntu, full roadmap
+
+Cleanup (file deletions, verified safe — not entry points, no code
+imports, only doc mentions):
+- DELETED autonomy/vo_capture.py (fault-status file-capture util;
+  superseded by copy-paste + bag recording).
+- DELETED autonomy/vo_live_plot.py (matplotlib live plotter;
+  superseded by saved PNG analysis plots).
+- KEPT autonomy/vo_supervisor.py despite operator's "not using it":
+  it is the act-on-faults node (stop_advised from /vo/healthy), a
+  registered entry point, and core to the VO-redundancy thesis +
+  EKF roadmap. Surfaced to operator; keep unless explicitly killed.
+- KEPT yolo_detector_new.py (possible future object-detection map
+  annotation), nav_to_pose, trip_planner, all active VO nodes, and
+  the *_old.py frozen references.
+- NOTE: did NOT reorganize autonomy/ into subfolders — ROS2
+  ament_python requires the flat module layout (entry points +
+  imports depend on autonomy.X:main); subfoldering would break the
+  build for no functional gain.
+- CLAUDE.md repo-layout updated (removed the two deleted files,
+  added vo_odom_tf_relay.py, sharpened vo_supervisor description).
+
+Migration off the QCar (operator handing the physical car to
+teammates): all remaining work is bag-based -> portable to the
+operator's Ubuntu machine; no live car / camera / Cartographer
+needed. Move = (1) git push Gabriel + pull on Ubuntu (push must be
+done from an interactive terminal; the QCar shell has no GitHub
+creds), (2) rsync the data (dbs + small vo_* bags ~160 MB for
+view/analysis; + the 5.7 GB vslam_test12 bag for re-runs),
+(3) apt install ros-<distro>-rtabmap-ros + python3-opencv/numpy/
+matplotlib, colcon build qcar2_autonomy for vo_node runs.
+
+FULL ROADMAP (everything discussed this session, prioritized):
+DONE:
+  - VSLAM showcase RTAB-Map A/B/C (pure-visual / our-VO / cartographer
+    -fused); quantified; poster panels.
+  - KLT/PnP 2x2 toolbox campaign (PnP lowers invalid rate ~3-4x; KLT
+    adds features but not reliability; jumps are environmental).
+NEAR-TERM (bag-based, do on Ubuntu):
+  1. Optional --rate 0.5 confirmation re-run of the 4 VO configs for
+     poster-grade numbers (kills 1x frame-drop confound).
+  2. KLT+PnP 3D map: RTAB-Map variant B with vo_node on klt+pnp ->
+     relay -> rtabmap, for a showcase panel.
+  3. RANSAC / feature poster panel: extend vo_image_overlay.py to
+     draw green inliers / red outliers + fitted model + a
+     before/after-RANSAC two-frame view.
+MID-TERM (the redundancy culmination):
+  4. EKF fusion "variant D": wire robot_localization to fuse
+     /vo/odometry (honest covariance) + Cartographer pose -> fused
+     odom -> feed RTAB-Map. vo_supervisor ties in (act on faults).
+     Showcase pitch: "VO publishes honest uncertainty, EKF does the
+     right blend." NOTE the C-result finding: Cartographer is smooth
+     (not jumpy) so it is the reliable backbone; VO is the jumpy
+     input the EKF down-weights.
+  5. RTAB-Map mapping->localization workflow: live-mapping launch
+     (build+save .db during the competition practice run while driving
+     the whole mat) + localization-mode launch (load .db, lightweight,
+     during the real task run).
+  6. camera_bridge rgb/depth sync investigation: the 0.03-0.65 s
+     rgb/depth timestamp misalignment degrades ALL variants and is a
+     prime suspect for the curve jumps; fixing timestamping could
+     clean up everything.
+  7. Z-range mapping limit: Grid/MaxObstacleHeight + depth limits to
+     cap cloud height ~mat level -> cut compute on the live-mapping run.
+FUTURE:
+  8. Object-detection map annotation: tag the 3D map with yolo
+     detections (stop sign / light at a pose) so trip_planner knows
+     the map in advance (keep yolo_detector_new).
+  9. New-obstacle handling at task time: Nav2 obstacle/costmap layer
+     on the static prebuilt map (NOT a live remap / learning agent).
+  10. Resolution campaign: intrinsics_source param (subscribe
+      /camera/camera_info -> resolution-agnostic VO) + 720p matrix
+      (480p x {400,800,1200} U 720p x {600,800,1200}).
+  11. Cartographer covariance tuning for the EKF (its covariance is
+      ~constant by default).
+
 ## 2026-05-21 KLT/PnP campaign — full 2x2 result (PnP lowers invalid rate; jumps are environmental)
 
 Completed the 2x2 (vo_orb_svd, vo_klt_svd, vo_orb_pnp, vo_klt_pnp)

@@ -44,11 +44,10 @@ ACC_Development_gabriel/
 │   ├── qcar2_autonomy/autonomy/        ← primary edit target
 │   │   ├── visual_odometry.py           # VO engine: ORB + depth backprojection + RANSAC + SVD Procrustes
 │   │   ├── vo_node.py                   # Redundancy monitor (VO vs Cartographer)
-│   │   ├── vo_supervisor.py             # NORMAL / VO_UNTRUSTED / ODOM_WARNING / ODOM_FAULT / INITIALIZING / DEGRADED
-│   │   ├── vo_capture.py                # Fault status capture utility
-│   │   ├── vo_live_plot.py              # Matplotlib live plotter
-│   │   ├── vo_terminal_dashboard.py     # Terminal dashboard
-│   │   ├── vo_image_overlay.py          # Image overlay (untracked, in progress)
+│   │   ├── vo_supervisor.py             # Redundancy state machine + act-on-faults (stop_advised from /vo/healthy)
+│   │   ├── vo_terminal_dashboard.py     # Terminal dashboard (entry point: vo_dashboard)
+│   │   ├── vo_image_overlay.py          # Image/feature overlay (entry point: vo_overlay; future RANSAC viz panel)
+│   │   ├── vo_odom_tf_relay.py          # Adapts /vo/odometry for RTAB-Map: re-frame to 'odom' + TF + covariance sanitize
 │   │   ├── nav_to_pose.py               # Nav2 goal sender
 │   │   ├── manual_drive.py              # WASD keyboard manual drive (recently added)
 │   │   ├── lane_detector.py / traffic_system_detector.py / yolo_detector*.py
