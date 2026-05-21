@@ -751,3 +751,109 @@ Transfer to personal machine (rsync or scp from your laptop):
   rsync -av nvidia@<qcar-ip>:~/vo_rtab_bags/  ./vo_rtab_bags/
 
 A complete showcase set (1 bag + 3 dbs) is roughly 6-10 GiB.
+
+
+==================================================
+8) Working OFF the QCar (bag-based, on Ubuntu) — 2026-05-21
+==================================================
+The physical car is no longer needed. Everything below replays the
+recorded bag (vslam_test12), so it runs on any Ubuntu box with ROS2
++ rtabmap. The pals can use the QCar; just keep a DIFFERENT
+ROS_DOMAIN_ID than 67 if anything live is ever on the same network
+(DDS isolates by domain). All artifacts persist on disk.
+
+----------------------------------------------------
+8.1) One-time setup on Ubuntu
+----------------------------------------------------
+# A) Get the code (branch Gabriel):
+git clone -b Gabriel https://github.com/RoboticsClubMDC/ACC_Development.git
+#   (or, if already cloned:  git checkout Gabriel && git pull origin Gabriel )
+
+# B) Get the DATA (NOT in git). From the Ubuntu box, while the QCar is on.
+#    Small set (maps + campaign bags + plots, ~160 MB) — enough to VIEW + analyze:
+mkdir -p ~/vo_rtab_bags
+rsync -av nvidia@qcar-61356:~/vo_rtab_bags/'*.db' nvidia@qcar-61356:~/vo_rtab_bags/'*.png' nvidia@qcar-61356:~/vo_rtab_bags/qos_reliable.yaml nvidia@qcar-61356:~/vo_rtab_bags/vo_orb_svd nvidia@qcar-61356:~/vo_rtab_bags/vo_klt_svd nvidia@qcar-61356:~/vo_rtab_bags/vo_orb_pnp nvidia@qcar-61356:~/vo_rtab_bags/vo_klt_pnp ~/vo_rtab_bags/
+#    Full source bag (5.7 GB) — only if you will RE-RUN replays:
+rsync -av nvidia@qcar-61356:~/vo_rtab_bags/vslam_test12 ~/vo_rtab_bags/
+
+# C) Install deps (adjust 'humble' to your distro from `ls /opt/ros/`):
+sudo apt install ros-humble-rtabmap-ros python3-opencv python3-numpy python3-matplotlib
+
+# D) Build qcar2_autonomy ONLY if you will run vo_node (campaign reruns / KLT+PnP map).
+#    Not needed just to view maps or run the analysis scripts.
+cd ~/ACC_Development/Development/ros2   # wherever you cloned it
+colcon build --packages-select qcar2_autonomy
+source install/setup.bash
+#    If the build complains about a missing dep, note it and resolve (cv_bridge,
+#    message pkgs come with ros-<distro>-desktop).
+
+Per-terminal prelude on Ubuntu:
+  source /opt/ros/<distro>/setup.bash
+  export ROS_DOMAIN_ID=67
+  cd ~/ACC_Development/Development/ros2 && source install/setup.bash   # if built
+
+----------------------------------------------------
+8.2) View any saved map (no build needed)
+----------------------------------------------------
+rtabmap-databaseViewer ~/vo_rtab_bags/rtabmap_odom.db    # variant A (pure visual)
+rtabmap-databaseViewer ~/vo_rtab_bags/vo_node.db         # variant B (our VO)
+rtabmap-databaseViewer ~/vo_rtab_bags/cartographer.db    # variant C (cartographer-fused)
+# In the viewer: View menu -> enable Graph View = trajectory + loop-closure links.
+
+----------------------------------------------------
+8.3) Re-run a RTAB-Map variant from the bag (needs the 5.7 GB bag)
+----------------------------------------------------
+# QoS note: camera topics are BEST_EFFORT in the bag. Either pass qos:=2 to the
+# stock rtabmap launch (RTAB-Map subscribes best-effort) OR use the
+# --qos-profile-overrides-path qos_reliable.yaml on the bag-play side.
+
+# Variant A (pure visual, rtabmap_odom):  T1 launch, T2 play
+ros2 launch rtabmap_launch rtabmap.launch.py rgb_topic:=/camera/color_image depth_topic:=/camera/depth_image camera_info_topic:=/camera/camera_info frame_id:=base_link approx_sync:=true rgbd_sync:=true qos:=2 visual_odometry:=true use_sim_time:=true database_path:=$HOME/vo_rtab_bags/rtabmap_odom.db
+ros2 bag play ~/vo_rtab_bags/vslam_test12 --clock --topics /camera/color_image /camera/depth_image /camera/camera_info /tf_static
+
+# Variant C (cartographer via TF):
+ros2 launch rtabmap_launch rtabmap.launch.py rgb_topic:=/camera/color_image depth_topic:=/camera/depth_image camera_info_topic:=/camera/camera_info frame_id:=base_link approx_sync:=true rgbd_sync:=true qos:=2 visual_odometry:=false odom_frame_id:=map map_frame_id:=carto_map use_sim_time:=true database_path:=$HOME/vo_rtab_bags/cartographer.db
+ros2 bag play ~/vo_rtab_bags/vslam_test12 --clock --topics /camera/color_image /camera/depth_image /camera/camera_info /tf_static /tf
+
+----------------------------------------------------
+8.4) ROADMAP item 2 — KLT+PnP 3D map (RTAB-Map variant B w/ our VO)
+----------------------------------------------------
+# Needs the 5.7 GB bag + qcar2_autonomy built (8.1 D). 3 terminals.
+# T-relay: re-frame /vo/odometry for RTAB-Map (frame fix + covariance sanitize)
+python3 ~/ACC_Development/Development/ros2/src/qcar2_autonomy/autonomy/vo_odom_tf_relay.py --ros-args -p use_sim_time:=true
+# T-vo: our VO with KLT + PnP, fed by the replayed camera
+ros2 run qcar2_autonomy vo_node --ros-args -p use_sim_time:=true -p camera_mode:=physical -p alignment_mode:=auto -p depth_scale:=0.0 -p n_features:=1200 -p feature_grid:=8 -p vo_frontend:=klt -p vo_estimator:=pnp
+# T-rtabmap: external odom = our relay
+ros2 launch rtabmap_launch rtabmap.launch.py rgb_topic:=/camera/color_image depth_topic:=/camera/depth_image camera_info_topic:=/camera/camera_info frame_id:=base_link approx_sync:=true rgbd_sync:=true qos:=2 visual_odometry:=false odom_topic:=/vo/odom_relay use_sim_time:=true database_path:=$HOME/vo_rtab_bags/vo_node_kltpnp.db
+# T-play: replay camera + TF (NOT /vo/* — vo_node regenerates it)
+ros2 bag play ~/vo_rtab_bags/vslam_test12 --clock --topics /camera/color_image /camera/depth_image /camera/camera_info /tf /tf_static
+
+----------------------------------------------------
+8.5) ROADMAP item 1 — clean --rate 0.5 re-run of the 4 VO configs
+----------------------------------------------------
+# Needs the 5.7 GB bag + qcar2_autonomy built. Per config, 3 terminals
+# (T-vo, T-record, T-play). Change vo_frontend/vo_estimator + the -o name.
+# T-vo (example orb+svd):
+ros2 run qcar2_autonomy vo_node --ros-args -p use_sim_time:=true -p camera_mode:=physical -p alignment_mode:=auto -p depth_scale:=0.0 -p n_features:=1200 -p feature_grid:=8 -p vo_frontend:=orb -p vo_estimator:=svd
+# T-record:
+cd ~/vo_rtab_bags && ros2 bag record -o vo_orb_svd_r05 /vo/odometry /vo/fault_status /vo/conditioning /vo/reason /vo/inliers /vo/confidence /vo/vo_x /vo/vo_y /vo/vo_psi /vo/cart_x /vo/cart_y /vo/cart_psi
+# T-play (--rate 0.5 forces every-frame processing, removes frame-drop confound):
+cd ~/vo_rtab_bags && ros2 bag play vslam_test12 --rate 0.5 --clock --topics /camera/color_image /camera/depth_image /camera/camera_info /tf /tf_static
+# Configs to sweep: orb_svd, klt_svd, orb_pnp, klt_pnp (each -o vo_<config>_r05).
+# Then ask Claude to decode + compare the /vo bags.
+
+----------------------------------------------------
+8.6) Full roadmap (see VO_CHANGELOG.md '2026-05-21 Session wrap' for detail)
+----------------------------------------------------
+DONE: VSLAM A/B/C showcase; KLT/PnP 2x2 campaign.
+NEAR: (1) rate-0.5 confirm runs; (2) KLT+PnP 3D map; (3) RANSAC/feature
+      poster panel (extend vo_image_overlay.py).
+MID:  (4) EKF "variant D" robot_localization fusing VO + Cartographer ->
+      RTAB-Map (vo_supervisor acts on faults); (5) RTAB-Map
+      mapping->localization workflow for the competition practice-run
+      pre-map; (6) camera_bridge rgb/depth sync fix (suspect for the
+      jumps); (7) Z-range mapping limit (Grid/MaxObstacleHeight).
+FUTURE: (8) object-detection map annotation (yolo_detector_new); (9) Nav2
+      obstacle layer for new obstacles; (10) resolution campaign
+      (intrinsics_source param + 720p matrix); (11) Cartographer
+      covariance tuning for the EKF.
