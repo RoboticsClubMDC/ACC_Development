@@ -1,0 +1,36 @@
+{
+  "type_description_msg": {
+    "type_description": {
+      "type_name": "qcar2_interfaces/msg/MotorCommands",
+      "fields": [
+        {
+          "name": "motor_names",
+          "type": {
+            "type_id": 161,
+            "capacity": 0,
+            "string_capacity": 0,
+            "nested_type_name": ""
+          },
+          "default_value": ""
+        },
+        {
+          "name": "values",
+          "type": {
+            "type_id": 155,
+            "capacity": 0,
+            "string_capacity": 0,
+            "nested_type_name": ""
+          },
+          "default_value": ""
+        }
+      ]
+    },
+    "referenced_type_descriptions": []
+  },
+  "type_hashes": [
+    {
+      "type_name": "qcar2_interfaces/msg/MotorCommands",
+      "hash_string": "RIHS01_88b4431b1db68047a2381eafe85a4409ae5d64e773e6cabf9b7e1cd66bb5c6ee"
+    }
+  ]
+}
