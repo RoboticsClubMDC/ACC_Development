@@ -230,3 +230,7 @@ Topics:
 
 Meaning:
 Stable map, live hypotheses, current observations, and residual checks are separate Foxglove layers now.
+
+
+Recommendation or fixes: 
+

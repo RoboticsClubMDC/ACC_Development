@@ -206,6 +206,95 @@ class YoloDetector(Node):
         y_b = -x_c + 0.032
         z_b = -y_c + 0.172
         return x_b, y_b, z_b
+    
+    def publish_detection_markers(self, detections):
+        """
+        detections format:
+        [
+            {
+                "class_name": "stop sign",
+                "conf": 0.88,
+                "camera_point": (x_c, y_c, z_c)
+            }
+        ]
+        """
+        marker_array = MarkerArray()
+        now = self.get_clock().now().to_msg()
+
+        for i, det in enumerate(detections):
+            class_name = det["class_name"]
+            conf = det["conf"]
+            x_c, y_c, z_c = det["camera_point"]
+
+            x_b, y_b, z_b = self.camera_to_base_link(x_c, y_c, z_c)
+
+            marker = Marker()
+            marker.header.stamp = now
+            marker.header.frame_id = "base_link"
+
+            marker.ns = "yolo_3d_objects"
+            marker.id = i
+            marker.type = Marker.SPHERE
+            marker.action = Marker.ADD
+
+            marker.pose.position.x = float(x_b)
+            marker.pose.position.y = float(y_b)
+            marker.pose.position.z = float(z_b)
+
+            marker.pose.orientation.x = 0.0
+            marker.pose.orientation.y = 0.0
+            marker.pose.orientation.z = 0.0
+            marker.pose.orientation.w = 1.0
+
+            marker.scale.x = 0.08
+            marker.scale.y = 0.08
+            marker.scale.z = 0.08
+
+            if "stop" in class_name.lower():
+                marker.color.r = 1.0
+                marker.color.g = 0.0
+                marker.color.b = 0.0
+            elif "car" in class_name.lower():
+                marker.color.r = 0.0
+                marker.color.g = 0.4
+                marker.color.b = 1.0
+            else:
+                marker.color.r = 1.0
+                marker.color.g = 1.0
+                marker.color.b = 0.0
+
+            marker.color.a = 1.0
+
+            marker.lifetime.sec = 1
+            marker_array.markers.append(marker)
+
+            text_marker = Marker()
+            text_marker.header.stamp = now
+            text_marker.header.frame_id = "base_link"
+
+            text_marker.ns = "yolo_3d_labels"
+            text_marker.id = i + 1000
+            text_marker.type = Marker.TEXT_VIEW_FACING
+            text_marker.action = Marker.ADD
+
+            text_marker.pose.position.x = float(x_b)
+            text_marker.pose.position.y = float(y_b)
+            text_marker.pose.position.z = float(z_b + 0.15)
+
+            text_marker.pose.orientation.w = 1.0
+
+            text_marker.scale.z = 0.12
+            text_marker.color.r = 1.0
+            text_marker.color.g = 1.0
+            text_marker.color.b = 1.0
+            text_marker.color.a = 1.0
+
+            text_marker.text = f"{class_name} {conf:.2f}"
+            text_marker.lifetime.sec = 1
+
+            marker_array.markers.append(text_marker)
+
+        self.marker_pub.publish(marker_array)
 
     def parse_class_filter(self, text):
         text = text.strip()
@@ -411,7 +500,13 @@ class YoloDetector(Node):
                     f"{class_name} conf={conf:.2f} "
                     f"bbox=({x1},{y1},{x2},{y2}) "
                     f"camera_point=({X:.3f}, {Y:.3f}, {Z:.3f})"
+                    detections_3d.append({
+                        "class_name": class_name,
+                        "conf": conf,
+                        "camera_point": (X, Y, Z)
+                    })
                 )
+                
 
             sphere = self.make_sphere_marker(
                 marker_id,

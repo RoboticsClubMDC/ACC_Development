@@ -61,5 +61,6 @@ def generate_launch_description():
         realsense_camera_node,
         csi_camera_node,
         qcar2_hardware,
-        qcar2_odometry,
+        #qcar2_odometry, -> DIsable for cartographer testing 2026-05-21
+
     ])
