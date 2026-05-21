@@ -45,12 +45,33 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Image
 from std_msgs.msg import String, Float64, Bool, Int32
+from nav_msgs.msg import Odometry
 from cv_bridge import CvBridge
 import tf2_ros
 from rcl_interfaces.msg import ParameterDescriptor
 
 # Import the depth-based VO engine
 from autonomy.visual_odometry import VisualOdometryDepth
+
+
+# ── Step 3 honest-uncertainty tuning constants ──────────────────────
+# These map the VO quality signals to a MONOTONE covariance: the worse
+# the geometry, the larger the reported variance. This is an honest
+# uncertainty proxy (bigger when less trustworthy), NOT a statistically
+# calibrated covariance — calibration against ground truth is future
+# work / the Friday EKF experiment. Constants are deliberately plain
+# (not ROS params) to avoid re-opening a tuning campaign on a
+# read-only/showcase feature.
+VO_SX_BASE = 0.03                 # m, best-case position 1-sigma
+VO_SYAW_BASE = np.radians(2.0)    # rad, best-case yaw 1-sigma
+VO_INL_REF = 40.0                 # inliers giving ~best-case trust
+VO_GCOND_REF = 0.20               # m, inlier-cloud spread for best case
+VO_RESID_REF = 0.02               # m, fit residual for best case
+VO_BARE_GCOND = 0.05              # m, below => bare-wall degeneracy
+VO_BARE_ANISO = 0.15              # below => near-collinear cloud
+VO_BIG_POS_VAR = 25.0             # m^2, "ignore VO" position variance
+VO_BIG_YAW_VAR = (np.pi / 2) ** 2  # rad^2, "ignore VO" yaw variance
+VO_FAC_CAP = 50.0                 # cap on any single inflation factor
 
 
 def _load_qcar2_depth_aligned(custom_path):
@@ -117,31 +138,32 @@ class VONodeDepth(Node):
         self.declare_parameter('negate_deltas', True)
         self.declare_parameter('max_translation', 0.20)
         self.declare_parameter('max_rotation_deg', 15.0)
-        # 2026-05-15: ORB ROI mask. Top fraction of the image is excluded
-        # from feature detection. 0.0 = full frame (legacy). Typical
-        # productive values 0.30-0.40 to skip sky/horizon and focus on
-        # ground-level features with usable depth.
-        self.declare_parameter('roi_top_fraction', 0.0)
         # 2026-05-15: RANSAC minimum-sample size. 2 = legacy minimum for
         # the 3-DOF rigid transform; 3 = robust over-constrained sample
         # that resists degenerate consensus on low-texture/bare-wall
         # scenes. Clamped to >= 2 in VisualOdometryDepth.
         self.declare_parameter('ransac_sample_size', 2)
-        # 2026-05-18: Step 1 — depth-weighted Procrustes power.
-        # Each matched correspondence is weighted by 1/range**power in
-        # the SVD rigid fit (range = camera depth of the noisier
-        # endpoint, meters in physical mode). 0.0 = OFF = the prior
-        # unweighted estimator (Test 6 control). 2.0 = gentle
-        # (weight ∝ 1/Z^2). 4.0 = full RealSense model (sigma_Z ∝ Z^2
-        # -> weight ∝ 1/Z^4). Clamped to [0, 8] in VisualOdometryDepth.
-        self.declare_parameter('depth_weight_power', 0.0)
-        # 2026-05-18: Step 1b — HARD max-depth cutoff (operator idea;
-        # Quanser precedent: pit/YOLO/nets.py clips depth past
-        # clippingDistance). A matched feature farther than this (camera
-        # range, metres in physical mode) is dropped from VO motion
-        # entirely. 0.0 = OFF (prior behavior). Composes with
-        # depth_weight_power. Typical test value 2.5-3.0.
-        self.declare_parameter('max_vo_feature_depth_m', 0.0)
+        # 2026-05-18: Step 3 — publish nav_msgs/Odometry on /vo/odometry
+        # with a principled covariance so VO is EKF-fusable. Default True
+        # is additive/safe: it only adds a topic, changes no existing
+        # behavior, and the node is simply not launched during the
+        # competition. Set False to suppress the Odometry publish.
+        # 2026-05-18: ORB-SLAM-style grid feature homogenization.
+        # feature_grid x feature_grid buckets, best-per-cell kept, to
+        # stop ORB clustering on one object (poorly-conditioned RANSAC).
+        # 0 = OFF (prior behavior, default-safe). 8-12 typical.
+        self.declare_parameter('feature_grid', 0)
+        # 2026-05-19: selectable motion estimator. 'svd' (default) =
+        # proven 3D-3D Procrustes; 'pnp' = 3D-2D reprojection
+        # (cv2.solvePnPRansac), Geiger Lec 7.1's recommended RGB-D
+        # method, A/B-able like the other knobs.
+        self.declare_parameter('vo_estimator', 'svd')
+        # 2026-05-19: selectable correspondence frontend. 'orb'
+        # (default) = detect+describe+match; 'klt' = detect ORB then
+        # Lucas-Kanade optical-flow track the previous frame's points
+        # (descriptors still kept). Either/or, A/B-able.
+        self.declare_parameter('vo_frontend', 'orb')
+        self.declare_parameter('publish_vo_odometry', True)
         # Official short-term policy for competition:
         # use Cartographer yaw for VO heading while keeping camera-derived
         # translation increments.
@@ -204,14 +226,23 @@ class VONodeDepth(Node):
         negate = self.get_parameter('negate_deltas').value
         max_trans = self.get_parameter('max_translation').value
         max_rot = self.get_parameter('max_rotation_deg').value
-        roi_top_fraction = float(
-            self.get_parameter('roi_top_fraction').value)
         ransac_sample_size = int(
             self.get_parameter('ransac_sample_size').value)
-        depth_weight_power = float(
-            self.get_parameter('depth_weight_power').value)
-        max_vo_feature_depth_m = float(
-            self.get_parameter('max_vo_feature_depth_m').value)
+        feature_grid = int(self.get_parameter('feature_grid').value)
+        vo_estimator = str(
+            self.get_parameter('vo_estimator').value).strip().lower()
+        if vo_estimator not in ('svd', 'pnp'):
+            self.get_logger().warn(
+                f"Invalid vo_estimator '{vo_estimator}', using 'svd'")
+            vo_estimator = 'svd'
+        vo_frontend = str(
+            self.get_parameter('vo_frontend').value).strip().lower()
+        if vo_frontend not in ('orb', 'klt'):
+            self.get_logger().warn(
+                f"Invalid vo_frontend '{vo_frontend}', using 'orb'")
+            vo_frontend = 'orb'
+        self.publish_vo_odometry = bool(
+            self.get_parameter('publish_vo_odometry').value)
         self.force_cart_yaw = bool(self.get_parameter('force_cart_yaw').value)
         camera_mode = self.get_parameter('camera_mode').value
         if camera_mode not in ('virtual', 'physical'):
@@ -289,10 +320,10 @@ class VONodeDepth(Node):
             max_translation=max_trans,
             max_rotation_deg=max_rot,
             negate_deltas=negate,
-            roi_top_fraction=roi_top_fraction,
             ransac_sample_size=ransac_sample_size,
-            depth_weight_power=depth_weight_power,
-            max_vo_feature_depth_m=max_vo_feature_depth_m,
+            feature_grid=feature_grid,
+            vo_estimator=vo_estimator,
+            vo_frontend=vo_frontend,
         )
         self.vo_lock = threading.Lock()
 
@@ -347,6 +378,14 @@ class VONodeDepth(Node):
         self.last_inliers = 0
         self.last_confidence = 0.0
         self.last_spread = 0.0
+        # Step 3 signals for the honest covariance + reason tag
+        self.last_geom_cond = 0.0
+        self.last_geom_aniso = 0.0
+        self.last_ransac_resid = 0.0
+        self.last_turn_rate = 0.0       # |cart yaw| change over the window
+        self.last_reason = 'init'       # why VO is (un)trusted right now
+        self.last_vo_valid = False      # did the engine produce a fix
+        self.last_vel = np.array([0.0, 0.0])
 
         # Shadow camera-only yaw: independent integrator of the raw per-frame
         # dpsi from the engine. Tracks what `vo_psi` would be if force_cart_yaw
@@ -413,6 +452,11 @@ class VONodeDepth(Node):
         # Shadow yaw — camera-only yaw integrated independent of force_cart_yaw
         self.pub_vo_psi_shadow = self.create_publisher(
             Float64, '/vo/vo_psi_shadow', 5)
+        # Step 3 — honest-uncertainty outputs (additive, read-only).
+        self.pub_odom = self.create_publisher(Odometry, '/vo/odometry', 10)
+        self.pub_cond = self.create_publisher(
+            Float64, '/vo/conditioning', 5)
+        self.pub_reason = self.create_publisher(String, '/vo/reason', 5)
 
         # ── Startup banner ──────────────────────────────────────
         k = self.vo.projector.K_rgb
@@ -431,23 +475,26 @@ class VONodeDepth(Node):
             f"║  Alignment: {'ON' if self.vo.projector.use_alignment else 'OFF':<21}║\n"
             f"║  negate_deltas: {negate!s:<16}║\n"
             f"║  features={n_features}  match_ratio={match_ratio}\n"
-            f"║  depth_weight_power={depth_weight_power} "
-            f"({'ON' if depth_weight_power > 0.0 else 'OFF (=Test 6)'})\n"
-            f"║  max_vo_feature_depth_m={max_vo_feature_depth_m} "
-            f"({'ON' if max_vo_feature_depth_m > 0.0 else 'OFF'})\n"
             f"╚══════════════════════════════════════════════╝")
-        if depth_weight_power > 0.0:
+        if feature_grid > 0:
             self.get_logger().warn(
-                f"Step 1 depth-weighted Procrustes ACTIVE "
-                f"(depth_weight_power={depth_weight_power}); the SVD fit "
-                "down-weights far/noisy depth points. Set "
-                "depth_weight_power:=0.0 for the unweighted Test 6 control.")
-        if max_vo_feature_depth_m > 0.0:
+                f"Grid feature homogenization ACTIVE (feature_grid="
+                f"{feature_grid}); ORB keypoints spread best-per-cell. "
+                "Set feature_grid:=0 for the prior clustered behavior.")
+        if vo_estimator == 'pnp':
             self.get_logger().warn(
-                f"Step 1b hard max-depth cutoff ACTIVE "
-                f"(max_vo_feature_depth_m={max_vo_feature_depth_m} m); "
-                "matched features farther than this are dropped from VO "
-                "motion. Set max_vo_feature_depth_m:=0.0 to disable.")
+                "Estimator = PnP (3D-2D reprojection, solvePnPRansac) "
+                "instead of SVD. Set vo_estimator:=svd for the proven "
+                "Procrustes path.")
+        if vo_frontend == 'klt':
+            self.get_logger().warn(
+                "Frontend = KLT optical-flow tracking instead of ORB "
+                "descriptor matching. Set vo_frontend:=orb for the "
+                "proven path.")
+        self.get_logger().info(
+            "Step 3 ACTIVE: /vo/odometry (pose + honest covariance)="
+            f"{self.publish_vo_odometry}, /vo/conditioning, /vo/reason "
+            "published. Additive/read-only — VO motion is unchanged.")
 
     # ── Callbacks ───────────────────────────────────────────────
 
@@ -678,6 +725,12 @@ class VONodeDepth(Node):
         self.last_inliers = result['inlier_count']
         self.last_confidence = result['confidence']
         self.last_spread = result.get('inlier_spread', 0.0)
+        self.last_geom_cond = result.get('geom_cond', 0.0)
+        self.last_geom_aniso = result.get('geom_aniso', 0.0)
+        self.last_ransac_resid = result.get('ransac_resid', 0.0)
+        self.last_vo_valid = bool(result.get('valid', False))
+        self.last_vel = np.asarray(
+            result.get('velocity', (0.0, 0.0)), dtype=float).reshape(-1)[:2]
 
         vo_x, vo_y, vo_psi = result['pose']
         vo_valid = result['valid']
@@ -708,6 +761,7 @@ class VONodeDepth(Node):
 
     def _evaluate(self, now, vo_x, vo_y, vo_psi):
         if len(self.eval_window) < 3:
+            self.last_reason = 'warming'
             self._publish_all(0.0, 0.0, 'warming', True, vo_x, vo_y, vo_psi)
             return
 
@@ -717,6 +771,7 @@ class VONodeDepth(Node):
                 anchor = s
                 break
         if anchor is None:
+            self.last_reason = 'no_anchor'
             self._push_decision('vo_suspect', now)
             self._publish_all(0.0, 0.0, self.confirmed_state, self.healthy,
                               vo_x, vo_y, vo_psi)
@@ -736,6 +791,9 @@ class VONodeDepth(Node):
         dpsi_cart = abs(latest[3] - anchor[3])
         if dpsi_cart > np.pi:
             dpsi_cart = 2 * np.pi - dpsi_cart
+        # Cartographer yaw change over the window — the turn-rate proxy
+        # that inflates the VO covariance (camera VO is weak in turns).
+        self.last_turn_rate = float(dpsi_cart)
 
         vo_valid = latest[7]
         conf = latest[8]
@@ -743,6 +801,14 @@ class VONodeDepth(Node):
         spread = latest[10]
 
         if not vo_valid or conf < 0.15 or inliers < 20:
+            if not vo_valid:
+                self.last_reason = 'invalid'
+            elif self._bare_wall():
+                self.last_reason = 'bare_wall'
+            elif inliers < 20:
+                self.last_reason = 'low_inliers'
+            else:
+                self.last_reason = 'low_conf'
             self._push_decision('vo_suspect', now)
             self._publish_all(rho, 0.0, self.confirmed_state, self.healthy,
                               vo_x, vo_y, vo_psi)
@@ -756,6 +822,8 @@ class VONodeDepth(Node):
         weight = (q_conf * q_inl * q_spread) ** (1.0 / 3.0)
 
         if weight < self.min_vo_weight:
+            self.last_reason = ('bare_wall' if self._bare_wall()
+                                else 'low_weight')
             self._push_decision('vo_suspect', now)
             self._publish_all(rho, weight, self.confirmed_state, self.healthy,
                               vo_x, vo_y, vo_psi)
@@ -765,14 +833,17 @@ class VONodeDepth(Node):
         # but we keep the gate as a safety measure. Can be loosened later
         # once depth heading is validated.
         if dpsi_cart > self.turn_gate_rad:
+            self.last_reason = 'turn'
             self._push_decision('vo_suspect', now)
             self._publish_all(rho, weight, self.confirmed_state, self.healthy,
                               vo_x, vo_y, vo_psi)
             return
 
         if rho <= self.trans_thresh:
+            self.last_reason = 'ok'
             self._push_decision('agree', now)
         else:
+            self.last_reason = 'odom_suspect'
             self._push_decision('odom_suspect', now)
 
         self._publish_all(rho, weight, self.confirmed_state, self.healthy,
@@ -818,12 +889,96 @@ class VONodeDepth(Node):
         self.last_reanchor_time = now
         self.last_reanchor_xy = np.array([self.cart_x, self.cart_y])
 
+    # ── Step 3 honest-uncertainty helpers ───────────────────────
+
+    def _bare_wall(self):
+        """True when the inlier 3D cloud is degenerate (collinear /
+        clustered) — the structural bare-wall regime the campaign
+        proved is unobservable to camera-only VO."""
+        return (self.last_geom_cond < VO_BARE_GCOND
+                or self.last_geom_aniso < VO_BARE_ANISO)
+
+    def _vo_covariance(self):
+        """Monotone honest variance (x, y, yaw): larger = less
+        trustworthy. Inflated by few inliers, a collinear/clustered
+        cloud, a sloppy RANSAC fit, fast turning, and the bare-wall
+        degeneracy. Not a calibrated covariance — an honest
+        uncertainty proxy for EKF down-weighting / the showcase."""
+        if not self.last_vo_valid:
+            return VO_BIG_POS_VAR, VO_BIG_POS_VAR, VO_BIG_YAW_VAR
+
+        def _cap(v):
+            return float(min(max(v, 1.0), VO_FAC_CAP))
+
+        f_inl = _cap(VO_INL_REF / max(self.last_inliers, 1))
+        f_cond = _cap(VO_GCOND_REF / max(self.last_geom_cond, 1e-3))
+        f_res = (_cap(self.last_ransac_resid / VO_RESID_REF)
+                 if self.last_ransac_resid > 0.0 else 1.0)
+        f_turn = 1.0
+        if self.turn_gate_rad > 1e-6:
+            f_turn = _cap(self.last_turn_rate / self.turn_gate_rad)
+        f_bare = VO_FAC_CAP if self._bare_wall() else 1.0
+
+        var_pos = (VO_SX_BASE ** 2) * f_inl * f_cond * f_res * f_turn * f_bare
+        var_pos = float(min(var_pos, VO_BIG_POS_VAR))
+        var_yaw = (VO_SYAW_BASE ** 2) * max(f_turn, f_inl, f_bare)
+        var_yaw = float(min(var_yaw, VO_BIG_YAW_VAR))
+        return var_pos, var_pos, var_yaw
+
+    def _publish_step3(self, state, vo_x, vo_y, vo_psi, reason):
+        """Publish /vo/odometry (pose + covariance), /vo/conditioning,
+        /vo/reason. Purely additive; no existing topic touched."""
+        c = Float64()
+        c.data = float(self.last_geom_cond)
+        self.pub_cond.publish(c)
+        r = String()
+        r.data = reason
+        self.pub_reason.publish(r)
+
+        if not self.publish_vo_odometry:
+            return
+        var_x, var_y, var_yaw = self._vo_covariance()
+        od = Odometry()
+        od.header.stamp = self.get_clock().now().to_msg()
+        od.header.frame_id = 'map'
+        od.child_frame_id = 'base_link'
+        od.pose.pose.position.x = float(vo_x)
+        od.pose.pose.position.y = float(vo_y)
+        od.pose.pose.orientation.z = float(np.sin(vo_psi / 2.0))
+        od.pose.pose.orientation.w = float(np.cos(vo_psi / 2.0))
+        cov = [0.0] * 36
+        cov[0] = var_x                 # x
+        cov[7] = var_y                 # y
+        cov[14] = VO_BIG_POS_VAR       # z (not observed by planar VO)
+        cov[21] = VO_BIG_YAW_VAR       # roll (not observed)
+        cov[28] = VO_BIG_YAW_VAR       # pitch (not observed)
+        cov[35] = var_yaw              # yaw
+        od.pose.covariance = cov
+        od.twist.twist.linear.x = float(self.last_vel[0])
+        od.twist.twist.linear.y = float(self.last_vel[1])
+        tw = [0.0] * 36
+        tw[0] = var_x; tw[7] = var_y; tw[35] = var_yaw
+        # Off-plane velocity dims are unobserved by planar VO. Leave them
+        # LARGE-but-finite (not 0.0): a consumer that inverts the covariance
+        # for an information matrix (e.g. RTAB-Map) hits 1/0 = inf on a zero
+        # diagonal and aborts (Link.cpp setInfMatrix). Mirrors the pose
+        # covariance convention set just above.
+        tw[14] = VO_BIG_POS_VAR        # vz (not observed)
+        tw[21] = VO_BIG_YAW_VAR        # v_roll (not observed)
+        tw[28] = VO_BIG_YAW_VAR        # v_pitch (not observed)
+        od.twist.covariance = tw
+        self.pub_odom.publish(od)
+
     # ── Publishing ──────────────────────────────────────────────
 
     def _publish_all(self, rho, weight, state, healthy,
                      vo_x=0.0, vo_y=0.0, vo_psi=0.0):
         STATE_MAP = {'init': 0, 'warming': 1, 'agree': 2,
                      'vo_suspect': 3, 'odom_suspect': 4}
+
+        # init/warming carry their own reason; otherwise use the tag
+        # _evaluate set for this decision.
+        reason = state if state in ('init', 'warming') else self.last_reason
 
         msg = String()
         msg.data = (
@@ -834,9 +989,11 @@ class VONodeDepth(Node):
             f"dx={self.last_frame_dx:.4f} dy={self.last_frame_dy:.4f} "
             f"dpsi={np.degrees(self.last_frame_dpsi):.1f} "
             f"inl={self.last_inliers} sp={self.last_spread:.0f} "
-            f"psi_raw={np.degrees(self.vo_psi_shadow):.0f}"
+            f"psi_raw={np.degrees(self.vo_psi_shadow):.0f} "
+            f"reason={reason}"
         )
         self.pub_fault.publish(msg)
+        self._publish_step3(state, vo_x, vo_y, vo_psi, reason)
 
         def _f(val):
             m = Float64(); m.data = float(val); return m

@@ -46,7 +46,8 @@ class Dashboard(Node):
         r'ct\((?P<ct_x>[-0-9.]+),(?P<ct_y>[-0-9.]+),(?P<ct_psi_deg>[-0-9.]+)\)\s+\|\s+'
         r'dx=(?P<dx>[-0-9.]+)\s+dy=(?P<dy>[-0-9.]+)\s+dpsi=(?P<dpsi_deg>[-0-9.]+)\s+'
         r'inl=(?P<inl>\d+)\s+sp=(?P<sp>[-0-9.]+)'
-        r'(?:\s+psi_raw=(?P<psi_raw_deg>[-0-9.]+))?$'
+        r'(?:\s+psi_raw=(?P<psi_raw_deg>[-0-9.]+))?'
+        r'(?:\s+reason=(?P<reason>\S+))?$'
     )
 
     def __init__(self):
@@ -87,6 +88,8 @@ class Dashboard(Node):
             }
             if g.get('psi_raw_deg') is not None:
                 d['vo_psi_raw'] = math.radians(float(g['psi_raw_deg']))
+            if g.get('reason') is not None:
+                d['reason'] = g['reason']
         else:
             # Fallback: legacy key=value parser.
             for part in text.split():
@@ -162,7 +165,9 @@ class Dashboard(Node):
         print(f'  {"dist":8s} {vo_dist:+12.4f}m')
 
         print(f'  ---')
-        print(f'  State: {state}  rho={rho:.3f}m  weight={weight:.2f}')
+        reason = _s(d, 'reason', '-')
+        print(f'  State: {state}  rho={rho:.3f}m  weight={weight:.2f}'
+              f'  why={reason}')
         print(f'  Drift: {drift:.4f}m  PsiErr: {psi_err:.2f}dg')
         print(f'  Inliers: {inliers}  Spread: {spread:.1f}')
         print(sep)

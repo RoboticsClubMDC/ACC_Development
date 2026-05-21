@@ -3,6 +3,878 @@
 This file tracks cleanup, calibration decisions, and test observations for
 the QCar2 visual odometry work.
 
+## 2026-05-21 KLT/PnP campaign — full 2x2 result (PnP lowers invalid rate; jumps are environmental)
+
+Completed the 2x2 (vo_orb_svd, vo_klt_svd, vo_orb_pnp, vo_klt_pnp)
+via bag replay of vslam_test12. Decoded all four /vo bags.
+
+  config       msgs  inliers  invalid%  jumps>0.3  ok%
+  ORB+SVD      1278  88       9.4       2          30
+  KLT+SVD      1116  141      14.5      4          29
+  ORB+PnP      2295  148      3.7       3          38
+  KLT+PnP      2258  238      3.1       2          39
+
+Findings:
+- KLT tracks more features than ORB (141>88, 238>148) but on SVD it
+  did NOT help (worst invalid rate + most jumps).
+- PnP is the standout: ~3-4x LOWER invalid rate than SVD (3-4% vs
+  9-15%) on both frontends. Mechanistic: PnP (3D->2D reprojection)
+  needs valid depth on only ONE frame; SVD (3D->3D Procrustes) needs
+  good depth on BOTH -- and our depth is noisy on the white walls,
+  so PnP degrades more gracefully. KLT+PnP best on paper (most
+  inliers, lowest invalid, fewest jumps).
+- KEY: big jumps (>0.3 m) stay at 2-4 across ALL FOUR configs. Neither
+  frontend nor estimator fixes them -> the jumps are
+  depth/sync/curve-dynamics, NOT an algorithm-choice problem.
+
+CAVEAT (methodology): PnP runs logged ~2x more msgs (2295/2258 vs
+1278/1116) -> 1x-replay frame-drop nondeterminism (load-dependent;
+SVD runs earlier/warmer, PnP later). Absolute counts not directly
+comparable; RATES control for it and still favor PnP, and a 3-4x
+invalid-rate gap is too large to be pure load. To put hard numbers
+on the poster, re-run all 4 at --rate 0.5 (forces every-frame
+processing, removes the drop confound).
+
+Plots saved: ~/vo_rtab_bags/klt_vs_orb_trajectory.png and
+~/vo_rtab_bags/klt_pnp_2x2_trajectories.png.
+
+Reminder logged for operator: these 4 runs are odometry-only (no
+3D map / loop closure -- that is the RTAB-Map side). To get a 3D
+map for a winning config (e.g. KLT+PnP), re-run RTAB-Map variant B
+with vo_node set to that frontend/estimator feeding /vo/odometry ->
+relay -> rtabmap.
+
+Operator decision pending: (1) clean --rate 0.5 confirmation run,
+(2) accept directional finding + write conclusions, or (3) build a
+3D map for the best config. Default-safe toolbox baseline stays
+ORB+SVD; PnP is a promising robustness lever worth confirming.
+
+## 2026-05-21 KLT/PnP campaign — KLT vs ORB result (ORB wins on reliability)
+
+Ran vo_orb_svd (baseline) + vo_klt_svd via bag replay of vslam_test12.
+Decoded /vo/odometry + diagnostics from each /vo bag (rosbag2_py +
+deserialize_message). Both = 983-1278 odom msgs over the ~128s replay.
+
+  metric            | ORB+SVD | KLT+SVD
+  inliers (mean)    | 88      | 141
+  invalid frames    | 120     | 162
+  big jumps >0.3 m  | 2       | 4
+  bare_wall flags   | 83      | 49
+  ok frames         | 386     | 328
+  odom msgs         | 1278    | 1116
+
+VERDICT: KLT does NOT clearly beat ORB — mixed, leans ORB. KLT tracks
+more features (141 vs 88 inliers) and flags bare_wall less, but pays
+with more invalid frames, more big jumps, and fewer ok frames. For
+our reliability-first use, ORB+SVD remains the better default; KLT
+trades robustness for feature count. Caveat: 1x replay frame-drop
+nondeterminism adds noise to small differences, but the
+reliability gap (invalid + jumps) is consistent.
+(Normalizing path by sample count: ORB 19.85m/1278 = 0.0155 m/step,
+KLT 16.91m/1116 = 0.0151 m/step -- essentially identical per-step,
+so the raw path-length difference is just sample count, not
+smoothness.)
+
+Saved trajectory comparison plot:
+~/vo_rtab_bags/klt_vs_orb_trajectory.png (ORB blue, KLT red,
+Cartographer black ref).
+
+Clarified for the operator the two experiment types from the one
+bag: (1) RTAB-Map variants A/B/C = SLAM/3D-map (rtabmap_viz, .db
+files, loop closure); (2) orb/klt/svd/pnp = OUR vo_node odometry
+A/B (only /vo/odometry, no 3D map / no loop closure). They connect:
+the winning VO config would feed a future RTAB-Map variant B.
+3D maps viewable via rtabmap-databaseViewer on the saved .db files.
+
+Next: run vo_orb_pnp (estimator test on the proven ORB frontend),
+optionally vo_klt_pnp, then final 2x2 verdict.
+
+## 2026-05-21 KLT/PnP campaign — bag-based methodology + multi-user isolation
+
+Multi-user check: domain 67 verified clean (only /parameter_events,
+/rosout) — friend running in Docker on a DIFFERENT ROS_DOMAIN_ID is
+fully isolated by DDS; zero cross-talk. Only shared resource would
+be the physical camera, which the bag-based campaign does not touch.
+
+Raw-/vo/cart_x check: deferred/skipped — operator reasoning accepted
+(Cartographer has no vision -> smooth but drifts; loop-closure
+rescues drift; VO rescues when Cartographer degrades). The C-map
+already shows Cartographer smooth.
+
+KLT/PnP campaign methodology = BAG-BASED on vslam_test12 (matches the
+established bag-driven evaluation used for the grid A/B):
+- vo_node subscribes camera with qos_profile_sensor_data (BEST_EFFORT),
+  which matches the bag natively -> NO QoS override needed (unlike
+  RTAB-Map). So we replay vslam_test12 camera+TF straight into
+  vo_node and A/B the knobs on identical input. Deterministic, no
+  driving, no camera contention.
+- Per config, 3 terminals: T1 vo_node (use_sim_time:=true,
+  camera_mode:=physical, alignment_mode:=auto, depth_scale:=0.0,
+  n_features:=1200, feature_grid:=8, + vo_frontend/vo_estimator under
+  test); T2 record /vo/* (odometry, fault_status, conditioning,
+  reason, inliers, confidence, vo_x/y/psi, cart_x/y/psi) to a small
+  bag vo_<config>; T3 bag play vslam_test12 --clock --topics
+  camera-triple + /tf + /tf_static (NOT /vo/* — vo_node regenerates
+  it). Order T1,T2 then T3; on T3 end Ctrl-C T2 then T1.
+- Configs (regenerate baseline via replay too, for apples-to-apples):
+  vo_orb_svd (baseline), vo_klt_svd, vo_orb_pnp, vo_klt_pnp.
+- Start with orb_svd + klt_svd (the headline KLT-vs-ORB question).
+  Analysis = decode each /vo/odometry trajectory (jumps, drift,
+  agreement vs /vo/cart_*) the same way the RTAB-Map dbs were
+  decoded. If KLT beats ORB, run the PnP pair; else conclude.
+
+Replay at 1x (realistic, best-effort drops mirror live cost). Could
+redo at --rate 0.5 if all-frame deterministic processing is wanted.
+
+## 2026-05-21 Physical Test 12 — Variant C result + full A/B/C table (Cartographer is smooth)
+
+Variant C (cartographer pose via TF, odom_frame_id:=map,
+map_frame_id:=carto_map) ran successfully. Decoded cartographer.db:
+
+  Full A/B/C (decoded from .db Node tables):
+  | metric        | A rtabmap_odom | B vo_node | C cartographer |
+  | nodes         | 37             | 134       | 136            |
+  | path length   | 4.66 m         | 11.80 m   | 12.35 m        |
+  | median step   | 0.088 m        | 0.063 m   | 0.091 m        |
+  | max step      | 1.493 m        | 0.937 m   | 0.164 m        |
+  | jumps >0.3 m  | 1              | 6         | 0              |
+  | loop closures | 8              | 3         | 14             |
+  | z-range       | [-0.044,0.002] | [0,0]     | [0,0]          |
+
+KEY FINDING: C is the best map by every measure — full loop, ZERO
+jumps (max step 0.16 m ~ 0.1 m/s x cycle), most loop closures (14).
+This REVISES the prior assumption (CLAUDE.md / earlier entries) that
+"Cartographer jumps in curves like VO." In this bag, the
+Cartographer-driven RTAB-Map trajectory is smooth end-to-end; only
+our VO (B) jumps. Implication for the EKF plan: Cartographer is a
+smooth reliable backbone and VO is the jumpy input, so EKF
+down-weighting of VO during its spikes SHOULD work (earlier worry
+"if both jump, EKF can't help" not supported here).
+
+CAVEAT: the C poses are RTAB-Map's OPTIMIZED output (14 loop
+closures could be smoothing raw Cartographer jitter). To confirm
+whether Cartographer's RAW pose jumps, parse /vo/cart_x directly
+from the bag (offered to user, pending). This matters before
+trusting Cartographer as the EKF backbone.
+
+Showcase narrative crystallized: pure-visual (A) cannot complete the
+loop in this low-texture environment; our VO (B) completes it but
+inherits curve jumps; Cartographer-fusion (C) is clean + complete +
+best loop closure. Directly motivates a future "variant D":
+VO + Cartographer -> EKF -> fused odom -> RTAB-Map.
+
+Idea triage (operator brainstorm; logged for continuity, not all
+actioned now):
+- "Build RTAB-Map in our files": do NOT reimplement RTAB-Map. Use
+  its standard mapping-run -> localization-run workflow. Practice
+  run = live RTAB-Map (camera+cartographer) saving the .db; real
+  run = RTAB-Map localization mode loading that .db (lightweight).
+  Two launch configs, no new algorithm. Feasible.
+- Object-detection annotation of the map (stop sign / light at a
+  pose): feasible future project via RTAB-Map labels/landmarks +
+  yolo_detector. Not now.
+- New obstacles at task time: Nav2 obstacle/costmap layer on the
+  static prebuilt map, NOT a learning agent / live remap.
+- Limit Z range of the cloud: GOOD concrete optimization.
+  RTAB-Map Grid/MaxObstacleHeight + depth-range limits; cap Z to
+  ~mat height + margin to cut compute and clean the cloud. Add to
+  the live-mapping launch when we build it.
+
+Next: view A/B/C in rtabmap-databaseViewer for poster screenshots
+(Graph View = trajectory + loop-closure links), then the KLT/PnP
+odometry campaign, then conclusions.
+
+## 2026-05-21 Physical Test 12 — A vs B comparison + Z-artifact explanation + variant C recipe
+
+Variant B re-ran successfully with the covariance-sanitizing relay.
+Decoded both pose graphs directly from the .db Node tables (python3
+sqlite3, 3x4 row-major pose blob, translation = floats[3,7,11]):
+
+  rtabmap_odom.db (A, pure visual): 37 nodes, path 4.66 m,
+    step mean 0.129 / median 0.088 / max 1.493 m, 1 step >0.3 m,
+    z-range [-0.044, 0.002], 8 loop closures.
+  vo_node.db (B, our VO + IMU yaw): 134 nodes, path 11.80 m,
+    step mean 0.089 / median 0.063 / max 0.937 m, 6 steps >0.3 m,
+    z-range [0.000, 0.000] (exactly planar), 3 loop closures
+    (2 global type-1 + 1 local type-2).
+
+Headline findings:
+- COMPLETENESS vs TRACKING LOSS: pure-visual A captured only 4.66 m
+  of the ~12 m loop (lost tracking on white walls -> stopped adding
+  nodes; one 1.49 m teleport on re-acquire). Our VO (B) never goes
+  dark -> full 11.80 m loop, 134 nodes. Concrete redundancy win:
+  pure-visual SLAM cannot complete the loop in this environment;
+  ours can.
+- JUMPS QUANTIFIED (B): top node-to-node steps 124->125 0.94 m
+  (0.71 m/s), 110->111 0.70 m (0.60 m/s), 61->62 0.65 m (0.57 m/s)
+  -- all 6-7x the commanded 0.10 m/s. These are the unphysical
+  /vo/odometry jumps baked into the map; locations match the
+  operator's visual report (biggest near the end / 5th turn).
+
+Z-ARTIFACT explained (operator saw "Z jumps, QCar went up/down"):
+  pose graph is verified exactly planar (all 134 nodes z=0.0000,
+  spread 0). The apparent Z motion is in the rendered CLOUD, not the
+  trajectory: the camera mount (base_link->camera_color_optical_frame)
+  is elevated + tilted, so an x/y/yaw pose jump projects depth points
+  up/down -> vertical smear in the cloud at the jump locations,
+  amplified by the rgb/depth time misalignment. Cleanup option (NOT
+  applied, to keep A/B/C comparable): Reg/Force3DoF=true constrains
+  RTAB-Map to x/y/yaw and removes the Z artifacts.
+
+KLT-for-RTAB-Map clarification (operator question): in the
+external-odometry architecture (variant B), the odometry frontend
+(KLT or ORB) only supplies POSES; RTAB-Map runs its OWN ORB
+loop-closure detection on the raw RGB images, independent of our
+frontend. So KLT-odometry + RTAB-Map's-ORB-loop-closure IS a valid
+combo -- the earlier "KLT can't do SLAM" caveat is specifically
+about KLT as the appearance/loop-closure frontend (no descriptors),
+not as an odometry source. Worth testing in the KLT/PnP campaign:
+does KLT reduce the 6 jumps? Only valuable if KLT beats ORB for
+odometry on the mat.
+
+EKF reframe (operator's "replace map nodes + train a model" idea,
+deferred): EKF is a recursive Bayesian filter, not a trained model
+(no learning across runs; you tune its process/measurement noise).
+The fusion architecture is VO + cartographer -> EKF -> fused odom ->
+RTAB-Map odom input (a future "variant D"), NOT post-hoc swapping of
+map nodes.
+
+Variant C recipe (cartographer via TF; no /odom topic exists; no
+rebuild, no relay; planar so no covariance-invert crash because
+TF-based odom is computed internally):
+  T6: ros2 launch rtabmap_launch rtabmap.launch.py
+      rgb_topic:=/camera/color_image depth_topic:=/camera/depth_image
+      camera_info_topic:=/camera/camera_info frame_id:=base_link
+      approx_sync:=true rgbd_sync:=true qos:=2 visual_odometry:=false
+      odom_frame_id:=map map_frame_id:=carto_map use_sim_time:=true
+      database_path:=~/vo_rtab_bags/cartographer.db
+  T7: ros2 bag play vslam_test12 --clock --topics
+      /camera/color_image /camera/depth_image /camera/camera_info
+      /tf_static /tf
+  (odom_frame_id:=map reads Cartographer's map->base_link from the
+  bagged /tf; map_frame_id:=carto_map avoids the frame collision.)
+
+Next: variant C, then the KLT/PnP odometry campaign, then
+conclusions.
+
+## 2026-05-21 Physical Test 12 — Variant B FATAL: zero twist covariance (RTAB-Map setInfMatrix inf)
+
+After the frame/TF relay fix, variant B got past the TF-tree problem
+(rtabmap subscribed to /vo/odom_relay, started processing) but the
+rtabmap node CRASHED:
+  [FATAL] Link.cpp:139::setInfMatrix() Condition
+  (uIsFinite(infMatrix(2,2)) && infMatrix(2,2)>0) not met!
+  [Linear information Z should not be null! Value=inf ...]
+  terminate called after throwing 'UException'
+
+Root cause (read vo_node.py:957-961): the POSE covariance is fully
+populated (cov[14]=VO_BIG_POS_VAR=25 for Z, etc.), but the TWIST
+covariance only set x/y/yaw:
+  tw = [0.0]*36; tw[0]=var_x; tw[7]=var_y; tw[35]=var_yaw
+leaving tw[14] (vz), tw[21] (v_roll), tw[28] (v_pitch) = 0.0.
+RTAB-Map inverts the covariance for its link information matrix;
+1/0 = inf on the Z diagonal trips the assertion and aborts the node.
+
+Two-layer fix (both committed):
+1. Relay (no-rebuild, effective immediately): vo_odom_tf_relay.py
+   now sanitizes BOTH pose and twist covariance via _sanitize_cov():
+   any diagonal entry that is non-finite or <=0 is replaced — off-plane
+   dims (z/roll/pitch, indices 14/21/28) -> 1e6 (large finite, ~0
+   information), observed dims (x/y/yaw) -> 1e-6 floor. Verified
+   standalone: zero twist-Z -> 1e6 -> info 1e-6 (finite). Since the
+   relay runs as python3, restarting it applies the fix with no
+   rebuild and no re-record (the bagged covariance is sanitized on
+   the fly during playback). py_compile PASS.
+2. vo_node root-cause (after next rebuild): vo_node.py twist
+   covariance now also sets tw[14]=VO_BIG_POS_VAR, tw[21]=tw[28]=
+   VO_BIG_YAW_VAR (mirrors the pose covariance convention). Removes
+   the latent zero-diagonal bug from the published /vo/odometry
+   regardless of downstream consumer. py_compile PASS. Does not
+   change x/y/yaw honesty (the EKF redundancy signal is untouched).
+
+Note: the rgbd_sync "rgb/depth time difference high (0.03-0.65 s)"
+warnings persist and are a SEPARATE, non-fatal issue (camera_bridge
+timestamp alignment) tracked in the variant-A entry; they degrade
+map quality but do not stop mapping. Pending: re-run variant B with
+the updated relay, then compare A vs B.
+
+## 2026-05-21 Physical Test 12 — Variant B (vo_node) stuck at 1 node: frame fix (vo_odom_tf_relay)
+
+Symptom: variant B (feed our /vo/odometry into RTAB-Map) built only
+1 node (vo_node.db = 472 KB, 0 links). GUI showed the live cloud but
+no accumulating map; "id stayed = 1".
+
+Root cause (from the pasted Terminal output): RTAB-Map logged
+"(can transform map -> base_link?) Could not find a connection
+between 'map' and 'base_link' ... Tf has two or more unconnected
+trees." Our vo_node publishes /vo/odometry stamped frame_id='map',
+child='base_link' (vo_node.py:943-944) to mirror Cartographer. As
+RTAB-Map external odometry this fails two ways:
+  1. frame_id='map' collides with RTAB-Map's own map_frame_id='map'.
+  2. Nothing broadcasts the odom->base_link TF that RTAB-Map needs to
+     interpolate the camera pose at each image stamp (vo_node only
+     uses tf2 to LISTEN, never broadcasts; and /tf was excluded from
+     the variant-B playback).
+=> broken TF tree, map cannot advance past node 1.
+
+Fix: new node autonomy/vo_odom_tf_relay.py. Subscribes /vo/odometry,
+republishes it on /vo/odom_relay with frame_id='odom',
+child='base_link', and broadcasts the matching odom->base_link TF.
+RTAB-Map then sees the connected chain map -> odom -> base_link ->
+camera. Standalone-runnable (python3, no colcon) so it works without
+a rebuild:
+  python3 .../autonomy/vo_odom_tf_relay.py --ros-args -p use_sim_time:=true
+py_compile PASS; rclpy/tf2_ros/nav_msgs/geometry_msgs import OK
+standalone.
+
+Wiring:
+- setup.py: added entry point vo_odom_relay=autonomy.vo_odom_tf_relay:main
+  (usable as `ros2 run qcar2_autonomy vo_odom_relay` after a rebuild).
+- qcar2_rtabmap_launch.py vo_node branch: odom_topic changed from
+  /vo/odometry to /vo/odom_relay (requires the relay running). Takes
+  effect after the next qcar2_nodes rebuild.
+
+No-rebuild path used for Test 12 today: stock
+`ros2 launch rtabmap_launch rtabmap.launch.py ... qos:=2
+visual_odometry:=false odom_topic:=/vo/odom_relay ...` + the relay
+node + bag play of /vo/odometry. With qos:=2 the camera QoS override
+file is not needed on this path (RTAB-Map subscribes Best Effort,
+matching the bag's native Best Effort camera topics).
+
+Note: this does NOT change vo_node's own /vo/odometry framing (still
+frame_id='map' for the Cartographer-redundancy comparison). The relay
+is purely an adapter for the SLAM ingestion path. Pending: re-run
+variant B with the relay, then compare A vs B.
+
+## 2026-05-21 Physical Test 12 — Variant A (rtabmap_odom) result + rgb/depth sync finding
+
+After the QoS fix, variant A (pure-visual rtabmap_odom) built a real
+map. Read the db directly via python3 sqlite3 (no sqlite3 CLI on the
+car):
+  ~/vo_rtab_bags/rtabmap_odom.db = 16 MB
+  Node (keyframes)    = 36
+  Link type 0 (neighbor/trajectory) = 24
+  Link type 1 (global loop closure) = 3   <-- 3 loop closures ACCEPTED
+  map_id distinct     = {0} (single session)
+
+Interpretation:
+- 36 nodes but only 24 neighbor links => the trajectory graph is
+  fragmented (~11 odometry breaks; a clean single chain would have
+  ~35 neighbor links). Confirmed by the log: many
+  "OdometryF2M Registration failed: Not enough inliers 0/20" with
+  quality=0, recovering to quality 42->109 only near the end.
+- FINDING: RTAB-Map's OWN pure-visual odometry struggles on the
+  white-wall / low-texture mat — same failure mode we see in our VO.
+  Strengthens the narrative that the environment (texture-poor) is
+  the fundamental limiter, not just our implementation. Reference
+  implementation in the same conditions also fragments.
+- 3 accepted global loop closures despite the fragmentation — RTAB-Map
+  rejected weaker candidates (user saw "image 13 rejected") but
+  confirmed 3.
+
+SECONDARY FINDING (affects ALL variants + our VO): rgbd_sync logged
+"The time difference between rgb and depth frames is high
+(diff=0.03-0.65 s)" repeatedly. Color and depth in the bag are
+mis-timestamped by 1-several frames (target <0.01 s), so RTAB-Map
+pairs mismatched RGB/depth -> corrupted depth association -> worse
+odometry. Root cause likely in qcar2_camera_bridge: whether color
+and depth are stamped from the same capture or at publish time.
+TODO (not today): investigate camera_bridge timestamping; consider
+approx_sync_max_interval tightening or hardware-synced capture.
+
+GUI note: rtabmap_viz "extrapolation into the future" TF warnings
+are visualization-side lag during fast bag playback; they did not
+affect the map the core rtabmap node built.
+
+Hypothesis to test with variant B: our /vo/odometry always emits a
+pose (never hard-loses tracking the way rtabmap_odom did), so the
+vo_node-driven map may be LESS fragmented than variant A — a
+potential concrete win for our approach. Pending variant B run.
+
+## 2026-05-21 Physical Test 12 — RTAB-Map QoS mismatch (empty map root cause + fix)
+
+Symptom: Physical Test 12 variant A (rtabmap_odom) produced an empty
+rtabmap_viz GUI (no odometry, no 3D map, no loop closures) and a
+90 KB database. rtabmap nodes spammed "Did not receive data since 5
+seconds" for /camera/* despite the bag playing.
+
+Root cause (from the user's pasted Terminal 7 output + bag metadata):
+- rosbag2_player warned: "New subscription discovered on topic
+  '/camera/color_image', requesting incompatible QoS. No messages
+  will be sent to it. Last incompatible policy:
+  RELIABILITY_QOS_POLICY".
+- Bag metadata confirms the camera topics were recorded with
+  reliability: 2 (BEST_EFFORT) — camera_bridge uses sensor QoS.
+  (/tf and /vo/* are reliability: 1 / Reliable, so they were fine.)
+- RTAB-Map's input subscriptions default to qos=1 (Reliable).
+- Reliable subscriber + Best-Effort publisher = INCOMPATIBLE in DDS,
+  so zero camera frames reached RTAB-Map → empty map. Not a bag
+  problem, not a drive problem — pure QoS handshake failure.
+
+Two fixes (different timelines):
+
+1. Immediate, no-rebuild (what the user runs for Test 12): force the
+   bag PLAYER to republish the camera topics as Reliable so they
+   match RTAB-Map's Reliable subscription. Created
+   ~/vo_rtab_bags/qos_reliable.yaml overriding /camera/color_image,
+   /camera/depth_image, /camera/camera_info to reliable+volatile and
+   /tf_static to reliable+transient_local (latched static TF). Play
+   with:
+     ros2 bag play vslam_test12 --clock --topics <cam triple> /tf_static \
+       --qos-profile-overrides-path /home/nvidia/vo_rtab_bags/qos_reliable.yaml
+   (variant B adds /vo/odometry to --topics; same override file.)
+
+2. Permanent, takes effect on next qcar2_nodes rebuild: added a `qos`
+   launch arg to qcar2_rtabmap_launch.py defaulting to '2' (Best
+   Effort), forwarded to rtabmap.launch.py as `qos:=2`. This makes
+   RTAB-Map subscribe Best Effort, matching both the live bridge and
+   a recorded bag, so NO --qos-profile-overrides-path is needed after
+   the rebuild. py_compile PASS. Default-safe rationale: qos=2 is the
+   correct setting for our actual sensor source in both live and bag
+   modes; qos=1 was never compatible with the bridge.
+
+Doc note: after the rebuild, the qos_reliable.yaml override becomes
+unnecessary (harmless if left in). Until the rebuild, the override
+is REQUIRED because the installed wrapper still subscribes Reliable.
+
+## 2026-05-21 No /odom topic on QCar — Cartographer pose is TF-only; rtabmap cartographer-mode fix
+
+Discovery during Physical Test 12 bring-up: the pre-flight
+`ros2 topic hz /odom` hung. Investigation (live `ros2 topic list`
+on domain 67 while the user's cartographer + vo_node were running)
+confirmed there is **no `/odom` topic** on this QCar. Full live
+list relevant subset: /camera/*, /scan, /map, /submap_list,
+/tf, /tf_static, /qcar2_imu, and the /vo/* family — no /odom.
+
+How the Cartographer pose is actually exposed:
+- Cartographer publishes the pose through TF only: map -> base_link.
+- vo_node reads it via `lookup_transform('map', 'base_link')`
+  (autonomy/vo_node.py:635-636) and republishes convenience scalars
+  /vo/cart_x, /vo/cart_y, /vo/cart_psi (all present in the live
+  list). /vo/odometry itself is stamped frame_id='map',
+  child_frame_id='base_link' (vo_node.py:943-944).
+
+Consequences / fixes:
+- Pre-flight: drop the `/odom` hz check. Confirm Cartographer is
+  flowing via `ros2 topic echo /vo/cart_x --once` (a number = TF
+  pose reaching vo_node).
+- Bag recording: `/odom` removed from the record list (records
+  nothing); `/tf` + `/tf_static` carry the Cartographer pose and
+  are the source for the cartographer playback variant. Added more
+  /vo/* analysis scalars to the canonical record list (vo_x/y/psi,
+  cart_x/y/psi, reason) for the §7.7 jump investigation.
+- qcar2_rtabmap_launch.py cartographer branch rewritten: instead of
+  the nonexistent `odom_topic:=/odom`, it now sets
+  `odom_frame_id:=map` (RTAB-Map reads odometry from the TF tree)
+  and `publish_tf_map:=false` (so RTAB-Map does not fight
+  Cartographer for the map frame). Both args verified to exist via
+  `rtabmap.launch.py --show-args`. Caveat documented in-code: the
+  map frame carries loop-closure jumps (not a strictly continuous
+  odom frame), acceptable for the A/B/C showcase. py_compile PASS.
+
+Playback variant recommendation (corrected to --topics whitelist
+instead of --exclude, cleaner than regex blacklisting):
+- A rtabmap_odom: play /camera/* + /tf_static only.
+- B vo_node: play /camera/* + /tf_static + /vo/odometry.
+- C cartographer: play /camera/* + /tf_static + /tf.
+
+Operational note (user decision this session): user opted NOT to
+rebuild qcar2_nodes mid-session, so the *installed* launch still
+has the old cartographer branch (odom_topic:=/odom). Therefore for
+Physical Test 12, variants A and B run as-is; variant C
+(cartographer) will hang waiting for /odom and must be deferred
+until a qcar2_nodes rebuild. The bag includes /tf + /tf_static so
+variant C is fully recoverable later on the same bag with no
+re-drive. The launch source fix above is committed to the gabriel
+tree and will take effect on the next rsync + colcon build of
+qcar2_nodes.
+
+## 2026-05-20 manual_drive turn_rate bump 0.25 → 0.40 rad/s
+
+User reported the WASD manual drive was under-turning on big curves
+(angular response too small for the actual mat geometry). Bumped
+the `turn_rate` parameter default in
+`autonomy/manual_drive.py:36` from 0.25 to 0.40 rad/s.
+
+Math sanity at the default forward_speed=0.10 m/s:
+  - old: 0.10 / 0.25 = 0.40 m turning radius
+  - new: 0.10 / 0.40 = 0.25 m turning radius
+Still well within mat scale; not aggressive enough to spin the car
+unintentionally. User can override per-run via
+  -p turn_rate:=<value>
+if 0.40 needs further adjustment.
+
+py_compile PASS. No other manual_drive behavior touched; speeds
+(forward 0.10, reverse 0.08) unchanged. Will require rsync +
+colcon build --packages-select qcar2_autonomy before next run.
+
+## 2026-05-20 VSLAM showcase launch wiring committed (Deliverable A code)
+
+Built the record-once / playback-three-ways scaffolding agreed in the
+prior turn. Doc-only on VO behavior — `visual_odometry.py`, `vo_node.py`
+and the rest of `qcar2_autonomy/` are untouched. All changes are
+additive.
+
+State verified before edits:
+- df -h /home → 164 GiB free of 227 GiB (plenty of room for several
+  bags + dbs).
+- vo_node already publishes the topics we need for the showcase:
+  /vo/odometry (5 Hz, nav_msgs/Odometry), /vo/fault_status,
+  /vo/conditioning, /vo/cart_psi, /vo/vo_psi_shadow, /vo/healthy,
+  /vo/confidence, /vo/inliers — all confirmed via grep in
+  autonomy/vo_node.py. vo_node does NOT publish odom->base_link TF
+  (it only uses tf2_ros for listening), so the bag's /tf can stay
+  in playback for vo_node mode without conflict.
+- rtabmap_launch.py exposes `visual_odometry:=true|false` to toggle
+  rtabmap_odom; `odom_topic` to bind external odom; `approx_sync`
+  and `rgbd_sync` available.
+- qcar2_nodes/CMakeLists.txt has `install(DIRECTORY launch ...)` so
+  the new launch file auto-installs on next colcon build —
+  no CMake edit needed.
+
+mkdir:
+- ~/vo_rtab_bags/ (created; persistent dir for both bags and .db
+  outputs; never /tmp).
+
+New file:
+- Development/ros2/src/qcar2_nodes/launch/qcar2_rtabmap_launch.py
+  - Wraps rtabmap_launch/rtabmap.launch.py via IncludeLaunchDescription.
+  - Single parametric switch:
+      odom_source ∈ {rtabmap_odom (default), vo_node, cartographer}.
+    Internally maps to (visual_odometry, odom_topic) combinations.
+  - Pinned QCar remaps:
+      rgb_topic:=/camera/color_image
+      depth_topic:=/camera/depth_image
+      camera_info_topic:=/camera/camera_info
+      frame_id:=base_link
+      approx_sync:=true
+      rgbd_sync:=true
+      queue_size:=30
+  - Other args (with defaults): use_sim_time=true (bag playback),
+    database_path=~/vo_rtab_bags/rtabmap.db, localization=false
+    (mapping), rtabmapviz=true, rviz=false.
+  - Pure glue: no rtabmap internals are redefined; the file just
+    selects topology and forwards to the stock launch.
+  - py_compile PASS.
+
+Easy_Start.txt — new Section 7 "VSLAM Showcase (RTAB-Map,
+record-once / playback-three-ways)":
+  7.1 Pre-record sanity checks (ros2 topic hz on all required
+      topics).
+  7.2 Recording the canonical bag — exact `ros2 bag record` topic
+      list (camera triple + 8 /vo/* topics + /odom + /tf +
+      /tf_static), bag-policy reminder (one best-bag on QCar,
+      transfer dbs off, prune old bags), force_cart_yaw two-bag
+      experiment recipe.
+  7.3 Playback A — rtabmap_odom (pure-visual baseline). Run FIRST
+      on every new bag as a sanity check.
+        --exclude '/odom' --exclude '/tf' to avoid publisher
+        collisions with rtabmap_odom's outputs.
+  7.4 Playback B — vo_node (our /vo/odometry from bag).
+        --exclude '/odom' only.
+  7.5 Playback C — cartographer (/odom from bag). Optional.
+        No excludes.
+  7.6 Compare the three databases via rtabmap-databaseViewer
+      (trajectory shape, loop-closure count, map sharpness,
+      feature density).
+  7.7 Cartographer-jump investigation: side-by-side replay of
+      /vo/odometry and /odom from the bag, with the bash
+      one-liner to dump per-axis x to CSV and plot. Same protocol
+      works for /vo/vo_psi_shadow vs /vo/cart_psi for the
+      force_cart_yaw analysis.
+  7.8 Cleanup / transfer (rsync command, expected ~6-10 GiB
+      complete showcase set).
+
+CLAUDE.md updates:
+- "RTAB-Map / SLAM showcase plan" section rewritten to reflect the
+  decided architecture (record-once / playback-three-ways), the
+  pinned launch file path and arg surface, the three odom-source
+  variants explained in a table with visual/non-visual
+  classification, the persistent bag policy, the ORB-only
+  frontend rule.
+- New section "Camera resolution — verdict (revised)" replaces the
+  earlier "skip, needs recalibration" line: 480p baseline keep,
+  720p worth a test campaign with LOWER n_features at iso-CPU
+  (per user's correction), 1080p probably skip. Documented the
+  proposed `intrinsics_source` parameter that would subscribe to
+  /camera/camera_info to become resolution-agnostic (next-session
+  work, not today). Documented the proposed test matrix:
+  480p×{400,800,1200} ∪ 720p×{600,800,1200}.
+- New section "EKF fusion — note for when we wire
+  robot_localization" captures the corrected Bayesian/Kalman-gain
+  description (rebutting the "average / 2" framing), notes that
+  /vo/odometry already publishes honest covariance driven by
+  conditioning, and flags that Cartographer's roughly-constant
+  default covariance is its own tuning concern.
+
+Operational gotcha to remember (encoded in §7.3/7.4/7.5
+--exclude lists):
+- rtabmap_odom mode + bag's /odom → two publishers on /odom → use
+  --exclude '/odom' (and --exclude '/tf' because rtabmap_odom
+  publishes odom->base TF itself).
+- vo_node mode + bag's /odom → bag's /odom would override
+  vo_node's already-bagged /vo/odometry path → exclude /odom.
+- cartographer mode → no exclusions; /odom and /tf ARE the source.
+
+NOT done (next sessions):
+- intrinsics_source param + /camera/camera_info subscription in
+  visual_odometry.py.
+- bridge config change to 720p for the resolution campaign.
+- robot_localization wiring (EKF fusion of /odom + /vo/odometry).
+- compare_rtabmap_dbs.py helper (mentioned in §7.6 narrative;
+  manual rtabmap-databaseViewer is fine for the first pass).
+
+## 2026-05-20 Odom-source decision + resolution-bump re-rank + EKF/Cartographer notes
+
+Confirmed decisions:
+- VSLAM showcase odom source = **`rtabmap_odom`** (pure-visual SLAM).
+  User wants the demo to be camera-only, no lidar involvement in the
+  trajectory; the map is built off RTAB-Map's own internal VO on the
+  RGB-D stream. Our `vo_node` keeps running independently so the
+  dashboard / redundancy story is unaffected. Duplicate ORB cost
+  (rtabmap_odom + vo_node) is a real concern on the Jetson; if it
+  bites we throttle one of them.
+- Resolution bump verdict revised: 480p baseline stays; **720p worth
+  trying as an experiment once VSLAM baseline is up**; 1080p probably
+  not. Reason for the revision: user correctly noted RealSense exposes
+  per-resolution intrinsics, so no manual recalibration is needed —
+  we either add a 720p hardcoded table from the SDK enumeration in
+  `vo_calib_logs/realsense_calib_*.txt`, or (cleaner) make VO
+  resolution-agnostic by subscribing to `/camera/camera_info`. The
+  real residual costs are per-frame ORB (~2.25x from 480p to 720p)
+  and bridge throughput at the higher resolution.
+
+EKF clarification (because a Quanser engineer told user "EKF just
+adds both and divides by two" — that is wrong and would mislead
+implementation):
+- EKF predict step: project state with motion model; covariance
+  grows by process noise.
+- EKF update step: Kalman gain weights each measurement INVERSELY
+  by its covariance vs. the predicted-state covariance. Result is
+  the statistically optimal blend under the Gaussian assumption.
+- Practical consequence for our pipeline: because `/vo/odometry`
+  already publishes honest covariance (driven by `confidence` and
+  `/vo/conditioning`), the EKF automatically downweights VO when
+  conditioning is poor. The redundancy pitch for the showcase is
+  therefore "VO publishes honest uncertainty and the EKF is
+  mathematically guaranteed to do the right blend" — not "we
+  average them."
+
+Cartographer-jump observation (open question to investigate on next
+runs):
+- User saw a VO x-jump 0.9 → 0.78 m at 0.1 m/s with a 200 ms VO
+  cycle → implied instantaneous velocity 0.6 m/s, ~6x the actual
+  speed. Unphysical, consistent with a bad-match-surviving-RANSAC
+  spike or a depth glitch.
+- User has seen similar magnitude jumps in Cartographer `/odom`
+  during curve segments. If true, this matters for the EKF design
+  because Cartographer's covariance is roughly constant by default
+  (no analog of our `/vo/conditioning`), so when Cartographer jumps
+  it does not flag itself as uncertain — the EKF blindly trusts it.
+- Action: next physical run must capture `/odom` and `/vo/odometry`
+  side-by-side (extend the standard bag topic list, extend
+  dashboard or add a side-by-side plot). Look for synchronized
+  jumps and characterize Cartographer's noise profile through
+  curves before we wire `robot_localization`.
+
+No code changes yet; this is the planning capture. Implementation of
+Deliverable A starts next: mkdir ~/vo_rtab_bags/, write
+qcar2_rtabmap_launch.py with rtabmap_odom included, add
+Easy_Start.txt §7 with record/playback recipe, refresh CLAUDE.md
+RTAB-Map section to reflect pure-visual choice.
+
+## 2026-05-20 VSLAM showcase scoping + EKF-fusion architecture clarification
+
+Design discussion with user (post-professor conversation). Capturing
+decisions so future sessions don't relitigate.
+
+User-raised ideas and verdicts:
+
+1. **Higher camera resolution to surface more features**
+   - Skip. Intrinsics in `visual_odometry.py` are calibrated for
+     640x480; a bump requires recalibration. Per-frame ORB cost
+     scales with pixel count (~4x at 720p, ~9x at 1080p), bridge
+     bandwidth goes up, real-time budget with cartographer + VO +
+     RTAB-Map co-running is unlikely on the Jetson. Worth a one-off
+     experiment later, not the baseline.
+
+2. **LoFTR (transformer matcher) for low-texture curve regions**
+   - Skip — future work / "presentation footnote" only. Needs
+     PyTorch + CUDA inference loop; typical inference 10-20 Hz on
+     desktop GPUs, sub-5 Hz expected on Jetson; integration is
+     multi-day engineering. Note in the report as a known
+     direction we did not pursue.
+
+3. **Adaptive frontend switching (ORB on straights, KLT/LoFTR in
+    curves)**
+   - Skip until evidence justifies it. Trigger logic (curve
+     detection or VO-confidence threshold) is itself a small
+     project; RTAB-Map loop closure is blind during any non-ORB
+     segment (no descriptors), so switching has a real SLAM cost
+     that must be earned by a measurable VO-quality win. Until A/B
+     shows KLT beating ORB in *some* regime, this is solving a
+     hypothetical.
+
+4. **"EKF swaps landmark coordinates while preserving descriptors"
+    architecture**
+   - Won't compose that way. Correcting the model here so we don't
+     build the wrong thing:
+     - RTAB-Map owns the map. Landmark world coords = (camera pose
+       at keyframe) x (3D point in camera frame). Descriptors are
+       just re-association keys, not coords.
+     - robot_localization EKF fuses pose/twist messages with
+       covariances and produces ONE fused pose. It does not reach
+       into RTAB-Map's database to modify landmarks.
+     - RTAB-Map's internal pose-graph + loop-closure optimization
+       is what adjusts landmark coords; it accepts no
+       "replace-this-landmark" inputs.
+   - The *spiritual equivalent* of what user wants is standard and
+     clean: feed RTAB-Map an EKF-fused pose via its `odom_topic`
+     input. In low-VO-confidence regions the fused pose is
+     dominated by Cartographer/IMU/wheel, so landmarks
+     triangulated during curves inherit Cartographer-dominated
+     coords automatically — without any surgical swapping. This
+     is the "research-quality" version of Deliverable A and is a
+     stretch goal, not today.
+
+Today's scope (TWO deliverables, hard prioritized A > B):
+
+**Deliverable A — Basic VSLAM (must-have)**
+- Create persistent bag dir `~/vo_rtab_bags/`.
+- Write `Development/ros2/src/qcar2_nodes/launch/qcar2_rtabmap_launch.py`
+  with pinned remaps:
+    rgb_topic:=/camera/color_image
+    depth_topic:=/camera/depth_image
+    camera_info_topic:=/camera/camera_info
+    frame_id:=base_link
+    approx_sync:=true
+    database_path:=~/vo_rtab_bags/rtabmap.db
+- Odom source for v1 = Cartographer `/odom` (already published; no
+  new fusion needed). Decision point still open: alternatively use
+  `rtabmap_odom` (RTAB-Map's own visual odom node) for a pure-visual
+  SLAM story. Defaulting to Cartographer odom — simpler, more
+  reliable, standard RTAB-Map RGB-D + external-odom recipe.
+- Record one representative bag (drive loop incl. curve) to
+  `~/vo_rtab_bags/`.
+- Replay through the launch in mapping mode, watch rtabmap-viz
+  build, save database = showcase artifact.
+
+**Deliverable B — Pure-VO + Cartographer redundancy under EKF
+(stretch, only if A is solid + time remains + KLT actually beats
+ORB in mat A/B)**
+- Requires `robot_localization` wired (config + launch). Not in the
+  repo yet. Realistic as a follow-up session.
+- B is the deliverable the redundancy code has been building
+  toward for weeks. A is "we also did SLAM with it." Don't
+  sacrifice A's solidity for B today.
+
+Frontend-for-SLAM rule (reaffirmed): vo_frontend:=orb during any
+SLAM recording. KLT/PnP knobs are A/B levers for the VO
+redundancy path only; they do NOT affect RTAB-Map (which uses its
+own pose estimator on the raw RGB-D stream).
+
+No code changes yet — this is the planning capture. Implementation
+of Deliverable A starts once user confirms odom-source choice
+(Cartographer `/odom` recommended).
+
+## 2026-05-20 RTAB-Map already installed on QCar — correction to prior guidance
+
+Probe (no install action; non-destructive `apt-cache` + `dpkg` queries):
+- `apt-cache policy ros-humble-rtabmap-ros` → `Installed: 0.21.1-1focal.20231230.122458`.
+- `apt-cache policy ros-humble-rtabmap` → `Installed: 0.21.1-1focal.20231230.025332`.
+- `apt list --installed | grep ros-humble-rtabmap` enumerates the full stack on the QCar (all 13 component packages):
+  `rtabmap, rtabmap-conversions, rtabmap-demos, rtabmap-examples, rtabmap-launch, rtabmap-msgs, rtabmap-odom, rtabmap-python, rtabmap-ros, rtabmap-rviz-plugins, rtabmap-slam, rtabmap-sync, rtabmap-util, rtabmap-viz`.
+- `apt-get install --simulate ros-humble-rtabmap-ros` → "ros-humble-rtabmap-ros is already the newest version. 0 upgraded, 0 newly installed, 0 to remove, 292 not upgraded."
+- `ros2 pkg list | grep ^rtabmap` enumerates all 13 packages discoverable via ament.
+- `which rtabmap rtabmap-databaseViewer` → `/opt/ros/humble/bin/rtabmap`, `/opt/ros/humble/bin/rtabmap-databaseViewer`.
+- `ros2 launch rtabmap_launch rtabmap.launch.py --show-args` parses with all expected knobs (`frame_id`, `localization`, `database_path`, `approx_sync`, `rgb_topic`, `depth_topic`, `camera_info_topic`, `odom_topic`, `imu_topic`, …).
+
+Conclusion:
+- **No apt install required.** Earlier note from Turn 116 ("rtabmap is not installed, install on teammate machine") was incorrect on this QCar — most likely the rtabmap stack came with the Quanser Academic JetPack image. Either way, we use what is already on the car.
+- The earlier CLAUDE.md guidance "never apt into the QCar's humble/L4T, install only on a teammate machine or container" was overcautious for our actual workflow. Replaced with a section that (a) records the verified install state, (b) keeps the persistent-bag rule (no `/tmp`), (c) keeps the single best-bag strategy, (d) calls out frontend choice for SLAM = ORB only.
+
+Frontend choice for SLAM = ORB:
+- KLT (LK optical-flow tracking) produces frame-to-frame correspondences with no descriptor.
+- RTAB-Map's loop closure / relocalization depends on appearance-database matching against descriptors (ORB or similar binary descriptors by default).
+- Therefore: when bagging or running for the SLAM showcase, `vo_frontend:=orb` (the default). The `vo_frontend:=klt` knob is reserved for VO-redundancy A/B experiments on the mat, not for the SLAM pipeline. PnP vs SVD likewise affects only the VO redundancy path; it is irrelevant to RTAB-Map (which has its own pose estimator).
+
+Recommended remap topology when the launch is wired (not yet committed):
+- `rgb_topic:=/camera/color_image`
+- `depth_topic:=/camera/depth_image`
+- `camera_info_topic:=/camera/camera_info`
+- `frame_id:=base_link`
+- `approx_sync:=true` (bridge does not time-align the three topics)
+- `database_path:=~/vo_rtab_bags/rtabmap.db` (persistent)
+- Open question: odom source ∈ {Cartographer `/odom`, our `/vo/odometry`, rtabmap's own VO node}. Decide when the launch wrapper is built.
+
+No code changed; no apt action taken; this is documentation only.
+
+## 2026-05-20 Folder rename + workspace scope correction
+
+Context:
+- Teammate deleted and restored Gabriel's working tree; on restore it
+  was renamed `/home/nvidia/Documents/ACC_Development_gabriel/`.
+- A separate clone of the repo lives at
+  `/home/nvidia/Documents/ACC_Development/` on branch
+  `Physical_Arturo` (Arturo's autonomy work — different file set:
+  `lane_assist_blend`, `lane_keeping`, `path_teacher`, …; no
+  `visual_odometry.py`).
+
+Risk eliminated:
+- `Easy_Start.txt` §0 / §0.5 / §0.6 / §1 / §6 and `CLAUDE.md` rsync
+  cheat sheet all pointed at the old `~/Documents/ACC_Development/...`
+  path. Running §0.6 unchanged would have rsync'd Arturo's
+  `qcar2_autonomy/autonomy/` over Gabriel's `~/ros2/src/qcar2_autonomy/`
+  and clobbered the entire VO toolbox (visual_odometry.py, vo_node.py,
+  vo_supervisor.py, vo_dashboard, vo_overlay, …).
+
+State verified before edits:
+- `git branch --show-current` = `Gabriel` (correct).
+- `~/ros2/src/qcar2_autonomy/autonomy/visual_odometry.py` byte-equal to
+  `~/Documents/ACC_Development_gabriel/.../visual_odometry.py`
+  (51,543 B, 2026-05-19 16:32) — `~/ros2` is currently Gabriel's code.
+- `git remote -v` → `RoboticsClubMDC/ACC_Development.git` (single upstream
+  shared with Arturo; we discriminate by branch, not by remote URL).
+
+Edits made (docs only, no code changes):
+- `CLAUDE.md`:
+  - Title + project block annotated with the 2026-05-20 folder rename.
+  - `/home/nvidia/Documents/ACC_Development/` added to Off-limits (Arturo's clone).
+  - `ACC_Development_backup_gabriel/` documented as read-only safety net.
+  - Repo layout heading + runtime workspace paragraph use
+    `ACC_Development_gabriel`.
+  - Build cheat sheet rsync source updated.
+  - New "VO toolbox knobs" section documenting `vo_frontend`,
+    `vo_estimator`, `feature_grid` (post-Turn-117 state, all default-safe).
+  - New "RTAB-Map / SLAM showcase plan" section: never apt into QCar
+    humble/L4T, recordings persistent (not `/tmp`), one permanent
+    best-bag strategy.
+  - Added post-rsync sanity check (`diff -q`) and runtime workspace
+    sanity instructions.
+- `Easy_Start.txt`:
+  - Header dated 2026-05-20, FOLDER NOTE block added.
+  - §0 `cp -r -u` source → `ACC_Development_gabriel`.
+  - §0.5 A/B/C `cd` paths → `ACC_Development_gabriel`; added pwd/branch
+    sanity check after the rename.
+  - §0.6 rsync sources (qcar2_autonomy AND qcar2_nodes) →
+    `ACC_Development_gabriel`; added explicit DO-NOT warning naming
+    Arturo's clone; added `diff -q` post-sync sanity one-liner.
+  - §1 calibration log dir `cd` → `ACC_Development_gabriel`.
+  - §6 (virtual/QLabs) docker + isaac_ros_common paths →
+    `ACC_Development_gabriel`.
+
+No runtime code touched; default-safe VO behavior (orb+svd, grid 0)
+unchanged. Next time §0.6 is run from the corrected instructions, the
+post-sync `diff -q` returns empty — that's the green light.
+
+Plan recap (carried forward from Turns 116–117):
+- VO toolbox COMPLETE: feature_grid × vo_estimator × vo_frontend, all
+  default-safe. Recommended operating point on the mat: orb + svd +
+  feature_grid=8 (Test-6 + grid-A/B winner).
+- RTAB-Map showcase = off-car build only; persistent bag path; one
+  canonical best-bag kept and overwritten only when beaten.
+
+
 ## 2026-03-27
 
 Scope of this pass:
@@ -4955,3 +5827,735 @@ awaiting operator go to implement).
 ### Files touched this turn
 - This changelog entry.
 - VO_Conversation_Log.txt Turn 106.
+
+## 2026-05-18 (Speedups #1/#2 + STEP 3 IMPLEMENTED: honest covariance, additive)
+
+Operator pushed the pre-bundle snapshot to origin/Gabriel for a
+teammate's VSLAM handoff, then gave the go for the bundle. Built
+the two free speedups + Step 3. ALL additive / default-safe: the
+proven estimate path is unchanged; only new outputs were added.
+
+### Speedup #1 — vectorized pixels_to_3d_body depth sampling
+
+visual_odometry.py: the per-feature Python loop (ran twice/frame
+in the hot path) replaced with np.rint + boolean-mask fancy
+indexing. Behavior-IDENTICAL: np.rint is the same round-half-to-
+even as int(round()), same bounds test, same zero-fill for
+out-of-image pixels. Verified out-of-tree: np.array_equal of the
+sampled depths vs the old loop on a synthetic 300-point case incl.
+out-of-bounds.
+
+### Speedup #2 — RANSAC squared-distance (no per-iteration sqrt)
+
+visual_odometry._ransac_motion: replaced
+  res = np.linalg.norm(diff, axis=1); inl = res < thr
+with
+  res2 = np.einsum('ij,ij->i', diff, diff); inl = res2 < thr2
+(thr2 = ransac_threshold**2, computed once). (a<t) ⇔ (a^2<t^2)
+for a,t>=0, so the inlier set, best model and motion are
+bit-identical; only the per-iteration sqrt over all M points x
+ransac_iterations is removed. Verified deterministic + identical
+model/inliers under fixed seed.
+
+### Step 3 — honest uncertainty (the Friday-EKF / showcase / teammate enabler)
+
+visual_odometry.py:
+- _ransac_motion now also returns the mean inlier residual (m)
+  of the FINAL fit (one sqrt over inliers only, negligible).
+  Signature: (tx, ty, dpsi, inliers, mean_resid). Sole caller
+  (update()) updated; M<s early return returns 0.0 resid.
+- update() computes a geometric-conditioning pair from the inlier
+  body-frame XY cloud: eigenvalues of its 2x2 covariance ->
+  geom_cond = sqrt(lam_min) (m; ~0 = collinear/clustered =
+  bare-wall translation degeneracy) and geom_aniso =
+  sqrt(lam_min/lam_max) in [0,1]. Cheap (2x2 eigvalsh). This does
+  NOT change the motion estimate — diagnostic only.
+- result dict gains geom_cond / geom_aniso / ransac_resid (present
+  in the base dict + every return path so consumers never
+  KeyError). New self.* state added + initialized in __init__ and
+  reset().
+
+vo_node.py:
+- New param publish_vo_odometry (default True; additive — only
+  adds a topic, no behavior change; node simply not launched in
+  competition).
+- New publishers: /vo/odometry (nav_msgs/Odometry, pose + 6x6
+  covariance), /vo/conditioning (Float64 geom_cond), /vo/reason
+  (String).
+- _evaluate sets a reason tag at every decision point:
+  warming / no_anchor / invalid / bare_wall / low_inliers /
+  low_conf / low_weight / turn / ok / odom_suspect (bare_wall
+  takes priority over low_inliers/low_weight when the cloud is
+  degenerate — the showcase-relevant root cause). Cartographer
+  window yaw-change captured as the turn-rate proxy.
+- _vo_covariance(): MONOTONE honest variance (x,y,yaw) inflated by
+  few inliers / collinear cloud / sloppy RANSAC residual / fast
+  turn / bare-wall degeneracy; invalid -> "ignore me" variances.
+  Explicitly an honest-uncertainty proxy, NOT a calibrated
+  covariance (calibration = future / Friday EKF). Tuning is plain
+  module constants (VO_*), deliberately NOT ROS params, to avoid
+  re-opening a sweep campaign on a read-only feature.
+- fault_status string gets a trailing ` reason=<tag>` (appended;
+  existing fields unchanged).
+- Startup info log announces Step 3 active.
+
+vo_terminal_dashboard.py / vo_image_overlay.py: regex extended
+with an OPTIONAL trailing (?:\s+reason=(?P<reason>\S+))? before
+$, so OLD captures (no reason) still parse AND new ones do;
+both surface `why=<reason>`. Backward-compat verified.
+
+### force_cart_yaw caveat (recorded for the Friday EKF test)
+
+/vo/odometry publishes the operating pose, whose yaw is pinned to
+Cartographer when force_cart_yaw:=true (default). For an honest
+VO-vs-Cart EKF fusion the camera-only yaw (/vo/vo_psi_shadow)
+should be used and yaw covariance widened, else yaw is
+double-counted. Not changed now (out of Step 3 scope); to be
+addressed when wiring the Friday EKF experiment.
+
+### Verification
+
+py_compile PASS (visual_odometry, vo_node, vo_terminal_dashboard,
+vo_image_overlay). Out-of-tree checks: #1 depth-sample identical
+to old loop; #2 deterministic + identical inliers/model; result
+carries the new keys; regex parses old AND new fault_status.
+rsync + colcon --symlink-install PASS; nav_msgs/Odometry import
+resolves in the ROS env. No mat run (additive; the real exercise
+is the optional Friday VO+Cart EKF test).
+
+### Files touched this turn
+- visual_odometry.py (#1 vectorize depth sample; #2 squared
+  RANSAC + mean_resid return; geom conditioning; result keys;
+  state init/reset)
+- vo_node.py (publish_vo_odometry param; /vo/odometry,
+  /vo/conditioning, /vo/reason; reason tags; _vo_covariance;
+  fault_status reason; Step 3 constants + info log)
+- vo_terminal_dashboard.py, vo_image_overlay.py (optional reason
+  in regex + display)
+- This changelog entry.
+- VO_Conversation_Log.txt Turn 107.
+
+## 2026-05-18 (Grid feature homogenization + camera->body extrinsic verified + direction)
+
+### Camera->body extrinsic VERIFIED against Quanser (operator precaution)
+
+Operator asked, as a precaution, whether the camera->car conversion
+in pixels_to_3d_body could be wrong. Checked against Quanser's own
+canonical extrinsic, qcar_functions.py get_extrinsics ("SECTION B.2
+Camera Extrinsics"): their vehicle->camera rotation evaluates to
+R_v2cam = [[0,-1,0],[0,0,-1],[1,0,0]]. Our PHYSICAL_T_CAM2BODY
+rotation [[0,0,1],[-1,0,0],[0,-1,0]] is EXACTLY R_v2cam transposed
+(correct camera->body inverse). Translation differs only because
+Quanser's reference models a simplified pure-height offset in QLabs
+10x units (it is written for their BEV/IPM ground-plane pipeline),
+whereas we use the real 3-axis hardware offset in metres
+(0.095,0.032,0.172) from the hardware manual — more correct for
+true 3D VO, and a translation offset does not affect yaw. CONCLUSION:
+camera->body conversion is correct; the camera-only-yaw vs
+Cartographer-yaw gap is drift (+ possibly a small camera mount
+rotational miscalibration), NOT a frame/extrinsic bug.
+
+### Code: ORB-SLAM-style grid feature homogenization (default-safe)
+
+Implemented at operator go. visual_odometry.py:
+- __init__ kwarg feature_grid=0 (clamped [0,32]); self.n_features
+  stored for the per-cell budget.
+- _distribute_features(keypoints, descriptors, H, W): buckets
+  keypoints into feature_grid x feature_grid cells, keeps
+  best-by-response per cell (per_cell = max(1, n_features/cells))
+  via np.lexsort + per-cell rank; keypoint<->descriptor row
+  alignment preserved. g<=0 / no descriptors -> inputs returned
+  UNCHANGED (true no-op default).
+- update() calls it right after detectAndCompute (no-op when off).
+This is the cheap, robust form of ORB-SLAM2/3's quadtree
+homogenizer; rationale: OpenCV ORB keeps strongest responses which
+CLUSTER on one object, making RANSAC inliers geometrically
+redundant (confident but ill-conditioned). Pixel coords unchanged
+=> intrinsics unaffected, no crop/resize.
+
+vo_node.py: declare/read/pass feature_grid; warn when active.
+
+Verification (out-of-tree): feature_grid=0 returns the SAME
+descriptor object (bit-identical, zero regression); feature_grid=8
+reduces per-cell clustering and preserves kp<->desc alignment.
+Known tradeoff (matches the over-uniform-quadtree literature):
+too fine a grid thins features on low-texture scenes and can
+starve RANSAC — hence a default-safe A/B knob judged with the
+Step 3 conditioning metric, not an always-on change.
+py_compile + rsync + colcon --symlink-install PASS.
+
+### Direction decisions (operator)
+
+- Approved: implement grid distribution first (done), THEN a
+  separate logged deletion pass removing the conclusively-dead
+  rejected levers (depth_weight_power, max_vo_feature_depth_m,
+  roi_top_fraction) and their code, while KEEPING the
+  pixels_to_3d_body range return (reusable for a future PnP/Step 2).
+  This explicitly overrides the old "additive only / never discard"
+  rule, at operator direction, now that the campaign is closed.
+- External systems (web-verified): Isaac ROS Visual SLAM / cuVSLAM
+  is NOT deployable on this QCar2 — current releases require Jetson
+  Thor + JetPack 7.1 (or x86 Ampere+); QCar2 is JetPack R35.6, and
+  it needs stereo+IMU we do not cleanly expose, and it shares the
+  bare-wall limit (its docs fall back to IMU there). DROP it.
+  RTAB-Map RGB-D = the realistic mature baseline + the teammate's
+  VSLAM/showcase track: our qcar2_camera_bridge already publishes
+  the RGB + aligned-depth topics it needs, so integration is
+  install + remap + calibrate, not pipeline-building. Pursue as a
+  TIMEBOXED stretch (teammate-owned) with the honest-VO + Step 3 +
+  grid showcase as the guaranteed fallback. ORB-SLAM3 = educational,
+  heavier ROS2 integration, lower priority.
+- VIO clarification recorded: force_cart_yaw is LOOSE pose-level
+  IMU+camera coupling; true VIO (ORB-SLAM3-VI / cuVSLAM /
+  RTAB-Map+IMU) is TIGHT joint optimization with calibrated
+  camera-IMU extrinsics + hardware time sync — stronger, but still
+  not a bare-wall fix. Showcase framing: production VO == VSLAM +
+  fusion; honest limits are the Waymo-serious story.
+
+No mat run this turn (grid is additive/default-off; validated when
+the operator next runs the mat). Next: separate deletion pass, then
+RTAB-Map bring-up guide for the teammate.
+
+### Files touched this turn
+- visual_odometry.py (feature_grid kwarg + _distribute_features +
+  update() hook + self.n_features)
+- vo_node.py (declare/read/pass feature_grid + warn)
+- This changelog entry.
+- VO_Conversation_Log.txt Turn 108.
+
+## 2026-05-18 (DELETION PASS: rejected ROI + depth-odometry levers removed)
+
+Operator confirmed removal ("you can remove them"). Separate clean
+pass, as planned. Removed the three conclusively-rejected,
+default-off levers and ALL their code; kept reusable plumbing and
+all live Step 3 work. This intentionally overrides the old
+"additive only / never discard" rule — campaign is closed.
+
+REMOVED (visual_odometry.py): roi_top_fraction,
+depth_weight_power, max_vo_feature_depth_m kwargs + their __init__
+comment/clamp blocks; the update() ROI-mask block (now
+detectAndCompute(gray, None)); the update() hard-cutoff block; the
+update() per-correspondence weight block; the `weights` parameter
+of _ransac_motion and the w_idx/w_in threading; the weighted
+branch of _svd_rigid_2d (reverted to the original 2-arg unweighted
+Kabsch); self._orb_mask. __init__ comment blocks deleted by line
+range (box/Unicode chars made exact-match editing error-prone);
+logic reverted via targeted edits.
+
+REMOVED (vo_node.py): declare/read/pass + startup banner lines +
+runtime warns for roi_top_fraction / depth_weight_power /
+max_vo_feature_depth_m.
+
+KEPT (reusable / live):
+- DepthProjector.pixels_to_3d_body still returns the 3rd value
+  `depths` (per-point camera range) — a future PnP/Step 2 needs
+  previous-frame depth; cheap and inert now.
+- Speedup #1 (vectorized depth sample) and #2 (squared-distance
+  RANSAC, no sqrt) — unaffected.
+- All Step 3: _ransac_motion still returns mean inlier residual
+  (5-tuple), geom_cond/geom_aniso, /vo/odometry + covariance,
+  /vo/conditioning, /vo/reason, reason tags.
+- feature_grid (the new grid homogenizer) and ransac_sample_size.
+
+Verification: py_compile PASS (both files). No residual code refs
+(the only grep hit is the substring `w_in` inside the Step 3
+reason tag 'low_inliers' — unrelated, correct). Out-of-tree: the
+default ctor still constructs; _svd_rigid_2d back to 2-arg and
+recovers a known transform; _ransac_motion returns 5 values with
+finite residual; the removed attributes are gone from the object;
+feature_grid default 0 / settable. rsync + colcon
+--symlink-install PASS; engine + node import in the ROS env.
+The campaign param history remains in VO_CHANGELOG.md /
+VO_readings.txt as the record of WHY these were removed; old
+campaign CLI commands referencing them will now error (expected —
+those experiments are closed).
+
+No mat run (removal of default-off dead code does not change the
+live estimate path; next mat run validates feature_grid + Step 3).
+
+### Files touched this turn
+- visual_odometry.py (removed roi/depth-weight/cutoff/weights;
+  _svd_rigid_2d reverted to unweighted; _ransac_motion 3-arg)
+- vo_node.py (removed the three params end-to-end)
+- This changelog entry.
+- VO_Conversation_Log.txt Turn 109.
+
+## 2026-05-18 (camera_info + static base_link->camera TF in our bridge)
+
+Operator approved the RTAB-Map/RViz enabler. Implemented in OUR
+qcar2_camera_bridge.py (NOT the Quanser library — confirmed no
+PIT/QCar2DepthAligned modification needed; camera_info is just a
+small ROS message of numbers we already own).
+
+Changes (qcar2_camera_bridge.py, all additive):
+- Imports: CameraInfo, TransformStamped, StaticTransformBroadcaster,
+  and DepthProjector (single source of truth for intrinsics +
+  extrinsic — no re-typing, no virtual/physical cross-pollination).
+  Added _rotation_to_quaternion() helper.
+- Params: publish_camera_info (default True), base_frame
+  (base_link), camera_optical_frame (camera_color_optical_frame).
+- __init__: builds a CameraInfo from the canonical RGB intrinsics
+  selected by device_type (depth is aligned to the COLOR grid, so
+  COLOR K describes both streams), plumb_bob, d=0 (post-calib no
+  distortion). Broadcasts ONE static TF base_frame->optical_frame
+  from the same T_cam2body the VO engine uses
+  (P_body = R@P_cam + t).
+- _tick: rgb/depth header.frame_id set to the optical frame (was
+  "color_image"/"depth_image" — metadata only; VO/overlay key off
+  the topic, not the string), and CameraInfo published every frame
+  with the SAME stamp as the images.
+
+Verification: py_compile PASS; quaternion (x,y,z,w)=
+(0.5,-0.5,0.5,-0.5) round-trips PHYSICAL_T_CAM2BODY's rotation
+exactly (np.allclose); CameraInfo fx=607.3 fy=607.3 cx=325.0
+cy=249.9, t=[0.095,0.032,0.172] m, pulled from DepthProjector.
+rsync + colcon --symlink-install PASS. Purely additive — the live
+VO path, Quanser core, and image pixel data are untouched; only a
+new /camera/camera_info topic, a static TF, and image frame_id
+strings changed.
+
+WHY (clarified for the operator): RTAB-Map = two separable parts —
+its OWN rgbd_odometry (a mature alternative to our whole VO, the
+honest baseline) + the SLAM/map backend (keyframes, loop closure,
+trajectory Path + 3D map for RViz; the showcase line). It needs
+RGB + registered depth + camera_info + a base_link->camera TF;
+we had the first two, this commit adds the last two. Our vo_node
+is NOT run alongside RTAB-Map (it replaces our frontend). RTAB-Map
+runs OFF the mat on a recorded bag — zero mat-time cost, no
+compute contention with the frame-rate-sensitive VO.
+
+No mat run this turn (additive). Next: off-mat validation
+checklist + a single consolidated mat session (grid A/B + one bag)
+given to the operator; RTAB-Map bring-up on the bag is the
+teammate's timeboxed track.
+
+### Files touched this turn
+- qcar2_camera_bridge.py (CameraInfo + static TF + frame_id +
+  _rotation_to_quaternion; params)
+- This changelog entry.
+- VO_Conversation_Log.txt Turn 110.
+
+## 2026-05-18 (Easy_Start.txt synced to current procedure)
+
+Operator asked for Easy_Start.txt to be kept current so they can
+self-serve the basic startup (cartographer etc.) instead of asking
+each time. Easy_Start.txt is in-scope for Claude edits.
+
+Verified from the launch files (not guessed): qcar2_keyboard_
+drive_launch.py / qcar2_manual_drive_launch.py declare
+camera_source with default 'depth_aligned', which conditionally
+launches the qcar2_autonomy 'camera_bridge' node; the
+*_cartographer_launch.py wrappers include those drive launches. So
+the cartographer launch ALREADY auto-starts qcar2_camera_bridge —
+no separate camera terminal was ever needed; the run book just
+never said so (it wrongly said "(includes rgbd)"). rgbd.cpp only
+runs with camera_source:=rgbd.
+
+Edits to Easy_Start.txt:
+- Header date -> 2026-05-18 + a "WHAT'S CURRENT" block: camera
+  bridge auto-start, the topics it now publishes (incl.
+  /camera/camera_info + static TF), the canonical Test-6 VO
+  command, the live knobs (feature_grid, publish_vo_odometry),
+  the REMOVED knobs (roi_top_fraction / depth_weight_power /
+  max_vo_feature_depth_m), and the new /vo topics + reason tag.
+- Section 2 "Important launch fact" corrected: cartographer launch
+  also auto-starts the camera bridge (depth_aligned default);
+  Terminal 1 relabeled "base + cartographer + camera bridge".
+- Canonical vo_node command updated everywhere (added
+  -p n_features:=1200) via replace_all. Caught + fixed a
+  double-append the replace_all caused on the header line.
+- New Section 2.1 E) pre-mat off-mat validation checklist
+  (camera_info / tf2_echo / topic hz / /vo topics / dashboard
+  why=) and F) bag-record line for off-mat RTAB-Map / re-analysis.
+- Other sections' stale vo_node commands brought to the canonical
+  form by the same replace_all.
+
+Doc-only change; no code, no build, no mat run. Kept the file's
+existing structure/style.
+
+### Files touched this turn
+- Easy_Start.txt (synced to current pipeline)
+- This changelog entry.
+- VO_Conversation_Log.txt Turn 111.
+
+## 2026-05-18 (Easy_Start fix: canonical launch is qcar2_cartographer_launch.py)
+
+Correction to the entry above. Operator flagged that they do NOT
+use the keyboard/manual cartographer launches (Sections 2/2.1) that
+the previous edit leaned on. Verified from the operator's OWN
+pasted sessions in VO_readings.txt: the actual startup is
+  ros2 launch qcar2_nodes qcar2_cartographer_launch.py
+That launch IncludeLaunchDescription's qcar2_launch.py, whose
+camera_source default is 'depth_aligned' -> qcar2_camera_bridge
+auto-starts. So the "camera bridge auto-starts, no separate camera
+terminal" point holds; only the launch FILE name was wrong.
+
+Easy_Start.txt edits:
+- Header WHAT'S CURRENT: states the canonical startup is Section
+  0.7 / qcar2_cartographer_launch.py and that Sections 2/2.1
+  (keyboard/manual) are legacy alternates.
+- New Section 0.7 "Canonical Physical Startup (THIS is what we
+  run)": the 4 real terminals (qcar2_cartographer_launch.py;
+  vo_node Test-6 cmd + feature_grid A/B note; vo_dashboard;
+  manual_drive), pointing to 2.1 E) for off-mat validation and
+  2.1 F) for the bag.
+- Section 1.5 daily order rewritten to route through Step 0.7 and
+  label Steps 2/2.1 as legacy alternates.
+
+Method note: confirmed the launch include chain from the launch
+files (qcar2_cartographer_launch.py -> qcar2_launch.py ->
+camera_source default depth_aligned) rather than assuming.
+Doc-only; no code/build/mat.
+
+### Files touched this turn
+- Easy_Start.txt (canonical startup corrected to
+  qcar2_cartographer_launch.py; new Section 0.7)
+- This changelog entry.
+- VO_Conversation_Log.txt Turn 112.
+
+## 2026-05-18 (Pre-Test 11: off-mat validation of the whole session — PASS)
+
+Operator ran the off-mat validation (car parked) and pasted it to
+VO_readings.txt "Physical Pre-Test 11". Reviewed in full.
+
+VERDICT: PASS. Everything built this session is verified working
+off the mat:
+- Deletion pass did NOT break vo_node: clean banner, no traceback,
+  "Step 3 ACTIVE ... =True".
+- /camera/camera_info: ~30 Hz, exactly correct — k=[607.327, 0,
+  324.950, 0, 607.345, 249.868, 0,0,1], plumb_bob, d=0, frame
+  camera_color_optical_frame. (The "does not appear yet" line is
+  the ros2-topic-hz startup warning; rate prints immediately
+  after.)
+- Static TF base_link->camera_color_optical_frame: exactly
+  correct — t=[0.095,0.032,0.172], q=[0.5,-0.5,0.5,-0.5], matrix
+  matches PHYSICAL_T_CAM2BODY. (Initial "frame does not exist" is
+  the one-time wait before the latched static TF; prints correctly
+  right after.)
+- /vo/odometry: covariance behaving as designed — x/y var ~0.0009
+  (best-case, locked on clutter w/ 400-500 inliers), z=25.0 and
+  roll/pitch~2.467 (unobserved-DOF big values), yaw var tiny.
+- /vo/conditioning, /vo/reason present; fault_status ends with
+  reason=; vo_dashboard shows why=ok.
+- feature_grid:=8 run: the ACTIVE warn fired, Step 3 active,
+  fault_status kept publishing (~220-260 inliers — fewer but
+  spread, as intended), dashboard parsed why=ok. New grid code
+  path runs clean.
+
+Told the operator they do NOT need to re-run the Terminal-3
+checks with grid on: camera_info / TF / topic rates are produced
+by the camera bridge + static broadcaster and are independent of
+the vo_node feature_grid knob; the only grid-relevant checks
+(node start + fault_status + dashboard) were already done.
+
+OBSERVATION (not a blocker): depth center read 7-13 m throughout
+both runs — camera was pointed at a far/open area while parked;
+>8 m is gated out by depth_max, yet VO still found 200-500
+inliers and low covariance, so the pipeline is healthy even on a
+far scene. On the mat the scene is near (mat/cones/signs <~4 m).
+
+REMAINING off-mat check the operator hadn't done: the ~10 s
+bag dry-run + ros2 bag info (the RTAB-Map artifact). Once that
+passes, cleared for the single consolidated mat session
+(feature_grid 0 vs 8 vs 12 + one bag).
+
+Doc/analysis only; no code/build/mat this turn.
+
+### Files touched this turn
+- This changelog entry.
+- VO_Conversation_Log.txt Turn 113.
+
+## 2026-05-19 (GRID A/B RESULT — feature_grid=8 WINS; first positive lever)
+
+Operator ran the single consolidated mat session (grid 0 / 8 / 12,
+same fixed scenario as the Step 1 campaign, --full-length capture
+so reason= is preserved) and pasted it to VO_readings.txt. Missed
+the bag record (not needed for this verdict; RTAB-Map-only,
+decoupled, grab opportunistically later). Rebuilt the zone
+analyzer (/tmp/analyze_grid.py; out-of-tree): segment by
+`=== GRID TEST n grid=N ===` headers + ts gap, zone B =
+[10 s, dur-10 s], longest qualifying run per grid.
+
+Zone-B (bare middle, competition-representative):
+
+  grid  agree%  vo_susp%  rej%  psi%  inl  drift  topReasons(zoneB)
+  0      12.3    82.5     48.9  61.0  187  0.01   turn205 invalid190 ok61
+  8      22.6    70.1     39.8  69.5   86  0.01   turn222 invalid171 ok129
+  12     21.7    71.2     45.4  67.6   59  1.00   invalid192 turn184 ok120
+
+VERDICT: feature_grid=8 is the FIRST lever in the whole campaign
+to beat the Test-6 baseline in the representative zone, and it
+wins on EVERY headline metric at once: agree ~doubled
+(12.3->22.6%), vo_suspect -12 pts (82.5->70.1), rej -9 pts
+(48.9->39.8), psi +8.5 pts (61->69.5), drift unchanged (0.01 m).
+Mechanism confirmed by the new reason tags: zone-B `ok` frames
+more than doubled (61->129) and `invalid` fell (190->171) — i.e.
+de-clustering produced better-conditioned geometry so VO actually
+locks more often. This is a much stronger, multi-metric,
+mechanistically-explained signal than anything in the depth
+campaign (which only ever tied or lost).
+
+grid=12 REJECTED: ties grid 8 on agree but inliers collapse to 59,
+rej not improved (45.4), end drift 1.00 m — the over-thinning /
+starvation knee predicted when the knob was built (matches the
+over-uniform-quadtree literature). grid 8 is the sweet spot.
+
+Caveats (honest): one run per config (run-to-run variance exists,
+no repeat), and 22.6% absolute agree is still modest — the
+structural bare-wall ceiling stands; grid 8 raises the
+BEST-ACHIEVABLE meaningfully, it does not "solve" bare walls
+(nothing vision-only can). Effect size + 4-metric consistency +
+reason-tag mechanism make it a credible adopt-now result by the
+same single-representative-run methodology the depth campaign
+used; an optional grid8-vs-grid0 confirm run is nice-to-have, not
+required, and not worth a dedicated mat session given the
+showcase timeline.
+
+DECISION: feature_grid=8 is the new recommended operating point /
+winning config (Test 6 base + feature_grid:=8). grid 12 rejected.
+Code default stays feature_grid=0 (default-safe; do NOT silently
+flip behavior) — the new operating point is expressed in the run
+book / commands, not by changing the engine default. Easy_Start.txt
+updated: header canonical command + Section 0.7 Terminal 2 now use
+-p feature_grid:=8 with the result summary and the 12-is-bad note;
+targeted edits only (no replace_all, to avoid the prior
+double-append).
+
+This is the campaign's first genuine win and a strong showcase
+beat ("diagnosed feature clustering -> applied ORB-SLAM-style grid
+homogenization -> measurably ~doubled agreement in the hard zone,
+with the reason tags proving the mechanism").
+
+No code changed this turn (analysis + decision + run-book update;
+the feature_grid engine code from 2026-05-18 stands, default 0).
+
+### Files touched this turn
+- Easy_Start.txt (canonical command -> Test 6 + feature_grid:=8;
+  result summary; grid 12 marked do-not-use)
+- This changelog entry.
+- VO_Conversation_Log.txt Turn 114.
+
+## 2026-05-19 (RTAB-Map bag verified + Test-6 cross-session reconciliation)
+
+Operator recorded the RTAB-Map bag (/tmp/vo_rtab) and pasted
+`ros2 bag info` to VO_readings.txt, and asked (a) to compare the
+grid session vs Test 6, having noticed the plain config looked
+worse than Test 6, and (b) what the bag is for / whether to delete
+it.
+
+BAG: PASS. 128.5 s, 5.5 GiB, all 9 topics healthy
+(camera_info 3889, color 2954, depth 2592, tf 3836, tf_static 2,
+/vo/* 763 each). RTAB-Map-ready.
+
+CROSS-SESSION baseline drift (zone B, bare middle):
+  Test 6 (05-15, n1200, no grid)     ~26% agree / ~66% vo_suspect
+  control (05-18, n1200, dwp0)        16% / 77%
+  grid 0  (05-19, n1200)              12% / 83%
+  grid 8  (05-19, n1200)              23% / 70%
+
+Operator asked if a code change caused the regression. Assessment
+(honest, evidence-based — NOT a code regression):
+- Speedups #1/#2 were verified bit-identical (np.array_equal depth
+  sample; deterministic identical RANSAC inliers/model). Step 3 is
+  additive only. The deletion pass removed roi/depth_weight/cutoff
+  + weighted Kabsch, but those are inactive in any control run
+  (all =0 -> original code path). So the control path math == Test 6.
+- The largest drop (26->16) occurred on 05-18, whose control path
+  was already behavior-equivalent to Test 6 — i.e. the drop
+  PREDATES the grid/cleanup work and happened with
+  verified-equivalent code. That isolates the cause to
+  environment + RANSAC stochasticity, not the edits.
+- RANSAC is unseeded in production: identical config + identical
+  scene still varies run-to-run; plus day-to-day scene/lighting/
+  placement (campaign already documented large environment
+  confounds). Cross-session ABSOLUTE numbers are not comparable —
+  the methodology has always judged WITHIN-session zone-B A/B
+  deltas. The grid0-vs-grid8 same-session A/B (12 -> 23) is the
+  valid comparison and stands.
+- Stronger reframe: on this harder day the plain config got 12%
+  but grid 8 recovered ~23% ≈ Test-6-level — grid 8 clawed back
+  to historical-best territory despite worse conditions. This
+  strengthens, not weakens, the grid-8 result.
+- Cannot prove zero subtle effect without an exact same-session
+  Test-6 rerun, but bit-identical verification + the drop
+  predating the changes make a regression very unlikely, and the
+  cross-session absolute comparison is methodologically invalid
+  regardless.
+
+BAG PURPOSE / KEEP-OR-DELETE: the bag is a raw sensor recording
+(no map in it). RTAB-Map (run later, off-car, teammate) builds the
+map + trajectory FROM it for RViz. Decision is conditional and
+left to the operator: KEEP only if the teammate will actually run
+the RTAB-Map/VSLAM showcase soon (then move off /tmp — it can be
+wiped on reboot: mv to a persistent path); otherwise DELETE
+(rm -rf /tmp/vo_rtab) — 5.5 GiB with no consumer is waste. If VO
+work is being called done and no one is committed to RTAB-Map,
+delete.
+
+STATUS: VO improvement work is effectively concluded. Net
+deliverables this campaign arc: speedups (#1/#2, bit-identical),
+Step 3 honest covariance/odometry/reason (EKF + showcase enabler),
+grid feature homogenization (feature_grid=8 = first lever to beat
+the Test-6 baseline, ~doubled zone-B agree same-session), dead
+levers removed, Easy_Start synced. Open optional threads (operator
+choice, none blocking): RTAB-Map on the bag (teammate showcase),
+a grid8-vs-grid0 confirm run, Friday VO+Cart EKF using Step 3
+covariance.
+
+No code changed this turn (analysis + bag verify + logging).
+
+### Files touched this turn
+- This changelog entry.
+- VO_Conversation_Log.txt Turn 115.
+
+## 2026-05-19 (Toolbox pt.1: selectable PnP estimator + bag/RViz reality)
+
+Operator directive: integrate PnP and KLT as user-selectable
+options ("go crazy on the mat"); also asked to see the RTAB-Map
+recording in RViz now. Identified the YouTube source they learn
+from = Prof. Andreas Geiger, "Self-Driving Cars Lec 7.1: Visual
+Odometry" (KITTI author) — his lecture frames 3D-2D PnP as the
+recommended RGB-D motion method and 3D-3D (our SVD) as the most
+depth-noise-sensitive: independent corroboration of Step 2.
+
+KLT-vs-ORB clarification recorded: KLT = good pure-VO frontend
+(no descriptors -> no loop closure/relocalization); ORB
+descriptors are why ORB-SLAM uses ORB (for relocalization/loop
+closure). Design consequence: keep ORB as the DETECTOR; KLT will
+be an optional tracking frontend on top, descriptors retained.
+RTAB-Map-over-ORB-SLAM3 rationale logged: RTAB-Map is ROS2-native,
+consumes our exact topics, outputs map+grid+trajectory+covariance,
+low integration risk; ORB-SLAM3 has no clean ROS2 wrapper, no nav
+covariance, same low-texture weakness, multi-day gamble — parallel
+external baseline, not fed by our frontend.
+
+BAG/RVIZ REALITY (honest): /tmp/vo_rtab is GONE (/tmp wiped, the
+reboot risk previously flagged; dryrun + vo_grid_session.txt also
+gone), and rtabmap is NOT installed. So no RTAB-Map map in RViz
+now — two blockers. Path: rtabmap_ros install (teammate, off-car)
++ a bag re-recorded to a PERSISTENT path (NOT /tmp). New rule:
+bags never to /tmp. Live /vo/odometry+image in RViz needs neither
+(offered an RViz config as a deliverable).
+
+### Code: selectable PnP estimator (default-safe; toolbox pt.1)
+
+visual_odometry.py:
+- __init__ kwarg vo_estimator='svd' (only 'pnp' enables PnP; any
+  other value -> 'svd' = unchanged proven path). pnp_reproj_px=3.0
+  (PnP RANSAC pixel gate).
+- New _pnp_motion(prev_3d_body, curr_3d_body, curr_px): converts
+  prev body 3D -> prev CAMERA frame (P_cam = (P_body - t_cb) @ R_cb),
+  cv2.solvePnPRansac (iterationsCount=ransac_iterations,
+  reprojectionError=pnp_reproj_px, ITERATIVE) -> camera ego
+  transform T_ego (prev_cam->curr_cam); body feature-motion
+  T_body = T_cb @ T_ego @ inv(T_cb); returns the SAME tuple/
+  semantics as _ransac_motion — body-frame planar (dx,dy,dpsi)
+  pre-negate, inlier_mask over input rows, residual in body-XY
+  metres (identical definition to SVD) so negate/accumulate/
+  Step-3 covariance are untouched. Guards: M<max(6,min_inliers),
+  cv2.error, not-ok, inliers None, inliers<min_inliers all ->
+  zeros (VO abstains, same as SVD low-inlier path).
+- update(): selectable branch — vo_estimator=='pnp' calls
+  _pnp_motion(prev_3d[both_valid], curr_3d[both_valid],
+  curr_pts[both_valid]); else the unchanged _ransac_motion.
+
+vo_node.py: declare/read/validate/pass vo_estimator (invalid ->
+svd warn); warn when PnP active.
+
+Verification (out-of-tree): PnP recovers a known camera motion
+EXACTLY — recovered (dx,dy,dpsi) matches the independent
+closed-form Tcb@Tego@inv(Tcb) to <2e-3, 80/80 inliers, residual
+~1e-2 m; default-safe confirmed (default 'svd', 'PNP'->'pnp',
+garbage->'svd'). py_compile + rsync + colcon --symlink-install
+PASS; engine imports with estimator=pnp, default svd.
+
+STATUS: PnP is toolbox pt.1, complete + verified + built.
+Toolbox pt.2 = KLT optical-flow tracking frontend (vo_frontend
+param, ORB kept as detector) — the immediate next build. Then
+mat A/B: feature_grid {0,8} x vo_estimator {svd,pnp} x
+vo_frontend {orb,klt}. Bare-wall structural ceiling still stands;
+these optimize the achievable region.
+
+No mat run this turn (additive/default-off; validated next mat).
+
+### Files touched this turn
+- visual_odometry.py (vo_estimator param + _pnp_motion + update()
+  selectable branch)
+- vo_node.py (declare/read/validate/pass vo_estimator + warn)
+- This changelog entry.
+- VO_Conversation_Log.txt Turn 116.
+
+## 2026-05-19 (Toolbox pt.2: selectable KLT frontend — toolbox complete)
+
+Operator clarified the ORB-vs-KLT confusion (it IS either/or:
+ORB-match frontend vs KLT-track frontend; KLT still needs a
+detector seed, ORB's is reused so descriptors stay available for
+future SLAM relocalization). rtabmap concern answered: the package
+never touches QCar runtime; the only risk is install footprint on
+the non-standard humble/L4T — so install/run RTAB-Map ISOLATED
+(teammate machine / container, on a bag), never apt into the
+QCar system ROS. Bag policy: only persist the single BEST run.
+
+### Code: selectable KLT optical-flow frontend (default-safe)
+
+visual_odometry.py:
+- __init__ kwarg vo_frontend='orb' (only 'klt' enables KLT; any
+  other value -> 'orb' = unchanged proven path).
+- New self._prev_gray; _store() gained a `gray` param (all 7 call
+  sites updated — 6 via replace_all, the 8-space success-path call
+  fixed separately after grep verification) so the previous
+  grayscale frame is available as the KLT source; __init__/reset
+  init _prev_gray=None.
+- update(): the descriptor-guard + _match + prev/curr extraction
+  is now an `else` (orb) branch; new `if vo_frontend=='klt'`
+  branch tracks the PREVIOUS frame's grid-distributed keypoints
+  into the current gray via cv2.calcOpticalFlowPyrLK
+  (winSize 21, maxLevel 3), keeps status==1 & in-bounds, feeds
+  the SAME backprojection->estimator->Step-3 pipeline. ORB is
+  still detected every frame (descriptors retained; next-frame KLT
+  seed; grid distribution applies so KLT tracks a spread set).
+  Guards (no prev gray/kp, LK None, <min_inliers tracked) ->
+  _store + return, same abstain semantics as the ORB guards.
+- BUG caught by the integration test and fixed: confidence still
+  did inlier_count/len(matches) — `matches` is undefined on the
+  KLT path -> UnboundLocalError. Replaced with
+  n_corr = prev_pts.shape[0] (frontend-agnostic; == len(matches)
+  on the ORB path so ORB confidence semantics unchanged).
+
+vo_node.py: declare/read/validate/pass vo_frontend (invalid ->
+orb warn); warn when KLT active.
+
+Verification (out-of-tree, synthetic textured pair + constant
+depth): all 4 combos {orb,klt} x {svd,pnp} run with NO exception;
+orb+svd unchanged (219 inliers, valid); klt tracks all 800 points
+on a pure-shift image; default-safe confirmed (default orb+svd;
+'KLT'->'klt'; bad->'orb'). pnp shows valid=False on this synthetic
+ONLY because constant depth = coplanar points (degenerate for
+solvePnP) — PnP correctness was already proven separately on
+proper non-coplanar data (exact recovery). py_compile + rsync +
+colcon --symlink-install PASS; engine imports, default orb/svd.
+
+Easy_Start.txt: knob notes extended with vo_estimator and
+vo_frontend (defaults = proven Test-6+grid8 path; mix freely).
+
+### TOOLBOX COMPLETE
+
+Selectable, all default-safe (defaults reproduce the proven path):
+  feature_grid   0 (legacy) | 8 (winner) | 12 (over-thins)
+  vo_estimator   svd (proven 3D-3D) | pnp (3D-2D reprojection)
+  vo_frontend    orb (match) | klt (optical-flow track)
+Next mat session can A/B any mix. Structural bare-wall ceiling
+still stands; these optimize the achievable region. RTAB-Map
+(isolated, on the BEST persistent bag) remains the parallel
+baseline/showcase track.
+
+No mat run this turn (additive/default-off; validated next mat).
+
+### Files touched this turn
+- visual_odometry.py (vo_frontend param + KLT branch + _prev_gray
+  + _store gray + n_corr confidence fix)
+- vo_node.py (declare/read/validate/pass vo_frontend + warn)
+- Easy_Start.txt (knob notes: vo_estimator, vo_frontend)
+- This changelog entry.
+- VO_Conversation_Log.txt Turn 117.
+- /tmp/analyze_grid.py (out-of-tree analyzer; not committed).

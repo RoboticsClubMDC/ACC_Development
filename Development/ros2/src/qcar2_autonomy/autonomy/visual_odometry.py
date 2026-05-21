@@ -502,13 +502,19 @@ class DepthProjector:
         N = pixels.shape[0]
         points_body = np.zeros((N, 3), dtype=np.float64)
 
-        # Sample depth at each pixel location
+        # Sample depth at each pixel location.
+        # 2026-05-18 speedup #1: vectorized replacement of the old
+        # per-feature Python loop. Behavior-identical — np.rint uses the
+        # same round-half-to-even as int(round(...)), the bounds test and
+        # the zero-fill for out-of-image pixels are unchanged. This ran
+        # twice per frame in the hot path; now it is pure numpy.
         depths = np.zeros(N, dtype=np.float64)
         H, W = aligned_depth.shape[:2]
-        for i in range(N):
-            u, v = int(round(pixels[i, 0])), int(round(pixels[i, 1]))
-            if 0 <= v < H and 0 <= u < W:
-                depths[i] = aligned_depth[v, u]
+        if N > 0:
+            u = np.rint(pixels[:, 0]).astype(np.intp)
+            v = np.rint(pixels[:, 1]).astype(np.intp)
+            inb = (u >= 0) & (u < W) & (v >= 0) & (v < H)
+            depths[inb] = aligned_depth[v[inb], u[inb]]
 
         # Valid depth mask
         valid = (depths > self.depth_min) & (depths < self.depth_max)
@@ -578,10 +584,10 @@ class VisualOdometryDepth:
                  max_translation=0.20, max_rotation_deg=15.0,
                  max_dt=0.20,
                  negate_deltas=True,
-                 roi_top_fraction=0.0,
                  ransac_sample_size=2,
-                 depth_weight_power=0.0,
-                 max_vo_feature_depth_m=0.0):
+                 feature_grid=0,
+                 vo_estimator='svd',
+                 vo_frontend='orb'):
         """Initialize Visual Odometry with depth-based 3D backprojection.
 
         Args:
@@ -604,6 +610,7 @@ class VisualOdometryDepth:
             dist_coeffs=dist_coeffs,
         )
 
+        self.n_features = int(n_features)
         self.orb = cv2.ORB_create(nfeatures=n_features)
         self.matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
 
@@ -622,58 +629,53 @@ class VisualOdometryDepth:
         self.max_dt = max_dt
         self.negate_deltas = negate_deltas
 
-        # 2026-05-15: ORB region-of-interest mask. The top fraction of the
-        # image is excluded from feature detection. Default 0.0 = full
-        # frame (legacy behavior). Typical productive values are 0.30-0.40
-        # to exclude sky / ceiling / horizon and keep ORB focused on
-        # ground-level scene features that actually carry useful depth.
-        # Implementation note: this uses cv2.ORB.detectAndCompute's mask
-        # argument, so image dimensions and camera intrinsics are
-        # unchanged. Pixel coords reported back by ORB stay in the full
-        # (640x480) frame, so DepthProjector.pixels_to_3d_body sees the
-        # same coordinate system it did before and no intrinsics need to
-        # be rescaled.
-        self.roi_top_fraction = float(roi_top_fraction)
-        if not (0.0 <= self.roi_top_fraction < 1.0):
-            self.roi_top_fraction = 0.0
-        self._orb_mask = None  # built lazily on first frame
+        # 2026-05-18: ORB-SLAM-style spatial feature homogenization.
+        # OpenCV's ORB keeps the strongest responses, which CLUSTER on
+        # one high-texture object (a sign, a table edge). Clustered
+        # features make RANSAC see many inliers that are geometrically
+        # redundant -> confident but poorly-conditioned motion. This
+        # buckets keypoints into a feature_grid x feature_grid grid over
+        # the image and keeps the best-per-cell, forcing spatial spread
+        # (the cheap, robust form of ORB-SLAM2/3's quadtree homogenizer).
+        #   0 = OFF -> keypoints/descriptors passed through unchanged
+        #             (bit-identical to prior behavior; default-safe).
+        #   8 .. 12 = typical productive grids on 640x480.
+        # Clamped to [0, 32]. Reported pixel coords are unchanged
+        # (same intrinsics, no crop/resize).
+        self.feature_grid = int(feature_grid)
+        if not (0 <= self.feature_grid <= 32):
+            self.feature_grid = 0
 
-        # 2026-05-18: Step 1 — depth-weighted Procrustes. Each matched
-        # correspondence is weighted by 1 / range**depth_weight_power
-        # before the SVD rigid fit, where `range` is the camera-frame
-        # depth (m, physical mode) of the noisier of the two endpoints.
-        # Rationale: RealSense stereo depth noise grows ~ sigma_Z ∝ Z^2,
-        # so a far bare-wall point is far noisier than a crisp near-mat
-        # point. Unweighted Procrustes weights them equally, letting the
-        # noisy far point drag x,y. Weighting de-emphasizes far points.
-        #   0.0 = OFF -> every weight 1.0 -> bit-identical to the prior
-        #         unweighted behavior (Test 6). This is the default and
-        #         the A/B control.
-        #   2.0 = gentle (treats sigma ∝ Z, weight ∝ 1/Z^2)
-        #   4.0 = full RealSense model (sigma_Z ∝ Z^2 -> weight ∝ 1/Z^4)
-        # Exposed as a default-safe ROS param so it can be A/B'd on the
-        # mat against Test 6 without a rebuild, mirroring the
-        # roi_top_fraction / ransac_sample_size pattern. Clamped to a
-        # sane [0, 8] band (8 is already extreme).
-        self.depth_weight_power = float(depth_weight_power)
-        if not (0.0 <= self.depth_weight_power <= 8.0):
-            self.depth_weight_power = 0.0
+        # 2026-05-19: selectable motion estimator.
+        #   'svd'  = 3D-3D Procrustes on body-frame XY (default, the
+        #            proven path; unchanged behavior).
+        #   'pnp'  = 3D-2D reprojection (cv2.solvePnPRansac): anchor
+        #            previous-frame 3D, minimise reprojection error in
+        #            CURRENT-frame pixels (error measured where the
+        #            camera is precise). Geiger Lec 7.1's recommended
+        #            method for RGB-D; converted back to the SAME
+        #            body-frame planar (dx,dy,dpsi) feature-motion the
+        #            SVD path returns, so negate/accumulate/Step-3 are
+        #            untouched — it is a true A/B of only the solver.
+        self.vo_estimator = ('pnp' if str(vo_estimator).lower() == 'pnp'
+                             else 'svd')
+        # PnP RANSAC reprojection inlier gate, pixels (estimator='pnp').
+        self.pnp_reproj_px = 3.0
 
-        # 2026-05-18: Step 1b — HARD max-depth cutoff (operator's idea;
-        # direct Quanser precedent: pit/YOLO/nets.py post_processing
-        # zeroes any depth pixel past `clippingDistance`). A matched
-        # feature whose camera range (EITHER endpoint) exceeds this is
-        # dropped from VO motion entirely — past a few metres RealSense
-        # depth is too noisy to contribute useful geometry, so it is
-        # excluded rather than merely down-weighted. This is the hard
-        # complement to depth_weight_power's soft trust; the two compose
-        # (cutoff filters first, weighting then trusts the survivors).
-        # Value is in the ACTIVE mode's depth units (metres in physical
-        # mode). 0.0 = OFF -> no extra masking -> prior behavior
-        # (default-safe A/B control). Negative -> treated as OFF.
-        self.max_vo_feature_depth = float(max_vo_feature_depth_m)
-        if not (self.max_vo_feature_depth > 0.0):
-            self.max_vo_feature_depth = 0.0
+        # 2026-05-19: selectable correspondence frontend.
+        #   'orb' = detect ORB + describe + brute-force match both
+        #           frames (default, the proven path; unchanged).
+        #   'klt' = detect ORB (kept as the detector; descriptors
+        #           still computed so SLAM relocalization stays
+        #           possible) then track the PREVIOUS frame's
+        #           grid-distributed keypoints into the current frame
+        #           with pyramidal Lucas-Kanade optical flow. Either/
+        #           or, not both — only the correspondence step
+        #           differs; backprojection + estimator + Step-3 are
+        #           untouched. Smaller per-frame motion handling and
+        #           skips the O(N^2) BFMatcher.
+        self.vo_frontend = ('klt' if str(vo_frontend).lower() == 'klt'
+                            else 'orb')
 
         # State
         self.pose = np.array([0.0, 0.0, 0.0])  # [x, y, psi] in map frame
@@ -682,12 +684,16 @@ class VisualOdometryDepth:
         self.inlier_count = 0
         self.confidence = 0.0
         self.inlier_spread = 0.0
+        self.geom_cond = 0.0
+        self.geom_aniso = 0.0
+        self.ransac_resid = 0.0
 
         # Previous frame storage
         self._prev_kp = None
         self._prev_desc = None
         self._prev_depth = None  # aligned depth from previous frame
         self._prev_time = None
+        self._prev_gray = None   # previous grayscale frame (KLT source)
 
     def update(self, color_image, depth_raw, timestamp):
         """Process one frame with color + depth.
@@ -711,20 +717,10 @@ class VisualOdometryDepth:
         gray = (cv2.cvtColor(color_image, cv2.COLOR_BGR2GRAY)
                 if len(color_image.shape) == 3 else color_image.copy())
 
-        # ROI mask for ORB feature detection. Built lazily and reused
-        # across frames as long as the image dimensions stay the same.
-        mask = None
-        if self.roi_top_fraction > 0.0:
-            H, W = gray.shape[:2]
-            if (self._orb_mask is None
-                    or self._orb_mask.shape[0] != H
-                    or self._orb_mask.shape[1] != W):
-                self._orb_mask = np.zeros((H, W), dtype=np.uint8)
-                y_start = int(H * self.roi_top_fraction)
-                self._orb_mask[y_start:, :] = 255
-            mask = self._orb_mask
-
-        keypoints, descriptors = self.orb.detectAndCompute(gray, mask)
+        keypoints, descriptors = self.orb.detectAndCompute(gray, None)
+        # ORB-SLAM-style spatial homogenization (no-op when grid==0).
+        keypoints, descriptors = self._distribute_features(
+            keypoints, descriptors, gray.shape[0], gray.shape[1])
 
         # Align depth to color pixel space and convert to QLabs units
         aligned_depth = self.projector.align_depth(depth_raw)
@@ -736,29 +732,75 @@ class VisualOdometryDepth:
             'inlier_count': 0,
             'confidence': 0.0,
             'inlier_spread': 0.0,
+            # Step 3 signals (always present so consumers never KeyError):
+            # geom_cond = smaller principal spread (m) of the inlier
+            #   body-frame XY cloud; ~0 => collinear/clustered =>
+            #   bare-wall translation degeneracy.
+            # geom_aniso = sqrt(lam_min/lam_max) in [0,1]; 0 collinear,
+            #   1 isotropic/well-conditioned.
+            # ransac_resid = mean inlier residual (m) of the final fit.
+            'geom_cond': 0.0,
+            'geom_aniso': 0.0,
+            'ransac_resid': 0.0,
             'valid': False
         }
 
         # First frame: store and return
         if not self.is_initialized:
-            self._store(keypoints, descriptors, aligned_depth, timestamp)
+            self._store(keypoints, descriptors, gray, aligned_depth, timestamp)
             self.is_initialized = True
             return result
 
-        # Need descriptors in both frames
-        if (descriptors is None or self._prev_desc is None
-                or len(descriptors) < 2 or len(self._prev_desc) < 2):
-            self._store(keypoints, descriptors, aligned_depth, timestamp)
-            return result
-
-        # --- Match features ---
-        matches = self._match(self._prev_desc, descriptors)
-        if len(matches) < self.min_inliers:
-            self._store(keypoints, descriptors, aligned_depth, timestamp)
-            return result
-
-        prev_pts = np.array([self._prev_kp[m.queryIdx].pt for m in matches])
-        curr_pts = np.array([keypoints[m.trainIdx].pt for m in matches])
+        # --- Correspondences (selectable frontend; default orb) ---
+        if self.vo_frontend == 'klt':
+            # Track the PREVIOUS frame's (grid-distributed) keypoints
+            # into the current frame with pyramidal Lucas-Kanade.
+            # Needs the previous gray + keypoints.
+            if (self._prev_gray is None or self._prev_kp is None
+                    or len(self._prev_kp) < self.min_inliers):
+                self._store(keypoints, descriptors, gray,
+                            aligned_depth, timestamp)
+                return result
+            p0 = np.array([k.pt for k in self._prev_kp],
+                          dtype=np.float32).reshape(-1, 1, 2)
+            p1, st, _err = cv2.calcOpticalFlowPyrLK(
+                self._prev_gray, gray, p0, None,
+                winSize=(21, 21), maxLevel=3,
+                criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT,
+                          30, 0.01))
+            if p1 is None or st is None:
+                self._store(keypoints, descriptors, gray,
+                            aligned_depth, timestamp)
+                return result
+            st = st.reshape(-1)
+            p0f = p0.reshape(-1, 2)
+            p1f = p1.reshape(-1, 2)
+            Hh, Ww = gray.shape[:2]
+            good = ((st == 1)
+                    & (p1f[:, 0] >= 0) & (p1f[:, 0] < Ww)
+                    & (p1f[:, 1] >= 0) & (p1f[:, 1] < Hh))
+            if int(np.sum(good)) < self.min_inliers:
+                self._store(keypoints, descriptors, gray,
+                            aligned_depth, timestamp)
+                return result
+            prev_pts = p0f[good].astype(np.float64)
+            curr_pts = p1f[good].astype(np.float64)
+        else:
+            # ORB descriptor matching (the proven path; unchanged).
+            if (descriptors is None or self._prev_desc is None
+                    or len(descriptors) < 2 or len(self._prev_desc) < 2):
+                self._store(keypoints, descriptors, gray,
+                            aligned_depth, timestamp)
+                return result
+            matches = self._match(self._prev_desc, descriptors)
+            if len(matches) < self.min_inliers:
+                self._store(keypoints, descriptors, gray,
+                            aligned_depth, timestamp)
+                return result
+            prev_pts = np.array(
+                [self._prev_kp[m.queryIdx].pt for m in matches])
+            curr_pts = np.array(
+                [keypoints[m.trainIdx].pt for m in matches])
 
         # --- Backproject matched pixels to 3D body-frame ---
         # Previous frame features use previous aligned depth
@@ -771,18 +813,8 @@ class VisualOdometryDepth:
         # Both must have valid depth
         both_valid = prev_valid & curr_valid
 
-        # Step 1b: hard max-depth cutoff. Drop any correspondence whose
-        # camera range exceeds the cutoff on EITHER frame. Applied before
-        # the min_inliers gate so an over-aggressive cutoff cleanly falls
-        # through to "not enough points" (VO abstains) instead of fitting
-        # on a near-empty set. 0.0 = off -> both_valid unchanged.
-        if self.max_vo_feature_depth > 0.0:
-            within = ((prev_depths <= self.max_vo_feature_depth)
-                      & (curr_depths <= self.max_vo_feature_depth))
-            both_valid = both_valid & within
-
         if np.sum(both_valid) < self.min_inliers:
-            self._store(keypoints, descriptors, aligned_depth, timestamp)
+            self._store(keypoints, descriptors, gray, aligned_depth, timestamp)
             return result
 
         # Extract 2D body-frame coordinates (X=forward, Y=left)
@@ -792,34 +824,24 @@ class VisualOdometryDepth:
         curr_2d = curr_3d[both_valid, :2]
         valid_prev_px = prev_pts[both_valid]  # pixel coords for spread
 
-        # Step 1: per-correspondence depth-noise weight. Use the noisier
-        # (farther) of the two endpoints so a pair is only as trustworthy
-        # as its worse observation. weight = 1 / range**power; power 0
-        # -> all-ones -> identical to the prior unweighted path. Pass
-        # weights=None in that case so the code path is literally the old
-        # one (default-safe A/B control).
-        weights = None
-        if self.depth_weight_power > 0.0:
-            pair_range = np.maximum(prev_depths[both_valid],
-                                    curr_depths[both_valid])
-            # both_valid guarantees each endpoint passed depth>depth_min,
-            # so pair_range is strictly positive; clamp anyway for safety.
-            pair_range = np.maximum(pair_range, 1e-6)
-            weights = pair_range ** (-self.depth_weight_power)
-            # Normalize so the largest weight is 1.0 (Procrustes only
-            # uses weights up to a common scale; this just keeps the
-            # numbers well-conditioned across the wide range span).
-            wmax = np.max(weights)
-            if wmax > 0.0:
-                weights = weights / wmax
-
-        # --- RANSAC + SVD ---
-        dx, dy, dpsi, inlier_mask = self._ransac_motion(
-            prev_2d, curr_2d, weights)
+        # --- Motion estimation (selectable solver; default svd) ---
+        if self.vo_estimator == 'pnp':
+            dx, dy, dpsi, inlier_mask, ransac_resid = self._pnp_motion(
+                prev_3d[both_valid], curr_3d[both_valid],
+                curr_pts[both_valid])
+        else:
+            dx, dy, dpsi, inlier_mask, ransac_resid = self._ransac_motion(
+                prev_2d, curr_2d)
 
         self.inlier_count = int(np.sum(inlier_mask))
-        self.confidence = (self.inlier_count / len(matches)
-                           if len(matches) > 0 else 0.0)
+        # putative-correspondence count, frontend-agnostic: equals
+        # len(matches) on the ORB path (prev_pts is built from matches)
+        # and the tracked-point count on the KLT path -> confidence
+        # semantics unchanged for ORB.
+        n_corr = int(prev_pts.shape[0])
+        self.confidence = (self.inlier_count / n_corr
+                           if n_corr > 0 else 0.0)
+        self.ransac_resid = float(ransac_resid)
 
         # Inlier pixel spread (quality metric)
         if self.inlier_count >= 2:
@@ -830,11 +852,34 @@ class VisualOdometryDepth:
         else:
             self.inlier_spread = 0.0
 
+        # Step 3: geometric conditioning of the inlier 3D->2D body cloud.
+        # Eigenvalues of the 2x2 covariance of the inlier (X,Y) body
+        # points: a bare wall traversed parallel makes the points nearly
+        # collinear / tightly clustered, so the smaller principal spread
+        # collapses toward 0 — a direct, cheap detector of the
+        # translation-unobservable regime the campaign proved is
+        # structural. This number drives the honest covariance in
+        # vo_node (it does NOT change the motion estimate).
+        if self.inlier_count >= 3:
+            inl_xy = prev_2d[inlier_mask]
+            C = np.cov(inl_xy.T)
+            ev = np.linalg.eigvalsh(C)  # ascending: [lam_min, lam_max]
+            lam_min = max(float(ev[0]), 0.0)
+            lam_max = max(float(ev[-1]), 1e-12)
+            self.geom_cond = float(np.sqrt(lam_min))
+            self.geom_aniso = float(np.sqrt(lam_min / lam_max))
+        else:
+            self.geom_cond = 0.0
+            self.geom_aniso = 0.0
+
         if self.inlier_count < self.min_inliers:
-            self._store(keypoints, descriptors, aligned_depth, timestamp)
+            self._store(keypoints, descriptors, gray, aligned_depth, timestamp)
             result['inlier_count'] = self.inlier_count
             result['confidence'] = self.confidence
             result['inlier_spread'] = self.inlier_spread
+            result['geom_cond'] = self.geom_cond
+            result['geom_aniso'] = self.geom_aniso
+            result['ransac_resid'] = self.ransac_resid
             return result
 
         # --- Safety gates ---
@@ -843,10 +888,13 @@ class VisualOdometryDepth:
         if (trans > self.max_translation
                 or abs(dpsi) > self.max_rotation
                 or dt > self.max_dt):
-            self._store(keypoints, descriptors, aligned_depth, timestamp)
+            self._store(keypoints, descriptors, gray, aligned_depth, timestamp)
             result['inlier_count'] = self.inlier_count
             result['confidence'] = self.confidence
             result['inlier_spread'] = self.inlier_spread
+            result['geom_cond'] = self.geom_cond
+            result['geom_aniso'] = self.geom_aniso
+            result['ransac_resid'] = self.ransac_resid
             return result
 
         # --- Negate: SVD gives feature motion, we need vehicle motion ---
@@ -869,7 +917,7 @@ class VisualOdometryDepth:
         if dt > 1e-6:
             self.velocity = np.array([dx_map / dt, dy_map / dt])
 
-        self._store(keypoints, descriptors, aligned_depth, timestamp)
+        self._store(keypoints, descriptors, gray, aligned_depth, timestamp)
         result.update({
             'pose': self.pose.copy(),
             'velocity': self.velocity.copy(),
@@ -877,11 +925,51 @@ class VisualOdometryDepth:
             'inlier_count': self.inlier_count,
             'confidence': self.confidence,
             'inlier_spread': self.inlier_spread,
+            'geom_cond': self.geom_cond,
+            'geom_aniso': self.geom_aniso,
+            'ransac_resid': self.ransac_resid,
             'valid': True
         })
         return result
 
     # ---- Internal methods ----
+
+    def _distribute_features(self, keypoints, descriptors, H, W):
+        """ORB-SLAM-style grid homogenization.
+
+        Bucket keypoints into a feature_grid x feature_grid grid over
+        the image and keep the best-by-response per cell (up to
+        ~n_features/cells), forcing spatial spread instead of letting
+        ORB pile features onto one high-texture object. Keypoint <->
+        descriptor row alignment is preserved. feature_grid == 0 (or no
+        descriptors) returns the inputs UNCHANGED — bit-identical to the
+        prior pipeline, so the default is a true no-op.
+        """
+        g = self.feature_grid
+        if (g <= 0 or descriptors is None
+                or keypoints is None or len(keypoints) == 0):
+            return keypoints, descriptors
+
+        pts = np.array([kp.pt for kp in keypoints], dtype=np.float64)
+        resp = np.array([kp.response for kp in keypoints], dtype=np.float64)
+        cx = np.clip((pts[:, 0] / max(W, 1) * g).astype(np.intp), 0, g - 1)
+        cy = np.clip((pts[:, 1] / max(H, 1) * g).astype(np.intp), 0, g - 1)
+        cell = cy * g + cx
+
+        # Sort by cell, then strongest response first within each cell.
+        order = np.lexsort((-resp, cell))
+        cell_sorted = cell[order]
+        _, first_idx, counts = np.unique(
+            cell_sorted, return_index=True, return_counts=True)
+        rank = np.arange(cell_sorted.shape[0]) - np.repeat(first_idx, counts)
+
+        per_cell = max(1, self.n_features // (g * g))
+        keep = order[rank < per_cell]
+        keep.sort()  # keep stable original ordering
+
+        kept_kp = [keypoints[i] for i in keep]
+        kept_desc = descriptors[keep]
+        return kept_kp, kept_desc
 
     def _match(self, d1, d2):
         """Brute-force k=2 matching + Lowe's ratio test.
@@ -906,7 +994,7 @@ class VisualOdometryDepth:
                 good.append(m)
         return good
 
-    def _ransac_motion(self, pts_prev, pts_curr, weights=None):
+    def _ransac_motion(self, pts_prev, pts_curr):
         """s-point RANSAC with SVD Procrustes on body-frame 2D points.
 
         Sample size s = self.ransac_sample_size (>=2). s=2 is the minimum
@@ -914,15 +1002,6 @@ class VisualOdometryDepth:
         hypotheses on low-texture scenes at the cost of needing more
         iterations for the same confidence (iterations are fixed here, so
         higher s simply trades a few weak hypotheses for stronger ones).
-
-        Step 1: `weights` (M,) is the per-correspondence depth-noise
-        weight. It is applied ONLY inside the SVD Procrustes fits (the
-        minimal-sample hypothesis fit and the final inlier refit) — the
-        RANSAC inlier test stays an UNWEIGHTED geometric distance vs the
-        locked ransac_threshold, so the consensus search and its tuned
-        threshold are unchanged; only the pose recovered FROM the chosen
-        consensus set is depth-weighted. weights=None reproduces the old
-        unweighted estimator exactly.
         """
         M = pts_prev.shape[0]
         best_inliers = np.zeros(M, dtype=bool)
@@ -930,7 +1009,15 @@ class VisualOdometryDepth:
 
         s = self.ransac_sample_size
         if M < s:
-            return best_t[0], best_t[1], 0.0, best_inliers
+            return best_t[0], best_t[1], 0.0, best_inliers, 0.0
+
+        # 2026-05-18 speedup #2: compare SQUARED distance to the SQUARED
+        # threshold instead of computing np.linalg.norm (a sqrt) over all
+        # M points on every one of ransac_iterations passes. (a < t) is
+        # identical to (a^2 < t^2) for non-negative a, t, so the inlier
+        # set, best model and result are bit-for-bit unchanged — only the
+        # per-iteration sqrt is removed.
+        thr2 = self.ransac_threshold * self.ransac_threshold
 
         for _ in range(self.ransac_iterations):
             idx = np.random.choice(M, s, replace=False)
@@ -939,64 +1026,122 @@ class VisualOdometryDepth:
             # are effectively coincident (no spread to fit a transform).
             if np.max(np.std(pts_prev[idx], axis=0)) < 1e-8:
                 continue
-            w_idx = None if weights is None else weights[idx]
-            R_e, t_e = self._svd_rigid_2d(
-                pts_prev[idx], pts_curr[idx], w_idx)
-            res = np.linalg.norm(
-                pts_curr - (R_e @ pts_prev.T).T - t_e, axis=1)
-            inl = res < self.ransac_threshold
+            R_e, t_e = self._svd_rigid_2d(pts_prev[idx], pts_curr[idx])
+            diff = pts_curr - (R_e @ pts_prev.T).T - t_e
+            res2 = np.einsum('ij,ij->i', diff, diff)  # squared dist, no sqrt
+            inl = res2 < thr2
             c = np.sum(inl)
             if c > best_count:
                 best_count, best_inliers, best_R, best_t = c, inl, R_e, t_e
 
-        # Refit on all inliers (depth-weighted when weights are given)
+        # Refit on all inliers
         if best_count >= s:
-            w_in = None if weights is None else weights[best_inliers]
             best_R, best_t = self._svd_rigid_2d(
-                pts_prev[best_inliers], pts_curr[best_inliers], w_in)
+                pts_prev[best_inliers], pts_curr[best_inliers])
 
         dpsi = np.arctan2(best_R[1, 0], best_R[0, 0])
-        return best_t[0], best_t[1], dpsi, best_inliers
+
+        # Step 3: mean inlier residual (metres) of the final fit. The
+        # sqrt is taken ONCE here over the inlier set only (not per
+        # iteration), so it is negligible cost and feeds the honest
+        # covariance — a sloppy fit (large residual) must inflate the
+        # reported VO uncertainty.
+        if best_count > 0:
+            d = (pts_curr[best_inliers]
+                 - (best_R @ pts_prev[best_inliers].T).T - best_t)
+            mean_resid = float(
+                np.sqrt(np.einsum('ij,ij->i', d, d)).mean())
+        else:
+            mean_resid = 0.0
+        return best_t[0], best_t[1], dpsi, best_inliers, mean_resid
+
+    def _pnp_motion(self, prev_3d_body, curr_3d_body, curr_px):
+        """3D-2D reprojection motion (cv2.solvePnPRansac).
+
+        Returns the SAME tuple/semantics as _ransac_motion:
+        (dx, dy, dpsi, inlier_mask, mean_resid) — body-frame planar
+        FEATURE motion (prev->curr, pre-negate), inlier_mask over the
+        input rows, residual in body-XY metres (identical definition to
+        the SVD path) so Step-3 covariance stays consistent. Only the
+        solver differs => clean A/B vs SVD.
+
+        Math: anchor previous-frame 3D in the PREVIOUS CAMERA frame
+        (P_cam = R_cb^T (P_body - t_cb)); solvePnPRansac finds the
+        camera ego-transform T_ego (prev_cam -> curr_cam) that best
+        reprojects them onto the CURRENT pixels (error in pixel space,
+        where the camera is precise). Conjugate by the cam->body
+        extrinsic to get the body-frame feature motion
+        T_body = T_cb @ T_ego @ T_cb^{-1}, then take its planar
+        (yaw, x, y) — same convention the SVD path emits.
+        """
+        M = prev_3d_body.shape[0]
+        bad = (0.0, 0.0, 0.0, np.zeros(M, dtype=bool), 0.0)
+        if M < max(6, self.min_inliers):
+            return bad
+
+        R_cb = self.projector.R_cam2body
+        t_cb = self.projector.t_cam2body
+        K = self.projector.K_rgb
+        dist = np.zeros(5, dtype=np.float64)
+
+        # body -> previous camera frame
+        prev_cam = (prev_3d_body - t_cb) @ R_cb
+        obj = np.ascontiguousarray(prev_cam, dtype=np.float64)
+        img = np.ascontiguousarray(curr_px, dtype=np.float64)
+        try:
+            ok, rvec, tvec, inliers = cv2.solvePnPRansac(
+                obj, img, K, dist,
+                iterationsCount=int(self.ransac_iterations),
+                reprojectionError=float(self.pnp_reproj_px),
+                flags=cv2.SOLVEPNP_ITERATIVE)
+        except cv2.error:
+            return bad
+        if not ok or inliers is None:
+            return bad
+        inl_idx = np.asarray(inliers).reshape(-1)
+        if inl_idx.size < self.min_inliers:
+            return bad
+
+        R_ce, _ = cv2.Rodrigues(rvec)
+        T_ego = np.eye(4, dtype=np.float64)
+        T_ego[:3, :3] = R_ce
+        T_ego[:3, 3] = tvec.reshape(3)
+        T_cb4 = self.projector.T_cam2body
+        T_body = T_cb4 @ T_ego @ np.linalg.inv(T_cb4)
+
+        R2 = T_body[:3, :3]
+        dpsi = np.arctan2(R2[1, 0], R2[0, 0])
+        dx, dy = float(T_body[0, 3]), float(T_body[1, 3])
+
+        inlier_mask = np.zeros(M, dtype=bool)
+        inlier_mask[inl_idx] = True
+
+        # residual: body-XY metres, SAME definition as the SVD path
+        c, s = np.cos(dpsi), np.sin(dpsi)
+        R2d = np.array([[c, -s], [s, c]])
+        pv = prev_3d_body[inl_idx, :2]
+        cv_ = curr_3d_body[inl_idx, :2]
+        pred = pv @ R2d.T + np.array([dx, dy])
+        d = cv_ - pred
+        mean_resid = float(np.sqrt(np.einsum('ij,ij->i', d, d)).mean())
+        return dx, dy, dpsi, inlier_mask, mean_resid
 
     @staticmethod
-    def _svd_rigid_2d(pts_a, pts_b, w=None):
-        """SVD Procrustes: find R, t such that pts_b ≈ R @ pts_a + t.
-
-        w (N,) is an optional per-point weight (Step 1 depth weighting).
-        With w=None — or any uniform weight — this is the original
-        unweighted Kabsch solve: uniform weights cancel out of the
-        normalized centroid and only scale S by a positive constant,
-        which leaves the SVD rotation/translation unchanged. So the
-        depth_weight_power=0 path is bit-identical to the prior code.
-        """
-        if w is None:
-            ca = np.mean(pts_a, axis=0)
-            cb = np.mean(pts_b, axis=0)
-            S = (pts_a - ca).T @ (pts_b - cb)
-        else:
-            w = np.asarray(w, dtype=np.float64)
-            wsum = w.sum()
-            if wsum <= 0.0 or not np.isfinite(wsum):
-                # Degenerate weights — fall back to the unweighted fit
-                # rather than producing NaNs.
-                ca = np.mean(pts_a, axis=0)
-                cb = np.mean(pts_b, axis=0)
-                S = (pts_a - ca).T @ (pts_b - cb)
-            else:
-                ca = (w[:, None] * pts_a).sum(axis=0) / wsum
-                cb = (w[:, None] * pts_b).sum(axis=0) / wsum
-                A = pts_a - ca
-                B = pts_b - cb
-                S = (w[:, None] * A).T @ B
+    def _svd_rigid_2d(pts_a, pts_b):
+        """SVD Procrustes: find R, t such that pts_b ≈ R @ pts_a + t."""
+        ca = np.mean(pts_a, axis=0)
+        cb = np.mean(pts_b, axis=0)
+        S = (pts_a - ca).T @ (pts_b - cb)
         U, _, Vt = np.linalg.svd(S)
         d = np.linalg.det(Vt.T @ U.T)
         R = Vt.T @ np.diag([1.0, np.sign(d)]) @ U.T
         t = cb - R @ ca
         return R, t
 
-    def _store(self, kp, desc, aligned_depth, ts):
+    def _store(self, kp, desc, gray, aligned_depth, ts):
         self._prev_kp = kp
         self._prev_desc = desc
+        self._prev_gray = gray   # next frame's KLT source
         self._prev_depth = aligned_depth
         self._prev_time = ts
 
@@ -1006,10 +1151,14 @@ class VisualOdometryDepth:
         self.velocity = np.array([0.0, 0.0])
         self.is_initialized = False
         self._prev_kp = self._prev_desc = self._prev_depth = None
+        self._prev_gray = None
         self._prev_time = None
         self.inlier_count = 0
         self.confidence = 0.0
         self.inlier_spread = 0.0
+        self.geom_cond = 0.0
+        self.geom_aniso = 0.0
+        self.ransac_resid = 0.0
 
     def soft_reset(self, x, y, psi):
         """Re-anchor pose without clearing feature history."""

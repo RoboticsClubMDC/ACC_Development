@@ -28,7 +28,8 @@ class VOImageOverlay(Node):
         r"ct\((?P<ct_x>[-0-9.]+),(?P<ct_y>[-0-9.]+),(?P<ct_psi_deg>[-0-9.]+)\)\s+\|\s+"
         r"dx=(?P<dx>[-0-9.]+)\s+dy=(?P<dy>[-0-9.]+)\s+dpsi=(?P<dpsi_deg>[-0-9.]+)\s+"
         r"inl=(?P<inl>\d+)\s+sp=(?P<sp>[-0-9.]+)"
-        r"(?:\s+psi_raw=(?P<psi_raw_deg>[-0-9.]+))?$"
+        r"(?:\s+psi_raw=(?P<psi_raw_deg>[-0-9.]+))?"
+        r"(?:\s+reason=(?P<reason>\S+))?$"
     )
 
     def __init__(self):
@@ -84,6 +85,7 @@ class VOImageOverlay(Node):
                 "sp": float(g["sp"]),
                 "psi_raw_deg": (float(g["psi_raw_deg"])
                                 if g.get("psi_raw_deg") is not None else None),
+                "reason": g.get("reason"),
             }
         with self._lock:
             self._status_raw = text
@@ -157,7 +159,8 @@ class VOImageOverlay(Node):
                 (parsed["vo_x"] - parsed["ct_x"]) ** 2 + (parsed["vo_y"] - parsed["ct_y"]) ** 2
             )
             lines = [
-                f"STATE={parsed['state']}  rho={parsed['rho']:.3f}  w={parsed['w']:.2f}",
+                (f"STATE={parsed['state']}  rho={parsed['rho']:.3f}  "
+                 f"w={parsed['w']:.2f}  why={parsed.get('reason') or '-'}"),
                 (
                     f"VO  x={parsed['vo_x']:+.2f} y={parsed['vo_y']:+.2f} "
                     f"psi={parsed['vo_psi_deg']:+.0f}deg"

@@ -61,7 +61,39 @@ import rclpy
 from cv_bridge import CvBridge
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, CameraInfo
+from geometry_msgs.msg import TransformStamped
+from tf2_ros import StaticTransformBroadcaster
+
+# Canonical intrinsics + camera->body extrinsic live in ONE place
+# (DepthProjector). Importing them here keeps camera_info / TF
+# consistent with the VO engine and avoids re-typing or
+# cross-polluting the virtual/physical tables.
+from autonomy.visual_odometry import DepthProjector
+
+
+def _rotation_to_quaternion(R):
+    """3x3 rotation matrix -> (x, y, z, w) unit quaternion."""
+    R = np.asarray(R, dtype=np.float64)
+    t = np.trace(R)
+    if t > 0.0:
+        s = np.sqrt(t + 1.0) * 2.0
+        w, x = 0.25 * s, (R[2, 1] - R[1, 2]) / s
+        y, z = (R[0, 2] - R[2, 0]) / s, (R[1, 0] - R[0, 1]) / s
+    elif R[0, 0] >= R[1, 1] and R[0, 0] >= R[2, 2]:
+        s = np.sqrt(1.0 + R[0, 0] - R[1, 1] - R[2, 2]) * 2.0
+        w, x = (R[2, 1] - R[1, 2]) / s, 0.25 * s
+        y, z = (R[0, 1] + R[1, 0]) / s, (R[0, 2] + R[2, 0]) / s
+    elif R[1, 1] >= R[2, 2]:
+        s = np.sqrt(1.0 + R[1, 1] - R[0, 0] - R[2, 2]) * 2.0
+        w, x = (R[0, 2] - R[2, 0]) / s, (R[0, 1] + R[1, 0]) / s
+        y, z = 0.25 * s, (R[1, 2] + R[2, 1]) / s
+    else:
+        s = np.sqrt(1.0 + R[2, 2] - R[0, 0] - R[1, 1]) * 2.0
+        w, x = (R[1, 0] - R[0, 1]) / s, (R[0, 2] + R[2, 0]) / s
+        y, z = (R[1, 2] + R[2, 1]) / s, 0.25 * s
+    q = np.array([x, y, z, w], dtype=np.float64)
+    return q / np.linalg.norm(q)
 
 
 def _resolve_pit_import(custom_path: str):
@@ -120,6 +152,14 @@ class CameraBridge(Node):
         self.declare_parameter("pit_non_blocking", True)
         self.declare_parameter("pit_manual_start", False)
         self.declare_parameter("publish_rate", 60.0)
+        # 2026-05-18: publish CameraInfo + a static base_link->camera
+        # optical TF so standard ROS RGB-D tools (RTAB-Map, RViz) work.
+        # Additive: new topic + static TF only, no behavior change to
+        # the image streams. Default ON (correct ROS hygiene anyway).
+        self.declare_parameter("publish_camera_info", True)
+        self.declare_parameter("base_frame", "base_link")
+        self.declare_parameter("camera_optical_frame",
+                                "camera_color_optical_frame")
 
         device_type = str(self.get_parameter("device_type").value).strip().lower()
         if device_type not in ("physical", "virtual"):
@@ -167,6 +207,65 @@ class CameraBridge(Node):
             Image, "/camera/color_image", qos_profile_sensor_data)
         self.pub_depth = self.create_publisher(
             Image, "/camera/depth_image", qos_profile_sensor_data)
+
+        # ── CameraInfo + static base_link->camera optical TF ────────
+        # RTAB-Map / RViz / any standard RGB-D tool need the intrinsics
+        # (CameraInfo) and the camera's place on the robot (TF). The
+        # depth is aligned to the COLOR grid, so the COLOR (RGB)
+        # intrinsics describe both streams. Numbers come from the
+        # canonical DepthProjector table (single source of truth),
+        # selected by device_type — never cross-pollinated.
+        self.publish_camera_info = bool(
+            self.get_parameter("publish_camera_info").value)
+        self.base_frame = str(self.get_parameter("base_frame").value)
+        self.optical_frame = str(
+            self.get_parameter("camera_optical_frame").value)
+        self.pub_caminfo = self.create_publisher(
+            CameraInfo, "/camera/camera_info", qos_profile_sensor_data)
+
+        if is_physical:
+            fx, fy = DepthProjector.PHYSICAL_FX_RGB, DepthProjector.PHYSICAL_FY_RGB
+            cx, cy = DepthProjector.PHYSICAL_CX_RGB, DepthProjector.PHYSICAL_CY_RGB
+            T_cb = DepthProjector.PHYSICAL_T_CAM2BODY
+        else:
+            fx, fy = DepthProjector.VIRTUAL_FX_RGB, DepthProjector.VIRTUAL_FY_RGB
+            cx, cy = DepthProjector.VIRTUAL_CX_RGB, DepthProjector.VIRTUAL_CY_RGB
+            T_cb = DepthProjector.VIRTUAL_T_CAM2BODY  # NOTE: QLabs units
+
+        self._caminfo = CameraInfo()
+        self._caminfo.width = 640
+        self._caminfo.height = 480
+        self._caminfo.distortion_model = "plumb_bob"
+        self._caminfo.d = [0.0, 0.0, 0.0, 0.0, 0.0]  # post-calib: none
+        self._caminfo.k = [fx, 0.0, cx, 0.0, fy, cy, 0.0, 0.0, 1.0]
+        self._caminfo.r = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+        self._caminfo.p = [fx, 0.0, cx, 0.0,
+                           0.0, fy, cy, 0.0,
+                           0.0, 0.0, 1.0, 0.0]
+
+        # Static TF base_link -> camera optical frame, from the same
+        # T_cam2body the VO engine uses (P_body = R@P_cam + t).
+        self._static_tf = StaticTransformBroadcaster(self)
+        T_cb = np.asarray(T_cb, dtype=np.float64)
+        q = _rotation_to_quaternion(T_cb[:3, :3])
+        st = TransformStamped()
+        st.header.stamp = self.get_clock().now().to_msg()
+        st.header.frame_id = self.base_frame
+        st.child_frame_id = self.optical_frame
+        st.transform.translation.x = float(T_cb[0, 3])
+        st.transform.translation.y = float(T_cb[1, 3])
+        st.transform.translation.z = float(T_cb[2, 3])
+        st.transform.rotation.x = float(q[0])
+        st.transform.rotation.y = float(q[1])
+        st.transform.rotation.z = float(q[2])
+        st.transform.rotation.w = float(q[3])
+        if self.publish_camera_info:
+            self._static_tf.sendTransform(st)
+            self.get_logger().info(
+                f"CameraInfo on /camera/camera_info "
+                f"(fx={fx:.1f} fy={fy:.1f} cx={cx:.1f} cy={cy:.1f}) and "
+                f"static TF {self.base_frame}->{self.optical_frame} "
+                "published (RTAB-Map / RViz ready).")
 
         # ── Polling timer ───────────────────────────────────────────
         rate = float(self.get_parameter("publish_rate").value)
@@ -226,15 +325,23 @@ class CameraBridge(Node):
 
         stamp = self.get_clock().now().to_msg()
 
+        # frame_id aligned to the TF tree's optical frame so RTAB-Map /
+        # RViz can place the camera correctly. (VO/overlay key off the
+        # topic, not this string, so this is metadata-only.)
         rgb_msg = self.bridge.cv2_to_imgmsg(rgb, encoding="bgr8")
         rgb_msg.header.stamp = stamp
-        rgb_msg.header.frame_id = "color_image"
+        rgb_msg.header.frame_id = self.optical_frame
         self.pub_rgb.publish(rgb_msg)
 
         depth_msg = self.bridge.cv2_to_imgmsg(depth, encoding="32FC1")
         depth_msg.header.stamp = stamp
-        depth_msg.header.frame_id = "depth_image"
+        depth_msg.header.frame_id = self.optical_frame
         self.pub_depth.publish(depth_msg)
+
+        if self.publish_camera_info:
+            self._caminfo.header.stamp = stamp
+            self._caminfo.header.frame_id = self.optical_frame
+            self.pub_caminfo.publish(self._caminfo)
 
         self._frames_published += 1
 

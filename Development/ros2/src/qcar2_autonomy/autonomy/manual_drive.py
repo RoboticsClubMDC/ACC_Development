@@ -33,7 +33,7 @@ class ManualDrive(Node):
         # Conservative defaults for first physical tests.
         self.declare_parameter("forward_speed", 0.10)
         self.declare_parameter("reverse_speed", 0.08)
-        self.declare_parameter("turn_rate", 0.25)
+        self.declare_parameter("turn_rate", 0.40)
         self.declare_parameter("cmd_topic", "/cmd_vel_nav")
 
         self.forward_speed = float(self.get_parameter("forward_speed").value)

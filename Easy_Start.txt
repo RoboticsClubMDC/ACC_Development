@@ -1,7 +1,55 @@
-ACC_Development Easy Start
+ACC_Development_gabriel Easy Start
 Physical VO first, Virtual later
 
-Last updated: 2026-04-30
+Last updated: 2026-05-20
+
+FOLDER NOTE (2026-05-20):
+- This workspace is /home/nvidia/Documents/ACC_Development_gabriel/
+  (renamed from ACC_Development after a teammate delete/restore).
+- /home/nvidia/Documents/ACC_Development/ is Arturo's clone
+  (branch Physical_Arturo). DO NOT rsync from it; its
+  qcar2_autonomy/autonomy/ contents are different (lane_assist_blend,
+  lane_keeping, path_teacher, ...) and would overwrite our VO work.
+- All paths below now point at ACC_Development_gabriel. If you see
+  ACC_Development anywhere (without the _gabriel suffix), it is wrong
+  for our workflow.
+
+WHAT'S CURRENT (read this first):
+- CANONICAL PHYSICAL STARTUP IS SECTION 0.7. We run
+  qcar2_cartographer_launch.py (NOT the keyboard/manual cartographer
+  launches in Sections 2/2.1 - those are legacy/alternate).
+- The physical camera is owned by qcar2_camera_bridge (the Python
+  "camera_bridge" node in qcar2_autonomy). qcar2_cartographer_launch.py
+  STARTS IT AUTOMATICALLY (it includes qcar2_launch.py whose
+  camera_source default is 'depth_aligned'). You do NOT run a
+  separate camera/rgbd terminal.
+- The bridge publishes: /camera/color_image (bgr8),
+  /camera/depth_image (32FC1 metres, aligned to colour),
+  /camera/camera_info (intrinsics), and a static TF
+  base_link -> camera_color_optical_frame. (camera_info + TF added
+  2026-05-18 for RTAB-Map / RViz.)
+- Canonical VO command (CURRENT winning config = Test 6 + grid 8;
+  2026-05-19 grid A/B: grid 8 ~doubled zone-B agree 12->23%,
+  vo_suspect 83->70%, vs control):
+    ros2 run qcar2_autonomy vo_node --ros-args -p camera_mode:=physical -p alignment_mode:=auto -p depth_scale:=0.0 -p n_features:=1200 -p feature_grid:=8
+  Knob notes:
+    -p feature_grid:=8     RECOMMENDED (ORB-SLAM-style grid spread).
+                           0 = legacy/control (clustered, worse).
+                           12 = over-thins (rejected: inliers
+                           collapse, drift up).
+    -p vo_estimator:=svd   svd (default, proven 3D-3D Procrustes) |
+                           pnp (3D-2D reprojection, solvePnPRansac).
+    -p vo_frontend:=orb    orb (default, detect+describe+match) |
+                           klt (ORB-detect + LK optical-flow track).
+    (mix freely on the mat: feature_grid x vo_estimator x
+     vo_frontend; defaults = the proven Test-6+grid8 path.)
+    -p publish_vo_odometry:=true  (default; /vo/odometry + covariance)
+  force_cart_yaw defaults ON (VO heading pinned to Cartographer).
+  REMOVED knobs (do not use; deleted 2026-05-18): roi_top_fraction,
+  depth_weight_power, max_vo_feature_depth_m.
+- VO now also publishes /vo/odometry (pose + honest covariance),
+  /vo/conditioning, /vo/reason; /vo/fault_status ends with
+  reason=<tag>; vo_dashboard shows why=<reason>.
 
 ==================================================
 0) Fresh Remote Session (QCar2) - always first
@@ -17,7 +65,7 @@ source install/setup.bash
 
 # If this is a fresh reset and install/ is missing
 mkdir -p ~/ros2
-cp -r -u ~/Documents/ACC_Development/Development/ros2/src ~/ros2/
+cp -r -u ~/Documents/ACC_Development_gabriel/Development/ros2/src ~/ros2/
 cd ~/ros2
 colcon build
 source install/setup.bash
@@ -31,7 +79,7 @@ Purpose:
 - Keep your branch updated and push once at end of day.
 
 A) Check/switch/update branch at start of session
-cd /home/$USER/Documents/ACC_Development
+cd /home/$USER/Documents/ACC_Development_gabriel
 git fetch origin
 git checkout Gabriel
 git pull --ff-only origin Gabriel
@@ -40,12 +88,18 @@ git status -sb
 Expected branch line:
 - ## Gabriel...origin/Gabriel
 
+Sanity check (do NOT skip after the 2026-05-20 folder rename):
+- pwd must end in ACC_Development_gabriel (not ACC_Development)
+- git branch --show-current must print Gabriel
+- If you accidentally cd into ~/Documents/ACC_Development, you are on
+  Arturo's Physical_Arturo clone. Back out.
+
 B) Quick branch check any time
-cd /home/$USER/Documents/ACC_Development
+cd /home/$USER/Documents/ACC_Development_gabriel
 git branch --show-current
 
 C) End-of-day push (only if you made changes)
-cd /home/$USER/Documents/ACC_Development
+cd /home/$USER/Documents/ACC_Development_gabriel
 git status
 git add <files_you_changed>
 git commit -m "<short message about today's work>"
@@ -64,26 +118,73 @@ Push policy for this workflow:
 ==================================================
 Why:
 - `vo_node` runs from `~/ros2/install`, not directly from
-  `~/Documents/ACC_Development`.
+  `~/Documents/ACC_Development_gabriel`.
 - If `~/ros2/src` is stale, physical runs may still show old behavior
   (e.g., `alignment_mode:=auto` -> OFF in physical, no `force_cart_yaw` pin).
+
+IMPORTANT (2026-05-20): rsync source is ACC_Development_gabriel.
+DO NOT rsync from ~/Documents/ACC_Development (Arturo's clone) - its
+qcar2_autonomy/autonomy/ has different files (lane_assist_blend,
+lane_keeping, path_teacher, ...) and would wipe Gabriel's VO work.
 
 Run before physical testing whenever VO/autonomy code changed:
 cd /home/$USER
 rsync -a --delete \
-  /home/$USER/Documents/ACC_Development/Development/ros2/src/qcar2_autonomy/ \
+  /home/$USER/Documents/ACC_Development_gabriel/Development/ros2/src/qcar2_autonomy/ \
   /home/$USER/ros2/src/qcar2_autonomy/
 cd /home/$USER/ros2
 colcon build --packages-select qcar2_autonomy
 source install/setup.bash
 
+Post-sync sanity check (one-liner; expect no output):
+diff -q \
+  /home/$USER/Documents/ACC_Development_gabriel/Development/ros2/src/qcar2_autonomy/autonomy/visual_odometry.py \
+  /home/$USER/ros2/src/qcar2_autonomy/autonomy/visual_odometry.py
+# If it prints "files differ" or errors, the wrong source folder was used.
+
 If you changed `qcar2_nodes` C++ code or launch files too:
 rsync -a --delete \
-  /home/$USER/Documents/ACC_Development/Development/ros2/src/qcar2_nodes/ \
+  /home/$USER/Documents/ACC_Development_gabriel/Development/ros2/src/qcar2_nodes/ \
   /home/$USER/ros2/src/qcar2_nodes/
 cd /home/$USER/ros2
 colcon build --packages-select qcar2_nodes
 source install/setup.bash
+
+
+==================================================
+0.7) Canonical Physical Startup (THIS is what we run)
+==================================================
+This is the actual day-to-day physical startup. Sections 2 / 2.1
+(keyboard/manual cartographer) are legacy alternates - ignore them
+unless you specifically need that path.
+
+Each terminal first:
+source /opt/ros/humble/setup.bash
+export PYTHONPATH=$PYTHONPATH:/usr/local/lib/python3.8/dist-packages
+export ROS_DOMAIN_ID=67
+cd ~/ros2
+source install/setup.bash
+
+Terminal 1 - base + cartographer + camera bridge (one launch;
+camera bridge auto-starts via camera_source:=depth_aligned):
+ros2 launch qcar2_nodes qcar2_cartographer_launch.py
+
+Terminal 2 - VO node (CURRENT winning config = Test 6 + grid 8):
+ros2 run qcar2_autonomy vo_node --ros-args -p camera_mode:=physical -p alignment_mode:=auto -p depth_scale:=0.0 -p n_features:=1200 -p feature_grid:=8
+  (feature_grid:=8 is the winner; :=0 = legacy control;
+   :=12 over-thins - do not use)
+
+Terminal 3 - diagnostics:
+ros2 run qcar2_autonomy vo_dashboard
+  (or: ros2 topic echo /vo/fault_status )
+
+Terminal 4 - drive when ready (WASD):
+ros2 run qcar2_autonomy manual_drive
+
+Before driving on the mat: run the off-mat validation in
+Section 2.1 E) (car parked). To capture a run, use Section 2.1 F)
+(bag) and the ts fault_status capture convention used for the
+campaign tests.
 
 
 ==================================================
@@ -97,7 +198,7 @@ Does car need to be at mat center?
 - Car can be anywhere safe and stationary.
 
 Commands:
-cd /home/$USER/Documents/ACC_Development
+cd /home/$USER/Documents/ACC_Development_gabriel
 mkdir -p vo_calib_logs
 rs-enumerate-devices -c > vo_calib_logs/realsense_calib_$(date +%F_%H%M%S).txt
 rs-enumerate-devices -o > vo_calib_logs/realsense_options_$(date +%F_%H%M%S).txt
@@ -111,10 +212,15 @@ Use this order each day:
 2. Step 0.5A + 0.5B
 3. Step 0.6
 4. Step 1
-5. Optional: Step 4 first (probe-only check)
-6. Step 2 or Step 3
+5. Step 0.7  (canonical startup: cartographer + camera bridge +
+   vo_node + dashboard), then Section 2.1 E) off-mat validation
+6. Drive / capture (Section 2.1 F bag + ts fault_status), or
+   Step 3 if running planner/autonomy
 7. Step 5 (safe shutdown)
 8. Step 0.5C only if you actually changed files
+
+Note: Steps 2 / 2.1 (keyboard/manual cartographer) are legacy
+alternates - the canonical path is Step 0.7.
 
 Note:
 - Doing Step 4 before Step 2/3 can save time if you only want to verify probe behavior first.
@@ -130,8 +236,12 @@ When to use:
 Important launch fact:
 - qcar2_manual_cartographer_launch.py includes qcar2_manual_drive_launch.py.
 - That means it launches manual drive stack + cartographer together.
+- It ALSO auto-starts the camera: qcar2_camera_bridge
+  (camera_source:=depth_aligned is the default). Legacy rgbd.cpp
+  only runs if you pass camera_source:=rgbd. No separate camera
+  terminal is needed.
 
-A) Terminal 1 - base + cartographer (includes rgbd)
+A) Terminal 1 - base + cartographer + camera bridge (one launch)
 source /opt/ros/humble/setup.bash
 export PYTHONPATH=$PYTHONPATH:/usr/local/lib/python3.8/dist-packages
 export ROS_DOMAIN_ID=67
@@ -144,7 +254,7 @@ source /opt/ros/humble/setup.bash
 export ROS_DOMAIN_ID=67
 cd ~/ros2
 source install/setup.bash
-ros2 run qcar2_autonomy vo_node --ros-args -p camera_mode:=physical -p alignment_mode:=auto -p depth_scale:=0.0
+ros2 run qcar2_autonomy vo_node --ros-args -p camera_mode:=physical -p alignment_mode:=auto -p depth_scale:=0.0 -p n_features:=1200
 
 C) Terminal 3 - VO diagnostics
 source /opt/ros/humble/setup.bash
@@ -197,7 +307,7 @@ source /opt/ros/humble/setup.bash
 export ROS_DOMAIN_ID=67
 cd ~/ros2
 source install/setup.bash
-ros2 run qcar2_autonomy vo_node --ros-args -p camera_mode:=physical -p alignment_mode:=auto -p depth_scale:=0.0
+ros2 run qcar2_autonomy vo_node --ros-args -p camera_mode:=physical -p alignment_mode:=auto -p depth_scale:=0.0 -p n_features:=1200
 
 C) Terminal 3 - VO diagnostics
 source /opt/ros/humble/setup.bash
@@ -223,6 +333,28 @@ Keyboard controls:
 
 Optional slower/faster tuning (Terminal 4):
 ros2 run qcar2_autonomy manual_drive --ros-args -p forward_speed:=0.08 -p reverse_speed:=0.06 -p turn_rate:=0.20
+
+E) Pre-mat validation (car parked, do BEFORE every mat session)
+Goal: prove the stack is good off the mat so the mat run is one
+efficient session (no on/off the mat repeatedly). After Terminal 1
+is up (camera bridge + cartographer), in a spare terminal:
+  ros2 topic echo /camera/camera_info --once
+    -> k: should show ~607, 607, 325, 250
+  ros2 run tf2_ros tf2_echo base_link camera_color_optical_frame
+    -> translation ~ [0.095, 0.032, 0.172],
+       rotation ~ [0.5, -0.5, 0.5, -0.5]
+  ros2 topic hz /camera/color_image /camera/depth_image /camera/camera_info
+    -> all ~30 Hz
+With vo_node (Terminal 2) running, still parked:
+  ros2 topic list | grep /vo/   -> /vo/odometry /vo/conditioning /vo/reason present
+  ros2 topic echo /vo/fault_status --once   -> line ends with reason=...
+  ros2 run qcar2_autonomy vo_dashboard      -> shows why=<reason>
+If all good, the mat session will be productive.
+
+F) Optional: record a bag (for off-mat RTAB-Map / re-analysis)
+Run during the drive; lets RTAB-Map and any re-analysis use the
+exact same data later, off the car:
+ros2 bag record -o /tmp/vo_matrun /camera/color_image /camera/depth_image /camera/camera_info /tf /tf_static /vo/odometry /vo/fault_status /vo/conditioning /vo/reason
 
 Does car need to be on mat center for this section?
 - Prefer yes for repeatability, but not mandatory for node startup.
@@ -254,7 +386,7 @@ source /opt/ros/humble/setup.bash
 export ROS_DOMAIN_ID=67
 cd ~/ros2
 source install/setup.bash
-ros2 run qcar2_autonomy vo_node --ros-args -p camera_mode:=physical -p alignment_mode:=auto -p depth_scale:=0.0
+ros2 run qcar2_autonomy vo_node --ros-args -p camera_mode:=physical -p alignment_mode:=auto -p depth_scale:=0.0 -p n_features:=1200
 
 D) Terminal 4 - readings
 source /opt/ros/humble/setup.bash
@@ -279,7 +411,7 @@ Terminal 1:
 ros2 launch qcar2_nodes qcar2_cartographer_launch.py
 
 Terminal 2:
-ros2 run qcar2_autonomy vo_node --ros-args -p camera_mode:=physical -p alignment_mode:=auto -p depth_scale:=0.0
+ros2 run qcar2_autonomy vo_node --ros-args -p camera_mode:=physical -p alignment_mode:=auto -p depth_scale:=0.0 -p n_features:=1200
 
 Terminal 3:
 ros2 run qcar2_autonomy vo_overlay
@@ -354,7 +486,7 @@ After processes stop, it is safe to disconnect remote desktop.
 Use this only when you are intentionally testing virtual/QLabs.
 
 A) Terminal A: QLabs container
-cd /home/$USER/Documents/ACC_Development/docker/virtual_qcar2
+cd /home/$USER/Documents/ACC_Development_gabriel/docker/virtual_qcar2
 sudo docker run --rm -it --network host --name virtual-qcar2 quanser/virtual-qcar2 bash
 
 Inside QLabs container:
@@ -362,8 +494,8 @@ cd /home/qcar2_scripts/python
 python3 Base_Scenarios_Python/Setup_Competition_Map.py
 
 B) Terminal B: dev container
-cd /home/$USER/Documents/ACC_Development/isaac_ros_common
-./scripts/run_dev.sh /home/$USER/Documents/ACC_Development/Development
+cd /home/$USER/Documents/ACC_Development_gabriel/isaac_ros_common
+./scripts/run_dev.sh /home/$USER/Documents/ACC_Development_gabriel/Development
 
 Inside dev container:
 colcon build
@@ -381,3 +513,241 @@ colcon build --packages-select qcar2_autonomy
 . install/setup.bash
 export ROS_DOMAIN_ID=67
 ros2 launch qcar2_autonomy autonomy_planner_launch.py
+
+
+==================================================
+7) VSLAM Showcase (RTAB-Map, record-once / playback-three-ways)
+==================================================
+Goal: capture one canonical physical-run bag, then replay it
+through RTAB-Map three times with different pose sources to
+compare the resulting maps.
+
+Pose-source variants (selected via the qcar2_rtabmap_launch.py
+`odom_source` arg, declared in qcar2_nodes/launch/):
+  - rtabmap_odom (DEFAULT)  Pure-visual SLAM. RTAB-Map runs its
+                            own internal visual odometry on the
+                            RGB-D stream. The reference baseline.
+  - vo_node                 Uses our /vo/odometry from the bag.
+                            If recorded with force_cart_yaw:=true
+                            (default), this is "visual + IMU yaw
+                            correction", not pure-visual.
+  - cartographer            Uses Cartographer's pose (lidar + IMU
+                            + wheel) read from TF (map->base_link)
+                            in the bag. NOTE: there is no /odom
+                            topic on this QCar — the cartographer
+                            branch uses odom_frame_id:=map, not a
+                            topic. Camera-augmented LIDAR SLAM;
+                            provided for completeness, not the
+                            headline. Requires the post-2026-05-21
+                            launch (rebuild qcar2_nodes first).
+
+Prereqs (all already true; verify after rsync + colcon build):
+  - ros-humble-rtabmap-ros installed (verified 2026-05-20). Check:
+      ros2 pkg list | grep ^rtabmap   # expect ~13 packages
+  - qcar2_rtabmap_launch.py present:
+      ls ~/ros2/install/qcar2_nodes/share/qcar2_nodes/launch/qcar2_rtabmap_launch.py
+  - ~/vo_rtab_bags/ exists (persistent bag/db dir; do NOT use /tmp):
+      mkdir -p ~/vo_rtab_bags
+
+----------------------------------------------------
+7.1) Pre-record sanity check (off-mat, ~5 min)
+----------------------------------------------------
+On the canonical physical startup (Section 0.7 running), confirm
+each topic is publishing:
+  ros2 topic hz /camera/color_image /camera/depth_image /camera/camera_info
+  ros2 topic hz /vo/odometry
+  ros2 topic echo /vo/cart_x --once
+  ros2 topic info /tf_static
+Expect: camera at ~30 Hz, /vo/odometry at ~5 Hz, /vo/cart_x prints
+a number (= Cartographer x reaching vo_node via TF map->base_link),
+/tf_static with at least one publisher. NOTE: do NOT check
+/odom — there is no /odom topic on this QCar; Cartographer's pose
+lives in TF only.
+
+----------------------------------------------------
+7.2) Record the canonical bag (one representative loop)
+----------------------------------------------------
+With Section 0.7 running (cartographer + camera_bridge + vo_node):
+
+Terminal 5 - recorder. NOTE: /odom is NOT recorded (no such topic);
+/tf + /tf_static carry the Cartographer pose. Single line so paste
+cannot break:
+  cd ~/vo_rtab_bags
+  ros2 bag record -o vslam_test12 /camera/color_image /camera/depth_image /camera/camera_info /tf /tf_static /vo/odometry /vo/vo_x /vo/vo_y /vo/vo_psi /vo/vo_psi_shadow /vo/cart_x /vo/cart_y /vo/cart_psi /vo/fault_status /vo/conditioning /vo/reason /vo/confidence /vo/inliers /vo/healthy
+
+Then drive a representative loop:
+  - Includes at least one curve (where VO struggles).
+  - Returns close to the start (a closed loop helps RTAB-Map
+    demonstrate loop closure).
+  - 60-90 seconds is enough; longer = bigger bag.
+
+Stop the recorder with Ctrl+C. Sanity-check the bag:
+  ros2 bag info "$BAGNAME"
+Expect: all listed topics present with non-zero message counts;
+bag size in the 3-7 GiB range for ~90 seconds.
+
+Bag policy:
+  - Keep ONLY the best representative bag on the QCar (disk).
+  - Transfer copies of the .db files (Sections 7.3-7.5) to your
+    personal machine for the showcase; do not hoard old bags on
+    the car.
+
+force_cart_yaw experiment (two-bag pair, optional):
+  - Record one bag with vo_node default (force_cart_yaw:=true).
+  - Record a second bag with vo_node force_cart_yaw:=false:
+      ros2 run qcar2_autonomy vo_node --ros-args \
+        -p camera_mode:=physical -p alignment_mode:=auto \
+        -p depth_scale:=0.0 -p n_features:=1200 \
+        -p feature_grid:=8 -p force_cart_yaw:=false
+  - Compare Playback B results between the two bags.
+  - Even within a single force_cart_yaw:=true bag, /vo/vo_psi_shadow
+    lets you inspect what the camera-only yaw would have been
+    (see Section 7.7).
+
+*** QoS GOTCHA (read before any playback) ***
+camera_bridge publishes /camera/* as BEST EFFORT (sensor QoS), and
+a bag of it replays Best Effort. RTAB-Map's INSTALLED launch (pre
+2026-05-21) subscribes RELIABLE -> incompatible -> ZERO frames
+reach RTAB-Map -> empty rtabmap_viz GUI + ~90 KB empty db. Symptom
+in the bag-play terminal: "requesting incompatible QoS. No messages
+will be sent ... RELIABILITY_QOS_POLICY".
+
+Two ways to fix:
+  (1) NO REBUILD (works with the currently installed launch): force
+      the bag PLAYER to republish /camera/* as Reliable using the
+      override file ~/vo_rtab_bags/qos_reliable.yaml. Add this flag
+      to every `ros2 bag play` below:
+        --qos-profile-overrides-path /home/nvidia/vo_rtab_bags/qos_reliable.yaml
+  (2) AFTER REBUILD: qcar2_rtabmap_launch.py now defaults qos:=2
+      (Best Effort), so RTAB-Map matches the bag and the override
+      file is NO LONGER needed. Rebuild qcar2_nodes (Section 0.6)
+      to switch to this path.
+The commands below include the (1) override so they work today.
+qos_reliable.yaml contents (recreate if missing): /camera/* ->
+reliable+volatile, /tf_static -> reliable+transient_local.
+
+----------------------------------------------------
+7.3) Playback A - rtabmap_odom (pure-visual baseline)
+----------------------------------------------------
+Run this FIRST on every new bag. If it fails to build a coherent
+map, the bag has a problem; no point running 7.4 or 7.5 until 7.3
+passes. If re-running, first delete the old db:
+  rm -f ~/vo_rtab_bags/rtabmap_odom.db
+
+Terminal 1 - RTAB-Map (pure-visual):
+  source /opt/ros/humble/setup.bash
+  export ROS_DOMAIN_ID=67
+  cd ~/ros2 && source install/setup.bash
+  ros2 launch qcar2_nodes qcar2_rtabmap_launch.py \
+    odom_source:=rtabmap_odom \
+    database_path:=$HOME/vo_rtab_bags/rtabmap_odom.db
+
+Terminal 2 - bag playback. NOTE: this rosbag2 (humble) has NO
+--exclude flag; use the --topics whitelist instead. Play only the
+camera + static base->camera TF so rtabmap_odom owns the odometry
+(do NOT play /tf — Cartographer's map->base would collide). The
+--qos-profile-overrides-path is the QoS-gotcha fix (1) above:
+  cd ~/vo_rtab_bags
+  ros2 bag play vslam_test12 --clock --topics /camera/color_image /camera/depth_image /camera/camera_info /tf_static --qos-profile-overrides-path /home/nvidia/vo_rtab_bags/qos_reliable.yaml
+
+You should now see: the incompatible-QoS warning GONE, rgbd_odometry
+printing pose updates, and the rtabmap_viz Odometry + 3D Map panels
+populating. (SPACE in the bag-play terminal is just pause/resume —
+not required.)
+
+Watch rtabmap_viz build the map. When the bag ends, Ctrl+C both
+terminals. rtabmap_odom.db is written to ~/vo_rtab_bags/.
+
+----------------------------------------------------
+7.4) Playback B - vo_node (our /vo/odometry)
+----------------------------------------------------
+Terminal 1 - RTAB-Map (external odom = ours):
+  ros2 launch qcar2_nodes qcar2_rtabmap_launch.py \
+    odom_source:=vo_node \
+    database_path:=$HOME/vo_rtab_bags/vo_node.db
+
+Terminal 2 - bag playback (--topics whitelist: camera + static
+base->camera TF + our /vo/odometry as the pose source. Do NOT play
+/tf — vo_node's odometry is the source here, not Cartographer's
+map->base. Includes the QoS override fix):
+  ros2 bag play vslam_test12 --clock --topics /camera/color_image /camera/depth_image /camera/camera_info /tf_static /vo/odometry --qos-profile-overrides-path /home/nvidia/vo_rtab_bags/qos_reliable.yaml
+
+Result: vo_node.db.
+
+----------------------------------------------------
+7.5) Playback C - cartographer (TF map->base) [optional]
+----------------------------------------------------
+IMPORTANT: there is NO /odom topic on this QCar. Cartographer
+exposes its pose only via TF (map->base_link). The launch's
+cartographer branch reads odometry from TF (odom_frame_id:=map),
+NOT from a topic. This branch requires the UPDATED launch file —
+if qcar2_nodes has not been rebuilt since 2026-05-21, this variant
+will not work yet (the old installed launch points at the
+nonexistent /odom and will hang). Rebuild qcar2_nodes first
+(Easy_Start 0.6), then run this. The bag carries /tf + /tf_static
+so no re-drive is needed.
+
+Terminal 1 - RTAB-Map (external odom = Cartographer via TF):
+  ros2 launch qcar2_nodes qcar2_rtabmap_launch.py \
+    odom_source:=cartographer \
+    database_path:=$HOME/vo_rtab_bags/cartographer.db
+
+Terminal 2 - bag playback (--topics whitelist: camera + static
+base->camera TF + /tf which carries Cartographer's map->base.
+Includes the QoS override fix):
+  ros2 bag play vslam_test12 --clock --topics /camera/color_image /camera/depth_image /camera/camera_info /tf_static /tf --qos-profile-overrides-path /home/nvidia/vo_rtab_bags/qos_reliable.yaml
+
+Result: cartographer.db.
+
+----------------------------------------------------
+7.6) Compare the three databases
+----------------------------------------------------
+  rtabmap-databaseViewer ~/vo_rtab_bags/rtabmap_odom.db
+  rtabmap-databaseViewer ~/vo_rtab_bags/vo_node.db
+  rtabmap-databaseViewer ~/vo_rtab_bags/cartographer.db
+
+Look at:
+  - Trajectory shape (closed loop returning near origin?)
+  - Loop-closure count (Tools menu)
+  - Map sharpness / consistency (3D View)
+  - Feature density per keyframe
+
+For the report, screenshots of all three trajectories + the
+loop-closure graphs side-by-side are the headline visuals.
+
+----------------------------------------------------
+7.7) Cartographer-jump investigation
+----------------------------------------------------
+User observed unphysical x-jumps in /vo/odometry (0.12 m in 200 ms
+at a commanded 0.1 m/s, ~6x actual velocity) and similar magnitude
+jumps in the Cartographer pose. NOTE: there is no /odom topic;
+Cartographer's pose is captured in the bag as /tf (map->base_link)
+and, conveniently, as the scalars /vo/cart_x, /vo/cart_y,
+/vo/cart_psi (vo_node republishes the TF lookup). The bag captures
+all of these, so this is a pure offline analysis — no car needed.
+
+Easiest path: hand the bag to Claude. It can read the sqlite3 bag
+directly (no live playback, no temp files) and plot:
+  - /vo/vo_x   vs /vo/cart_x   (VO x vs Cartographer x)
+  - /vo/vo_y   vs /vo/cart_y
+  - /vo/vo_psi_shadow vs /vo/cart_psi  (camera-only yaw vs the
+    force_cart_yaw-applied yaw)
+and flag synchronized jumps through the curve segment.
+
+The point of capturing both: determine whether the jumps are
+VO-only (bad-match / depth glitch), Cartographer-only (its pose
+estimate jumping), or synchronized (a shared timing/source issue) —
+which directly informs EKF weighting when robot_localization is
+wired.
+
+----------------------------------------------------
+7.8) Cleanup / transfer
+----------------------------------------------------
+On the QCar (keep only the best bag, prune the others):
+  ls -lh ~/vo_rtab_bags/
+  # rm -rf ~/vo_rtab_bags/<old_bag_dirs>
+
+Transfer to personal machine (rsync or scp from your laptop):
+  rsync -av nvidia@<qcar-ip>:~/vo_rtab_bags/  ./vo_rtab_bags/
+
+A complete showcase set (1 bag + 3 dbs) is roughly 6-10 GiB.
