@@ -1,7 +1,16 @@
 #! /usr/bin/env python3
 
+import os
 import sys
-sys.path.insert(0, "/workspaces/isaac_ros-dev/MDC_libraries/python")
+
+for library_root in (
+    "/workspaces/isaac_ros-dev/MDC_libraries/python",
+    "/home/nvidia/Documents/ACC_Development/Development/MDC_libraries/python",
+    "/home/nvidia/Documents/Quanser/0_libraries/python",
+):
+    if os.path.isdir(library_root):
+        sys.path.insert(0, library_root)
+        break
 
 from pit.YOLO.nets import YOLOv8
 from pit.YOLO.utils import QCar2DepthAligned
@@ -12,13 +21,18 @@ import cv2
 from pathlib import Path
 import urllib.request
 import tempfile
-import os
 
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Bool
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
+
+from autonomy.cuda_utils import (
+    clear_cuda_cache,
+    is_cuda_runtime_error,
+    select_yolo_device,
+)
 
 
 def ensure_model_exists(model_path: Path, url: str, logger=None) -> None:
@@ -64,11 +78,41 @@ class ObjectDetector(Node):
     def __init__(self):
         super().__init__('yolo_detector')
 
+        self.declare_parameter("device", 0)
+        self.declare_parameter("use_cuda", True)
+        self.declare_parameter("use_tensorrt", False)
+        self.declare_parameter("inference_hz", 10.0)
+        self.declare_parameter("motion_flag_hz", 30.0)
+        self.declare_parameter("allow_cpu_fallback", False)
+
         imageWidth  = 640
         imageHeight = 480
         self.QCarImg = QCar2DepthAligned()
 
-        model_dir  = Path("/workspaces/isaac_ros-dev/ros2/src/qcar2_autonomy/models")
+        device = int(self.get_parameter("device").get_parameter_value().integer_value)
+        use_cuda = bool(self.get_parameter("use_cuda").get_parameter_value().bool_value)
+        use_tensorrt = bool(self.get_parameter("use_tensorrt").get_parameter_value().bool_value)
+        self.allow_cpu_fallback = bool(
+            self.get_parameter("allow_cpu_fallback").get_parameter_value().bool_value)
+        inference_hz = max(
+            1.0,
+            float(self.get_parameter("inference_hz").get_parameter_value().double_value),
+        )
+        motion_flag_hz = max(
+            1.0,
+            float(self.get_parameter("motion_flag_hz").get_parameter_value().double_value),
+        )
+        self.yolo_device = select_yolo_device(
+            self.get_logger(),
+            requested_device=device,
+            use_cuda=use_cuda,
+            context="Traffic YOLO",
+            allow_cpu_fallback=self.allow_cpu_fallback,
+        )
+
+        model_dir = Path("/workspaces/isaac_ros-dev/ros2/src/qcar2_autonomy/models")
+        if not model_dir.exists():
+            model_dir = Path(__file__).resolve().parents[1] / "models"
         model_path = model_dir / "quanser_yolov8s-seg.pt"
         model_url  = "https://quanserinc.box.com/shared/static/ce0gxomeg4b12wlcch9cmlh0376nditf.pt"
 
@@ -78,10 +122,12 @@ class ObjectDetector(Node):
             modelPath=str(model_path),
             imageHeight=imageHeight,
             imageWidth=imageWidth,
-            convert_tensorrt=False,
+            convert_tensorrt=use_tensorrt and self.yolo_device != "cpu",
+            device=self.yolo_device,
         )
+        self.get_logger().info(f"YOLO inference device: {self.yolo_device}")
 
-        self.dt    = 1 / 30
+        self.dt    = 1.0 / inference_hz
         self.timer = self.create_timer(self.dt, self.on_timer)
 
         self.motion_publisher = self.create_publisher(Bool, '/motion_enable', 1)
@@ -103,7 +149,10 @@ class ObjectDetector(Node):
         self.publish_rgb     = self.create_publisher(Image, '/qcar_camera/rgb',       10)
         self.publish_depth   = self.create_publisher(Image, '/qcar_camera/depth',     10)
         self.publish_rgb_yolo = self.create_publisher(Image, '/qcar_camera/rgb_yolo', 10)
-        self.timer2          = self.create_timer(1 / 500, self.flag_publisher)
+        self.timer2          = self.create_timer(1.0 / motion_flag_hz, self.flag_publisher)
+        self.get_logger().info(
+            f"YOLO timers: inference={inference_hz:.1f} Hz, motion_flag={motion_flag_hz:.1f} Hz"
+        )
 
     def flag_publisher(self):
         self.publish_motion_flag(self.flag_value)
@@ -144,13 +193,24 @@ class ObjectDetector(Node):
         delay    = 0.0
 
         rgbProcessed = self.myYolo.pre_process(self.QCarImg.rgb)
-        predicion    = self.myYolo.predict(
-            inputImg=rgbProcessed,
-            classes=[9, 11, 33],
-            confidence=0.3,
-            half=True,
-            verbose=False
-        )
+        try:
+            predicion, processedResults = self._run_yolo(rgbProcessed)
+        except RuntimeError as e:
+            if self.yolo_device == "cpu" or not is_cuda_runtime_error(e):
+                raise
+            if not self.allow_cpu_fallback:
+                self.get_logger().error(
+                    f"YOLO CUDA inference failed on device={self.yolo_device}: {e}. "
+                    "CPU fallback is disabled for traffic detection.")
+                raise
+            self.get_logger().error(
+                f"YOLO CUDA inference failed on device={self.yolo_device}: {e}. "
+                "Falling back to CPU for traffic detection.")
+            self.yolo_device = "cpu"
+            clear_cuda_cache()
+            if hasattr(self.myYolo, "set_device"):
+                self.myYolo.set_device("cpu")
+            predicion, processedResults = self._run_yolo(rgbProcessed)
 
         try:
             ann  = None
@@ -163,11 +223,6 @@ class ObjectDetector(Node):
                 self.publish_rgb_yolo.publish(self.bridge.cv2_to_imgmsg(ann, "bgr8"))
         except Exception as e:
             self.get_logger().warn(f"YOLO overlay publish failed: {e}")
-
-        processedResults = self.myYolo.post_processing(
-            alignedDepth=self.QCarImg.depth,
-            clippingDistance=5
-        )
 
         total_timer = 10.0
 
@@ -209,6 +264,20 @@ class ObjectDetector(Node):
 
         print("===============================")
         return delay, detected
+
+    def _run_yolo(self, rgbProcessed):
+        prediction = self.myYolo.predict(
+            inputImg=rgbProcessed,
+            classes=[9, 11, 33],
+            confidence=0.3,
+            half=self.yolo_device != "cpu",
+            verbose=False
+        )
+        processedResults = self.myYolo.post_processing(
+            alignedDepth=self.QCarImg.depth,
+            clippingDistance=5
+        )
+        return prediction, processedResults
 
     def publish_motion_flag(self, enable: bool):
         msg      = Bool()

@@ -1,0 +1,58 @@
+[0.750s] Invoking command in '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_nodes': AMENT_PREFIX_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces CMAKE_PREFIX_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces LD_LIBRARY_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib:/usr/local/cuda/lib64:/usr/local/cuda/lib64:/usr/local/cuda/lib64 PYTHONPATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib/python3.9/site-packages:${PYTHONPATH} /usr/bin/cmake --build /home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_nodes -- -j8 -l8
+[0.924s] [ 12%] Built target qcar2_hardware
+[1.011s] [ 25%] Built target fixed_lidar_frame_virtual
+[1.076s] Scanning dependencies of target nav2_qcar2_converter
+[1.112s] [ 31%] Building CXX object CMakeFiles/nav2_qcar2_converter.dir/src/nav2_qcar_command_convert.cpp.o
+[19.842s] [ 37%] Linking CXX executable nav2_qcar2_converter
+[20.869s] [ 37%] Built target nav2_qcar2_converter
+[20.962s] [ 50%] Built target fixed_lidar_frame
+[21.025s] [ 62%] Built target csi
+[21.105s] [ 75%] Built target command
+[21.163s] [ 87%] Built target lidar
+[21.228s] [100%] Built target rgbd
+[51.077s] Invoked command in '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_nodes' returned '0': AMENT_PREFIX_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces CMAKE_PREFIX_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces LD_LIBRARY_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib:/usr/local/cuda/lib64:/usr/local/cuda/lib64:/usr/local/cuda/lib64 PYTHONPATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib/python3.9/site-packages:${PYTHONPATH} /usr/bin/cmake --build /home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_nodes -- -j8 -l8
+[51.220s] Invoking command in '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_nodes': AMENT_PREFIX_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces CMAKE_PREFIX_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces LD_LIBRARY_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib:/usr/local/cuda/lib64:/usr/local/cuda/lib64:/usr/local/cuda/lib64 PYTHONPATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib/python3.9/site-packages:${PYTHONPATH} /usr/bin/cmake --install /home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_nodes
+[51.240s] -- Install configuration: ""
+[51.242s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/lib/qcar2_nodes/qcar2_hardware
+[51.242s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/lib/qcar2_nodes/rgbd
+[51.243s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/lib/qcar2_nodes/lidar
+[51.243s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/lib/qcar2_nodes/csi
+[51.244s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/lib/qcar2_nodes/command
+[51.244s] -- Installing: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/lib/qcar2_nodes/nav2_qcar2_converter
+[51.255s] -- Set runtime path of "/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/lib/qcar2_nodes/nav2_qcar2_converter" to ""
+[51.255s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/lib/qcar2_nodes/fixed_lidar_frame
+[51.255s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/lib/qcar2_nodes/fixed_lidar_frame_virtual
+[51.255s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//launch
+[51.256s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//launch/qcar2_slam_and_nav_bringup_virtual_launch.py
+[51.256s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//launch/qcar2_slam_and_nav_bringup_launch.py
+[51.256s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//launch/qcar2_manual_drive_launch.py
+[51.256s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//launch/qcar2_manual_cartographer_launch.py
+[51.256s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//launch/__pycache__
+[51.257s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//launch/__pycache__/qcar2_slam_and_nav_bringup_virtual_launch.cpython-38.pyc
+[51.257s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//launch/__pycache__/qcar2_slam_and_nav_bringup_launch.cpython-38.pyc
+[51.257s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//launch/qcar2_launch.py
+[51.257s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//launch/qcar2_cartographer_virtual_launch.py
+[51.257s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//launch/qcar2_cartographer_launch.py
+[51.257s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//launch/qcar2_virtual_launch.py
+[51.257s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//rt_models
+[51.257s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//rt_models/dummy_model
+[51.257s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//config
+[51.257s] -- Installing: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//config/qcar2_2d.lua
+[51.258s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//config/qcar2_slam_and_nav.yaml
+[51.258s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//config/qcar2_slam_and_nav_virtual.yaml
+[51.258s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/ament_index/resource_index/package_run_dependencies/qcar2_nodes
+[51.259s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/ament_index/resource_index/parent_prefix_path/qcar2_nodes
+[51.259s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/environment/ament_prefix_path.sh
+[51.259s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/environment/ament_prefix_path.dsv
+[51.259s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/environment/path.sh
+[51.259s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/environment/path.dsv
+[51.259s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/local_setup.bash
+[51.259s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/local_setup.sh
+[51.259s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/local_setup.zsh
+[51.259s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/local_setup.dsv
+[51.259s] -- Installing: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/package.dsv
+[51.259s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/ament_index/resource_index/packages/qcar2_nodes
+[51.260s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/cmake/qcar2_nodesConfig.cmake
+[51.260s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/cmake/qcar2_nodesConfig-version.cmake
+[51.260s] -- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/package.xml
+[51.263s] Invoked command in '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_nodes' returned '0': AMENT_PREFIX_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces CMAKE_PREFIX_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces LD_LIBRARY_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib:/usr/local/cuda/lib64:/usr/local/cuda/lib64:/usr/local/cuda/lib64 PYTHONPATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib/python3.9/site-packages:${PYTHONPATH} /usr/bin/cmake --install /home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_nodes

@@ -16,10 +16,11 @@ from cv_bridge import CvBridge
 
 from ultralytics import YOLO
 
-try:
-    import torch
-except Exception:
-    torch = None
+from autonomy.cuda_utils import (
+    clear_cuda_cache,
+    is_cuda_runtime_error,
+    select_yolo_device,
+)
 
 
 LANE = 0
@@ -43,6 +44,8 @@ class LaneDetectionNode(Node):
         self.declare_parameter("model_path",       "ros2/src/qcar2_autonomy/models/lane_seg_yolo.pt")
         self.declare_parameter("imgsz",            640)
         self.declare_parameter("device",           0)
+        self.declare_parameter("use_cuda",         True)
+        self.declare_parameter("allow_cpu_fallback", False)
         self.declare_parameter("lane_seed_x_frac", 0.55)
         self.declare_parameter("lane_lost_frames", 10)
 
@@ -50,6 +53,9 @@ class LaneDetectionNode(Node):
         model_path_param = self.get_parameter("model_path").get_parameter_value().string_value
         imgsz            = int(self.get_parameter("imgsz").get_parameter_value().integer_value)
         device           = int(self.get_parameter("device").get_parameter_value().integer_value)
+        use_cuda         = bool(self.get_parameter("use_cuda").get_parameter_value().bool_value)
+        self.allow_cpu_fallback = bool(
+            self.get_parameter("allow_cpu_fallback").get_parameter_value().bool_value)
 
         model_path = self._resolve_model_path(model_path_param)
 
@@ -62,7 +68,13 @@ class LaneDetectionNode(Node):
         self.last_lane_cx   = None
         self.last_lane_seen = 0
         self.imgsz  = imgsz
-        self.device = self._select_device(device)
+        self.device = select_yolo_device(
+            self.get_logger(),
+            requested_device=device,
+            use_cuda=use_cuda,
+            context="Lane YOLO",
+            allow_cpu_fallback=self.allow_cpu_fallback,
+        )
         self.get_logger().info(f"YOLO inference device: {self.device}")
 
         self.pub_overlay       = self.create_publisher(Image,  "/lane_detection/overlay",          qos_profile_sensor_data)
@@ -80,50 +92,6 @@ class LaneDetectionNode(Node):
                 return cand
         return os.path.abspath(model_path_param)
 
-    def _select_device(self, requested_device):
-        if requested_device < 0:
-            return "cpu"
-
-        if torch is None:
-            self.get_logger().warn("PyTorch is not importable; using CPU for YOLO")
-            return "cpu"
-
-        if not torch.cuda.is_available():
-            self.get_logger().warn("CUDA is not available; using CPU for YOLO")
-            return "cpu"
-
-        if requested_device >= torch.cuda.device_count():
-            self.get_logger().warn(
-                f"Requested CUDA device {requested_device}, but only "
-                f"{torch.cuda.device_count()} device(s) exist; using CPU")
-            return "cpu"
-
-        try:
-            major, minor = torch.cuda.get_device_capability(requested_device)
-            arch = f"sm_{major}{minor}"
-            supported = set(torch.cuda.get_arch_list())
-        except Exception as e:
-            self.get_logger().warn(f"Could not verify CUDA capability ({e}); using CPU")
-            return "cpu"
-
-        if supported and arch not in supported:
-            name = torch.cuda.get_device_name(requested_device)
-            self.get_logger().warn(
-                f"CUDA device {requested_device} ({name}, {arch}) is not supported by "
-                f"this PyTorch build ({sorted(supported)}); using CPU")
-            return "cpu"
-
-        return requested_device
-
-    @staticmethod
-    def _is_cuda_kernel_error(err):
-        text = str(err).lower()
-        return (
-            "no kernel image is available" in text or
-            "cuda error" in text or
-            "not compatible with the current pytorch installation" in text
-        )
-
     def _predict(self, img_bgr):
         try:
             return self.model.predict(
@@ -133,18 +101,19 @@ class LaneDetectionNode(Node):
                 verbose=False,
             )[0]
         except RuntimeError as e:
-            if self.device == "cpu" or not self._is_cuda_kernel_error(e):
+            if self.device == "cpu" or not is_cuda_runtime_error(e):
+                raise
+            if not self.allow_cpu_fallback:
+                self.get_logger().error(
+                    f"YOLO CUDA inference failed on device={self.device}: {e}. "
+                    "CPU fallback is disabled for lane detection.")
                 raise
 
             self.get_logger().error(
                 f"YOLO CUDA inference failed on device={self.device}: {e}. "
                 "Falling back to CPU for lane detection.")
             self.device = "cpu"
-            if torch is not None and torch.cuda.is_available():
-                try:
-                    torch.cuda.empty_cache()
-                except Exception:
-                    pass
+            clear_cuda_cache()
             return self.model.predict(
                 img_bgr,
                 imgsz=self.imgsz,

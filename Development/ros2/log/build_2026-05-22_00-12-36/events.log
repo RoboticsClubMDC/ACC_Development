@@ -1,0 +1,80 @@
+[0.000000] (-) TimerEvent: {}
+[0.000143] (-) JobUnselected: {'identifier': 'qcar2_interfaces'}
+[0.000325] (-) JobUnselected: {'identifier': 'qcar2_nodes'}
+[0.000745] (qcar2_autonomy) JobQueued: {'identifier': 'qcar2_autonomy', 'dependencies': OrderedDict([('qcar2_interfaces', '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces')])}
+[0.001239] (qcar2_autonomy) JobStarted: {'identifier': 'qcar2_autonomy'}
+[0.099603] (-) TimerEvent: {}
+[0.200005] (-) TimerEvent: {}
+[0.300335] (-) TimerEvent: {}
+[0.400666] (-) TimerEvent: {}
+[0.501015] (-) TimerEvent: {}
+[0.601399] (-) TimerEvent: {}
+[0.701793] (-) TimerEvent: {}
+[0.802166] (-) TimerEvent: {}
+[0.902491] (-) TimerEvent: {}
+[1.002824] (-) TimerEvent: {}
+[1.103178] (-) TimerEvent: {}
+[1.203551] (-) TimerEvent: {}
+[1.303929] (-) TimerEvent: {}
+[1.404264] (-) TimerEvent: {}
+[1.504588] (-) TimerEvent: {}
+[1.604971] (-) TimerEvent: {}
+[1.676090] (qcar2_autonomy) Command: {'cmd': ['/usr/bin/python3', '-W', 'ignore:setup.py install is deprecated', 'setup.py', 'egg_info', '--egg-base', '../../build/qcar2_autonomy', 'build', '--build-base', '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_autonomy/build', 'install', '--record', '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_autonomy/install.log', '--single-version-externally-managed', 'install_data'], 'cwd': '/home/nvidia/Documents/ACC_Development/Development/ros2/src/qcar2_autonomy', 'env': {'LESSOPEN': '| /usr/bin/lesspipe %s', 'VSCODE_CWD': '/home/nvidia', 'VSCODE_ESM_ENTRYPOINT': 'vs/workbench/api/node/extensionHostProcess', 'CODEX_CI': '1', 'USER': 'nvidia', 'SSH_CLIENT': '192.168.2.33 60158 22', 'CODEX_INTERNAL_ORIGINATOR_OVERRIDE': 'codex_vscode', 'VSCODE_NLS_CONFIG': '{"userLocale":"en","osLocale":"en","resolvedLanguage":"en","defaultMessagesFile":"/home/nvidia/.vscode-server/cli/servers/Stable-f6cfa2ea2403534de03f069bdf160d06451ed282/server/out/nls.messages.json","locale":"en","availableLanguages":{}}', 'QAL_DIR': '/home/nvidia/Documents/Quanser', 'VSCODE_HANDLES_UNCAUGHT_ERRORS': 'true', 'XDG_SESSION_TYPE': 'tty', 'DEBUG': 'release', 'SHLVL': '0', 'LD_LIBRARY_PATH': '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib:/usr/local/cuda/lib64:/usr/local/cuda/lib64:/usr/local/cuda/lib64', 'BROWSER': '/home/nvidia/.vscode-server/cli/servers/Stable-f6cfa2ea2403534de03f069bdf160d06451ed282/server/bin/helpers/browser.sh', 'MOTD_SHOWN': 'pam', 'HOME': '/home/nvidia', 'VSCODE_RECONNECTION_GRACE_TIME': '10800000', 'VSCODE_IPC_HOOK_CLI': '/run/user/1000/vscode-ipc-df5f7c47-a63b-461d-a947-ca9ceea97671.sock', 'PAGER': 'cat', 'LC_CTYPE': 'C.UTF-8', 'NO_COLOR': '1', 'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/run/user/1000/bus', 'COLORTERM': '', 'LOGNAME': 'nvidia', 'VSCODE_HANDLES_SIGPIPE': 'true', '_': '/usr/bin/colcon', 'XDG_SESSION_CLASS': 'user', 'RUST_LOG': 'warn', 'TERM': 'dumb', 'XDG_SESSION_ID': '4', 'VSCODE_CLI_REQUIRE_TOKEN': '221b602a-3de7-45af-9a3b-85601b0fca70', 'PATH': '/home/nvidia/.local/bin:/usr/local/cuda/bin:/home/nvidia/.codex/tmp/arg0/codex-arg0U3bu0m:/home/nvidia/.vscode-server/cli/servers/Stable-f6cfa2ea2403534de03f069bdf160d06451ed282/server/bin/remote-cli:/home/nvidia/.local/bin:/usr/local/cuda/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/nvidia/.vscode-server/extensions/openai.chatgpt-26.513.21555/bin/linux-aarch64', 'VSCODE_AGENT_FOLDER': '/home/nvidia/.vscode-server', 'XDG_RUNTIME_DIR': '/run/user/1000', 'CODEX_SANDBOX_NETWORK_DISABLED': '1', 'LANG': 'C.UTF-8', 'GH_PAGER': 'cat', 'LS_COLORS': '', 'AMENT_PREFIX_PATH': '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces', 'SHELL': '/bin/bash', 'ELECTRON_RUN_AS_NODE': '1', 'LESSCLOSE': '/usr/bin/lesspipe %s %s', 'CODEX_THREAD_ID': '019e4d39-33eb-7c00-80b6-469452a41560', 'GIT_PAGER': 'cat', 'PWD': '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_autonomy', 'LC_ALL': 'C.UTF-8', 'SSH_CONNECTION': '192.168.2.33 60158 192.168.2.207 22', 'XDG_DATA_DIRS': '/usr/local/share:/usr/share:/var/lib/snapd/desktop', 'PYTHONPATH': '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_autonomy/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.8/site-packages:/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib/python3.9/site-packages::/home/nvidia/Documents/Quanser/0_libraries/python:/usr/local/lib/python3.8/dist-packages:/home/nvidia/Documents/Quanser/0_libraries/python:/usr/local/lib/python3.8/dist-packages:/home/nvidia/Documents/Quanser/0_libraries/python:/usr/local/lib/python3.8/dist-packages', 'COLCON': '1', 'CMAKE_PREFIX_PATH': '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces'}, 'shell': False}
+[1.705114] (-) TimerEvent: {}
+[1.805452] (-) TimerEvent: {}
+[1.905781] (-) TimerEvent: {}
+[2.006110] (-) TimerEvent: {}
+[2.106442] (-) TimerEvent: {}
+[2.206773] (-) TimerEvent: {}
+[2.227086] (qcar2_autonomy) StdoutLine: {'line': b'running egg_info\n'}
+[2.244770] (qcar2_autonomy) StdoutLine: {'line': b'writing ../../build/qcar2_autonomy/qcar2_autonomy.egg-info/PKG-INFO\n'}
+[2.245461] (qcar2_autonomy) StdoutLine: {'line': b'writing dependency_links to ../../build/qcar2_autonomy/qcar2_autonomy.egg-info/dependency_links.txt\n'}
+[2.245954] (qcar2_autonomy) StdoutLine: {'line': b'writing entry points to ../../build/qcar2_autonomy/qcar2_autonomy.egg-info/entry_points.txt\n'}
+[2.246498] (qcar2_autonomy) StdoutLine: {'line': b'writing requirements to ../../build/qcar2_autonomy/qcar2_autonomy.egg-info/requires.txt\n'}
+[2.246731] (qcar2_autonomy) StdoutLine: {'line': b'writing top-level names to ../../build/qcar2_autonomy/qcar2_autonomy.egg-info/top_level.txt\n'}
+[2.285457] (qcar2_autonomy) StdoutLine: {'line': b"reading manifest file '../../build/qcar2_autonomy/qcar2_autonomy.egg-info/SOURCES.txt'\n"}
+[2.287537] (qcar2_autonomy) StdoutLine: {'line': b"writing manifest file '../../build/qcar2_autonomy/qcar2_autonomy.egg-info/SOURCES.txt'\n"}
+[2.287999] (qcar2_autonomy) StdoutLine: {'line': b'running build\n'}
+[2.288142] (qcar2_autonomy) StdoutLine: {'line': b'running build_py\n'}
+[2.288726] (qcar2_autonomy) StdoutLine: {'line': b'copying autonomy/yolo_detector.py -> /home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy\n'}
+[2.289246] (qcar2_autonomy) StdoutLine: {'line': b'copying autonomy/cuda_utils.py -> /home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy\n'}
+[2.289547] (qcar2_autonomy) StdoutLine: {'line': b'copying autonomy/sidewalk_detection.py -> /home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy\n'}
+[2.289886] (qcar2_autonomy) StdoutLine: {'line': b'copying autonomy/lane_detection.py -> /home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy\n'}
+[2.290647] (qcar2_autonomy) StdoutLine: {'line': b'running install\n'}
+[2.298859] (qcar2_autonomy) StdoutLine: {'line': b'running install_lib\n'}
+[2.306841] (-) TimerEvent: {}
+[2.316916] (qcar2_autonomy) StdoutLine: {'line': b'copying /home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy/yolo_detector.py -> /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy\n'}
+[2.317356] (qcar2_autonomy) StdoutLine: {'line': b'copying /home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy/cuda_utils.py -> /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy\n'}
+[2.317665] (qcar2_autonomy) StdoutLine: {'line': b'copying /home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy/sidewalk_detection.py -> /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy\n'}
+[2.317909] (qcar2_autonomy) StdoutLine: {'line': b'copying /home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy/lane_detection.py -> /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy\n'}
+[2.319243] (qcar2_autonomy) StdoutLine: {'line': b'byte-compiling /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy/yolo_detector.py to yolo_detector.cpython-38.pyc\n'}
+[2.322532] (qcar2_autonomy) StdoutLine: {'line': b'byte-compiling /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy/cuda_utils.py to cuda_utils.cpython-38.pyc\n'}
+[2.323723] (qcar2_autonomy) StdoutLine: {'line': b'byte-compiling /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy/sidewalk_detection.py to sidewalk_detection.cpython-38.pyc\n'}
+[2.325648] (qcar2_autonomy) StdoutLine: {'line': b'byte-compiling /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy/lane_detection.py to lane_detection.cpython-38.pyc\n'}
+[2.327811] (qcar2_autonomy) StdoutLine: {'line': b'running install_data\n'}
+[2.328159] (qcar2_autonomy) StdoutLine: {'line': b'running install_egg_info\n'}
+[2.348284] (qcar2_autonomy) StdoutLine: {'line': b"removing '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.8/site-packages/qcar2_autonomy-0.0.0-py3.8.egg-info' (and everything under it)\n"}
+[2.348806] (qcar2_autonomy) StdoutLine: {'line': b'Copying ../../build/qcar2_autonomy/qcar2_autonomy.egg-info to /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.8/site-packages/qcar2_autonomy-0.0.0-py3.8.egg-info\n'}
+[2.350957] (qcar2_autonomy) StdoutLine: {'line': b'running install_scripts\n'}
+[2.406989] (-) TimerEvent: {}
+[2.456738] (qcar2_autonomy) StdoutLine: {'line': b'Installing auto_teach_mapper script to /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy\n'}
+[2.457421] (qcar2_autonomy) StdoutLine: {'line': b'Installing bev_csi_node script to /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy\n'}
+[2.458138] (qcar2_autonomy) StdoutLine: {'line': b'Installing bev_csi_seg script to /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy\n'}
+[2.458675] (qcar2_autonomy) StdoutLine: {'line': b'Installing controller_drive script to /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy\n'}
+[2.459096] (qcar2_autonomy) StdoutLine: {'line': b'Installing lane_assist_blend script to /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy\n'}
+[2.459471] (qcar2_autonomy) StdoutLine: {'line': b'Installing lane_detection script to /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy\n'}
+[2.459656] (qcar2_autonomy) StdoutLine: {'line': b'Installing lane_stanley_node script to /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy\n'}
+[2.460063] (qcar2_autonomy) StdoutLine: {'line': b'Installing manual_drive script to /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy\n'}
+[2.460279] (qcar2_autonomy) StdoutLine: {'line': b'Installing path_follower script to /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy\n'}
+[2.460402] (qcar2_autonomy) StdoutLine: {'line': b'Installing path_teacher script to /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy\n'}
+[2.460514] (qcar2_autonomy) StdoutLine: {'line': b'Installing recorded_map_visualizer script to /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy\n'}
+[2.460623] (qcar2_autonomy) StdoutLine: {'line': b'Installing sidewalk_detection script to /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy\n'}
+[2.460740] (qcar2_autonomy) StdoutLine: {'line': b'Installing stanley_live_plot script to /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy\n'}
+[2.460843] (qcar2_autonomy) StdoutLine: {'line': b'Installing traffic_system_detector script to /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy\n'}
+[2.460943] (qcar2_autonomy) StdoutLine: {'line': b'Installing trip_planner script to /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy\n'}
+[2.461110] (qcar2_autonomy) StdoutLine: {'line': b'Installing yolo_detector script to /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy\n'}
+[2.461304] (qcar2_autonomy) StdoutLine: {'line': b"writing list of installed files to '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_autonomy/install.log'\n"}
+[2.507116] (-) TimerEvent: {}
+[2.563775] (qcar2_autonomy) CommandEnded: {'returncode': 0}
+[2.601867] (qcar2_autonomy) JobEnded: {'identifier': 'qcar2_autonomy', 'rc': 0}
+[2.603505] (-) EventReactorShutdown: {}

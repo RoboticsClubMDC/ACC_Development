@@ -188,11 +188,15 @@ class PathFollower(Node):
 
         self.target_frame = self.declare_parameter(
             'target_frame', 'base_link').get_parameter_value().string_value
+        self.declare_parameter('control_hz', 30.0)
+        control_hz = float(
+            self.get_parameter('control_hz').get_parameter_value().double_value)
+        control_hz = float(np.clip(control_hz, 5.0, 80.0))
 
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
-        self.dt = 1 / 80
+        self.dt = 1.0 / control_hz
 
         x0 = np.zeros((3, 1))
         P0 = np.eye(3)
@@ -208,7 +212,7 @@ class PathFollower(Node):
                                R=np.diagflat([.1]))
 
         self.yaw = 0
-        self.cutoff_frequency_filter = 15.0
+        self.cutoff_frequency_filter = min(15.0, 0.45 * control_hz)
         self.a1, self.b1 = self.filter_coefficients(self.cutoff_frequency_filter, self.dt)
 
         self.path_control_timer = self.create_timer(self.dt, self.path_planner)

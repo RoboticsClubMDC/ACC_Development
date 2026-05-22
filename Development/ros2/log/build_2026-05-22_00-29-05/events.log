@@ -1,0 +1,624 @@
+[0.000000] (-) TimerEvent: {}
+[0.000435] (-) JobUnselected: {'identifier': 'qcar2_interfaces'}
+[0.000706] (qcar2_autonomy) JobQueued: {'identifier': 'qcar2_autonomy', 'dependencies': OrderedDict([('qcar2_interfaces', '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces')])}
+[0.000886] (qcar2_nodes) JobQueued: {'identifier': 'qcar2_nodes', 'dependencies': OrderedDict([('qcar2_interfaces', '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces')])}
+[0.001276] (qcar2_autonomy) JobStarted: {'identifier': 'qcar2_autonomy'}
+[0.029253] (qcar2_nodes) JobStarted: {'identifier': 'qcar2_nodes'}
+[0.099516] (-) TimerEvent: {}
+[0.199921] (-) TimerEvent: {}
+[0.300656] (-) TimerEvent: {}
+[0.401039] (-) TimerEvent: {}
+[0.501415] (-) TimerEvent: {}
+[0.601770] (-) TimerEvent: {}
+[0.702125] (-) TimerEvent: {}
+[0.771224] (qcar2_nodes) JobProgress: {'identifier': 'qcar2_nodes', 'progress': 'cmake'}
+[0.773254] (qcar2_nodes) JobProgress: {'identifier': 'qcar2_nodes', 'progress': 'build'}
+[0.774644] (qcar2_nodes) Command: {'cmd': ['/usr/bin/cmake', '--build', '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_nodes', '--', '-j8', '-l8'], 'cwd': '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_nodes', 'env': OrderedDict([('LESSOPEN', '| /usr/bin/lesspipe %s'), ('VSCODE_CWD', '/home/nvidia'), ('VSCODE_ESM_ENTRYPOINT', 'vs/workbench/api/node/extensionHostProcess'), ('CODEX_CI', '1'), ('USER', 'nvidia'), ('SSH_CLIENT', '192.168.2.33 49359 22'), ('CODEX_INTERNAL_ORIGINATOR_OVERRIDE', 'codex_vscode'), ('VSCODE_NLS_CONFIG', '{"userLocale":"en","osLocale":"en","resolvedLanguage":"en","defaultMessagesFile":"/home/nvidia/.vscode-server/cli/servers/Stable-f6cfa2ea2403534de03f069bdf160d06451ed282/server/out/nls.messages.json","locale":"en","availableLanguages":{}}'), ('QAL_DIR', '/home/nvidia/Documents/Quanser'), ('VSCODE_HANDLES_UNCAUGHT_ERRORS', 'true'), ('XDG_SESSION_TYPE', 'tty'), ('DEBUG', 'release'), ('SHLVL', '0'), ('LD_LIBRARY_PATH', '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib:/usr/local/cuda/lib64:/usr/local/cuda/lib64:/usr/local/cuda/lib64'), ('BROWSER', '/home/nvidia/.vscode-server/cli/servers/Stable-f6cfa2ea2403534de03f069bdf160d06451ed282/server/bin/helpers/browser.sh'), ('MOTD_SHOWN', 'pam'), ('HOME', '/home/nvidia'), ('VSCODE_RECONNECTION_GRACE_TIME', '10800000'), ('VSCODE_IPC_HOOK_CLI', '/run/user/1000/vscode-ipc-77656d82-1816-4d7c-987b-9f4553ed958b.sock'), ('PAGER', 'cat'), ('LC_CTYPE', 'C.UTF-8'), ('NO_COLOR', '1'), ('DBUS_SESSION_BUS_ADDRESS', 'unix:path=/run/user/1000/bus'), ('COLORTERM', ''), ('APPLICATION_INSIGHTS_NO_STATSBEAT', 'true'), ('LOGNAME', 'nvidia'), ('VSCODE_HANDLES_SIGPIPE', 'true'), ('_', '/usr/bin/colcon'), ('XDG_SESSION_CLASS', 'user'), ('RUST_LOG', 'warn'), ('TERM', 'dumb'), ('XDG_SESSION_ID', '4'), ('VSCODE_CLI_REQUIRE_TOKEN', '01050a62-8fce-4c6c-9491-c5ffaa49413a'), ('PATH', '/home/nvidia/.local/bin:/usr/local/cuda/bin:/home/nvidia/.codex/tmp/arg0/codex-arg0sRkfD6:/home/nvidia/.vscode-server/cli/servers/Stable-f6cfa2ea2403534de03f069bdf160d06451ed282/server/bin/remote-cli:/home/nvidia/.local/bin:/usr/local/cuda/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/nvidia/.vscode-server/extensions/openai.chatgpt-26.513.21555/bin/linux-aarch64'), ('VSCODE_AGENT_FOLDER', '/home/nvidia/.vscode-server'), ('XDG_RUNTIME_DIR', '/run/user/1000'), ('CODEX_SANDBOX_NETWORK_DISABLED', '1'), ('LANG', 'C.UTF-8'), ('GH_PAGER', 'cat'), ('LS_COLORS', ''), ('AMENT_PREFIX_PATH', '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces'), ('SHELL', '/bin/bash'), ('ELECTRON_RUN_AS_NODE', '1'), ('LESSCLOSE', '/usr/bin/lesspipe %s %s'), ('CODEX_THREAD_ID', '019e4d39-33eb-7c00-80b6-469452a41560'), ('GIT_PAGER', 'cat'), ('PWD', '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_nodes'), ('LC_ALL', 'C.UTF-8'), ('SSH_CONNECTION', '192.168.2.33 49359 192.168.2.207 22'), ('XDG_DATA_DIRS', '/usr/local/share:/usr/share:/var/lib/snapd/desktop'), ('PYTHONPATH', '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib/python3.9/site-packages::/home/nvidia/Documents/Quanser/0_libraries/python:/usr/local/lib/python3.8/dist-packages:/home/nvidia/Documents/Quanser/0_libraries/python:/usr/local/lib/python3.8/dist-packages:/home/nvidia/Documents/Quanser/0_libraries/python:/usr/local/lib/python3.8/dist-packages'), ('COLCON', '1'), ('CMAKE_PREFIX_PATH', '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces')]), 'shell': False}
+[0.802536] (-) TimerEvent: {}
+[0.903056] (-) TimerEvent: {}
+[0.953321] (qcar2_nodes) StdoutLine: {'line': b'[ 12%] Built target qcar2_hardware\n'}
+[1.003211] (-) TimerEvent: {}
+[1.040294] (qcar2_nodes) StdoutLine: {'line': b'[ 25%] Built target fixed_lidar_frame_virtual\n'}
+[1.103348] (-) TimerEvent: {}
+[1.105030] (qcar2_nodes) StdoutLine: {'line': b'Scanning dependencies of target nav2_qcar2_converter\n'}
+[1.141209] (qcar2_nodes) StdoutLine: {'line': b'[ 31%] Building CXX object CMakeFiles/nav2_qcar2_converter.dir/src/nav2_qcar_command_convert.cpp.o\n'}
+[1.203492] (-) TimerEvent: {}
+[1.303845] (-) TimerEvent: {}
+[1.404178] (-) TimerEvent: {}
+[1.504523] (-) TimerEvent: {}
+[1.604887] (-) TimerEvent: {}
+[1.705248] (-) TimerEvent: {}
+[1.805621] (-) TimerEvent: {}
+[1.905978] (-) TimerEvent: {}
+[2.006615] (-) TimerEvent: {}
+[2.107025] (-) TimerEvent: {}
+[2.207371] (-) TimerEvent: {}
+[2.307726] (-) TimerEvent: {}
+[2.408100] (-) TimerEvent: {}
+[2.508505] (-) TimerEvent: {}
+[2.608924] (-) TimerEvent: {}
+[2.709260] (-) TimerEvent: {}
+[2.809643] (-) TimerEvent: {}
+[2.909988] (-) TimerEvent: {}
+[3.010380] (-) TimerEvent: {}
+[3.110722] (-) TimerEvent: {}
+[3.211202] (-) TimerEvent: {}
+[3.311892] (-) TimerEvent: {}
+[3.413111] (-) TimerEvent: {}
+[3.513454] (-) TimerEvent: {}
+[3.613813] (-) TimerEvent: {}
+[3.714395] (-) TimerEvent: {}
+[3.819461] (-) TimerEvent: {}
+[3.919862] (-) TimerEvent: {}
+[4.020235] (-) TimerEvent: {}
+[4.120612] (-) TimerEvent: {}
+[4.220997] (-) TimerEvent: {}
+[4.321365] (-) TimerEvent: {}
+[4.421732] (-) TimerEvent: {}
+[4.522855] (-) TimerEvent: {}
+[4.623216] (-) TimerEvent: {}
+[4.723564] (-) TimerEvent: {}
+[4.823907] (-) TimerEvent: {}
+[4.924255] (-) TimerEvent: {}
+[5.024675] (-) TimerEvent: {}
+[5.125037] (-) TimerEvent: {}
+[5.225380] (-) TimerEvent: {}
+[5.325744] (-) TimerEvent: {}
+[5.426103] (-) TimerEvent: {}
+[5.526487] (-) TimerEvent: {}
+[5.626842] (-) TimerEvent: {}
+[5.728203] (-) TimerEvent: {}
+[5.828532] (-) TimerEvent: {}
+[5.928881] (-) TimerEvent: {}
+[6.029344] (-) TimerEvent: {}
+[6.129701] (-) TimerEvent: {}
+[6.230434] (-) TimerEvent: {}
+[6.330799] (-) TimerEvent: {}
+[6.431160] (-) TimerEvent: {}
+[6.531547] (-) TimerEvent: {}
+[6.631902] (-) TimerEvent: {}
+[6.732284] (-) TimerEvent: {}
+[6.832905] (-) TimerEvent: {}
+[6.933334] (-) TimerEvent: {}
+[7.033751] (-) TimerEvent: {}
+[7.134125] (-) TimerEvent: {}
+[7.234525] (-) TimerEvent: {}
+[7.334934] (-) TimerEvent: {}
+[7.435298] (-) TimerEvent: {}
+[7.535644] (-) TimerEvent: {}
+[7.636001] (-) TimerEvent: {}
+[7.736408] (-) TimerEvent: {}
+[7.836750] (-) TimerEvent: {}
+[7.937119] (-) TimerEvent: {}
+[8.037515] (-) TimerEvent: {}
+[8.137920] (-) TimerEvent: {}
+[8.238468] (-) TimerEvent: {}
+[8.339133] (-) TimerEvent: {}
+[8.439513] (-) TimerEvent: {}
+[8.540061] (-) TimerEvent: {}
+[8.640420] (-) TimerEvent: {}
+[8.740798] (-) TimerEvent: {}
+[8.842897] (-) TimerEvent: {}
+[8.943284] (-) TimerEvent: {}
+[9.043647] (-) TimerEvent: {}
+[9.144020] (-) TimerEvent: {}
+[9.244417] (-) TimerEvent: {}
+[9.344771] (-) TimerEvent: {}
+[9.445132] (-) TimerEvent: {}
+[9.545513] (-) TimerEvent: {}
+[9.645856] (-) TimerEvent: {}
+[9.746218] (-) TimerEvent: {}
+[9.846569] (-) TimerEvent: {}
+[9.946956] (-) TimerEvent: {}
+[10.047321] (-) TimerEvent: {}
+[10.147694] (-) TimerEvent: {}
+[10.249964] (-) TimerEvent: {}
+[10.350349] (-) TimerEvent: {}
+[10.450728] (-) TimerEvent: {}
+[10.551395] (-) TimerEvent: {}
+[10.652088] (-) TimerEvent: {}
+[10.752439] (-) TimerEvent: {}
+[10.852791] (-) TimerEvent: {}
+[10.953237] (-) TimerEvent: {}
+[11.053595] (-) TimerEvent: {}
+[11.153994] (-) TimerEvent: {}
+[11.254338] (-) TimerEvent: {}
+[11.354687] (-) TimerEvent: {}
+[11.455061] (-) TimerEvent: {}
+[11.555427] (-) TimerEvent: {}
+[11.655778] (-) TimerEvent: {}
+[11.756136] (-) TimerEvent: {}
+[11.856527] (-) TimerEvent: {}
+[11.956904] (-) TimerEvent: {}
+[12.057269] (-) TimerEvent: {}
+[12.157633] (-) TimerEvent: {}
+[12.257997] (-) TimerEvent: {}
+[12.358366] (-) TimerEvent: {}
+[12.458727] (-) TimerEvent: {}
+[12.559130] (-) TimerEvent: {}
+[12.659496] (-) TimerEvent: {}
+[12.759856] (-) TimerEvent: {}
+[12.860669] (-) TimerEvent: {}
+[12.963559] (-) TimerEvent: {}
+[13.063971] (-) TimerEvent: {}
+[13.164375] (-) TimerEvent: {}
+[13.264732] (-) TimerEvent: {}
+[13.365116] (-) TimerEvent: {}
+[13.465515] (-) TimerEvent: {}
+[13.565885] (-) TimerEvent: {}
+[13.666313] (-) TimerEvent: {}
+[13.766706] (-) TimerEvent: {}
+[13.867137] (-) TimerEvent: {}
+[13.967486] (-) TimerEvent: {}
+[14.067829] (-) TimerEvent: {}
+[14.168168] (-) TimerEvent: {}
+[14.268501] (-) TimerEvent: {}
+[14.368846] (-) TimerEvent: {}
+[14.469191] (-) TimerEvent: {}
+[14.569548] (-) TimerEvent: {}
+[14.672527] (-) TimerEvent: {}
+[14.772848] (-) TimerEvent: {}
+[14.873224] (-) TimerEvent: {}
+[14.973575] (-) TimerEvent: {}
+[15.075195] (-) TimerEvent: {}
+[15.175519] (-) TimerEvent: {}
+[15.277562] (-) TimerEvent: {}
+[15.378350] (-) TimerEvent: {}
+[15.478704] (-) TimerEvent: {}
+[15.579035] (-) TimerEvent: {}
+[15.679387] (-) TimerEvent: {}
+[15.779724] (-) TimerEvent: {}
+[15.880166] (-) TimerEvent: {}
+[15.980734] (-) TimerEvent: {}
+[16.081089] (-) TimerEvent: {}
+[16.181427] (-) TimerEvent: {}
+[16.281760] (-) TimerEvent: {}
+[16.384375] (-) TimerEvent: {}
+[16.484755] (-) TimerEvent: {}
+[16.585780] (-) TimerEvent: {}
+[16.686133] (-) TimerEvent: {}
+[16.786483] (-) TimerEvent: {}
+[16.886824] (-) TimerEvent: {}
+[16.987145] (-) TimerEvent: {}
+[17.087478] (-) TimerEvent: {}
+[17.187813] (-) TimerEvent: {}
+[17.288382] (-) TimerEvent: {}
+[17.388759] (-) TimerEvent: {}
+[17.489184] (-) TimerEvent: {}
+[17.589529] (-) TimerEvent: {}
+[17.690309] (-) TimerEvent: {}
+[17.790673] (-) TimerEvent: {}
+[17.891054] (-) TimerEvent: {}
+[17.991379] (-) TimerEvent: {}
+[18.091719] (-) TimerEvent: {}
+[18.192053] (-) TimerEvent: {}
+[18.292377] (-) TimerEvent: {}
+[18.392710] (-) TimerEvent: {}
+[18.493237] (-) TimerEvent: {}
+[18.593584] (-) TimerEvent: {}
+[18.693930] (-) TimerEvent: {}
+[18.794297] (-) TimerEvent: {}
+[18.894675] (-) TimerEvent: {}
+[18.995034] (-) TimerEvent: {}
+[19.095391] (-) TimerEvent: {}
+[19.195754] (-) TimerEvent: {}
+[19.296127] (-) TimerEvent: {}
+[19.396499] (-) TimerEvent: {}
+[19.496861] (-) TimerEvent: {}
+[19.597219] (-) TimerEvent: {}
+[19.697614] (-) TimerEvent: {}
+[19.798093] (-) TimerEvent: {}
+[19.870132] (qcar2_nodes) StdoutLine: {'line': b'[ 37%] Linking CXX executable nav2_qcar2_converter\n'}
+[19.871267] (qcar2_autonomy) Command: {'cmd': ['/usr/bin/python3', '-W', 'ignore:setup.py install is deprecated', 'setup.py', 'egg_info', '--egg-base', '../../build/qcar2_autonomy', 'build', '--build-base', '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_autonomy/build', 'install', '--record', '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_autonomy/install.log', '--single-version-externally-managed', 'install_data'], 'cwd': '/home/nvidia/Documents/ACC_Development/Development/ros2/src/qcar2_autonomy', 'env': {'LESSOPEN': '| /usr/bin/lesspipe %s', 'VSCODE_CWD': '/home/nvidia', 'VSCODE_ESM_ENTRYPOINT': 'vs/workbench/api/node/extensionHostProcess', 'CODEX_CI': '1', 'USER': 'nvidia', 'SSH_CLIENT': '192.168.2.33 49359 22', 'CODEX_INTERNAL_ORIGINATOR_OVERRIDE': 'codex_vscode', 'VSCODE_NLS_CONFIG': '{"userLocale":"en","osLocale":"en","resolvedLanguage":"en","defaultMessagesFile":"/home/nvidia/.vscode-server/cli/servers/Stable-f6cfa2ea2403534de03f069bdf160d06451ed282/server/out/nls.messages.json","locale":"en","availableLanguages":{}}', 'QAL_DIR': '/home/nvidia/Documents/Quanser', 'VSCODE_HANDLES_UNCAUGHT_ERRORS': 'true', 'XDG_SESSION_TYPE': 'tty', 'DEBUG': 'release', 'SHLVL': '0', 'LD_LIBRARY_PATH': '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib:/usr/local/cuda/lib64:/usr/local/cuda/lib64:/usr/local/cuda/lib64', 'BROWSER': '/home/nvidia/.vscode-server/cli/servers/Stable-f6cfa2ea2403534de03f069bdf160d06451ed282/server/bin/helpers/browser.sh', 'MOTD_SHOWN': 'pam', 'HOME': '/home/nvidia', 'VSCODE_RECONNECTION_GRACE_TIME': '10800000', 'VSCODE_IPC_HOOK_CLI': '/run/user/1000/vscode-ipc-77656d82-1816-4d7c-987b-9f4553ed958b.sock', 'PAGER': 'cat', 'LC_CTYPE': 'C.UTF-8', 'NO_COLOR': '1', 'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/run/user/1000/bus', 'COLORTERM': '', 'APPLICATION_INSIGHTS_NO_STATSBEAT': 'true', 'LOGNAME': 'nvidia', 'VSCODE_HANDLES_SIGPIPE': 'true', '_': '/usr/bin/colcon', 'XDG_SESSION_CLASS': 'user', 'RUST_LOG': 'warn', 'TERM': 'dumb', 'XDG_SESSION_ID': '4', 'VSCODE_CLI_REQUIRE_TOKEN': '01050a62-8fce-4c6c-9491-c5ffaa49413a', 'PATH': '/home/nvidia/.local/bin:/usr/local/cuda/bin:/home/nvidia/.codex/tmp/arg0/codex-arg0sRkfD6:/home/nvidia/.vscode-server/cli/servers/Stable-f6cfa2ea2403534de03f069bdf160d06451ed282/server/bin/remote-cli:/home/nvidia/.local/bin:/usr/local/cuda/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/nvidia/.vscode-server/extensions/openai.chatgpt-26.513.21555/bin/linux-aarch64', 'VSCODE_AGENT_FOLDER': '/home/nvidia/.vscode-server', 'XDG_RUNTIME_DIR': '/run/user/1000', 'CODEX_SANDBOX_NETWORK_DISABLED': '1', 'LANG': 'C.UTF-8', 'GH_PAGER': 'cat', 'LS_COLORS': '', 'AMENT_PREFIX_PATH': '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces', 'SHELL': '/bin/bash', 'ELECTRON_RUN_AS_NODE': '1', 'LESSCLOSE': '/usr/bin/lesspipe %s %s', 'CODEX_THREAD_ID': '019e4d39-33eb-7c00-80b6-469452a41560', 'GIT_PAGER': 'cat', 'PWD': '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_autonomy', 'LC_ALL': 'C.UTF-8', 'SSH_CONNECTION': '192.168.2.33 49359 192.168.2.207 22', 'XDG_DATA_DIRS': '/usr/local/share:/usr/share:/var/lib/snapd/desktop', 'PYTHONPATH': '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_autonomy/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.8/site-packages:/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib/python3.9/site-packages::/home/nvidia/Documents/Quanser/0_libraries/python:/usr/local/lib/python3.8/dist-packages:/home/nvidia/Documents/Quanser/0_libraries/python:/usr/local/lib/python3.8/dist-packages:/home/nvidia/Documents/Quanser/0_libraries/python:/usr/local/lib/python3.8/dist-packages', 'COLCON': '1', 'CMAKE_PREFIX_PATH': '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces'}, 'shell': False}
+[19.898247] (-) TimerEvent: {}
+[19.998573] (-) TimerEvent: {}
+[20.098940] (-) TimerEvent: {}
+[20.199314] (-) TimerEvent: {}
+[20.299694] (-) TimerEvent: {}
+[20.400035] (-) TimerEvent: {}
+[20.504323] (-) TimerEvent: {}
+[20.600408] (qcar2_autonomy) StdoutLine: {'line': b'running egg_info\n'}
+[20.604462] (-) TimerEvent: {}
+[20.621216] (qcar2_autonomy) StdoutLine: {'line': b'writing ../../build/qcar2_autonomy/qcar2_autonomy.egg-info/PKG-INFO\n'}
+[20.621816] (qcar2_autonomy) StdoutLine: {'line': b'writing dependency_links to ../../build/qcar2_autonomy/qcar2_autonomy.egg-info/dependency_links.txt\n'}
+[20.622552] (qcar2_autonomy) StdoutLine: {'line': b'writing entry points to ../../build/qcar2_autonomy/qcar2_autonomy.egg-info/entry_points.txt\n'}
+[20.622942] (qcar2_autonomy) StdoutLine: {'line': b'writing requirements to ../../build/qcar2_autonomy/qcar2_autonomy.egg-info/requires.txt\n'}
+[20.623263] (qcar2_autonomy) StdoutLine: {'line': b'writing top-level names to ../../build/qcar2_autonomy/qcar2_autonomy.egg-info/top_level.txt\n'}
+[20.692408] (qcar2_autonomy) StdoutLine: {'line': b"reading manifest file '../../build/qcar2_autonomy/qcar2_autonomy.egg-info/SOURCES.txt'\n"}
+[20.694825] (qcar2_autonomy) StdoutLine: {'line': b"writing manifest file '../../build/qcar2_autonomy/qcar2_autonomy.egg-info/SOURCES.txt'\n"}
+[20.695612] (qcar2_autonomy) StdoutLine: {'line': b'running build\n'}
+[20.695820] (qcar2_autonomy) StdoutLine: {'line': b'running build_py\n'}
+[20.696457] (qcar2_autonomy) StdoutLine: {'line': b'copying autonomy/nav_to_pose.py -> /home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy\n'}
+[20.697390] (qcar2_autonomy) StdoutLine: {'line': b'copying autonomy/yolo_detector.py -> /home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy\n'}
+[20.698755] (qcar2_autonomy) StdoutLine: {'line': b'running install\n'}
+[20.704606] (-) TimerEvent: {}
+[20.708712] (qcar2_autonomy) StdoutLine: {'line': b'running install_lib\n'}
+[20.731748] (qcar2_autonomy) StdoutLine: {'line': b'copying /home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy/nav_to_pose.py -> /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy\n'}
+[20.732176] (qcar2_autonomy) StdoutLine: {'line': b'copying /home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_autonomy/build/lib/autonomy/yolo_detector.py -> /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy\n'}
+[20.735347] (qcar2_autonomy) StdoutLine: {'line': b'byte-compiling /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy/nav_to_pose.py to nav_to_pose.cpython-38.pyc\n'}
+[20.744359] (qcar2_autonomy) StdoutLine: {'line': b'byte-compiling /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.8/site-packages/autonomy/yolo_detector.py to yolo_detector.cpython-38.pyc\n'}
+[20.747690] (qcar2_autonomy) StdoutLine: {'line': b'running install_data\n'}
+[20.750045] (qcar2_autonomy) StdoutLine: {'line': b'copying launch/autonomy_planner_launch.py -> /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/share/qcar2_autonomy/launch\n'}
+[20.750402] (qcar2_autonomy) StdoutLine: {'line': b'running install_egg_info\n'}
+[20.771324] (qcar2_autonomy) StdoutLine: {'line': b"removing '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.8/site-packages/qcar2_autonomy-0.0.0-py3.8.egg-info' (and everything under it)\n"}
+[20.773632] (qcar2_autonomy) StdoutLine: {'line': b'Copying ../../build/qcar2_autonomy/qcar2_autonomy.egg-info to /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.8/site-packages/qcar2_autonomy-0.0.0-py3.8.egg-info\n'}
+[20.774000] (qcar2_autonomy) StdoutLine: {'line': b'running install_scripts\n'}
+[20.804729] (-) TimerEvent: {}
+[20.898536] (qcar2_nodes) StdoutLine: {'line': b'[ 37%] Built target nav2_qcar2_converter\n'}
+[20.904874] (-) TimerEvent: {}
+[20.908534] (qcar2_autonomy) StdoutLine: {'line': b'Installing auto_teach_mapper script to /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy\n'}
+[20.909121] (qcar2_autonomy) StdoutLine: {'line': b'Installing bev_csi_node script to /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy\n'}
+[20.909613] (qcar2_autonomy) StdoutLine: {'line': b'Installing bev_csi_seg script to /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy\n'}
+[20.911190] (qcar2_autonomy) StdoutLine: {'line': b'Installing controller_drive script to /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy\n'}
+[20.911478] (qcar2_autonomy) StdoutLine: {'line': b'Installing lane_assist_blend script to /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy\n'}
+[20.911620] (qcar2_autonomy) StdoutLine: {'line': b'Installing lane_detection script to /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy\n'}
+[20.914871] (qcar2_autonomy) StdoutLine: {'line': b'Installing lane_stanley_node script to /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy\n'}
+[20.915171] (qcar2_autonomy) StdoutLine: {'line': b'Installing manual_drive script to /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy\n'}
+[20.915300] (qcar2_autonomy) StdoutLine: {'line': b'Installing path_follower script to /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy\n'}
+[20.915417] (qcar2_autonomy) StdoutLine: {'line': b'Installing path_teacher script to /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy\n'}
+[20.915522] (qcar2_autonomy) StdoutLine: {'line': b'Installing recorded_map_visualizer script to /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy\n'}
+[20.915634] (qcar2_autonomy) StdoutLine: {'line': b'Installing sidewalk_detection script to /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy\n'}
+[20.915741] (qcar2_autonomy) StdoutLine: {'line': b'Installing stanley_live_plot script to /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy\n'}
+[20.917836] (qcar2_autonomy) StdoutLine: {'line': b'Installing traffic_system_detector script to /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy\n'}
+[20.918084] (qcar2_autonomy) StdoutLine: {'line': b'Installing trip_planner script to /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy\n'}
+[20.918210] (qcar2_autonomy) StdoutLine: {'line': b'Installing yolo_detector script to /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/qcar2_autonomy\n'}
+[20.918321] (qcar2_autonomy) StdoutLine: {'line': b"writing list of installed files to '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_autonomy/install.log'\n"}
+[20.990773] (qcar2_nodes) StdoutLine: {'line': b'[ 50%] Built target fixed_lidar_frame\n'}
+[21.005026] (-) TimerEvent: {}
+[21.053878] (qcar2_nodes) StdoutLine: {'line': b'[ 62%] Built target csi\n'}
+[21.063644] (qcar2_autonomy) CommandEnded: {'returncode': 0}
+[21.093249] (qcar2_autonomy) JobEnded: {'identifier': 'qcar2_autonomy', 'rc': 0}
+[21.105143] (-) TimerEvent: {}
+[21.133808] (qcar2_nodes) StdoutLine: {'line': b'[ 75%] Built target command\n'}
+[21.192342] (qcar2_nodes) StdoutLine: {'line': b'[ 87%] Built target lidar\n'}
+[21.205445] (-) TimerEvent: {}
+[21.257322] (qcar2_nodes) StdoutLine: {'line': b'[100%] Built target rgbd\n'}
+[21.305700] (-) TimerEvent: {}
+[21.406943] (-) TimerEvent: {}
+[21.507450] (-) TimerEvent: {}
+[21.607811] (-) TimerEvent: {}
+[21.708201] (-) TimerEvent: {}
+[21.808569] (-) TimerEvent: {}
+[21.908902] (-) TimerEvent: {}
+[22.009280] (-) TimerEvent: {}
+[22.109654] (-) TimerEvent: {}
+[22.210040] (-) TimerEvent: {}
+[22.310440] (-) TimerEvent: {}
+[22.410818] (-) TimerEvent: {}
+[22.511199] (-) TimerEvent: {}
+[22.611586] (-) TimerEvent: {}
+[22.711939] (-) TimerEvent: {}
+[22.813114] (-) TimerEvent: {}
+[22.913489] (-) TimerEvent: {}
+[23.013858] (-) TimerEvent: {}
+[23.114233] (-) TimerEvent: {}
+[23.214594] (-) TimerEvent: {}
+[23.314975] (-) TimerEvent: {}
+[23.415378] (-) TimerEvent: {}
+[23.515746] (-) TimerEvent: {}
+[23.616120] (-) TimerEvent: {}
+[23.716465] (-) TimerEvent: {}
+[23.816846] (-) TimerEvent: {}
+[23.917398] (-) TimerEvent: {}
+[24.017747] (-) TimerEvent: {}
+[24.118111] (-) TimerEvent: {}
+[24.218470] (-) TimerEvent: {}
+[24.318848] (-) TimerEvent: {}
+[24.419219] (-) TimerEvent: {}
+[24.519597] (-) TimerEvent: {}
+[24.619962] (-) TimerEvent: {}
+[24.720329] (-) TimerEvent: {}
+[24.820707] (-) TimerEvent: {}
+[24.921078] (-) TimerEvent: {}
+[25.021699] (-) TimerEvent: {}
+[25.122058] (-) TimerEvent: {}
+[25.222383] (-) TimerEvent: {}
+[25.322791] (-) TimerEvent: {}
+[25.423186] (-) TimerEvent: {}
+[25.523537] (-) TimerEvent: {}
+[25.623898] (-) TimerEvent: {}
+[25.724235] (-) TimerEvent: {}
+[25.824620] (-) TimerEvent: {}
+[25.924963] (-) TimerEvent: {}
+[26.025312] (-) TimerEvent: {}
+[26.125638] (-) TimerEvent: {}
+[26.228289] (-) TimerEvent: {}
+[26.328614] (-) TimerEvent: {}
+[26.429151] (-) TimerEvent: {}
+[26.529769] (-) TimerEvent: {}
+[26.630114] (-) TimerEvent: {}
+[26.730461] (-) TimerEvent: {}
+[26.830841] (-) TimerEvent: {}
+[26.931210] (-) TimerEvent: {}
+[27.031551] (-) TimerEvent: {}
+[27.132477] (-) TimerEvent: {}
+[27.233006] (-) TimerEvent: {}
+[27.333427] (-) TimerEvent: {}
+[27.435166] (-) TimerEvent: {}
+[27.535513] (-) TimerEvent: {}
+[27.635861] (-) TimerEvent: {}
+[27.736632] (-) TimerEvent: {}
+[27.836976] (-) TimerEvent: {}
+[27.937372] (-) TimerEvent: {}
+[28.038033] (-) TimerEvent: {}
+[28.138380] (-) TimerEvent: {}
+[28.238712] (-) TimerEvent: {}
+[28.339090] (-) TimerEvent: {}
+[28.439453] (-) TimerEvent: {}
+[28.539833] (-) TimerEvent: {}
+[28.640213] (-) TimerEvent: {}
+[28.740566] (-) TimerEvent: {}
+[28.840899] (-) TimerEvent: {}
+[28.941237] (-) TimerEvent: {}
+[29.041586] (-) TimerEvent: {}
+[29.142803] (-) TimerEvent: {}
+[29.243145] (-) TimerEvent: {}
+[29.343526] (-) TimerEvent: {}
+[29.443903] (-) TimerEvent: {}
+[29.544275] (-) TimerEvent: {}
+[29.644639] (-) TimerEvent: {}
+[29.744986] (-) TimerEvent: {}
+[29.845329] (-) TimerEvent: {}
+[29.945695] (-) TimerEvent: {}
+[30.046036] (-) TimerEvent: {}
+[30.146384] (-) TimerEvent: {}
+[30.246888] (-) TimerEvent: {}
+[30.347257] (-) TimerEvent: {}
+[30.447598] (-) TimerEvent: {}
+[30.547970] (-) TimerEvent: {}
+[30.648326] (-) TimerEvent: {}
+[30.748663] (-) TimerEvent: {}
+[30.850029] (-) TimerEvent: {}
+[30.950372] (-) TimerEvent: {}
+[31.050756] (-) TimerEvent: {}
+[31.151142] (-) TimerEvent: {}
+[31.251509] (-) TimerEvent: {}
+[31.351865] (-) TimerEvent: {}
+[31.452217] (-) TimerEvent: {}
+[31.552576] (-) TimerEvent: {}
+[31.652956] (-) TimerEvent: {}
+[31.753308] (-) TimerEvent: {}
+[31.853649] (-) TimerEvent: {}
+[31.954959] (-) TimerEvent: {}
+[32.055529] (-) TimerEvent: {}
+[32.156429] (-) TimerEvent: {}
+[32.256806] (-) TimerEvent: {}
+[32.357180] (-) TimerEvent: {}
+[32.457564] (-) TimerEvent: {}
+[32.558066] (-) TimerEvent: {}
+[32.658418] (-) TimerEvent: {}
+[32.758839] (-) TimerEvent: {}
+[32.859208] (-) TimerEvent: {}
+[32.962617] (-) TimerEvent: {}
+[33.062974] (-) TimerEvent: {}
+[33.166847] (-) TimerEvent: {}
+[33.267196] (-) TimerEvent: {}
+[33.367554] (-) TimerEvent: {}
+[33.467901] (-) TimerEvent: {}
+[33.568259] (-) TimerEvent: {}
+[33.668628] (-) TimerEvent: {}
+[33.768987] (-) TimerEvent: {}
+[33.869347] (-) TimerEvent: {}
+[33.969701] (-) TimerEvent: {}
+[34.070050] (-) TimerEvent: {}
+[34.171909] (-) TimerEvent: {}
+[34.272246] (-) TimerEvent: {}
+[34.372661] (-) TimerEvent: {}
+[34.473057] (-) TimerEvent: {}
+[34.573427] (-) TimerEvent: {}
+[34.673799] (-) TimerEvent: {}
+[34.774217] (-) TimerEvent: {}
+[34.874580] (-) TimerEvent: {}
+[34.975134] (-) TimerEvent: {}
+[35.075484] (-) TimerEvent: {}
+[35.175845] (-) TimerEvent: {}
+[35.276203] (-) TimerEvent: {}
+[35.376566] (-) TimerEvent: {}
+[35.476907] (-) TimerEvent: {}
+[35.577244] (-) TimerEvent: {}
+[35.677601] (-) TimerEvent: {}
+[35.777937] (-) TimerEvent: {}
+[35.878865] (-) TimerEvent: {}
+[35.979229] (-) TimerEvent: {}
+[36.079605] (-) TimerEvent: {}
+[36.179941] (-) TimerEvent: {}
+[36.280282] (-) TimerEvent: {}
+[36.386497] (-) TimerEvent: {}
+[36.486851] (-) TimerEvent: {}
+[36.587214] (-) TimerEvent: {}
+[36.698231] (-) TimerEvent: {}
+[36.798581] (-) TimerEvent: {}
+[36.898943] (-) TimerEvent: {}
+[36.999284] (-) TimerEvent: {}
+[37.099647] (-) TimerEvent: {}
+[37.209113] (-) TimerEvent: {}
+[37.309428] (-) TimerEvent: {}
+[37.409772] (-) TimerEvent: {}
+[37.510112] (-) TimerEvent: {}
+[37.610489] (-) TimerEvent: {}
+[37.710861] (-) TimerEvent: {}
+[37.811219] (-) TimerEvent: {}
+[37.911587] (-) TimerEvent: {}
+[38.012436] (-) TimerEvent: {}
+[38.112764] (-) TimerEvent: {}
+[38.213127] (-) TimerEvent: {}
+[38.313482] (-) TimerEvent: {}
+[38.413839] (-) TimerEvent: {}
+[38.514184] (-) TimerEvent: {}
+[38.614540] (-) TimerEvent: {}
+[38.715012] (-) TimerEvent: {}
+[38.815386] (-) TimerEvent: {}
+[38.915720] (-) TimerEvent: {}
+[39.016057] (-) TimerEvent: {}
+[39.116442] (-) TimerEvent: {}
+[39.216769] (-) TimerEvent: {}
+[39.317084] (-) TimerEvent: {}
+[39.417424] (-) TimerEvent: {}
+[39.517751] (-) TimerEvent: {}
+[39.618103] (-) TimerEvent: {}
+[39.718458] (-) TimerEvent: {}
+[39.818821] (-) TimerEvent: {}
+[39.919141] (-) TimerEvent: {}
+[40.019520] (-) TimerEvent: {}
+[40.119871] (-) TimerEvent: {}
+[40.220231] (-) TimerEvent: {}
+[40.320583] (-) TimerEvent: {}
+[40.420933] (-) TimerEvent: {}
+[40.521290] (-) TimerEvent: {}
+[40.621627] (-) TimerEvent: {}
+[40.721969] (-) TimerEvent: {}
+[40.822306] (-) TimerEvent: {}
+[40.922657] (-) TimerEvent: {}
+[41.022990] (-) TimerEvent: {}
+[41.123322] (-) TimerEvent: {}
+[41.223680] (-) TimerEvent: {}
+[41.323991] (-) TimerEvent: {}
+[41.424309] (-) TimerEvent: {}
+[41.524655] (-) TimerEvent: {}
+[41.625007] (-) TimerEvent: {}
+[41.725371] (-) TimerEvent: {}
+[41.825724] (-) TimerEvent: {}
+[41.926084] (-) TimerEvent: {}
+[42.026420] (-) TimerEvent: {}
+[42.126778] (-) TimerEvent: {}
+[42.227156] (-) TimerEvent: {}
+[42.328213] (-) TimerEvent: {}
+[42.428579] (-) TimerEvent: {}
+[42.528878] (-) TimerEvent: {}
+[42.629217] (-) TimerEvent: {}
+[42.729568] (-) TimerEvent: {}
+[42.830103] (-) TimerEvent: {}
+[42.930468] (-) TimerEvent: {}
+[43.030813] (-) TimerEvent: {}
+[43.131178] (-) TimerEvent: {}
+[43.231548] (-) TimerEvent: {}
+[43.331920] (-) TimerEvent: {}
+[43.432358] (-) TimerEvent: {}
+[43.532732] (-) TimerEvent: {}
+[43.633447] (-) TimerEvent: {}
+[43.733801] (-) TimerEvent: {}
+[43.834174] (-) TimerEvent: {}
+[43.934530] (-) TimerEvent: {}
+[44.034906] (-) TimerEvent: {}
+[44.135284] (-) TimerEvent: {}
+[44.235652] (-) TimerEvent: {}
+[44.336001] (-) TimerEvent: {}
+[44.436396] (-) TimerEvent: {}
+[44.536772] (-) TimerEvent: {}
+[44.637130] (-) TimerEvent: {}
+[44.737542] (-) TimerEvent: {}
+[44.837941] (-) TimerEvent: {}
+[44.938314] (-) TimerEvent: {}
+[45.038711] (-) TimerEvent: {}
+[45.139085] (-) TimerEvent: {}
+[45.239467] (-) TimerEvent: {}
+[45.339816] (-) TimerEvent: {}
+[45.440138] (-) TimerEvent: {}
+[45.540498] (-) TimerEvent: {}
+[45.640858] (-) TimerEvent: {}
+[45.741248] (-) TimerEvent: {}
+[45.841682] (-) TimerEvent: {}
+[45.942149] (-) TimerEvent: {}
+[46.042506] (-) TimerEvent: {}
+[46.142852] (-) TimerEvent: {}
+[46.243245] (-) TimerEvent: {}
+[46.344351] (-) TimerEvent: {}
+[46.444742] (-) TimerEvent: {}
+[46.545115] (-) TimerEvent: {}
+[46.645491] (-) TimerEvent: {}
+[46.746204] (-) TimerEvent: {}
+[46.846584] (-) TimerEvent: {}
+[46.946962] (-) TimerEvent: {}
+[47.047294] (-) TimerEvent: {}
+[47.147665] (-) TimerEvent: {}
+[47.248147] (-) TimerEvent: {}
+[47.348650] (-) TimerEvent: {}
+[47.448980] (-) TimerEvent: {}
+[47.549360] (-) TimerEvent: {}
+[47.649720] (-) TimerEvent: {}
+[47.750086] (-) TimerEvent: {}
+[47.850848] (-) TimerEvent: {}
+[47.951184] (-) TimerEvent: {}
+[48.052036] (-) TimerEvent: {}
+[48.152428] (-) TimerEvent: {}
+[48.252781] (-) TimerEvent: {}
+[48.353128] (-) TimerEvent: {}
+[48.453463] (-) TimerEvent: {}
+[48.553780] (-) TimerEvent: {}
+[48.654120] (-) TimerEvent: {}
+[48.754469] (-) TimerEvent: {}
+[48.854834] (-) TimerEvent: {}
+[48.955224] (-) TimerEvent: {}
+[49.055569] (-) TimerEvent: {}
+[49.155927] (-) TimerEvent: {}
+[49.256274] (-) TimerEvent: {}
+[49.356632] (-) TimerEvent: {}
+[49.457009] (-) TimerEvent: {}
+[49.557364] (-) TimerEvent: {}
+[49.657720] (-) TimerEvent: {}
+[49.758075] (-) TimerEvent: {}
+[49.858460] (-) TimerEvent: {}
+[49.958854] (-) TimerEvent: {}
+[50.059217] (-) TimerEvent: {}
+[50.159587] (-) TimerEvent: {}
+[50.259923] (-) TimerEvent: {}
+[50.360266] (-) TimerEvent: {}
+[50.460622] (-) TimerEvent: {}
+[50.560958] (-) TimerEvent: {}
+[50.661308] (-) TimerEvent: {}
+[50.761652] (-) TimerEvent: {}
+[50.862011] (-) TimerEvent: {}
+[50.963349] (-) TimerEvent: {}
+[51.063718] (-) TimerEvent: {}
+[51.101095] (qcar2_nodes) CommandEnded: {'returncode': 0}
+[51.163902] (-) TimerEvent: {}
+[51.213440] (qcar2_nodes) JobProgress: {'identifier': 'qcar2_nodes', 'progress': 'install'}
+[51.244396] (qcar2_nodes) Command: {'cmd': ['/usr/bin/cmake', '--install', '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_nodes'], 'cwd': '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_nodes', 'env': OrderedDict([('LESSOPEN', '| /usr/bin/lesspipe %s'), ('VSCODE_CWD', '/home/nvidia'), ('VSCODE_ESM_ENTRYPOINT', 'vs/workbench/api/node/extensionHostProcess'), ('CODEX_CI', '1'), ('USER', 'nvidia'), ('SSH_CLIENT', '192.168.2.33 49359 22'), ('CODEX_INTERNAL_ORIGINATOR_OVERRIDE', 'codex_vscode'), ('VSCODE_NLS_CONFIG', '{"userLocale":"en","osLocale":"en","resolvedLanguage":"en","defaultMessagesFile":"/home/nvidia/.vscode-server/cli/servers/Stable-f6cfa2ea2403534de03f069bdf160d06451ed282/server/out/nls.messages.json","locale":"en","availableLanguages":{}}'), ('QAL_DIR', '/home/nvidia/Documents/Quanser'), ('VSCODE_HANDLES_UNCAUGHT_ERRORS', 'true'), ('XDG_SESSION_TYPE', 'tty'), ('DEBUG', 'release'), ('SHLVL', '0'), ('LD_LIBRARY_PATH', '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib:/usr/local/cuda/lib64:/usr/local/cuda/lib64:/usr/local/cuda/lib64'), ('BROWSER', '/home/nvidia/.vscode-server/cli/servers/Stable-f6cfa2ea2403534de03f069bdf160d06451ed282/server/bin/helpers/browser.sh'), ('MOTD_SHOWN', 'pam'), ('HOME', '/home/nvidia'), ('VSCODE_RECONNECTION_GRACE_TIME', '10800000'), ('VSCODE_IPC_HOOK_CLI', '/run/user/1000/vscode-ipc-77656d82-1816-4d7c-987b-9f4553ed958b.sock'), ('PAGER', 'cat'), ('LC_CTYPE', 'C.UTF-8'), ('NO_COLOR', '1'), ('DBUS_SESSION_BUS_ADDRESS', 'unix:path=/run/user/1000/bus'), ('COLORTERM', ''), ('APPLICATION_INSIGHTS_NO_STATSBEAT', 'true'), ('LOGNAME', 'nvidia'), ('VSCODE_HANDLES_SIGPIPE', 'true'), ('_', '/usr/bin/colcon'), ('XDG_SESSION_CLASS', 'user'), ('RUST_LOG', 'warn'), ('TERM', 'dumb'), ('XDG_SESSION_ID', '4'), ('VSCODE_CLI_REQUIRE_TOKEN', '01050a62-8fce-4c6c-9491-c5ffaa49413a'), ('PATH', '/home/nvidia/.local/bin:/usr/local/cuda/bin:/home/nvidia/.codex/tmp/arg0/codex-arg0sRkfD6:/home/nvidia/.vscode-server/cli/servers/Stable-f6cfa2ea2403534de03f069bdf160d06451ed282/server/bin/remote-cli:/home/nvidia/.local/bin:/usr/local/cuda/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/nvidia/.vscode-server/extensions/openai.chatgpt-26.513.21555/bin/linux-aarch64'), ('VSCODE_AGENT_FOLDER', '/home/nvidia/.vscode-server'), ('XDG_RUNTIME_DIR', '/run/user/1000'), ('CODEX_SANDBOX_NETWORK_DISABLED', '1'), ('LANG', 'C.UTF-8'), ('GH_PAGER', 'cat'), ('LS_COLORS', ''), ('AMENT_PREFIX_PATH', '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces'), ('SHELL', '/bin/bash'), ('ELECTRON_RUN_AS_NODE', '1'), ('LESSCLOSE', '/usr/bin/lesspipe %s %s'), ('CODEX_THREAD_ID', '019e4d39-33eb-7c00-80b6-469452a41560'), ('GIT_PAGER', 'cat'), ('PWD', '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_nodes'), ('LC_ALL', 'C.UTF-8'), ('SSH_CONNECTION', '192.168.2.33 49359 192.168.2.207 22'), ('XDG_DATA_DIRS', '/usr/local/share:/usr/share:/var/lib/snapd/desktop'), ('PYTHONPATH', '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib/python3.9/site-packages::/home/nvidia/Documents/Quanser/0_libraries/python:/usr/local/lib/python3.8/dist-packages:/home/nvidia/Documents/Quanser/0_libraries/python:/usr/local/lib/python3.8/dist-packages:/home/nvidia/Documents/Quanser/0_libraries/python:/usr/local/lib/python3.8/dist-packages'), ('COLCON', '1'), ('CMAKE_PREFIX_PATH', '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces')]), 'shell': False}
+[51.264093] (-) TimerEvent: {}
+[51.269243] (qcar2_nodes) StdoutLine: {'line': b'-- Install configuration: ""\n'}
+[51.270998] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/lib/qcar2_nodes/qcar2_hardware\n'}
+[51.271446] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/lib/qcar2_nodes/rgbd\n'}
+[51.272097] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/lib/qcar2_nodes/lidar\n'}
+[51.272439] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/lib/qcar2_nodes/csi\n'}
+[51.272861] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/lib/qcar2_nodes/command\n'}
+[51.273371] (qcar2_nodes) StdoutLine: {'line': b'-- Installing: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/lib/qcar2_nodes/nav2_qcar2_converter\n'}
+[51.283764] (qcar2_nodes) StdoutLine: {'line': b'-- Set runtime path of "/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/lib/qcar2_nodes/nav2_qcar2_converter" to ""\n'}
+[51.284185] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/lib/qcar2_nodes/fixed_lidar_frame\n'}
+[51.284566] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/lib/qcar2_nodes/fixed_lidar_frame_virtual\n'}
+[51.284731] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//launch\n'}
+[51.285225] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//launch/qcar2_slam_and_nav_bringup_virtual_launch.py\n'}
+[51.285390] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//launch/qcar2_slam_and_nav_bringup_launch.py\n'}
+[51.285510] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//launch/qcar2_manual_drive_launch.py\n'}
+[51.285621] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//launch/qcar2_manual_cartographer_launch.py\n'}
+[51.285741] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//launch/__pycache__\n'}
+[51.285846] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//launch/__pycache__/qcar2_slam_and_nav_bringup_virtual_launch.cpython-38.pyc\n'}
+[51.285957] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//launch/__pycache__/qcar2_slam_and_nav_bringup_launch.cpython-38.pyc\n'}
+[51.286060] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//launch/qcar2_launch.py\n'}
+[51.286159] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//launch/qcar2_cartographer_virtual_launch.py\n'}
+[51.286255] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//launch/qcar2_cartographer_launch.py\n'}
+[51.286355] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//launch/qcar2_virtual_launch.py\n'}
+[51.286452] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//rt_models\n'}
+[51.286547] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//rt_models/dummy_model\n'}
+[51.286640] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//config\n'}
+[51.286754] (qcar2_nodes) StdoutLine: {'line': b'-- Installing: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//config/qcar2_2d.lua\n'}
+[51.287550] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//config/qcar2_slam_and_nav.yaml\n'}
+[51.287702] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes//config/qcar2_slam_and_nav_virtual.yaml\n'}
+[51.287836] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/ament_index/resource_index/package_run_dependencies/qcar2_nodes\n'}
+[51.287934] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/ament_index/resource_index/parent_prefix_path/qcar2_nodes\n'}
+[51.288030] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/environment/ament_prefix_path.sh\n'}
+[51.288119] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/environment/ament_prefix_path.dsv\n'}
+[51.288205] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/environment/path.sh\n'}
+[51.288293] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/environment/path.dsv\n'}
+[51.288382] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/local_setup.bash\n'}
+[51.288470] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/local_setup.sh\n'}
+[51.288557] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/local_setup.zsh\n'}
+[51.288644] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/local_setup.dsv\n'}
+[51.288731] (qcar2_nodes) StdoutLine: {'line': b'-- Installing: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/package.dsv\n'}
+[51.288832] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/ament_index/resource_index/packages/qcar2_nodes\n'}
+[51.288922] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/cmake/qcar2_nodesConfig.cmake\n'}
+[51.289010] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/cmake/qcar2_nodesConfig-version.cmake\n'}
+[51.289096] (qcar2_nodes) StdoutLine: {'line': b'-- Up-to-date: /home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/package.xml\n'}
+[51.291823] (qcar2_nodes) CommandEnded: {'returncode': 0}
+[51.364255] (-) TimerEvent: {}
+[51.401274] (qcar2_nodes) JobEnded: {'identifier': 'qcar2_nodes', 'rc': 0}
+[51.402892] (-) EventReactorShutdown: {}

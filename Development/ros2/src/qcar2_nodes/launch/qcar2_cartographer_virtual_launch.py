@@ -6,7 +6,7 @@ import os
 from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchDescription
-from launch.actions import (IncludeLaunchDescription, DeclareLaunchArgument)
+from launch.actions import (IncludeLaunchDescription, DeclareLaunchArgument, SetEnvironmentVariable)
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import (PathJoinSubstitution, LaunchConfiguration)
 
@@ -25,6 +25,7 @@ def generate_launch_description():
     configuration_basename = LaunchConfiguration('configuration_basename')
     resolution = LaunchConfiguration('resolution')
     publish_period_sec = LaunchConfiguration('publish_period_sec', default='1.0')
+    cartographer_log_level = LaunchConfiguration('cartographer_log_level')
 
     qcar2_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([os.path.join(
@@ -57,20 +58,29 @@ def generate_launch_description():
             default_value='1.0',
             description='Publishing period')
 
+    cartographer_log_level_la = DeclareLaunchArgument(
+            'cartographer_log_level',
+            default_value='warn',
+            description='Log level for Cartographer nodes')
+
     cartographer_node = Node(
             package='cartographer_ros',
             executable='cartographer_node',
-            output='screen',
+            output='log',
             parameters=[{'use_sim_time': use_sim}],
             arguments=['-configuration_directory', cartographer_config_dir,
-                       '-configuration_basename', configuration_basename])
+                       '-configuration_basename', configuration_basename,
+                       '--ros-args', '--log-level', cartographer_log_level,
+                       '--disable-rosout-logs'])
 
     cartographer_occupancy_grid_node = Node(
             package='cartographer_ros',
             executable='cartographer_occupancy_grid_node',
-            output='screen',
+            output='log',
             parameters=[{'use_sim_time': use_sim}],
-            arguments=['-resolution', resolution, '-publish_period_sec', publish_period_sec])
+            arguments=['-resolution', resolution, '-publish_period_sec', publish_period_sec,
+                       '--ros-args', '--log-level', cartographer_log_level,
+                       '--disable-rosout-logs'])
 
     qcar2_nav2_converter = Node(
     package='qcar2_nodes',
@@ -84,6 +94,9 @@ def generate_launch_description():
         use_sim_la,
         resolution_la,
         publish_period_sec_la,
+        cartographer_log_level_la,
+        SetEnvironmentVariable('GLOG_minloglevel', '1'),
+        SetEnvironmentVariable('GLOG_v', '0'),
         cartographer_node,
         cartographer_occupancy_grid_node,
         qcar2_to_lidar_tf_node,

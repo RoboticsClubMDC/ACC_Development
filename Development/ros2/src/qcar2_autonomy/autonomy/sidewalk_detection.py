@@ -14,6 +14,12 @@ from cv_bridge import CvBridge
 
 from ultralytics import YOLO
 
+from autonomy.cuda_utils import (
+    clear_cuda_cache,
+    is_cuda_runtime_error,
+    select_yolo_device,
+)
+
 
 NO_GO      = 2
 COLORS_BGR = {NO_GO: (0, 0, 255)}
@@ -37,11 +43,16 @@ class SidewalkDetectionNode(Node):
         self.declare_parameter("model_path",  "ros2/src/qcar2_autonomy/models/sidewalk_seg_yolo.pt")
         self.declare_parameter("imgsz",       640)
         self.declare_parameter("device",      0)
+        self.declare_parameter("use_cuda",    True)
+        self.declare_parameter("allow_cpu_fallback", False)
 
         image_topic      = self.get_parameter("image_topic").get_parameter_value().string_value
         model_path_param = self.get_parameter("model_path").get_parameter_value().string_value
         imgsz            = int(self.get_parameter("imgsz").get_parameter_value().integer_value)
         device           = int(self.get_parameter("device").get_parameter_value().integer_value)
+        use_cuda         = bool(self.get_parameter("use_cuda").get_parameter_value().bool_value)
+        self.allow_cpu_fallback = bool(
+            self.get_parameter("allow_cpu_fallback").get_parameter_value().bool_value)
 
         model_path = self._resolve_model_path(model_path_param)
 
@@ -52,7 +63,14 @@ class SidewalkDetectionNode(Node):
         self.model  = YOLO(model_path)
 
         self.imgsz  = imgsz
-        self.device = device
+        self.device = select_yolo_device(
+            self.get_logger(),
+            requested_device=device,
+            use_cuda=use_cuda,
+            context="Sidewalk YOLO",
+            allow_cpu_fallback=self.allow_cpu_fallback,
+        )
+        self.get_logger().info(f"YOLO inference device: {self.device}")
 
         k = 2 * NO_GO_MARGIN_PX + 1
         self.no_go_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k))
@@ -72,6 +90,35 @@ class SidewalkDetectionNode(Node):
                 return cand
         return os.path.abspath(model_path_param)
 
+    def _predict(self, img_bgr):
+        try:
+            return self.model.predict(
+                img_bgr,
+                imgsz=self.imgsz,
+                device=self.device,
+                verbose=False,
+            )[0]
+        except RuntimeError as e:
+            if self.device == "cpu" or not is_cuda_runtime_error(e):
+                raise
+            if not self.allow_cpu_fallback:
+                self.get_logger().error(
+                    f"YOLO CUDA inference failed on device={self.device}: {e}. "
+                    "CPU fallback is disabled for sidewalk detection.")
+                raise
+
+            self.get_logger().error(
+                f"YOLO CUDA inference failed on device={self.device}: {e}. "
+                "Falling back to CPU for sidewalk detection.")
+            self.device = "cpu"
+            clear_cuda_cache()
+            return self.model.predict(
+                img_bgr,
+                imgsz=self.imgsz,
+                device="cpu",
+                verbose=False,
+            )[0]
+
     def image_cb(self, msg: Image):
         try:
             img_bgr = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
@@ -84,7 +131,7 @@ class SidewalkDetectionNode(Node):
 
         h, w = img_bgr.shape[:2]
 
-        res = self.model.predict(img_bgr, imgsz=self.imgsz, device=self.device, verbose=False)[0]
+        res = self._predict(img_bgr)
 
         union     = {NO_GO: np.zeros((h, w), dtype=bool)}
         dbg_lines = []

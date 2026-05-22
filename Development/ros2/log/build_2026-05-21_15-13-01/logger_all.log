@@ -1,0 +1,267 @@
+[0.409s] DEBUG:colcon:Command line arguments: ['/usr/bin/colcon', 'build']
+[0.409s] DEBUG:colcon:Parsed command line arguments: Namespace(allow_overriding=[], ament_cmake_args=None, base_paths=['.'], build_base='build', catkin_cmake_args=None, catkin_skip_building_tests=False, cmake_args=None, cmake_clean_cache=False, cmake_clean_first=False, cmake_force_configure=False, cmake_target=None, cmake_target_skip_unavailable=False, continue_on_error=False, event_handlers=None, executor='parallel', ignore_user_meta=False, install_base='install', log_base=None, log_level=None, main=<bound method BuildVerb.main of <colcon_core.verb.build.BuildVerb object at 0xffff81072790>>, merge_install=False, metas=['./colcon.meta'], mixin=None, mixin_files=None, mixin_verb=('build',), packages_above=None, packages_above_and_dependencies=None, packages_above_depth=None, packages_end=None, packages_ignore=None, packages_ignore_regex=None, packages_select=None, packages_select_build_failed=False, packages_select_by_dep=None, packages_select_regex=None, packages_select_test_failures=False, packages_skip=None, packages_skip_build_finished=False, packages_skip_by_dep=None, packages_skip_regex=None, packages_skip_test_passed=False, packages_skip_up_to=None, packages_start=None, packages_up_to=None, packages_up_to_regex=None, parallel_workers=8, paths=None, symlink_install=False, test_result_base=None, verb_extension=<colcon_core.verb.build.BuildVerb object at 0xffff81072790>, verb_name='build', verb_parser=<colcon_mixin.mixin.mixin_argument.MixinArgumentDecorator object at 0xffff80fa4640>)
+[0.886s] Level 1:colcon.colcon_core.package_discovery:discover_packages(colcon_meta) check parameters
+[0.886s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) check parameters
+[0.886s] Level 1:colcon.colcon_core.package_discovery:discover_packages(ignore) check parameters
+[0.886s] Level 1:colcon.colcon_core.package_discovery:discover_packages(path) check parameters
+[0.886s] Level 1:colcon.colcon_core.package_discovery:discover_packages(colcon_meta) discover
+[0.886s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) discover
+[0.887s] INFO:colcon.colcon_core.package_discovery:Crawling recursively for packages in '/home/nvidia/Documents/ACC_Development/Development/ros2'
+[0.887s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['ignore', 'ignore_ament_install']
+[0.887s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'ignore'
+[0.887s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'ignore_ament_install'
+[0.887s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['colcon_pkg']
+[0.887s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'colcon_pkg'
+[0.887s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['colcon_meta']
+[0.887s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'colcon_meta'
+[0.887s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['ros']
+[0.887s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'ros'
+[0.911s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['cmake', 'python']
+[0.911s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'cmake'
+[0.911s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'python'
+[0.912s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['python_setup_py']
+[0.912s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'python_setup_py'
+[0.912s] Level 1:colcon.colcon_core.package_identification:_identify(build) by extensions ['ignore', 'ignore_ament_install']
+[0.912s] Level 1:colcon.colcon_core.package_identification:_identify(build) by extension 'ignore'
+[0.912s] Level 1:colcon.colcon_core.package_identification:_identify(build) ignored
+[0.912s] Level 1:colcon.colcon_core.package_identification:_identify(install) by extensions ['ignore', 'ignore_ament_install']
+[0.913s] Level 1:colcon.colcon_core.package_identification:_identify(install) by extension 'ignore'
+[0.913s] Level 1:colcon.colcon_core.package_identification:_identify(install) ignored
+[0.913s] Level 1:colcon.colcon_core.package_identification:_identify(log) by extensions ['ignore', 'ignore_ament_install']
+[0.913s] Level 1:colcon.colcon_core.package_identification:_identify(log) by extension 'ignore'
+[0.913s] Level 1:colcon.colcon_core.package_identification:_identify(log) ignored
+[0.913s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extensions ['ignore', 'ignore_ament_install']
+[0.913s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extension 'ignore'
+[0.914s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extension 'ignore_ament_install'
+[0.914s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extensions ['colcon_pkg']
+[0.914s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extension 'colcon_pkg'
+[0.914s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extensions ['colcon_meta']
+[0.914s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extension 'colcon_meta'
+[0.914s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extensions ['ros']
+[0.914s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extension 'ros'
+[0.914s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extensions ['cmake', 'python']
+[0.914s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extension 'cmake'
+[0.914s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extension 'python'
+[0.914s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extensions ['python_setup_py']
+[0.914s] Level 1:colcon.colcon_core.package_identification:_identify(src) by extension 'python_setup_py'
+[0.915s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_autonomy) by extensions ['ignore', 'ignore_ament_install']
+[0.915s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_autonomy) by extension 'ignore'
+[0.915s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_autonomy) by extension 'ignore_ament_install'
+[0.915s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_autonomy) by extensions ['colcon_pkg']
+[0.915s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_autonomy) by extension 'colcon_pkg'
+[0.915s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_autonomy) by extensions ['colcon_meta']
+[0.915s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_autonomy) by extension 'colcon_meta'
+[0.915s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_autonomy) by extensions ['ros']
+[0.915s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_autonomy) by extension 'ros'
+[0.920s] DEBUG:colcon.colcon_core.package_identification:Package 'src/qcar2_autonomy' with type 'ros.ament_python' and name 'qcar2_autonomy'
+[0.921s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_interfaces) by extensions ['ignore', 'ignore_ament_install']
+[0.921s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_interfaces) by extension 'ignore'
+[0.921s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_interfaces) by extension 'ignore_ament_install'
+[0.921s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_interfaces) by extensions ['colcon_pkg']
+[0.921s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_interfaces) by extension 'colcon_pkg'
+[0.921s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_interfaces) by extensions ['colcon_meta']
+[0.921s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_interfaces) by extension 'colcon_meta'
+[0.921s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_interfaces) by extensions ['ros']
+[0.921s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_interfaces) by extension 'ros'
+[0.922s] DEBUG:colcon.colcon_core.package_identification:Package 'src/qcar2_interfaces' with type 'ros.ament_cmake' and name 'qcar2_interfaces'
+[0.923s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_nodes) by extensions ['ignore', 'ignore_ament_install']
+[0.923s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_nodes) by extension 'ignore'
+[0.923s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_nodes) by extension 'ignore_ament_install'
+[0.923s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_nodes) by extensions ['colcon_pkg']
+[0.923s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_nodes) by extension 'colcon_pkg'
+[0.923s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_nodes) by extensions ['colcon_meta']
+[0.923s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_nodes) by extension 'colcon_meta'
+[0.923s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_nodes) by extensions ['ros']
+[0.923s] Level 1:colcon.colcon_core.package_identification:_identify(src/qcar2_nodes) by extension 'ros'
+[0.926s] DEBUG:colcon.colcon_core.package_identification:Package 'src/qcar2_nodes' with type 'ros.ament_cmake' and name 'qcar2_nodes'
+[0.926s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) using defaults
+[0.926s] Level 1:colcon.colcon_core.package_discovery:discover_packages(ignore) discover
+[0.926s] Level 1:colcon.colcon_core.package_discovery:discover_packages(ignore) using defaults
+[0.926s] Level 1:colcon.colcon_core.package_discovery:discover_packages(path) discover
+[0.926s] Level 1:colcon.colcon_core.package_discovery:discover_packages(path) using defaults
+[0.956s] Level 1:colcon.colcon_core.package_discovery:discover_packages(prefix_path) check parameters
+[0.956s] Level 1:colcon.colcon_core.package_discovery:discover_packages(prefix_path) discover
+[0.960s] DEBUG:colcon.colcon_installed_package_information.package_discovery:Found 3 installed packages in /home/nvidia/ros2/install
+[0.962s] DEBUG:colcon.colcon_installed_package_information.package_discovery:Found 355 installed packages in /opt/ros/humble
+[0.966s] Level 1:colcon.colcon_core.package_discovery:discover_packages(prefix_path) using defaults
+[1.067s] Level 5:colcon.colcon_core.verb:set package 'qcar2_interfaces' build argument 'cmake_args' from command line to 'None'
+[1.067s] Level 5:colcon.colcon_core.verb:set package 'qcar2_interfaces' build argument 'cmake_target' from command line to 'None'
+[1.067s] Level 5:colcon.colcon_core.verb:set package 'qcar2_interfaces' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[1.067s] Level 5:colcon.colcon_core.verb:set package 'qcar2_interfaces' build argument 'cmake_clean_cache' from command line to 'False'
+[1.067s] Level 5:colcon.colcon_core.verb:set package 'qcar2_interfaces' build argument 'cmake_clean_first' from command line to 'False'
+[1.068s] Level 5:colcon.colcon_core.verb:set package 'qcar2_interfaces' build argument 'cmake_force_configure' from command line to 'False'
+[1.068s] Level 5:colcon.colcon_core.verb:set package 'qcar2_interfaces' build argument 'ament_cmake_args' from command line to 'None'
+[1.068s] Level 5:colcon.colcon_core.verb:set package 'qcar2_interfaces' build argument 'catkin_cmake_args' from command line to 'None'
+[1.068s] Level 5:colcon.colcon_core.verb:set package 'qcar2_interfaces' build argument 'catkin_skip_building_tests' from command line to 'False'
+[1.068s] DEBUG:colcon.colcon_core.verb:Building package 'qcar2_interfaces' with the following arguments: {'ament_cmake_args': None, 'build_base': '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_interfaces', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces', 'merge_install': False, 'path': '/home/nvidia/Documents/ACC_Development/Development/ros2/src/qcar2_interfaces', 'symlink_install': False, 'test_result_base': None}
+[1.068s] Level 5:colcon.colcon_core.verb:set package 'qcar2_autonomy' build argument 'cmake_args' from command line to 'None'
+[1.068s] Level 5:colcon.colcon_core.verb:set package 'qcar2_autonomy' build argument 'cmake_target' from command line to 'None'
+[1.068s] Level 5:colcon.colcon_core.verb:set package 'qcar2_autonomy' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[1.069s] Level 5:colcon.colcon_core.verb:set package 'qcar2_autonomy' build argument 'cmake_clean_cache' from command line to 'False'
+[1.069s] Level 5:colcon.colcon_core.verb:set package 'qcar2_autonomy' build argument 'cmake_clean_first' from command line to 'False'
+[1.069s] Level 5:colcon.colcon_core.verb:set package 'qcar2_autonomy' build argument 'cmake_force_configure' from command line to 'False'
+[1.069s] Level 5:colcon.colcon_core.verb:set package 'qcar2_autonomy' build argument 'ament_cmake_args' from command line to 'None'
+[1.069s] Level 5:colcon.colcon_core.verb:set package 'qcar2_autonomy' build argument 'catkin_cmake_args' from command line to 'None'
+[1.069s] Level 5:colcon.colcon_core.verb:set package 'qcar2_autonomy' build argument 'catkin_skip_building_tests' from command line to 'False'
+[1.069s] DEBUG:colcon.colcon_core.verb:Building package 'qcar2_autonomy' with the following arguments: {'ament_cmake_args': None, 'build_base': '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_autonomy', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy', 'merge_install': False, 'path': '/home/nvidia/Documents/ACC_Development/Development/ros2/src/qcar2_autonomy', 'symlink_install': False, 'test_result_base': None}
+[1.069s] Level 5:colcon.colcon_core.verb:set package 'qcar2_nodes' build argument 'cmake_args' from command line to 'None'
+[1.069s] Level 5:colcon.colcon_core.verb:set package 'qcar2_nodes' build argument 'cmake_target' from command line to 'None'
+[1.069s] Level 5:colcon.colcon_core.verb:set package 'qcar2_nodes' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[1.069s] Level 5:colcon.colcon_core.verb:set package 'qcar2_nodes' build argument 'cmake_clean_cache' from command line to 'False'
+[1.069s] Level 5:colcon.colcon_core.verb:set package 'qcar2_nodes' build argument 'cmake_clean_first' from command line to 'False'
+[1.070s] Level 5:colcon.colcon_core.verb:set package 'qcar2_nodes' build argument 'cmake_force_configure' from command line to 'False'
+[1.070s] Level 5:colcon.colcon_core.verb:set package 'qcar2_nodes' build argument 'ament_cmake_args' from command line to 'None'
+[1.070s] Level 5:colcon.colcon_core.verb:set package 'qcar2_nodes' build argument 'catkin_cmake_args' from command line to 'None'
+[1.070s] Level 5:colcon.colcon_core.verb:set package 'qcar2_nodes' build argument 'catkin_skip_building_tests' from command line to 'False'
+[1.070s] DEBUG:colcon.colcon_core.verb:Building package 'qcar2_nodes' with the following arguments: {'ament_cmake_args': None, 'build_base': '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_nodes', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes', 'merge_install': False, 'path': '/home/nvidia/Documents/ACC_Development/Development/ros2/src/qcar2_nodes', 'symlink_install': False, 'test_result_base': None}
+[1.070s] INFO:colcon.colcon_core.executor:Executing jobs using 'parallel' executor
+[1.072s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:run_until_complete
+[1.073s] INFO:colcon.colcon_ros.task.ament_cmake.build:Building ROS package in '/home/nvidia/Documents/ACC_Development/Development/ros2/src/qcar2_interfaces' with build type 'ament_cmake'
+[1.073s] INFO:colcon.colcon_cmake.task.cmake.build:Building CMake package in '/home/nvidia/Documents/ACC_Development/Development/ros2/src/qcar2_interfaces'
+[1.077s] INFO:colcon.colcon_core.plugin_system:Skipping extension 'colcon_core.shell.bat': Not used on non-Windows systems
+[1.077s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[1.077s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[1.102s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_interfaces': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/nvidia/ros2/install/qcar2_autonomy:/opt/ros/humble /usr/bin/cmake /home/nvidia/Documents/ACC_Development/Development/ros2/src/qcar2_interfaces -DCMAKE_INSTALL_PREFIX=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces
+[5.184s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_interfaces' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/nvidia/ros2/install/qcar2_autonomy:/opt/ros/humble /usr/bin/cmake /home/nvidia/Documents/ACC_Development/Development/ros2/src/qcar2_interfaces -DCMAKE_INSTALL_PREFIX=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces
+[5.186s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_interfaces': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/nvidia/ros2/install/qcar2_autonomy:/opt/ros/humble /usr/bin/cmake --build /home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_interfaces -- -j8 -l8
+[9.887s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_interfaces' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/nvidia/ros2/install/qcar2_autonomy:/opt/ros/humble /usr/bin/cmake --build /home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_interfaces -- -j8 -l8
+[10.020s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_interfaces': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/nvidia/ros2/install/qcar2_autonomy:/opt/ros/humble /usr/bin/cmake --install /home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_interfaces
+[10.173s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(qcar2_interfaces)
+[10.176s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_interfaces' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/nvidia/ros2/install/qcar2_autonomy:/opt/ros/humble /usr/bin/cmake --install /home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_interfaces
+[10.179s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces' for CMake module files
+[10.180s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces' for CMake config files
+[10.180s] Level 1:colcon.colcon_core.shell:create_environment_hook('qcar2_interfaces', 'cmake_prefix_path')
+[10.181s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/hook/cmake_prefix_path.ps1'
+[10.182s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/hook/cmake_prefix_path.dsv'
+[10.183s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/hook/cmake_prefix_path.sh'
+[10.185s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib'
+[10.185s] Level 1:colcon.colcon_core.shell:create_environment_hook('qcar2_interfaces', 'ld_library_path_lib')
+[10.185s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/hook/ld_library_path_lib.ps1'
+[10.186s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/hook/ld_library_path_lib.dsv'
+[10.187s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/hook/ld_library_path_lib.sh'
+[10.188s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/bin'
+[10.188s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib/pkgconfig/qcar2_interfaces.pc'
+[10.197s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib/python3.8/site-packages'
+[10.198s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/bin'
+[10.199s] INFO:colcon.colcon_core.shell:Creating package script '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/package.ps1'
+[10.200s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/package.dsv'
+[10.201s] INFO:colcon.colcon_core.shell:Creating package script '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/package.sh'
+[10.202s] INFO:colcon.colcon_core.shell:Creating package script '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/package.bash'
+[10.204s] INFO:colcon.colcon_core.shell:Creating package script '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/package.zsh'
+[10.205s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/share/colcon-core/packages/qcar2_interfaces)
+[10.307s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(qcar2_interfaces)
+[10.308s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces' for CMake module files
+[10.309s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces' for CMake config files
+[10.310s] Level 1:colcon.colcon_core.shell:create_environment_hook('qcar2_interfaces', 'cmake_prefix_path')
+[10.310s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/hook/cmake_prefix_path.ps1'
+[10.311s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/hook/cmake_prefix_path.dsv'
+[10.312s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/hook/cmake_prefix_path.sh'
+[10.313s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib'
+[10.313s] Level 1:colcon.colcon_core.shell:create_environment_hook('qcar2_interfaces', 'ld_library_path_lib')
+[10.314s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/hook/ld_library_path_lib.ps1'
+[10.315s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/hook/ld_library_path_lib.dsv'
+[10.315s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/hook/ld_library_path_lib.sh'
+[10.316s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/bin'
+[10.316s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib/pkgconfig/qcar2_interfaces.pc'
+[10.317s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib/python3.8/site-packages'
+[10.317s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/bin'
+[10.318s] INFO:colcon.colcon_core.shell:Creating package script '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/package.ps1'
+[10.319s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/package.dsv'
+[10.320s] INFO:colcon.colcon_core.shell:Creating package script '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/package.sh'
+[10.321s] INFO:colcon.colcon_core.shell:Creating package script '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/package.bash'
+[10.322s] INFO:colcon.colcon_core.shell:Creating package script '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/share/qcar2_interfaces/package.zsh'
+[10.323s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/share/colcon-core/packages/qcar2_interfaces)
+[10.324s] INFO:colcon.colcon_ros.task.ament_python.build:Building ROS package in '/home/nvidia/Documents/ACC_Development/Development/ros2/src/qcar2_autonomy' with build type 'ament_python'
+[10.324s] Level 1:colcon.colcon_core.shell:create_environment_hook('qcar2_autonomy', 'ament_prefix_path')
+[10.325s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/share/qcar2_autonomy/hook/ament_prefix_path.ps1'
+[10.326s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/share/qcar2_autonomy/hook/ament_prefix_path.dsv'
+[10.327s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/share/qcar2_autonomy/hook/ament_prefix_path.sh'
+[10.328s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[10.328s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[10.338s] INFO:colcon.colcon_ros.task.ament_cmake.build:Building ROS package in '/home/nvidia/Documents/ACC_Development/Development/ros2/src/qcar2_nodes' with build type 'ament_cmake'
+[10.339s] INFO:colcon.colcon_cmake.task.cmake.build:Building CMake package in '/home/nvidia/Documents/ACC_Development/Development/ros2/src/qcar2_nodes'
+[10.340s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[10.341s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[11.064s] INFO:colcon.colcon_core.task.python.build:Building Python package in '/home/nvidia/Documents/ACC_Development/Development/ros2/src/qcar2_autonomy'
+[11.065s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[11.065s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[11.085s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_nodes': AMENT_PREFIX_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces:/home/nvidia/ros2/install/qcar2_nodes:/home/nvidia/ros2/install/qcar2_interfaces:/home/nvidia/ros2/install/qcar2_autonomy:/opt/ros/humble LD_LIBRARY_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib:/home/nvidia/ros2/install/qcar2_interfaces/lib:/opt/ros/humble/opt/rviz_ogre_vendor/lib:/opt/ros/humble/lib/aarch64-linux-gnu:/opt/ros/humble/lib:/usr/local/cuda/lib64 PYTHONPATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib/python3.9/site-packages:${PYTHONPATH} /usr/bin/cmake /home/nvidia/Documents/ACC_Development/Development/ros2/src/qcar2_nodes -DCMAKE_INSTALL_PREFIX=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes
+[12.396s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/nvidia/Documents/ACC_Development/Development/ros2/src/qcar2_autonomy': AMENT_PREFIX_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces:${CMAKE_PREFIX_PATH} LD_LIBRARY_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib:/home/nvidia/ros2/install/qcar2_interfaces/lib:/opt/ros/humble/opt/rviz_ogre_vendor/lib:/opt/ros/humble/lib/aarch64-linux-gnu:/opt/ros/humble/lib:/usr/local/cuda/lib64 PYTHONPATH=/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_autonomy/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.8/site-packages:/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib/python3.9/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated setup.py egg_info --egg-base ../../build/qcar2_autonomy build --build-base /home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_autonomy/build install --record /home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_autonomy/install.log --single-version-externally-managed install_data
+[13.593s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy' for CMake module files
+[13.594s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/nvidia/Documents/ACC_Development/Development/ros2/src/qcar2_autonomy' returned '0': AMENT_PREFIX_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces:${CMAKE_PREFIX_PATH} LD_LIBRARY_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib:/home/nvidia/ros2/install/qcar2_interfaces/lib:/opt/ros/humble/opt/rviz_ogre_vendor/lib:/opt/ros/humble/lib/aarch64-linux-gnu:/opt/ros/humble/lib:/usr/local/cuda/lib64 PYTHONPATH=/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_autonomy/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.8/site-packages:/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib/python3.9/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated setup.py egg_info --egg-base ../../build/qcar2_autonomy build --build-base /home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_autonomy/build install --record /home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_autonomy/install.log --single-version-externally-managed install_data
+[13.595s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy' for CMake config files
+[13.597s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib'
+[13.597s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/bin'
+[13.598s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/pkgconfig/qcar2_autonomy.pc'
+[13.598s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/lib/python3.8/site-packages'
+[13.598s] Level 1:colcon.colcon_core.shell:create_environment_hook('qcar2_autonomy', 'pythonpath')
+[13.599s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/share/qcar2_autonomy/hook/pythonpath.ps1'
+[13.603s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/share/qcar2_autonomy/hook/pythonpath.dsv'
+[13.604s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/share/qcar2_autonomy/hook/pythonpath.sh'
+[13.605s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/bin'
+[13.605s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(qcar2_autonomy)
+[13.606s] INFO:colcon.colcon_core.shell:Creating package script '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/share/qcar2_autonomy/package.ps1'
+[13.607s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/share/qcar2_autonomy/package.dsv'
+[13.608s] INFO:colcon.colcon_core.shell:Creating package script '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/share/qcar2_autonomy/package.sh'
+[13.609s] INFO:colcon.colcon_core.shell:Creating package script '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/share/qcar2_autonomy/package.bash'
+[13.611s] INFO:colcon.colcon_core.shell:Creating package script '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/share/qcar2_autonomy/package.zsh'
+[13.612s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_autonomy/share/colcon-core/packages/qcar2_autonomy)
+[15.703s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_nodes' returned '0': AMENT_PREFIX_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces:/home/nvidia/ros2/install/qcar2_nodes:/home/nvidia/ros2/install/qcar2_interfaces:/home/nvidia/ros2/install/qcar2_autonomy:/opt/ros/humble LD_LIBRARY_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib:/home/nvidia/ros2/install/qcar2_interfaces/lib:/opt/ros/humble/opt/rviz_ogre_vendor/lib:/opt/ros/humble/lib/aarch64-linux-gnu:/opt/ros/humble/lib:/usr/local/cuda/lib64 PYTHONPATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib/python3.9/site-packages:${PYTHONPATH} /usr/bin/cmake /home/nvidia/Documents/ACC_Development/Development/ros2/src/qcar2_nodes -DCMAKE_INSTALL_PREFIX=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes
+[15.711s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_nodes': AMENT_PREFIX_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces:/home/nvidia/ros2/install/qcar2_nodes:/home/nvidia/ros2/install/qcar2_interfaces:/home/nvidia/ros2/install/qcar2_autonomy:/opt/ros/humble LD_LIBRARY_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib:/home/nvidia/ros2/install/qcar2_interfaces/lib:/opt/ros/humble/opt/rviz_ogre_vendor/lib:/opt/ros/humble/lib/aarch64-linux-gnu:/opt/ros/humble/lib:/usr/local/cuda/lib64 PYTHONPATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib/python3.9/site-packages:${PYTHONPATH} /usr/bin/cmake --build /home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_nodes -- -j8 -l8
+[45.529s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_nodes' returned '0': AMENT_PREFIX_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces:/home/nvidia/ros2/install/qcar2_nodes:/home/nvidia/ros2/install/qcar2_interfaces:/home/nvidia/ros2/install/qcar2_autonomy:/opt/ros/humble LD_LIBRARY_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib:/home/nvidia/ros2/install/qcar2_interfaces/lib:/opt/ros/humble/opt/rviz_ogre_vendor/lib:/opt/ros/humble/lib/aarch64-linux-gnu:/opt/ros/humble/lib:/usr/local/cuda/lib64 PYTHONPATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib/python3.9/site-packages:${PYTHONPATH} /usr/bin/cmake --build /home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_nodes -- -j8 -l8
+[45.600s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_nodes': AMENT_PREFIX_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces:/home/nvidia/ros2/install/qcar2_nodes:/home/nvidia/ros2/install/qcar2_interfaces:/home/nvidia/ros2/install/qcar2_autonomy:/opt/ros/humble LD_LIBRARY_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib:/home/nvidia/ros2/install/qcar2_interfaces/lib:/opt/ros/humble/opt/rviz_ogre_vendor/lib:/opt/ros/humble/lib/aarch64-linux-gnu:/opt/ros/humble/lib:/usr/local/cuda/lib64 PYTHONPATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib/python3.9/site-packages:${PYTHONPATH} /usr/bin/cmake --install /home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_nodes
+[45.686s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(qcar2_nodes)
+[45.687s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes' for CMake module files
+[45.688s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_nodes' returned '0': AMENT_PREFIX_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces:/home/nvidia/ros2/install/qcar2_nodes:/home/nvidia/ros2/install/qcar2_interfaces:/home/nvidia/ros2/install/qcar2_autonomy:/opt/ros/humble LD_LIBRARY_PATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib:/home/nvidia/ros2/install/qcar2_interfaces/lib:/opt/ros/humble/opt/rviz_ogre_vendor/lib:/opt/ros/humble/lib/aarch64-linux-gnu:/opt/ros/humble/lib:/usr/local/cuda/lib64 PYTHONPATH=/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_interfaces/lib/python3.9/site-packages:${PYTHONPATH} /usr/bin/cmake --install /home/nvidia/Documents/ACC_Development/Development/ros2/build/qcar2_nodes
+[45.689s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes' for CMake config files
+[45.689s] Level 1:colcon.colcon_core.shell:create_environment_hook('qcar2_nodes', 'cmake_prefix_path')
+[45.690s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/hook/cmake_prefix_path.ps1'
+[45.691s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/hook/cmake_prefix_path.dsv'
+[45.691s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/hook/cmake_prefix_path.sh'
+[45.693s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/lib'
+[45.694s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/bin'
+[45.694s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/lib/pkgconfig/qcar2_nodes.pc'
+[45.694s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/lib/python3.8/site-packages'
+[45.694s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/bin'
+[45.695s] INFO:colcon.colcon_core.shell:Creating package script '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/package.ps1'
+[45.696s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/package.dsv'
+[45.697s] INFO:colcon.colcon_core.shell:Creating package script '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/package.sh'
+[45.698s] INFO:colcon.colcon_core.shell:Creating package script '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/package.bash'
+[45.698s] INFO:colcon.colcon_core.shell:Creating package script '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/package.zsh'
+[45.699s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/colcon-core/packages/qcar2_nodes)
+[45.763s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(qcar2_nodes)
+[45.764s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes' for CMake module files
+[45.765s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes' for CMake config files
+[45.765s] Level 1:colcon.colcon_core.shell:create_environment_hook('qcar2_nodes', 'cmake_prefix_path')
+[45.766s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/hook/cmake_prefix_path.ps1'
+[45.767s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/hook/cmake_prefix_path.dsv'
+[45.768s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/hook/cmake_prefix_path.sh'
+[45.769s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/lib'
+[45.769s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/bin'
+[45.769s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/lib/pkgconfig/qcar2_nodes.pc'
+[45.770s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/lib/python3.8/site-packages'
+[45.770s] Level 1:colcon.colcon_core.environment:checking '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/bin'
+[45.771s] INFO:colcon.colcon_core.shell:Creating package script '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/package.ps1'
+[45.773s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/package.dsv'
+[45.774s] INFO:colcon.colcon_core.shell:Creating package script '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/package.sh'
+[45.775s] INFO:colcon.colcon_core.shell:Creating package script '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/package.bash'
+[45.775s] INFO:colcon.colcon_core.shell:Creating package script '/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/qcar2_nodes/package.zsh'
+[45.776s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/nvidia/Documents/ACC_Development/Development/ros2/install/qcar2_nodes/share/colcon-core/packages/qcar2_nodes)
+[45.777s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:closing loop
+[45.777s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:loop closed
+[45.778s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:run_until_complete finished with '0'
+[45.778s] DEBUG:colcon.colcon_core.event_reactor:joining thread
+[45.787s] INFO:colcon.colcon_core.plugin_system:Skipping extension 'colcon_notification.desktop_notification.terminal_notifier': Not used on non-Darwin systems
+[45.787s] INFO:colcon.colcon_core.plugin_system:Skipping extension 'colcon_notification.desktop_notification.win32': Not used on non-Windows systems
+[45.787s] INFO:colcon.colcon_notification.desktop_notification:Sending desktop notification using 'notify2'
+[45.818s] DEBUG:colcon.colcon_core.event_reactor:joined thread
+[45.819s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/nvidia/Documents/ACC_Development/Development/ros2/install/local_setup.ps1'
+[45.821s] INFO:colcon.colcon_core.shell:Creating prefix util module '/home/nvidia/Documents/ACC_Development/Development/ros2/install/_local_setup_util_ps1.py'
+[45.824s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/nvidia/Documents/ACC_Development/Development/ros2/install/setup.ps1'
+[45.826s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/nvidia/Documents/ACC_Development/Development/ros2/install/local_setup.sh'
+[45.827s] INFO:colcon.colcon_core.shell:Creating prefix util module '/home/nvidia/Documents/ACC_Development/Development/ros2/install/_local_setup_util_sh.py'
+[45.828s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/nvidia/Documents/ACC_Development/Development/ros2/install/setup.sh'
+[45.830s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/nvidia/Documents/ACC_Development/Development/ros2/install/local_setup.bash'
+[45.831s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/nvidia/Documents/ACC_Development/Development/ros2/install/setup.bash'
+[45.832s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/nvidia/Documents/ACC_Development/Development/ros2/install/local_setup.zsh'
+[45.833s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/nvidia/Documents/ACC_Development/Development/ros2/install/setup.zsh'

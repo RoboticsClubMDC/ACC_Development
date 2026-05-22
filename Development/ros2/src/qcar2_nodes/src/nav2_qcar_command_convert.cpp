@@ -25,6 +25,11 @@ class Nav2QCarConverter : public rclcpp::Node
     Nav2QCarConverter()
     : Node("nav2_qcar2_command_converter")
     {
+    double command_publish_hz = this->declare_parameter<double>("command_publish_hz", 50.0);
+    double led_publish_hz = this->declare_parameter<double>("led_publish_hz", 30.0);
+    command_publish_hz = command_publish_hz < 1.0 ? 1.0 : command_publish_hz;
+    led_publish_hz = led_publish_hz < 1.0 ? 1.0 : led_publish_hz;
+
     // configuring command publisher
     command_publisher_  = this->create_publisher<qcar2_interfaces::msg::MotorCommands>("qcar2_motor_speed_cmd", 1);
     // led_publisher_      = this->create_publisher<qcar2_interfaces::msg::BooleanLeds>("qcar2_led_cmd",10);
@@ -33,10 +38,14 @@ class Nav2QCarConverter : public rclcpp::Node
     nav2_subscriber_ = this->create_subscription<geometry_msgs::msg::Twist>("/cmd_vel_nav",1,std::bind(&Nav2QCarConverter::nav2_command_callback, this, std::placeholders::_1));
     
     //publishing timer for converted command
-    timer_ = this->create_wall_timer(1ms, std::bind(&Nav2QCarConverter::command_plublish, this));
+    timer_ = this->create_wall_timer(
+        std::chrono::duration<double>(1.0 / command_publish_hz),
+        std::bind(&Nav2QCarConverter::command_plublish, this));
 
     //publishing timer for converted command
-    timer2_ = this->create_wall_timer(33ms, std::bind(&Nav2QCarConverter::led_publish, this));
+    timer2_ = this->create_wall_timer(
+        std::chrono::duration<double>(1.0 / led_publish_hz),
+        std::bind(&Nav2QCarConverter::led_publish, this));
 
 
 

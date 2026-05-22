@@ -29,6 +29,7 @@ class YOLOv8():
         imageHeight = 480,
         modelPath = None,
         convert_tensorrt = True,
+        device = "auto",
         ):
         """Creates a LaneNet Instance. Find the path to the LaneNet model, load the 
            Tensor RT engine, and prepare for executing inference.
@@ -44,6 +45,7 @@ class YOLOv8():
                         '../../../resources/pretrained_models/yolov8s-seg.engine'))
         self.imageWidth , self.imageHeight = self._dim_check(imageWidth, imageHeight)
         self.convert_tensorrt = convert_tensorrt and not platform.system() == "Windows"
+        self.device = self._select_device(device)
         
         self.modelPath = self.__check_path(modelPath)
         self.img=np.empty((self.imageHeight,self.imageWidth,3),dtype=np.uint8)
@@ -67,6 +69,9 @@ class YOLOv8():
                                 (self.imageWidth,self.imageHeight))
         self.img[:,:,:]=inputImg[:,:,:]
         return self.img
+
+    def set_device(self, device):
+        self.device = self._select_device(device)
     
     def predict(self, inputImg, classes = [2,9,11,33], confidence = 0.3, verbose = False, half = False):
         '''Use YOLOv8s-seg to run predictions and output segmentation masks of 
@@ -98,7 +103,8 @@ class YOLOv8():
                                                      self.imageWidth),
                                             classes = classes,
                                             conf = confidence,
-                                            half = half
+                                            half = half and self.device != "cpu",
+                                            device = self.device
                                             )
         self.objectsDetected=self.predictions[0].boxes.cls.cpu().numpy()
         self.FPS=1000/self.predictions[0].speed['inference']
@@ -156,18 +162,18 @@ class YOLOv8():
             bgRemoved = np.where((depth3D > clippingDistance)| 
                                  (depth3D <= 0), 0, depth3D)
             self._calc_distence = True
-            self.depthTensor=torch.as_tensor(bgRemoved,device="cuda:0")
+            self.depthTensor=torch.as_tensor(bgRemoved,device=self.device)
         for i in range(len(self.objectsDetected)):
             if self.objectsDetected[i]==9:
                 trafficBox = self.bounding[i]
-                traficLightColor = self.check_traffic_light(trafficBox,self.img)
+                traficLightColor = self.check_traffic_light(trafficBox,self.img,self.device)
                 result=TrafficLight(color=traficLightColor)
                 result.name+=(' ('+traficLightColor+')')
             else:
                 name=self.predictions[0].names[self.objectsDetected[i]]
                 result=Obstacle(name=name)
             if alignedDepth is not None:
-                mask=self.predictions[0].masks.data.cuda()[i]
+                mask=self.predictions[0].masks.data.to(self.device)[i]
                 distance=self.check_distance(mask,self.depthTensor[:,:,:1])
                 result.distance=distance.cpu().numpy().round(3)
             points=self.predictions[0].boxes.xyxy.cpu()[i]
@@ -200,7 +206,7 @@ class YOLOv8():
             else: out=self.img
             return out
         colors=[]
-        masks = self.predictions[0].masks.data.cuda()
+        masks = self.predictions[0].masks.data.to(self.device)
         boxes = self.predictions[0].boxes.xyxy.cpu().numpy().astype(int)
         imgClone=self.img.copy()
         for i in range(len(self.objectsDetected)):
@@ -221,8 +227,8 @@ class YOLOv8():
             cv2.putText(imgClone, 'Inference FPS: '+str(round(self.FPS)), 
                         (495,15), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
                         (255,255,255), 2)
-        imgTensor=torch.from_numpy(imgClone).to("cuda:0")
-        imgMask=self.mask_color(masks, imgTensor,colors)
+        imgTensor=torch.from_numpy(imgClone).to(self.device)
+        imgMask=self.mask_color(masks, imgTensor,colors, device=self.device)
         if imgMask.shape[:2] != self.inputShape:
             imgMask=cv2.resize(imgMask,
                                (self.inputShape[1],self.inputShape[0]))
@@ -264,7 +270,7 @@ class YOLOv8():
         return enginePath
         
     @staticmethod
-    def mask_color(masks, im_gpu,colors, alpha=0.5):
+    def mask_color(masks, im_gpu,colors, alpha=0.5, device="cuda:0"):
         '''Overlay input image with segmentation masks with assigned colors.
         
         Args: 
@@ -277,7 +283,7 @@ class YOLOv8():
             ndarray: Input image overlaid with colored object masks.
 
         '''
-        colors = torch.tensor(colors, device="cuda:0", dtype=torch.float32) / 255.0 
+        colors = torch.as_tensor(colors, device=device, dtype=torch.float32) / 255.0 
         colors = colors[:, None, None]
         masks = masks.unsqueeze(3)
         masks_color = masks * (colors * alpha)
@@ -317,7 +323,7 @@ class YOLOv8():
         return new_height,new_width
 
     
-    def check_traffic_light(self,traffic_box,im_cpu):
+    def check_traffic_light(self,traffic_box,im_cpu,device="cuda:0"):
         '''Check traffic light status by estimating the position of the three lights
            and comparing the color brightness of the three locations.
         
@@ -338,11 +344,11 @@ class YOLOv8():
         maskR=cv2.circle(copy.deepcopy(mask),R_center,int(d/2),1,-1)
         maskY=cv2.circle(copy.deepcopy(mask),Y_center,int(d/2),1,-1)
         maskG=cv2.circle(copy.deepcopy(mask),G_center,int(d/2),1,-1)
-        maskR_gpu=torch.tensor(maskR,device="cuda:0").unsqueeze(2)
-        maskY_gpu=torch.tensor(maskY,device="cuda:0").unsqueeze(2)
-        maskG_gpu=torch.tensor(maskG,device="cuda:0").unsqueeze(2)
+        maskR_gpu=torch.as_tensor(maskR,device=device).unsqueeze(2)
+        maskY_gpu=torch.as_tensor(maskY,device=device).unsqueeze(2)
+        maskG_gpu=torch.as_tensor(maskG,device=device).unsqueeze(2)
         im_hsv=cv2.cvtColor(im_cpu, cv2.COLOR_RGB2HSV)
-        im_hsv_gpu = torch.tensor(im_hsv,device="cuda:0")
+        im_hsv_gpu = torch.as_tensor(im_hsv,device=device)
         masked_red = im_hsv_gpu*maskR_gpu
         masked_yellow = im_hsv_gpu*maskY_gpu
         masked_green = im_hsv_gpu*maskG_gpu
@@ -351,8 +357,9 @@ class YOLOv8():
         value_G=torch.sum(masked_green[:,:,2])/torch.count_nonzero(masked_green[:,:,2])
         mean = (value_R+value_Y+value_G)/3
         threshold_perc=0.25
-        min= torch.min(torch.tensor([value_R,value_Y,value_G]))
-        max= torch.max(torch.tensor([value_R,value_Y,value_G]))
+        values=torch.stack([value_R,value_Y,value_G])
+        min= torch.min(values)
+        max= torch.max(values)
         if (max-min)<30:
             return 'idle'
         threshold=(max-min)*threshold_perc
@@ -360,7 +367,7 @@ class YOLOv8():
         redOn=(value_R>mean) and (value_R-mean)>threshold
         yellowOn=(value_Y>mean) and (value_Y-mean)>threshold
         greenOn=(value_G>mean) and (value_G-mean)>threshold
-        traffic_light_status=[redOn.cpu().numpy(),yellowOn.cpu().numpy(),greenOn.cpu().numpy()]
+        traffic_light_status=[bool(redOn.cpu().numpy()),bool(yellowOn.cpu().numpy()),bool(greenOn.cpu().numpy())]
         colors=['red','yellow','green']
         traffic_light_color=''
         for i in range(len(traffic_light_status)):
@@ -387,6 +394,31 @@ class YOLOv8():
         # distance = torch.sum(isolated_depth)/torch.count_nonzero(isolated_depth)
         distance = torch.median(isolated_depth[isolated_depth.nonzero(as_tuple=True)])
         return distance
+
+    @staticmethod
+    def _select_device(device):
+        if isinstance(device, str):
+            requested = device.strip().lower()
+            if requested in ("auto", "cuda"):
+                requested_index = 0
+            elif requested.startswith("cuda:"):
+                requested_index = int(requested.split(":", 1)[1])
+            elif requested in ("cpu", "-1", "none", "off"):
+                return "cpu"
+            else:
+                requested_index = int(requested)
+        else:
+            requested_index = int(device)
+
+        if requested_index < 0:
+            return "cpu"
+
+        try:
+            if torch.cuda.is_available() and requested_index < torch.cuda.device_count():
+                return f"cuda:{requested_index}"
+        except Exception:
+            pass
+        return "cpu"
     
     @staticmethod
     def reshape_for_matlab_server(frame):

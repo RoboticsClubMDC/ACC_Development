@@ -1,6 +1,9 @@
 import subprocess
 
 from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable
+from launch.substitutions import LaunchConfiguration
+from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.actions import Node
 
 
@@ -10,6 +13,10 @@ SDCS_TAXI_HUB_XY = [-1.28205, -0.45991]
 
 
 def generate_launch_description():
+    use_cuda = LaunchConfiguration('use_cuda')
+    cuda_device = LaunchConfiguration('cuda_device')
+    use_tensorrt = LaunchConfiguration('use_tensorrt')
+    allow_cpu_fallback = LaunchConfiguration('allow_cpu_fallback')
 
     path_follower = Node(
         package='qcar2_autonomy',
@@ -19,6 +26,7 @@ def generate_launch_description():
             'visualize_pose': [True],
             'route_frame':    'map',
             'progress_search_max_step': 25,
+            'control_hz': 30.0,
             'curve_lookahead_min_m':    0.18,
             'curve_lookahead_max_m':    0.70,
             'curvature_lookahead_gain': 1.0,
@@ -43,7 +51,15 @@ def generate_launch_description():
     traffic_system_detector = Node(
         package ='qcar2_autonomy',
         executable='yolo_detector',
-        name = 'qcar2_yolo_detector'
+        name = 'qcar2_yolo_detector',
+        parameters=[{
+            'use_cuda':    ParameterValue(use_cuda, value_type=bool),
+            'device':      ParameterValue(cuda_device, value_type=int),
+            'use_tensorrt': ParameterValue(use_tensorrt, value_type=bool),
+            'allow_cpu_fallback': ParameterValue(allow_cpu_fallback, value_type=bool),
+            'inference_hz': 10.0,
+            'motion_flag_hz': 30.0,
+        }],
     )
     
     trip_planner = Node(
@@ -68,6 +84,11 @@ def generate_launch_description():
         package='qcar2_autonomy',
         executable='lane_detection',
         name='lane_detection',
+        parameters=[{
+            'use_cuda': ParameterValue(use_cuda, value_type=bool),
+            'device':   ParameterValue(cuda_device, value_type=int),
+            'allow_cpu_fallback': ParameterValue(allow_cpu_fallback, value_type=bool),
+        }],
     )
 
 
@@ -87,6 +108,11 @@ def generate_launch_description():
         package='qcar2_autonomy',
         executable='sidewalk_detection',
         name='sidewalk_detection',
+        parameters=[{
+            'use_cuda': ParameterValue(use_cuda, value_type=bool),
+            'device':   ParameterValue(cuda_device, value_type=int),
+            'allow_cpu_fallback': ParameterValue(allow_cpu_fallback, value_type=bool),
+        }],
     )
 
     bev_csi_seg = Node(
@@ -101,6 +127,26 @@ def generate_launch_description():
     '''
 
     return LaunchDescription([
+        DeclareLaunchArgument(
+            'use_cuda',
+            default_value='true',
+            description='Prefer CUDA for YOLO/lane/sidewalk inference nodes'),
+        DeclareLaunchArgument(
+            'cuda_device',
+            default_value='0',
+            description='CUDA device index for GPU-capable inference nodes'),
+        DeclareLaunchArgument(
+            'use_tensorrt',
+            default_value='false',
+            description='Convert/use TensorRT engine for traffic YOLO when available'),
+        DeclareLaunchArgument(
+            'allow_cpu_fallback',
+            default_value='false',
+            description='Allow AI inference nodes to fall back to CPU if CUDA fails'),
+        SetEnvironmentVariable('QCAR2_USE_CUDA', use_cuda),
+        SetEnvironmentVariable('QCAR2_CUDA_DEVICE', cuda_device),
+        SetEnvironmentVariable('QCAR2_ALLOW_CPU_FALLBACK', allow_cpu_fallback),
+        SetEnvironmentVariable('CUDA_VISIBLE_DEVICES', cuda_device),
         path_follower,
         recorded_map_visualizer,
         traffic_system_detector,

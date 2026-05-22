@@ -36,6 +36,8 @@ def generate_launch_description():
     use_composition = LaunchConfiguration('use_composition')
     use_respawn = LaunchConfiguration('use_respawn')
     log_level = LaunchConfiguration('log_level')
+    use_cuda = LaunchConfiguration('use_cuda')
+    cuda_device = LaunchConfiguration('cuda_device')
 
     remappings = [('/tf', 'tf'),
                   ('/tf_static', 'tf_static')]
@@ -52,6 +54,12 @@ def generate_launch_description():
 
     stdout_linebuf_envvar = SetEnvironmentVariable(
         'RCUTILS_LOGGING_BUFFERED_STREAM', '1')
+    qcar2_use_cuda_envvar = SetEnvironmentVariable(
+        'QCAR2_USE_CUDA', use_cuda)
+    qcar2_cuda_device_envvar = SetEnvironmentVariable(
+        'QCAR2_CUDA_DEVICE', cuda_device)
+    cuda_visible_devices_envvar = SetEnvironmentVariable(
+        'CUDA_VISIBLE_DEVICES', cuda_device)
 
     declare_namespace_cmd = DeclareLaunchArgument(
         'namespace',
@@ -91,8 +99,16 @@ def generate_launch_description():
         description='Whether to respawn if a node crashes. Applied when composition is disabled.')
 
     declare_log_level_cmd = DeclareLaunchArgument(
-        'log_level', default_value='info',
+        'log_level', default_value='warn',
         description='log level')
+
+    declare_use_cuda_cmd = DeclareLaunchArgument(
+        'use_cuda', default_value='true',
+        description='Prefer CUDA for any GPU-capable QCar2 perception nodes launched under this bringup')
+
+    declare_cuda_device_cmd = DeclareLaunchArgument(
+        'cuda_device', default_value='0',
+        description='CUDA device index for GPU-capable QCar2 perception nodes')
 
     # Specify the actions
     bringup_cmd_group = GroupAction([
@@ -157,9 +173,6 @@ def generate_launch_description():
     # Load the QBot Platform Cartographer launch file
     ld.add_action(qcar2_cartographer_launch)
 
-    # Set environment variables
-    ld.add_action(stdout_linebuf_envvar)
-
     # Declare the launch options
     ld.add_action(declare_namespace_cmd)
     ld.add_action(declare_use_namespace_cmd)
@@ -170,6 +183,14 @@ def generate_launch_description():
     ld.add_action(declare_use_composition_cmd)
     ld.add_action(declare_use_respawn_cmd)
     ld.add_action(declare_log_level_cmd)
+    ld.add_action(declare_use_cuda_cmd)
+    ld.add_action(declare_cuda_device_cmd)
+
+    # Set environment variables after their launch arguments exist.
+    ld.add_action(stdout_linebuf_envvar)
+    ld.add_action(qcar2_use_cuda_envvar)
+    ld.add_action(qcar2_cuda_device_envvar)
+    ld.add_action(cuda_visible_devices_envvar)
 
     # Add the actions to launch all of the navigation nodes
     ld.add_action(bringup_cmd_group)

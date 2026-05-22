@@ -1,8 +1,15 @@
 from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
+    use_cuda = LaunchConfiguration('use_cuda')
+    cuda_device = LaunchConfiguration('cuda_device')
+    allow_cpu_fallback = LaunchConfiguration('allow_cpu_fallback')
+
     controller_drive = Node(
         package='qcar2_autonomy',
         executable='controller_drive',
@@ -36,7 +43,9 @@ def generate_launch_description():
         parameters=[{
             'image_topic': '/camera/csi_image',
             'imgsz':       640,
-            'device':      0,
+            'device':      ParameterValue(cuda_device, value_type=int),
+            'use_cuda':    ParameterValue(use_cuda, value_type=bool),
+            'allow_cpu_fallback': ParameterValue(allow_cpu_fallback, value_type=bool),
         }],
     )
 
@@ -75,6 +84,22 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
+        DeclareLaunchArgument(
+            'use_cuda',
+            default_value='true',
+            description='Prefer CUDA for lane detection'),
+        DeclareLaunchArgument(
+            'cuda_device',
+            default_value='0',
+            description='CUDA device index for lane detection'),
+        DeclareLaunchArgument(
+            'allow_cpu_fallback',
+            default_value='false',
+            description='Allow lane detection to fall back to CPU if CUDA fails'),
+        SetEnvironmentVariable('QCAR2_USE_CUDA', use_cuda),
+        SetEnvironmentVariable('QCAR2_CUDA_DEVICE', cuda_device),
+        SetEnvironmentVariable('QCAR2_ALLOW_CPU_FALLBACK', allow_cpu_fallback),
+        SetEnvironmentVariable('CUDA_VISIBLE_DEVICES', cuda_device),
         controller_drive,
         lane_detection,
         lane_stanley,
