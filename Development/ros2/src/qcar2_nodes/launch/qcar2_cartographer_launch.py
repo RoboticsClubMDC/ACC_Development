@@ -43,11 +43,18 @@ def generate_launch_description():
             executable='fixed_lidar_frame',
             name='fixed_lidar_frame')
 
+    pose_estimator = Node(
+            package='qcar2_autonomy',
+            executable='pose_estimator',
+            name='pose_estimator',
+            output='screen',
+            parameters=[{'use_sim_time': use_sim}])
+
     configuration_basename_la = DeclareLaunchArgument(
             'configuration_basename',
             default_value='qcar2_2d.lua',
             description='Name of LUA file for cartographer')
-    
+
     use_sim_la = DeclareLaunchArgument(
             'use_sim',
             default_value='false',
@@ -91,6 +98,7 @@ def generate_launch_description():
         qcar2_cartographer_transform_publisher,
         qcar2_launch,
         qcar2_nav2_converter,
+        pose_estimator,
         cartographer_node,
         cartographer_occupancy_grid_node,
         qcar2_to_lidar_tf_node,

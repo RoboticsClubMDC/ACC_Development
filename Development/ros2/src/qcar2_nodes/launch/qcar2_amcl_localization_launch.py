@@ -45,10 +45,10 @@ def generate_launch_description():
         output="screen",
     )
 
-    ekf = Node(
+    pose_estimator = Node(
         package="qcar2_autonomy",
-        executable="qcar2_ekf_odometry",
-        name="qcar2_ekf_odometry",
+        executable="pose_estimator",
+        name="pose_estimator",
         output="screen",
         parameters=[
             {"use_sim_time": use_sim_time},
@@ -188,7 +188,7 @@ def generate_launch_description():
         ),
         qcar2_physical,
         lidar_tf,
-        ekf,
+        pose_estimator,
         map_server,
         amcl,
         lifecycle_manager,

@@ -19,8 +19,10 @@ notes so the commands stay easy to scan while testing.
 9. [RTAB-Map Source Build](#rtab-map-source-build)
 10. [RTAB-Map RGB-D + LiDAR Mapping Launch](#rtab-map-rgb-d--lidar-mapping-launch)
 11. [Logs, Bags, And Debug Checks](#logs-bags-and-debug-checks)
-12. [Architecture Direction](#architecture-direction)
-13. [Change Log](#change-log)
+12. [Killing Stale ROS Nodes Between Runs](#killing-stale-ros-nodes-between-runs)
+13. [Odometry Architecture (EKF owns odom)](#odometry-architecture-ekf-owns-odom)
+14. [Architecture Direction](#architecture-direction)
+15. [Change Log](#change-log)
 
 ## Normal Startup Order
 
@@ -671,6 +673,117 @@ Debug meanings:
 - If YOLO detects the QCar body/dead image region, check that `/perception/yolo/image_annotated` shows the red `NA` polygon.
 - If map-frame semantic landmarks warn about transforms, start Cartographer before the perception core launch.
 
+## Killing Stale ROS Nodes Between Runs
+
+Ctrl-C on a `ros2 launch` does not always reap child processes. Leftover nodes
+become "ghosts" that duplicate publishers (e.g. two `/foxglove_bridge`,
+two `odom -> base_link` TFs) and silently corrupt the next run. Use this
+between sessions.
+
+One-shot in the dev container (or any terminal that can see the processes):
+
+```bash
+pkill -INT  -f "ros2 launch" 2>/dev/null
+pkill -INT  -f "ros2 run"    2>/dev/null
+sleep 2
+pkill -TERM -f "qcar2|nav2_qcar2|foxglove_bridge|fixed_lidar|pose_estimator|cartographer|amcl|lifecycle_manager|map_server|nav2_map_server" 2>/dev/null
+sleep 1
+pkill -KILL -f "qcar2|nav2_qcar2|foxglove_bridge|fixed_lidar|pose_estimator|cartographer|amcl|lifecycle_manager|map_server|nav2_map_server" 2>/dev/null
+ros2 daemon stop 2>/dev/null
+ros2 daemon start
+```
+
+Why three signal stages: `SIGINT` (same as Ctrl-C) gives launchers a chance to
+unwind cleanly. `SIGTERM` is graceful for plain executables. `SIGKILL` is the
+last resort. The `ros2 daemon stop/start` resets the discovery cache so
+`ros2 node list` does not report stale entries.
+
+Convenience alias for `~/.bashrc`:
+
+```bash
+ros2_killall() {
+  pkill -INT  -f "ros2 launch" 2>/dev/null
+  pkill -INT  -f "ros2 run"    2>/dev/null
+  sleep 2
+  pkill -TERM -f "qcar2|nav2_qcar2|foxglove_bridge|fixed_lidar|pose_estimator|cartographer|amcl|lifecycle_manager|map_server|nav2_map_server" 2>/dev/null
+  sleep 1
+  pkill -KILL -f "qcar2|nav2_qcar2|foxglove_bridge|fixed_lidar|pose_estimator|cartographer|amcl|lifecycle_manager|map_server|nav2_map_server" 2>/dev/null
+  ros2 daemon stop 2>/dev/null
+  ros2 daemon start
+  echo "ROS 2 processes killed. Remaining:"
+  ps -ef | grep -E "qcar2|ros2 (launch|run)|foxglove_bridge|cartographer|amcl|lifecycle_manager|map_server" | grep -v grep || echo "  (none)"
+}
+```
+
+After sourcing `~/.bashrc`, run `ros2_killall` between launches.
+
+The QLabs container is separate. Because it runs `--network host` with
+`ROS_DOMAIN_ID=69`, nodes inside it appear as peers but are not killed by host
+`pkill`. Clean it with:
+
+```bash
+sudo docker exec virtual-qcar2 pkill -f "csi_camera|foxglove_bridge|ros2"
+```
+
+Or restart the QLabs container fully:
+
+```bash
+sudo docker rm -f virtual-qcar2
+# then re-run the QLabs startup from "Start QLabs / Virtual QCar2"
+```
+
+Verify everything is clean:
+
+```bash
+ros2 node list                  # should be empty (or only your active launches)
+ros2 topic list | wc -l         # should be ~10 framework topics if nothing is running
+ps -ef | grep -E "qcar2|ros2|foxglove_bridge|cartographer|amcl" | grep -v grep
+```
+
+## Odometry Architecture (EKF owns odom)
+
+Updated: 2026-05-23 EDT
+
+Single source of truth for `odom -> base_link` and `/odom`:
+
+```text
+/qcar2_joint  ──┐
+/qcar2_imu    ──┼─►  qcar2_autonomy pose_estimator (EKF)  ──►  /odom + odom->base_link TF
+steering      ──┘                                                │
+                                                                 ▼
+                                          Cartographer (use_odometry = true) ──► map->odom
+                                                                                 │
+                                                                                 ▼
+                                                              AMCL ──► map->odom (replaces Cartographer's after lap)
+```
+
+Rules:
+
+- `pose_estimator` (`qcar2_autonomy/autonomy/pose_estimator.py`) is the **only** node that publishes `odom -> base_link` and `/odom`.
+- The C++ node `qcar2_odometry` is **retired**. Do not launch it. It is no longer referenced in `qcar2_virtual_launch.py`, `qcar2_amcl_localization_launch.py`, or `qcar2_amcl_localization_virtual_launch.py`. The source file in `qcar2_nodes/src/qcar2_odometry.cpp` remains for reference only.
+- Cartographer reads `/odom` (`use_odometry = true` in `qcar2_2d.lua`) as its motion prior.
+- AMCL reads `odom -> base_link` from TF — same EKF source, no changes to AMCL.
+- The EKF fuses wheel speed (encoders via `/qcar2_joint`) with IMU yaw rate (`/qcar2_imu`) using `gyro_weight` (default 0.65). Steering from `/cmd_vel_nav` / `/qcar2_motor_speed_cmd` feeds the bicycle-model term.
+- The EKF has **no** `map -> base_link` correction. Earlier versions had one, which made the EKF a downstream observer of SLAM and prevented it from helping Cartographer. That has been removed; pure dead-reckoning fusion now.
+
+Cartographer config for external odometry (`qcar2_nodes/config/qcar2_2d.lua`):
+
+```lua
+tracking_frame     = "base_scan"   -- sensor frame
+published_frame    = "odom"        -- Cartographer publishes map -> odom
+odom_frame         = "odom"
+provide_odom_frame = false         -- do NOT have Cartographer manage odom
+use_odometry       = true          -- subscribe to EKF /odom
+```
+
+Common pitfall: setting `published_frame = "base_link"` with `provide_odom_frame = false` makes Cartographer publish `map -> base_link` directly, which collides with the EKF's `odom -> base_link` (two parents for the same frame). Symptom is `/map` never appearing. Keep `published_frame = "odom"`.
+
+If you ever need to disable TF broadcast (e.g. running two odom sources for comparison):
+
+```bash
+ros2 run qcar2_autonomy pose_estimator --ros-args -p publish_tf:=false
+```
+
 ## Architecture Direction
 
 Final target:
@@ -710,6 +823,49 @@ Immediate execution order:
 13. Add motion arbiter.
 
 ## Change Log
+
+### 2026-05-23 EDT — discovery: Cartographer precision over AMCL
+
+Observed during testing after the EKF + max_range fixes: Cartographer's live SLAM is **noticeably more accurate** than AMCL on the saved map from the same run. AMCL holds the geometry only because we tuned the scan-match weights extremely tight (`laser_likelihood_max_dist=0.30`, `max_beams=180`, `sigma_hit=0.20`); it does not converge to the same submillimeter alignment Cartographer achieves live.
+
+**Why this is structural, not a tuning gap:**
+
+- Cartographer is **graph-based SLAM** (Hess et al. 2016, "Real-Time Loop Closure in 2D LIDAR SLAM"). Local SLAM does correlative scan matching against probabilistic occupancy submaps; global SLAM optimizes a pose graph via Sparse Pose Adjustment (Konolige et al. 2010, Ceres-Solver under the hood). Every loop closure adds a new edge constraint and the optimizer **redistributes error retroactively across the entire trajectory**. The map literally gets better every overlapping lap. Drift is not "corrected" — it's eliminated.
+- AMCL is **Adaptive Monte Carlo Localization** (Dellaert/Fox/Burgard/Thrun 1999), a particle filter over a frozen map. It can only update the current pose belief; there is no retroactive graph optimization. It is fundamentally a filter, not a smoother.
+- AMCL is therefore capped by the quality of the saved PGM. Live Cartographer outperforms it because Cartographer is continuously refining both pose AND map. Once the map is frozen, AMCL inherits whatever quality existed at snapshot time and cannot improve on it.
+
+**What the EKF contributes to Cartographer's accuracy gain:**
+
+- The EKF (encoders + IMU yaw rate via bicycle model) provides `nav_msgs/Odometry` as a **motion prior** to Cartographer's local SLAM.
+- With the prior, the correlative scan matcher's search is tightly centered → finds the correct local minimum reliably → submap insertions are crisp.
+- Crisp submaps mean revisits look almost identical to previous traversals → branch-and-bound loop closure fires reliably → more edge constraints in the pose graph → tighter SPA optimization → less global drift.
+- Net effect: the EKF doesn't *do* loop closure; it makes loop closure *reliable*. Stacked with the `max_range = 10` change (richer scan signatures) this is what unlocked the "soft-learning" behavior observed during multi-lap runs.
+
+**The "anchor hard" tuning on AMCL works for the same reason and reveals the same ceiling:**
+
+- Tight scan-match params (`z_hit=0.90`, `sigma_hit=0.20`, etc.) force AMCL to bind the current scan very strongly to map geometry — which is great when the map is correct, fragile when it isn't.
+- The residual scan-vs-map offset observed in Foxglove is **not AMCL's fault** — it is the quality ceiling imposed by the frozen map. No further AMCL tuning will close it.
+
+**Implications for the system design:**
+
+- The current AMCL is being driven against an **abstract map** (Cartographer's self-referential output: origin at trajectory start, orientation at boot heading). For competition coordinates you want an **ideal map** — same geometry, but the YAML's `origin: [x, y, yaw]` field rigid-aligned to the world frame (e.g. corner of the track).
+- Alignment is a **Procrustes / Kabsch** problem: given ≥3 landmark correspondences (abstract coords ↔ ideal coords), solve for the rigid transform via SVD. Closed form, no optimization. The semantic landmark mapper is the right input source for this.
+- For competition runs this becomes: Cartographer (or RTAB-Map offline) → semantic landmark alignment → ideal `golden_map.yaml` → AMCL — which is exactly the architecture in the "Architecture Direction" section.
+
+**Practical takeaways:**
+
+1. Drive ≥3 overlapping laps before saving the map. Each pass adds loop-closure constraints; the third lap is typically near-optimal.
+2. Use `cartographer_pbstream_to_ros_map` rather than `map_saver_cli` when accuracy matters — `write_state` forces a final SPA pass before export, producing a cleaner PGM.
+3. Treat AMCL as **filter localization for race-time tracking**, not as a map-quality improver. It is fast and deterministic; that is its job.
+4. Future work: implement landmark-based map alignment so AMCL operates in competition coordinates instead of Cartographer's abstract frame.
+
+### 2026-05-23 EDT
+
+- Wired the EKF as the single owner of `/odom` and `odom -> base_link` TF.
+- Rewrote `qcar2_autonomy/autonomy/pose_estimator.py` to publish `nav_msgs/Odometry` on `/odom` and broadcast `odom -> base_link`. Removed the `map -> base_link` correction loop that made the EKF a downstream observer of SLAM.
+- Retired the `qcar2_odometry` C++ node from active launches: removed from `qcar2_amcl_localization_launch.py` and `qcar2_amcl_localization_virtual_launch.py`. Already commented out of `qcar2_virtual_launch.py`.
+- Enabled `use_odometry = true` in `qcar2_nodes/config/qcar2_2d.lua` so Cartographer fuses the EKF `/odom` as a motion prior.
+- Reason: Cartographer was running on LiDAR-only scan matching with no motion prior, causing drift in open stretches between distinctive geometry. The homemade EKF existed but was a sidecar publishing `/robot_pose` that nobody consumed.
 
 ### 2026-05-22 19:00:55 EDT
 

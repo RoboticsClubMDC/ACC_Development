@@ -1,0 +1,25 @@
+[0.000000] (-) TimerEvent: {}
+[0.000302] (-) JobUnselected: {'identifier': 'qcar2_autonomy'}
+[0.000417] (-) JobUnselected: {'identifier': 'qcar2_interfaces'}
+[0.000506] (-) JobUnselected: {'identifier': 'qcar2_perception'}
+[0.000520] (-) JobUnselected: {'identifier': 'rtabmap'}
+[0.000548] (-) JobUnselected: {'identifier': 'rtabmap_conversions'}
+[0.000559] (-) JobUnselected: {'identifier': 'rtabmap_demos'}
+[0.000568] (-) JobUnselected: {'identifier': 'rtabmap_examples'}
+[0.000577] (-) JobUnselected: {'identifier': 'rtabmap_launch'}
+[0.000586] (-) JobUnselected: {'identifier': 'rtabmap_msgs'}
+[0.000594] (-) JobUnselected: {'identifier': 'rtabmap_odom'}
+[0.000603] (-) JobUnselected: {'identifier': 'rtabmap_python'}
+[0.000611] (-) JobUnselected: {'identifier': 'rtabmap_ros'}
+[0.000619] (-) JobUnselected: {'identifier': 'rtabmap_rviz_plugins'}
+[0.000627] (-) JobUnselected: {'identifier': 'rtabmap_slam'}
+[0.000635] (-) JobUnselected: {'identifier': 'rtabmap_sync'}
+[0.000642] (-) JobUnselected: {'identifier': 'rtabmap_util'}
+[0.000650] (-) JobUnselected: {'identifier': 'rtabmap_viz'}
+[0.000660] (qcar2_nodes) JobQueued: {'identifier': 'qcar2_nodes', 'dependencies': OrderedDict([('qcar2_interfaces', '/workspaces/isaac_ros-dev/ros2/install/qcar2_interfaces'), ('qcar2_autonomy', '/workspaces/isaac_ros-dev/ros2/install/qcar2_autonomy')])}
+[0.000674] (qcar2_nodes) JobStarted: {'identifier': 'qcar2_nodes'}
+[0.099753] (-) TimerEvent: {}
+[0.200058] (-) TimerEvent: {}
+[0.300376] (-) TimerEvent: {}
+[0.319899] (qcar2_nodes) JobEnded: {'identifier': 'qcar2_nodes', 'rc': 1}
+[0.330364] (-) EventReactorShutdown: {}

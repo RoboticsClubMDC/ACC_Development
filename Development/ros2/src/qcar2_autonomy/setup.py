@@ -38,6 +38,8 @@ setup(
             'roadmap_alignment_node = autonomy.LCroadmap_alignment_node:main',
             'manual_drive = autonomy.manual_drive:main',
             'visual_odometry = autonomy.vo_node:main',
+            'pose_estimator = autonomy.pose_estimator:main',
+            'qcar2_ekf_odometry = autonomy.pose_estimator:main',
         ],
     },
 )
