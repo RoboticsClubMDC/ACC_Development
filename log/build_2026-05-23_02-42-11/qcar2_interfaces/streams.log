@@ -1,0 +1,58 @@
+[0.151s] Invoking command in '/workspaces/isaac_ros-dev/build/qcar2_interfaces': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/workspaces/isaac_ros-dev/install/rtabmap_python:/workspaces/isaac_ros-dev/Development/ros2/install/qcar2_perception:/workspaces/isaac_ros-dev/Development/ros2/install/qcar2_autonomy:/workspaces/isaac_ros-dev/install/qcar2_perception:/workspaces/isaac_ros-dev/install/qcar2_autonomy:/workspaces/isaac_ros-dev/install/isaac_ros_test:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble _=/usr/bin/env /usr/bin/cmake --build /workspaces/isaac_ros-dev/build/qcar2_interfaces -- -j24 -l24
+[0.775s] [ 10%] Built target qcar2_interfaces__rosidl_generator_c
+[0.775s] [ 12%] Built target qcar2_interfaces__cpp
+[0.776s] [ 12%] Built target ament_cmake_python_copy_qcar2_interfaces
+[0.776s] [ 28%] Built target qcar2_interfaces__rosidl_typesupport_fastrtps_cpp
+[0.777s] [ 33%] Built target qcar2_interfaces__rosidl_typesupport_cpp
+[0.777s] [ 43%] Built target qcar2_interfaces__rosidl_typesupport_introspection_c
+[0.778s] [ 53%] Built target qcar2_interfaces__rosidl_typesupport_fastrtps_c
+[0.778s] [ 64%] Built target qcar2_interfaces__rosidl_typesupport_c
+[0.779s] [ 74%] Built target qcar2_interfaces__rosidl_typesupport_introspection_cpp
+[0.779s] [ 74%] Built target qcar2_interfaces
+[0.779s] [ 76%] Built target qcar2_interfaces__py
+[0.780s] [ 84%] Built target qcar2_interfaces__rosidl_generator_py
+[0.784s] [ 94%] Built target qcar2_interfaces__rosidl_typesupport_introspection_c__pyext
+[0.785s] [ 94%] Built target qcar2_interfaces__rosidl_typesupport_c__pyext
+[0.785s] [100%] Built target qcar2_interfaces__rosidl_typesupport_fastrtps_c__pyext
+[0.786s] running egg_info
+[0.786s] writing qcar2_interfaces.egg-info/PKG-INFO
+[0.787s] writing dependency_links to qcar2_interfaces.egg-info/dependency_links.txt
+[0.791s] writing top-level names to qcar2_interfaces.egg-info/top_level.txt
+[0.792s] reading manifest file 'qcar2_interfaces.egg-info/SOURCES.txt'
+[0.793s] writing manifest file 'qcar2_interfaces.egg-info/SOURCES.txt'
+[0.793s] [100%] Built target ament_cmake_python_build_qcar2_interfaces_egg
+[1.098s] Invoked command in '/workspaces/isaac_ros-dev/build/qcar2_interfaces' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/workspaces/isaac_ros-dev/install/rtabmap_python:/workspaces/isaac_ros-dev/Development/ros2/install/qcar2_perception:/workspaces/isaac_ros-dev/Development/ros2/install/qcar2_autonomy:/workspaces/isaac_ros-dev/install/qcar2_perception:/workspaces/isaac_ros-dev/install/qcar2_autonomy:/workspaces/isaac_ros-dev/install/isaac_ros_test:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble _=/usr/bin/env /usr/bin/cmake --build /workspaces/isaac_ros-dev/build/qcar2_interfaces -- -j24 -l24
+[1.237s] Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/colcon_parallel_executor/executor/parallel.py", line 75, in execute
+    loop.run_until_complete(future)
+  File "/usr/lib/python3.8/asyncio/base_events.py", line 603, in run_until_complete
+    self.run_forever()
+  File "/usr/lib/python3.8/asyncio/base_events.py", line 570, in run_forever
+    self._run_once()
+  File "/usr/lib/python3.8/asyncio/base_events.py", line 1823, in _run_once
+    event_list = self._selector.select(timeout)
+  File "/usr/lib/python3.8/selectors.py", line 468, in select
+    fd_event_list = self._selector.poll(timeout, max_ev)
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/colcon_core/executor/__init__.py", line 91, in __call__
+    rc = await self.task(*args, **kwargs)
+  File "/usr/lib/python3/dist-packages/colcon_core/task/__init__.py", line 93, in __call__
+    return await task_method(*args, **kwargs)
+  File "/usr/lib/python3/dist-packages/colcon_ros/task/ament_cmake/build.py", line 59, in build
+    rc = await extension.build(
+  File "/usr/lib/python3/dist-packages/colcon_cmake/task/cmake/build.py", line 110, in build
+    if await has_target(args.build_base, 'install'):
+  File "/usr/lib/python3/dist-packages/colcon_cmake/task/cmake/__init__.py", line 57, in has_target
+    return target in await get_makefile_targets(path)
+  File "/usr/lib/python3/dist-packages/colcon_cmake/task/cmake/__init__.py", line 77, in get_makefile_targets
+    output = await check_output([
+  File "/usr/lib/python3/dist-packages/colcon_core/subprocess.py", line 129, in check_output
+    assert not rc, f'Expected {args} to pass: {stderr_data}'
+AssertionError: Expected ['/usr/bin/cmake', '--build', '/workspaces/isaac_ros-dev/build/qcar2_interfaces', '--target', 'help'] to pass: make: *** wait: No child processes.  Stop.
+make: *** Waiting for unfinished jobs....
+make: *** wait: No child processes.  Stop.
+

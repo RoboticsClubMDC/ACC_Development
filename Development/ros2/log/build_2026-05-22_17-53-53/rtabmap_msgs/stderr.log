@@ -1,8 +1,0 @@
-[33mCMake Warning:
-  Manually-specified variables were not used by the project:
-
-    BUILD_APP
-    BUILD_EXAMPLES
-    BUILD_TOOLS
-
-[0m

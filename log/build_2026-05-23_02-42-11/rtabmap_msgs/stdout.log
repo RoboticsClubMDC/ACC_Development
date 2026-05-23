@@ -1,0 +1,43 @@
+[35m[1mConsolidate compiler generated dependencies of target rtabmap_msgs__rosidl_generator_c[0m
+[  0%] Built target rtabmap_msgs__cpp
+[ 12%] Built target rtabmap_msgs__rosidl_generator_c
+[35m[1mConsolidate compiler generated dependencies of target rtabmap_msgs__rosidl_typesupport_introspection_cpp[0m
+[35m[1mConsolidate compiler generated dependencies of target rtabmap_msgs__rosidl_typesupport_fastrtps_cpp[0m
+[ 12%] Built target ament_cmake_python_copy_rtabmap_msgs
+[35m[1mConsolidate compiler generated dependencies of target rtabmap_msgs__rosidl_typesupport_cpp[0m
+[35m[1mConsolidate compiler generated dependencies of target rtabmap_msgs__rosidl_typesupport_c[0m
+[35m[1mConsolidate compiler generated dependencies of target rtabmap_msgs__rosidl_typesupport_introspection_c[0m
+[35m[1mConsolidate compiler generated dependencies of target rtabmap_msgs__rosidl_typesupport_fastrtps_c[0m
+[ 25%] Built target rtabmap_msgs__rosidl_typesupport_introspection_cpp
+[ 38%] Built target rtabmap_msgs__rosidl_typesupport_c
+[ 51%] Built target rtabmap_msgs__rosidl_typesupport_introspection_c
+[ 63%] Built target rtabmap_msgs__rosidl_typesupport_cpp
+[ 75%] Built target rtabmap_msgs__rosidl_typesupport_fastrtps_cpp
+[ 88%] Built target rtabmap_msgs__rosidl_typesupport_fastrtps_c
+[ 88%] Built target rtabmap_msgs
+[ 88%] Built target rtabmap_msgs__py
+[35m[1mConsolidate compiler generated dependencies of target rtabmap_msgs__rosidl_generator_py[0m
+[ 89%] [32mBuilding C object CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/rosidl_generator_py/rtabmap_msgs/msg/_sensor_data_s.c.o[0m
+[ 89%] [32mBuilding C object CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/rosidl_generator_py/rtabmap_msgs/srv/_publish_map_s.c.o[0m
+[ 90%] [32mBuilding C object CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/rosidl_generator_py/rtabmap_msgs/srv/_global_bundle_adjustment_s.c.o[0m
+[ 90%] [32mBuilding C object CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/rosidl_generator_py/rtabmap_msgs/srv/_set_goal_s.c.o[0m
+[ 90%] [32mBuilding C object CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/rosidl_generator_py/rtabmap_msgs/srv/_get_node_data_s.c.o[0m
+[ 91%] [32mBuilding C object CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/rosidl_generator_py/rtabmap_msgs/srv/_get_nodes_in_radius_s.c.o[0m
+[ 92%] [32mBuilding C object CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/rosidl_generator_py/rtabmap_msgs/srv/_remove_label_s.c.o[0m
+[ 92%] [32mBuilding C object CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/rosidl_generator_py/rtabmap_msgs/srv/_cleanup_local_grids_s.c.o[0m
+[ 92%] [32mBuilding C object CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/rosidl_generator_py/rtabmap_msgs/srv/_detect_more_loop_closures_s.c.o[0m
+running egg_info
+writing rtabmap_msgs.egg-info/PKG-INFO
+writing dependency_links to rtabmap_msgs.egg-info/dependency_links.txt
+writing top-level names to rtabmap_msgs.egg-info/top_level.txt
+reading manifest file 'rtabmap_msgs.egg-info/SOURCES.txt'
+writing manifest file 'rtabmap_msgs.egg-info/SOURCES.txt'
+[ 92%] Built target ament_cmake_python_build_rtabmap_msgs_egg
+[ 92%] [32m[1mLinking C shared library rosidl_generator_py/rtabmap_msgs/librtabmap_msgs__rosidl_generator_py.so[0m
+[100%] Built target rtabmap_msgs__rosidl_generator_py
+[100%] [32mBuilding C object CMakeFiles/rtabmap_msgs__rosidl_typesupport_fastrtps_c__pyext.dir/rosidl_generator_py/rtabmap_msgs/_rtabmap_msgs_s.ep.rosidl_typesupport_fastrtps_c.c.o[0m
+[100%] [32mBuilding C object CMakeFiles/rtabmap_msgs__rosidl_typesupport_c__pyext.dir/rosidl_generator_py/rtabmap_msgs/_rtabmap_msgs_s.ep.rosidl_typesupport_c.c.o[0m
+[100%] [32mBuilding C object CMakeFiles/rtabmap_msgs__rosidl_typesupport_introspection_c__pyext.dir/rosidl_generator_py/rtabmap_msgs/_rtabmap_msgs_s.ep.rosidl_typesupport_introspection_c.c.o[0m
+[100%] [32m[1mLinking C shared library rosidl_generator_py/rtabmap_msgs/rtabmap_msgs_s__rosidl_typesupport_c.cpython-38-x86_64-linux-gnu.so[0m
+[100%] [32m[1mLinking C shared library rosidl_generator_py/rtabmap_msgs/rtabmap_msgs_s__rosidl_typesupport_introspection_c.cpython-38-x86_64-linux-gnu.so[0m
+[100%] [32m[1mLinking C shared library rosidl_generator_py/rtabmap_msgs/rtabmap_msgs_s__rosidl_typesupport_fastrtps_c.cpython-38-x86_64-linux-gnu.so[0m

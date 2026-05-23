@@ -1,0 +1,52 @@
+[0.207s] Invoking command in '/workspaces/isaac_ros-dev/build/rtabmap_msgs': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/workspaces/isaac_ros-dev/install/rtabmap_python:/workspaces/isaac_ros-dev/Development/ros2/install/qcar2_perception:/workspaces/isaac_ros-dev/Development/ros2/install/qcar2_autonomy:/workspaces/isaac_ros-dev/install/qcar2_perception:/workspaces/isaac_ros-dev/install/qcar2_autonomy:/workspaces/isaac_ros-dev/install/isaac_ros_test:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble _=/usr/bin/env /usr/bin/cmake --build /workspaces/isaac_ros-dev/build/rtabmap_msgs -- -j24 -l24
+[0.820s] [35m[1mConsolidate compiler generated dependencies of target rtabmap_msgs__rosidl_generator_c[0m
+[0.821s] [  0%] Built target rtabmap_msgs__cpp
+[0.821s] [ 12%] Built target rtabmap_msgs__rosidl_generator_c
+[0.822s] [35m[1mConsolidate compiler generated dependencies of target rtabmap_msgs__rosidl_typesupport_introspection_cpp[0m
+[0.822s] [35m[1mConsolidate compiler generated dependencies of target rtabmap_msgs__rosidl_typesupport_fastrtps_cpp[0m
+[0.822s] [ 12%] Built target ament_cmake_python_copy_rtabmap_msgs
+[0.822s] [35m[1mConsolidate compiler generated dependencies of target rtabmap_msgs__rosidl_typesupport_cpp[0m
+[0.822s] [35m[1mConsolidate compiler generated dependencies of target rtabmap_msgs__rosidl_typesupport_c[0m
+[0.823s] [35m[1mConsolidate compiler generated dependencies of target rtabmap_msgs__rosidl_typesupport_introspection_c[0m
+[0.823s] [35m[1mConsolidate compiler generated dependencies of target rtabmap_msgs__rosidl_typesupport_fastrtps_c[0m
+[0.823s] [ 25%] Built target rtabmap_msgs__rosidl_typesupport_introspection_cpp
+[0.823s] [ 38%] Built target rtabmap_msgs__rosidl_typesupport_c
+[0.823s] [ 51%] Built target rtabmap_msgs__rosidl_typesupport_introspection_c
+[0.823s] [ 63%] Built target rtabmap_msgs__rosidl_typesupport_cpp
+[0.823s] [ 75%] Built target rtabmap_msgs__rosidl_typesupport_fastrtps_cpp
+[0.823s] [ 88%] Built target rtabmap_msgs__rosidl_typesupport_fastrtps_c
+[0.823s] [ 88%] Built target rtabmap_msgs
+[0.823s] [ 88%] Built target rtabmap_msgs__py
+[0.824s] [35m[1mConsolidate compiler generated dependencies of target rtabmap_msgs__rosidl_generator_py[0m
+[0.824s] [ 89%] [32mBuilding C object CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/rosidl_generator_py/rtabmap_msgs/msg/_sensor_data_s.c.o[0m
+[0.824s] [ 89%] [32mBuilding C object CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/rosidl_generator_py/rtabmap_msgs/srv/_publish_map_s.c.o[0m
+[0.824s] [ 90%] [32mBuilding C object CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/rosidl_generator_py/rtabmap_msgs/srv/_global_bundle_adjustment_s.c.o[0m
+[0.828s] [ 90%] [32mBuilding C object CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/rosidl_generator_py/rtabmap_msgs/srv/_set_goal_s.c.o[0m
+[0.829s] [ 90%] [32mBuilding C object CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/rosidl_generator_py/rtabmap_msgs/srv/_get_node_data_s.c.o[0m
+[0.829s] [ 91%] [32mBuilding C object CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/rosidl_generator_py/rtabmap_msgs/srv/_get_nodes_in_radius_s.c.o[0m
+[0.830s] [ 92%] [32mBuilding C object CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/rosidl_generator_py/rtabmap_msgs/srv/_remove_label_s.c.o[0m
+[0.830s] [ 92%] [32mBuilding C object CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/rosidl_generator_py/rtabmap_msgs/srv/_cleanup_local_grids_s.c.o[0m
+[0.830s] [ 92%] [32mBuilding C object CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/rosidl_generator_py/rtabmap_msgs/srv/_detect_more_loop_closures_s.c.o[0m
+[0.831s] running egg_info
+[0.831s] writing rtabmap_msgs.egg-info/PKG-INFO
+[0.832s] writing dependency_links to rtabmap_msgs.egg-info/dependency_links.txt
+[0.832s] writing top-level names to rtabmap_msgs.egg-info/top_level.txt
+[0.833s] reading manifest file 'rtabmap_msgs.egg-info/SOURCES.txt'
+[0.833s] writing manifest file 'rtabmap_msgs.egg-info/SOURCES.txt'
+[0.834s] [ 92%] Built target ament_cmake_python_build_rtabmap_msgs_egg
+[0.834s] [ 92%] [32m[1mLinking C shared library rosidl_generator_py/rtabmap_msgs/librtabmap_msgs__rosidl_generator_py.so[0m
+[0.835s] [100%] Built target rtabmap_msgs__rosidl_generator_py
+[0.864s] [100%] [32mBuilding C object CMakeFiles/rtabmap_msgs__rosidl_typesupport_fastrtps_c__pyext.dir/rosidl_generator_py/rtabmap_msgs/_rtabmap_msgs_s.ep.rosidl_typesupport_fastrtps_c.c.o[0m
+[0.864s] [100%] [32mBuilding C object CMakeFiles/rtabmap_msgs__rosidl_typesupport_c__pyext.dir/rosidl_generator_py/rtabmap_msgs/_rtabmap_msgs_s.ep.rosidl_typesupport_c.c.o[0m
+[0.864s] [100%] [32mBuilding C object CMakeFiles/rtabmap_msgs__rosidl_typesupport_introspection_c__pyext.dir/rosidl_generator_py/rtabmap_msgs/_rtabmap_msgs_s.ep.rosidl_typesupport_introspection_c.c.o[0m
+[1.203s] [100%] [32m[1mLinking C shared library rosidl_generator_py/rtabmap_msgs/rtabmap_msgs_s__rosidl_typesupport_c.cpython-38-x86_64-linux-gnu.so[0m
+[1.221s] [100%] [32m[1mLinking C shared library rosidl_generator_py/rtabmap_msgs/rtabmap_msgs_s__rosidl_typesupport_introspection_c.cpython-38-x86_64-linux-gnu.so[0m
+[1.251s] [100%] [32m[1mLinking C shared library rosidl_generator_py/rtabmap_msgs/rtabmap_msgs_s__rosidl_typesupport_fastrtps_c.cpython-38-x86_64-linux-gnu.so[0m
+[1.281s] make[2]: *** Deleting file 'rosidl_generator_py/rtabmap_msgs/rtabmap_msgs_s__rosidl_typesupport_introspection_c.cpython-38-x86_64-linux-gnu.so'
+[1.281s] make[1]: *** [CMakeFiles/Makefile2:565: CMakeFiles/rtabmap_msgs__rosidl_typesupport_c__pyext.dir/all] Interrupt
+[1.281s] make[2]: *** Deleting file 'rosidl_generator_py/rtabmap_msgs/rtabmap_msgs_s__rosidl_typesupport_fastrtps_c.cpython-38-x86_64-linux-gnu.so'
+[1.286s] make[2]: *** [CMakeFiles/rtabmap_msgs__rosidl_typesupport_introspection_c__pyext.dir/build.make:153: rosidl_generator_py/rtabmap_msgs/rtabmap_msgs_s__rosidl_typesupport_introspection_c.cpython-38-x86_64-linux-gnu.so] Interrupt
+[1.286s] make[1]: *** [CMakeFiles/Makefile2:535: CMakeFiles/rtabmap_msgs__rosidl_typesupport_introspection_c__pyext.dir/all] Interrupt
+[1.289s] make[2]: *** [CMakeFiles/rtabmap_msgs__rosidl_typesupport_fastrtps_c__pyext.dir/build.make:153: rosidl_generator_py/rtabmap_msgs/rtabmap_msgs_s__rosidl_typesupport_fastrtps_c.cpython-38-x86_64-linux-gnu.so] Interrupt
+[1.290s] make[1]: *** [CMakeFiles/Makefile2:505: CMakeFiles/rtabmap_msgs__rosidl_typesupport_fastrtps_c__pyext.dir/all] Interrupt
+[1.290s] make: *** [Makefile:146: all] Interrupt

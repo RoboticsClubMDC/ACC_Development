@@ -1,0 +1,43 @@
+[  0%] Built target rtabmap_msgs__cpp
+[ 12%] Built target rtabmap_msgs__rosidl_generator_c
+[ 12%] Built target ament_cmake_python_copy_rtabmap_msgs
+[ 24%] Built target rtabmap_msgs__rosidl_typesupport_cpp
+[ 37%] Built target rtabmap_msgs__rosidl_typesupport_introspection_cpp
+[ 50%] Built target rtabmap_msgs__rosidl_typesupport_c
+[ 62%] Built target rtabmap_msgs__rosidl_typesupport_fastrtps_cpp
+[ 75%] Built target rtabmap_msgs__rosidl_typesupport_introspection_c
+[ 88%] Built target rtabmap_msgs__rosidl_typesupport_fastrtps_c
+[ 88%] Built target rtabmap_msgs
+[ 88%] Built target rtabmap_msgs__py
+[35m[1mConsolidate compiler generated dependencies of target rtabmap_msgs__rosidl_generator_py[0m
+[100%] Built target rtabmap_msgs__rosidl_generator_py
+[35m[1mConsolidate compiler generated dependencies of target rtabmap_msgs__rosidl_typesupport_c__pyext[0m
+[35m[1mConsolidate compiler generated dependencies of target rtabmap_msgs__rosidl_typesupport_fastrtps_c__pyext[0m
+Traceback (most recent call last):
+  File "setup.py", line 1, in <module>
+make[2]: *** [CMakeFiles/rtabmap_msgs__rosidl_typesupport_introspection_c__pyext.dir/build.make:164: CMakeFiles/rtabmap_msgs__rosidl_typesupport_introspection_c__pyext.dir/depend] Interrupt
+    from setuptools import find_packages
+  File "/usr/local/lib/python3.8/dist-packages/setuptools/__init__.py", line 16, in <module>
+make[2]: *** [CMakeFiles/rtabmap_msgs__rosidl_typesupport_fastrtps_c__pyext.dir/build.make:164: CMakeFiles/rtabmap_msgs__rosidl_typesupport_fastrtps_c__pyext.dir/depend] Interrupt
+    import setuptools.version
+  File "/usr/local/lib/python3.8/dist-packages/setuptools/version.py", line 1, in <module>
+make[1]: *** [CMakeFiles/Makefile2:563: CMakeFiles/rtabmap_msgs__rosidl_typesupport_c__pyext.dir/all] Interrupt
+make[1]: *** [CMakeFiles/Makefile2:504: CMakeFiles/rtabmap_msgs__rosidl_typesupport_fastrtps_c__pyext.dir/all] Interrupt
+make[1]: *** [CMakeFiles/Makefile2:534: CMakeFiles/rtabmap_msgs__rosidl_typesupport_introspection_c__pyext.dir/all] Interrupt
+    import pkg_resources
+  File "/usr/local/lib/python3.8/dist-packages/pkg_resources/__init__.py", line 3260, in <module>
+    def _initialize_master_working_set():
+  File "/usr/local/lib/python3.8/dist-packages/pkg_resources/__init__.py", line 3234, in _call_aside
+    f(*args, **kwargs)
+  File "/usr/local/lib/python3.8/dist-packages/pkg_resources/__init__.py", line 3295, in _initialize_master_working_set
+    list(map(working_set.add_entry, sys.path))
+  File "/usr/local/lib/python3.8/dist-packages/pkg_resources/__init__.py", line 621, in add_entry
+    for dist in find_distributions(entry, True):
+  File "/usr/local/lib/python3.8/dist-packages/pkg_resources/__init__.py", line 2096, in find_on_path
+    for dist in factory(fullpath):
+  File "/usr/local/lib/python3.8/dist-packages/pkg_resources/__init__.py", line 2154, in distributions_from_metadata
+    if len(os.listdir(path)) == 0:
+KeyboardInterrupt
+make[2]: *** [CMakeFiles/ament_cmake_python_build_rtabmap_msgs_egg.dir/build.make:70: CMakeFiles/ament_cmake_python_build_rtabmap_msgs_egg] Interrupt
+make[1]: *** [CMakeFiles/Makefile2:447: CMakeFiles/ament_cmake_python_build_rtabmap_msgs_egg.dir/all] Interrupt
+make: *** [Makefile:146: all] Interrupt

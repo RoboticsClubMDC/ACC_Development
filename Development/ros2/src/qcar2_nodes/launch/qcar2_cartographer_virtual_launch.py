@@ -82,12 +82,12 @@ def generate_launch_description():
     name='nav2_qcar2_converter',
     )
     return LaunchDescription([
-        qcar2_launch,
-        qcar2_nav2_converter,
         configuration_basename_la,
         use_sim_la,
         resolution_la,
         publish_period_sec_la,
+        qcar2_launch,
+        qcar2_nav2_converter,
         cartographer_node,
         cartographer_occupancy_grid_node,
         qcar2_to_lidar_tf_node,

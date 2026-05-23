@@ -42,7 +42,7 @@ def generate_launch_description():
             package='qcar2_nodes',
             executable='fixed_lidar_frame',
             name='fixed_lidar_frame')
-    
+
     configuration_basename_la = DeclareLaunchArgument(
             'configuration_basename',
             default_value='qcar2_2d.lua',
@@ -62,7 +62,7 @@ def generate_launch_description():
             'publish_period_sec',
             default_value='1.0',
             description='Publishing period')
-    
+
     cartographer_node = Node(
             package='cartographer_ros',
             executable='cartographer_node',
@@ -84,13 +84,13 @@ def generate_launch_description():
        output = 'screen'
        )
     return LaunchDescription([
-        qcar2_cartographer_transform_publisher,
-        qcar2_launch,
-        qcar2_nav2_converter,
         configuration_basename_la,
         use_sim_la,
         resolution_la,
         publish_period_sec_la,
+        qcar2_cartographer_transform_publisher,
+        qcar2_launch,
+        qcar2_nav2_converter,
         cartographer_node,
         cartographer_occupancy_grid_node,
         qcar2_to_lidar_tf_node,

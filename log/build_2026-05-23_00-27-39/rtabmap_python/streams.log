@@ -1,0 +1,35 @@
+[1.225s] Invoking command in '/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap_ros/rtabmap_python': PYTHONPATH=/workspaces/isaac_ros-dev/build/rtabmap_python/prefix_override:/workspaces/isaac_ros-dev/install/rtabmap_python/lib/python3.8/site-packages:${PYTHONPATH} _=/usr/bin/env /usr/bin/python3 setup.py egg_info --egg-base ../../../../../build/rtabmap_python build --build-base /workspaces/isaac_ros-dev/build/rtabmap_python/build install --record /workspaces/isaac_ros-dev/build/rtabmap_python/install.log --single-version-externally-managed
+[1.436s] running egg_info
+[1.437s] creating ../../../../../build/rtabmap_python/rtabmap_python.egg-info
+[1.442s] writing ../../../../../build/rtabmap_python/rtabmap_python.egg-info/PKG-INFO
+[1.442s] writing dependency_links to ../../../../../build/rtabmap_python/rtabmap_python.egg-info/dependency_links.txt
+[1.442s] writing requirements to ../../../../../build/rtabmap_python/rtabmap_python.egg-info/requires.txt
+[1.442s] writing top-level names to ../../../../../build/rtabmap_python/rtabmap_python.egg-info/top_level.txt
+[1.443s] writing manifest file '../../../../../build/rtabmap_python/rtabmap_python.egg-info/SOURCES.txt'
+[1.452s] reading manifest file '../../../../../build/rtabmap_python/rtabmap_python.egg-info/SOURCES.txt'
+[1.452s] writing manifest file '../../../../../build/rtabmap_python/rtabmap_python.egg-info/SOURCES.txt'
+[1.452s] running build
+[1.452s] running build_py
+[1.452s] creating /workspaces/isaac_ros-dev/build/rtabmap_python/build
+[1.452s] creating /workspaces/isaac_ros-dev/build/rtabmap_python/build/lib
+[1.453s] creating /workspaces/isaac_ros-dev/build/rtabmap_python/build/lib/rtabmap_python
+[1.453s] copying rtabmap_python/__init__.py -> /workspaces/isaac_ros-dev/build/rtabmap_python/build/lib/rtabmap_python
+[1.453s] copying rtabmap_python/compression.py -> /workspaces/isaac_ros-dev/build/rtabmap_python/build/lib/rtabmap_python
+[1.453s] running install
+[1.454s] running install_lib
+[1.460s] creating /workspaces/isaac_ros-dev/install/rtabmap_python/lib/python3.8/site-packages/rtabmap_python
+[1.460s] copying /workspaces/isaac_ros-dev/build/rtabmap_python/build/lib/rtabmap_python/__init__.py -> /workspaces/isaac_ros-dev/install/rtabmap_python/lib/python3.8/site-packages/rtabmap_python
+[1.460s] copying /workspaces/isaac_ros-dev/build/rtabmap_python/build/lib/rtabmap_python/compression.py -> /workspaces/isaac_ros-dev/install/rtabmap_python/lib/python3.8/site-packages/rtabmap_python
+[1.460s] byte-compiling /workspaces/isaac_ros-dev/install/rtabmap_python/lib/python3.8/site-packages/rtabmap_python/__init__.py to __init__.cpython-38.pyc
+[1.460s] byte-compiling /workspaces/isaac_ros-dev/install/rtabmap_python/lib/python3.8/site-packages/rtabmap_python/compression.py to compression.cpython-38.pyc
+[1.460s] running install_data
+[1.471s] creating /workspaces/isaac_ros-dev/install/rtabmap_python/share/ament_index
+[1.471s] creating /workspaces/isaac_ros-dev/install/rtabmap_python/share/ament_index/resource_index
+[1.472s] creating /workspaces/isaac_ros-dev/install/rtabmap_python/share/ament_index/resource_index/packages
+[1.472s] copying resource/rtabmap_python -> /workspaces/isaac_ros-dev/install/rtabmap_python/share/ament_index/resource_index/packages
+[1.472s] copying package.xml -> /workspaces/isaac_ros-dev/install/rtabmap_python/share/rtabmap_python
+[1.472s] running install_egg_info
+[1.477s] Copying ../../../../../build/rtabmap_python/rtabmap_python.egg-info to /workspaces/isaac_ros-dev/install/rtabmap_python/lib/python3.8/site-packages/rtabmap_python-0.1.0-py3.8.egg-info
+[1.477s] running install_scripts
+[1.500s] writing list of installed files to '/workspaces/isaac_ros-dev/build/rtabmap_python/install.log'
+[1.528s] Invoked command in '/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap_ros/rtabmap_python' returned '0': PYTHONPATH=/workspaces/isaac_ros-dev/build/rtabmap_python/prefix_override:/workspaces/isaac_ros-dev/install/rtabmap_python/lib/python3.8/site-packages:${PYTHONPATH} _=/usr/bin/env /usr/bin/python3 setup.py egg_info --egg-base ../../../../../build/rtabmap_python build --build-base /workspaces/isaac_ros-dev/build/rtabmap_python/build install --record /workspaces/isaac_ros-dev/build/rtabmap_python/install.log --single-version-externally-managed

@@ -5,6 +5,8 @@
 
 #include "sensor_msgs/msg/laser_scan.hpp"
 
+#include <limits>
+
 bool node_running = false;
 
 // RPLIDAR A2M12 parameters
@@ -118,6 +120,46 @@ rcl_interfaces::msg::SetParametersResult set_parameters_callback(const std::vect
                 result.reason = error_stream.str();
             }
         }
+        else if (parameter.get_name().compare("min_distance") == 0)
+        {
+            if ((parameter.as_double() < 0.0) || (parameter.as_double() >= max_distance))
+            {
+                std::ostringstream error_stream;
+
+                error_stream << "min_distance must be >= 0 and less than max_distance (" << max_distance << ").";
+
+                result.successful = false;
+                result.reason = error_stream.str();
+            }
+            else
+            {
+                min_distance = parameter.as_double();
+            }
+        }
+        else if (parameter.get_name().compare("max_distance") == 0)
+        {
+            if ((parameter.as_double() <= min_distance) || (parameter.as_double() > 10.0))
+            {
+                std::ostringstream error_stream;
+
+                error_stream << "max_distance must be greater than min_distance (" << min_distance << ") and <= 10.0.";
+
+                result.successful = false;
+                result.reason = error_stream.str();
+            }
+            else
+            {
+                max_distance = parameter.as_double();
+            }
+        }
+        else if (parameter.get_name().compare("publish_rate") == 0)
+        {
+            if ((parameter.as_double() <= 0.0) || (parameter.as_double() > 30.0))
+            {
+                result.successful = false;
+                result.reason = "publish_rate must be > 0.0 and <= 30.0 Hz.";
+            }
+        }
         else if (parameter.get_name().compare("max_interpolated_angle") == 0)
         {
             if ((parameter.as_double() < 0.0) || (parameter.as_double() > 360.0))
@@ -172,7 +214,7 @@ rcl_interfaces::msg::SetParametersResult set_parameters_callback(const std::vect
 int main(int argc, char ** argv)
 {
     char error_message[1024];
-    double publish_rate = 20;           // Hz. RPLIDAR A2M12 can do 21 Hz at device level. So set to 20 Hz for the node.
+    double publish_rate = 5.0;           // Hz. RPLIDAR A2M12 can do 21 Hz at device level. So set to 20 Hz for the node.
     
     // parameters change callback
     rclcpp::Node::OnSetParametersCallbackHandle::SharedPtr parameter_cb;
@@ -243,6 +285,18 @@ would not be sent on the /scan message.";
     param_desc.additional_constraints = "This parameter can be 0 (short), 1 (medium) or 2 (long).";
     node->declare_parameter("ranging_distance", (int)ranging_distance, param_desc);
 
+    param_desc.description = "Minimum accepted range in metres for /scan. Samples below this are published as infinity.";
+    param_desc.additional_constraints = "This parameter must be >= 0 and less than max_distance.";
+    node->declare_parameter("min_distance", (double)min_distance, param_desc);
+
+    param_desc.description = "Maximum accepted range in metres for /scan. Samples beyond this are published as infinity.";
+    param_desc.additional_constraints = "This parameter must be greater than min_distance and <= 10.0.";
+    node->declare_parameter("max_distance", (double)max_distance, param_desc);
+
+    param_desc.description = "Target /scan publish frequency in Hz.";
+    param_desc.additional_constraints = "This parameter must be > 0.0 and <= 30.0.";
+    node->declare_parameter("publish_rate", publish_rate, param_desc);
+
     /*** Get node parameters used when opening the device ***/
 
     //Use device_type to automatically configure for virtual/physical/custom for user defined values
@@ -270,6 +324,9 @@ would not be sent on the /scan message.";
 
     scan_mode = node->get_parameter("scan_mode").as_int();
     ranging_distance = (t_ranging_distance)node->get_parameter("ranging_distance").as_int();
+    min_distance = node->get_parameter("min_distance").as_double();
+    max_distance = node->get_parameter("max_distance").as_double();
+    publish_rate = node->get_parameter("publish_rate").as_double();
 
     //RCLCPP_INFO(node->get_logger(), "Parameter uri = %s", uri.c_str());
     //RCLCPP_INFO(node->get_logger(), "Parameter scan_mode = %d", scan_mode);
@@ -293,7 +350,6 @@ would not be sent on the /scan message.";
 
         RCLCPP_INFO(node->get_logger(), "Starting lidar loop...");
 
-        rclcpp::WallRate loop_rate((double)publish_rate);
         node_running = true;
         while (rclcpp::ok())
         {
@@ -309,6 +365,9 @@ would not be sent on the /scan message.";
             max_interpolated_distance = node->get_parameter("max_interpolated_distance").as_double();
             max_interpolated_angle = node->get_parameter("max_interpolated_angle").as_double();
             num_allowable_invalid_data = node->get_parameter("num_allowable_invalid_data").as_int();
+            min_distance = node->get_parameter("min_distance").as_double();
+            max_distance = node->get_parameter("max_distance").as_double();
+            publish_rate = node->get_parameter("publish_rate").as_double();
             
             result = rplidar_read(lidar_sensor, static_cast<t_ranging_measurement_mode>(scan_mode),
                                         max_interpolated_distance, max_interpolated_angle,
@@ -339,7 +398,15 @@ would not be sent on the /scan message.";
                 // Fill msgs.ranges in reverse order to be compatible with the CCW convention
                 for (int i = (result - 1); i >= 0; --i)
                 {
-                    msgs.ranges.push_back(measurements[i].distance);
+                    const auto distance = measurements[i].distance;
+                    if ((distance < min_distance) || (distance > max_distance))
+                    {
+                        msgs.ranges.push_back(std::numeric_limits<float>::infinity());
+                    }
+                    else
+                    {
+                        msgs.ranges.push_back(distance);
+                    }
                 }
                 
                 scan_publisher->publish(msgs);
@@ -366,6 +433,7 @@ would not be sent on the /scan message.";
             }
 
             rclcpp::spin_some(node);
+            rclcpp::WallRate loop_rate(publish_rate);
             loop_rate.sleep();
         }
 

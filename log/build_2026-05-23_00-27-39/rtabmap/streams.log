@@ -1,0 +1,538 @@
+[0.207s] Invoking command in '/workspaces/isaac_ros-dev/build/rtabmap': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/workspaces/isaac_ros-dev/install/qcar2_perception:/workspaces/isaac_ros-dev/install/qcar2_autonomy:/workspaces/isaac_ros-dev/install/isaac_ros_test:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble _=/usr/bin/env /usr/bin/cmake /workspaces/isaac_ros-dev/Development/ros2/src/rtabmap -DCMAKE_INSTALL_PREFIX=/workspaces/isaac_ros-dev/install/rtabmap
+[0.665s] -- The C compiler identification is GNU 9.4.0
+[0.666s] -- The CXX compiler identification is GNU 9.4.0
+[0.666s] -- Detecting C compiler ABI info
+[0.666s] -- Detecting C compiler ABI info - done
+[0.666s] -- Check for working C compiler: /usr/bin/cc - skipped
+[0.666s] -- Detecting C compile features
+[0.666s] -- Detecting C compile features - done
+[0.666s] -- Detecting CXX compiler ABI info
+[0.666s] -- Detecting CXX compiler ABI info - done
+[0.666s] -- Check for working CXX compiler: /usr/bin/c++ - skipped
+[0.667s] -- Detecting CXX compile features
+[0.667s] -- Detecting CXX compile features - done
+[0.667s] -- MOBILE_BUILD=OFF
+[0.667s] -- Checking for module 'eigen3'
+[0.669s] --   Found eigen3, version 3.3.7
+[0.669s] -- Found Eigen: /usr/include/eigen3 (Required is at least version "3.1") 
+[0.669s] -- Eigen found (include: /usr/include/eigen3, version: 3.3.7)
+[0.669s] -- Checking for module 'libusb-1.0'
+[0.669s] --   Found libusb-1.0, version 1.0.23
+[0.670s] -- Found USB_10: /usr/lib/x86_64-linux-gnu/libusb-1.0.so  
+[0.670s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[0.670s]   The package name passed to `find_package_handle_standard_args` (USB_10)
+[0.670s]   does not match the name of the calling package (OpenNI).  This can lead to
+[0.671s]   problems in calling code that expects `find_package` result variables
+[0.671s]   (e.g., `_FOUND`) to follow a certain pattern.
+[0.671s] Call Stack (most recent call first):
+[0.671s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/Modules/FindOpenNI.cmake:28 (find_package_handle_standard_args)
+[0.671s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:179 (find_package)
+[0.671s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:322 (find_openni)
+[0.671s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:548 (find_external_library)
+[0.671s]   CMakeLists.txt:240 (FIND_PACKAGE)
+[0.671s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[0.671s] [0m
+[0.696s] -- OpenNI found (include: /usr/include/ni, lib: /usr/lib/libOpenNI.so)
+[0.716s] -- The imported target "vtkParseOGLExt" references the file
+[0.716s]    "/usr/bin/vtkParseOGLExt-7.1"
+[0.716s] but this file does not exist.  Possible reasons include:
+[0.716s] * The file was deleted, renamed, or moved to another location.
+[0.716s] * An install or uninstall procedure did not complete successfully.
+[0.716s] * The installation package was faulty and contained
+[0.716s]    "/usr/lib/cmake/vtk-7.1/VTKTargets.cmake"
+[0.716s] but not all the files it references.
+[0.716s] 
+[0.716s] -- The imported target "vtkRenderingPythonTkWidgets" references the file
+[0.716s]    "/usr/lib/x86_64-linux-gnu/libvtkRenderingPythonTkWidgets.so"
+[0.716s] but this file does not exist.  Possible reasons include:
+[0.716s] * The file was deleted, renamed, or moved to another location.
+[0.716s] * An install or uninstall procedure did not complete successfully.
+[0.716s] * The installation package was faulty and contained
+[0.716s]    "/usr/lib/cmake/vtk-7.1/VTKTargets.cmake"
+[0.716s] but not all the files it references.
+[0.717s] 
+[0.717s] -- The imported target "vtk" references the file
+[0.717s]    "/usr/bin/vtk"
+[0.717s] but this file does not exist.  Possible reasons include:
+[0.717s] * The file was deleted, renamed, or moved to another location.
+[0.717s] * An install or uninstall procedure did not complete successfully.
+[0.717s] * The installation package was faulty and contained
+[0.717s]    "/usr/lib/cmake/vtk-7.1/VTKTargets.cmake"
+[0.717s] but not all the files it references.
+[0.717s] 
+[0.717s] -- The imported target "pvtk" references the file
+[0.717s]    "/usr/bin/pvtk"
+[0.717s] but this file does not exist.  Possible reasons include:
+[0.717s] * The file was deleted, renamed, or moved to another location.
+[0.717s] * An install or uninstall procedure did not complete successfully.
+[0.717s] * The installation package was faulty and contained
+[0.717s]    "/usr/lib/cmake/vtk-7.1/VTKTargets.cmake"
+[0.717s] but not all the files it references.
+[0.717s] 
+[0.729s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[0.729s]   The package name passed to `find_package_handle_standard_args` (libusb-1.0)
+[0.729s]   does not match the name of the calling package (PCL).  This can lead to
+[0.729s]   problems in calling code that expects `find_package` result variables
+[0.729s]   (e.g., `_FOUND`) to follow a certain pattern.
+[0.729s] Call Stack (most recent call first):
+[0.729s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:291 (find_package_handle_standard_args)
+[0.729s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:338 (find_libusb)
+[0.729s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:548 (find_external_library)
+[0.730s]   CMakeLists.txt:240 (FIND_PACKAGE)
+[0.730s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[0.730s] [0m
+[0.730s] -- Found libusb-1.0: /usr/include  
+[0.746s] -- Checking for module 'flann'
+[0.762s] --   Found flann, version 1.9.1
+[0.807s] -- Found FLANN: /usr/lib/x86_64-linux-gnu/libflann_cpp.so  
+[0.820s] -- Found Qhull: optimized;/usr/lib/x86_64-linux-gnu/libqhull.so;debug;/usr/lib/x86_64-linux-gnu/libqhull.so  
+[0.820s] -- QHULL found (include: /usr/include, lib: optimized;/usr/lib/x86_64-linux-gnu/libqhull.so;debug;/usr/lib/x86_64-linux-gnu/libqhull.so)
+[0.834s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[0.834s]   The package name passed to `find_package_handle_standard_args` (USB_10)
+[0.834s]   does not match the name of the calling package (OpenNI).  This can lead to
+[0.834s]   problems in calling code that expects `find_package` result variables
+[0.834s]   (e.g., `_FOUND`) to follow a certain pattern.
+[0.834s] Call Stack (most recent call first):
+[0.834s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/Modules/FindOpenNI.cmake:28 (find_package_handle_standard_args)
+[0.834s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:179 (find_package)
+[0.834s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:322 (find_openni)
+[0.834s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:548 (find_external_library)
+[0.834s]   CMakeLists.txt:240 (FIND_PACKAGE)
+[0.834s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[0.834s] [0m
+[0.834s] -- OpenNI found (include: /usr/include/ni, lib: /usr/lib/libOpenNI.so)
+[0.839s] -- Found PCL_COMMON: /usr/lib/x86_64-linux-gnu/libpcl_common.so  
+[0.840s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[0.840s]   The package name passed to `find_package_handle_standard_args` (PCL_COMMON)
+[0.840s]   does not match the name of the calling package (PCL).  This can lead to
+[0.840s]   problems in calling code that expects `find_package` result variables
+[0.840s]   (e.g., `_FOUND`) to follow a certain pattern.
+[0.840s] Call Stack (most recent call first):
+[0.840s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[0.840s]   CMakeLists.txt:240 (FIND_PACKAGE)
+[0.840s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[0.840s] [0m
+[0.840s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[0.840s]   The package name passed to `find_package_handle_standard_args` (PCL_OCTREE)
+[0.840s]   does not match the name of the calling package (PCL).  This can lead to
+[0.840s]   problems in calling code that expects `find_package` result variables
+[0.840s]   (e.g., `_FOUND`) to follow a certain pattern.
+[0.840s] Call Stack (most recent call first):
+[0.840s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[0.840s]   CMakeLists.txt:240 (FIND_PACKAGE)
+[0.840s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[0.840s] [0m
+[0.840s] -- Found PCL_OCTREE: /usr/lib/x86_64-linux-gnu/libpcl_octree.so  
+[0.840s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[0.840s]   The package name passed to `find_package_handle_standard_args` (PCL_IO)
+[0.840s]   does not match the name of the calling package (PCL).  This can lead to
+[0.840s]   problems in calling code that expects `find_package` result variables
+[0.840s]   (e.g., `_FOUND`) to follow a certain pattern.
+[0.840s] Call Stack (most recent call first):
+[0.840s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[0.841s]   CMakeLists.txt:240 (FIND_PACKAGE)
+[0.841s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[0.841s] [0m
+[0.841s] -- Found PCL_IO: /usr/lib/x86_64-linux-gnu/libpcl_io.so  
+[0.841s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[0.841s]   The package name passed to `find_package_handle_standard_args` (PCL_KDTREE)
+[0.841s]   does not match the name of the calling package (PCL).  This can lead to
+[0.841s]   problems in calling code that expects `find_package` result variables
+[0.841s]   (e.g., `_FOUND`) to follow a certain pattern.
+[0.841s] Call Stack (most recent call first):
+[0.841s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[0.841s]   CMakeLists.txt:240 (FIND_PACKAGE)
+[0.841s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[0.841s] [0m
+[0.841s] -- Found PCL_KDTREE: /usr/lib/x86_64-linux-gnu/libpcl_kdtree.so  
+[0.841s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[0.841s]   The package name passed to `find_package_handle_standard_args` (PCL_SEARCH)
+[0.841s]   does not match the name of the calling package (PCL).  This can lead to
+[0.841s]   problems in calling code that expects `find_package` result variables
+[0.841s]   (e.g., `_FOUND`) to follow a certain pattern.
+[0.841s] Call Stack (most recent call first):
+[0.841s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[0.842s]   CMakeLists.txt:240 (FIND_PACKAGE)
+[0.842s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[0.842s] [0m
+[0.842s] -- Found PCL_SEARCH: /usr/lib/x86_64-linux-gnu/libpcl_search.so  
+[0.842s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[0.842s]   The package name passed to `find_package_handle_standard_args`
+[0.842s]   (PCL_SURFACE) does not match the name of the calling package (PCL).  This
+[0.842s]   can lead to problems in calling code that expects `find_package` result
+[0.842s]   variables (e.g., `_FOUND`) to follow a certain pattern.
+[0.842s] Call Stack (most recent call first):
+[0.842s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[0.842s]   CMakeLists.txt:240 (FIND_PACKAGE)
+[0.842s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[0.842s] [0m
+[0.842s] -- Found PCL_SURFACE: /usr/lib/x86_64-linux-gnu/libpcl_surface.so  
+[0.842s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[0.842s]   The package name passed to `find_package_handle_standard_args`
+[0.842s]   (PCL_FILTERS) does not match the name of the calling package (PCL).  This
+[0.842s]   can lead to problems in calling code that expects `find_package` result
+[0.843s]   variables (e.g., `_FOUND`) to follow a certain pattern.
+[0.843s] Call Stack (most recent call first):
+[0.843s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[0.843s]   CMakeLists.txt:240 (FIND_PACKAGE)
+[0.843s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[0.843s] [0m
+[0.843s] -- Found PCL_FILTERS: /usr/lib/x86_64-linux-gnu/libpcl_filters.so  
+[0.843s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[0.843s]   The package name passed to `find_package_handle_standard_args` (PCL_2D)
+[0.843s]   does not match the name of the calling package (PCL).  This can lead to
+[0.843s]   problems in calling code that expects `find_package` result variables
+[0.843s]   (e.g., `_FOUND`) to follow a certain pattern.
+[0.843s] Call Stack (most recent call first):
+[0.843s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:619 (find_package_handle_standard_args)
+[0.843s]   CMakeLists.txt:240 (FIND_PACKAGE)
+[0.843s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[0.843s] [0m
+[0.843s] -- Found PCL_2D: /usr/include/pcl-1.10  
+[0.843s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[0.843s]   The package name passed to `find_package_handle_standard_args`
+[0.843s]   (PCL_FEATURES) does not match the name of the calling package (PCL).  This
+[0.843s]   can lead to problems in calling code that expects `find_package` result
+[0.843s]   variables (e.g., `_FOUND`) to follow a certain pattern.
+[0.843s] Call Stack (most recent call first):
+[0.843s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[0.843s]   CMakeLists.txt:240 (FIND_PACKAGE)
+[0.843s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[0.843s] [0m
+[0.843s] -- Found PCL_FEATURES: /usr/lib/x86_64-linux-gnu/libpcl_features.so  
+[0.844s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[0.844s]   The package name passed to `find_package_handle_standard_args`
+[0.844s]   (PCL_REGISTRATION) does not match the name of the calling package (PCL).
+[0.844s]   This can lead to problems in calling code that expects `find_package`
+[0.844s]   result variables (e.g., `_FOUND`) to follow a certain pattern.
+[0.844s] Call Stack (most recent call first):
+[0.844s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[0.844s]   CMakeLists.txt:240 (FIND_PACKAGE)
+[0.844s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[0.844s] [0m
+[0.844s] -- Found PCL_REGISTRATION: /usr/lib/x86_64-linux-gnu/libpcl_registration.so  
+[0.844s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[0.844s]   The package name passed to `find_package_handle_standard_args`
+[0.844s]   (PCL_SAMPLE_CONSENSUS) does not match the name of the calling package
+[0.844s]   (PCL).  This can lead to problems in calling code that expects
+[0.844s]   `find_package` result variables (e.g., `_FOUND`) to follow a certain
+[0.844s]   pattern.
+[0.844s] Call Stack (most recent call first):
+[0.844s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[0.845s]   CMakeLists.txt:240 (FIND_PACKAGE)
+[0.845s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[0.845s] [0m
+[0.845s] -- Found PCL_SAMPLE_CONSENSUS: /usr/lib/x86_64-linux-gnu/libpcl_sample_consensus.so  
+[0.845s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[0.845s]   The package name passed to `find_package_handle_standard_args`
+[0.845s]   (PCL_GEOMETRY) does not match the name of the calling package (PCL).  This
+[0.845s]   can lead to problems in calling code that expects `find_package` result
+[0.845s]   variables (e.g., `_FOUND`) to follow a certain pattern.
+[0.845s] Call Stack (most recent call first):
+[0.845s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:619 (find_package_handle_standard_args)
+[0.845s]   CMakeLists.txt:240 (FIND_PACKAGE)
+[0.845s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[0.845s] [0m
+[0.845s] -- Found PCL_GEOMETRY: /usr/include/pcl-1.10  
+[0.846s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[0.846s]   The package name passed to `find_package_handle_standard_args` (PCL_ML)
+[0.846s]   does not match the name of the calling package (PCL).  This can lead to
+[0.846s]   problems in calling code that expects `find_package` result variables
+[0.846s]   (e.g., `_FOUND`) to follow a certain pattern.
+[0.846s] Call Stack (most recent call first):
+[0.846s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[0.846s]   CMakeLists.txt:240 (FIND_PACKAGE)
+[0.846s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[0.846s] [0m
+[0.846s] -- Found PCL_ML: /usr/lib/x86_64-linux-gnu/libpcl_ml.so  
+[0.846s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[0.846s]   The package name passed to `find_package_handle_standard_args`
+[0.846s]   (PCL_SEGMENTATION) does not match the name of the calling package (PCL).
+[0.846s]   This can lead to problems in calling code that expects `find_package`
+[0.846s]   result variables (e.g., `_FOUND`) to follow a certain pattern.
+[0.846s] Call Stack (most recent call first):
+[0.846s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[0.846s]   CMakeLists.txt:240 (FIND_PACKAGE)
+[0.846s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[0.846s] [0m
+[0.846s] -- Found PCL_SEGMENTATION: /usr/lib/x86_64-linux-gnu/libpcl_segmentation.so  
+[0.847s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[0.847s]   The package name passed to `find_package_handle_standard_args`
+[0.847s]   (PCL_VISUALIZATION) does not match the name of the calling package (PCL).
+[0.847s]   This can lead to problems in calling code that expects `find_package`
+[0.847s]   result variables (e.g., `_FOUND`) to follow a certain pattern.
+[0.847s] Call Stack (most recent call first):
+[0.847s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[0.847s]   CMakeLists.txt:240 (FIND_PACKAGE)
+[0.847s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[0.847s] [0m
+[0.847s] -- Found PCL_VISUALIZATION: /usr/lib/x86_64-linux-gnu/libpcl_visualization.so  
+[0.848s] -- PCL definitions don't contain "-march=native", make sure all libraries using Eigen are also compiled without that flag to avoid some segmentation faults (with gdb referring to some Eigen functions).
+[0.858s] -- Found SQLite3: /usr/include /usr/lib/x86_64-linux-gnu/libsqlite3.so
+[1.037s] -- Found OpenMP_C: -fopenmp (found version "4.5") 
+[1.095s] -- Found OpenMP_CXX: -fopenmp (found version "4.5") 
+[1.095s] -- Found OpenMP: TRUE (found version "4.5") found components: C CXX 
+[1.096s] -- Found OpenMP: /usr/lib/gcc/x86_64-linux-gnu/9/libgomp.so;/usr/lib/x86_64-linux-gnu/libpthread.so
+[1.096s] -- Add PCL_OMP to definitions
+[1.096s] -- Found OpenCV: /usr/include/opencv4
+[1.096s] -- Found PCL: /usr/include/pcl-1.10;/usr/include/eigen3;/usr/include;/usr/include/ni;/usr/include/vtk-7.1;/usr/include/freetype2;/usr/include/x86_64-linux-gnu
+[1.096s] -- Found ZLIB: /usr/include
+[1.139s] -- VTK_RENDERING_BACKEND=OpenGL2
+[1.158s] -- Found Freenect: /usr/include
+[1.206s] -- Found OpenNI2: /usr/include/openni2
+[1.206s] -- Found DC1394: /usr/include/dc1394
+[1.218s] -- Could NOT find g2o (missing: g2o_DIR)
+[1.219s] -- RTAB-Map's cmake g2o find module used for convenience (for older g2o versions)
+[1.223s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.223s]   The package name passed to `find_package_handle_standard_args` (CSPARSE)
+[1.223s]   does not match the name of the calling package (G2O).  This can lead to
+[1.223s]   problems in calling code that expects `find_package` result variables
+[1.223s]   (e.g., `_FOUND`) to follow a certain pattern.
+[1.224s] Call Stack (most recent call first):
+[1.224s]   cmake_modules/FindG2O.cmake:9 (find_package_handle_standard_args)
+[1.224s]   CMakeLists.txt:516 (FIND_PACKAGE)
+[1.224s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.224s] [0m
+[1.225s] -- Found CSPARSE: /usr/include/suitesparse  
+[1.275s] -- FlyCapture2_INCLUDE_DIR=FlyCapture2_INCLUDE_DIR-NOTFOUND
+[1.275s] -- FlyCapture2_LIBRARY=FlyCapture2_LIBRARY-NOTFOUND
+[1.275s] -- Triclops_INCLUDE_DIR=Triclops_INCLUDE_DIR-NOTFOUND
+[1.275s] -- Triclops_LIBRARY=Triclops_LIBRARY-NOTFOUND
+[1.275s] -- FlyCaptureBridge_LIBRARY=FlyCaptureBridge_LIBRARY-NOTFOUND
+[1.311s] -- Found RealSense2: 
+[1.326s] -- Found octomap 1.9.3: /usr/include
+[1.332s] -- Architecture: x86_64
+[1.343s] -- Performing Test COMPILER_SUPPORTS_CXX14
+[1.428s] -- Performing Test COMPILER_SUPPORTS_CXX14 - Success
+[1.433s] -- Found Pthreads
+[1.433s] -- Performing Test COMPILER_HAS_HIDDEN_VISIBILITY
+[1.509s] -- Performing Test COMPILER_HAS_HIDDEN_VISIBILITY - Success
+[1.509s] -- Performing Test COMPILER_HAS_HIDDEN_INLINE_VISIBILITY
+[1.580s] -- Performing Test COMPILER_HAS_HIDDEN_INLINE_VISIBILITY - Success
+[1.580s] -- Performing Test COMPILER_HAS_DEPRECATED_ATTR
+[1.643s] -- Performing Test COMPILER_HAS_DEPRECATED_ATTR - Success
+[1.707s] -- --------------------------------------------
+[1.708s] -- Info :
+[1.708s] --   RTAB-Map Version =     0.22.1
+[1.708s] --   CMAKE_VERSION =        3.22.1
+[1.708s] --   CMAKE_INSTALL_PREFIX = /workspaces/isaac_ros-dev/install/rtabmap
+[1.708s] --   CMAKE_BUILD_TYPE =     Release
+[1.708s] --   CMAKE_INSTALL_LIBDIR = lib
+[1.708s] --   BUILD_APP =            ON
+[1.708s] --   BUILD_TOOLS =          ON
+[1.708s] --   BUILD_EXAMPLES =       ON
+[1.708s] --   BUILD_SHARED_LIBS =    ON
+[1.708s] --   CMAKE_CXX_FLAGS =  -fmessage-length=0  -fopenmp -std=c++14
+[1.709s] --   FLANN_KDTREE_MEM_OPT = OFF
+[1.709s] --   PCL_DEFINITIONS = -DDISABLE_OPENNI2;-DDISABLE_PCAP;-DDISABLE_PNG;-DDISABLE_LIBUSB_1_0
+[1.709s] --   PCL_VERSION = 1.10.0
+[1.709s] -- 
+[1.709s] -- Optional dependencies ('*' affects some default parameters) :
+[1.709s] --  *With OpenCV 4.2.0 xfeatures2d = NO, nonfree = NO (License: BSD)
+[1.709s] --   With Qt 5.12.8            = YES (License: Open Source or Commercial)
+[1.709s] --   With VTK 7.1              = YES (License: BSD)
+[1.709s] --   With external SQLite3     = YES (License: Public Domain)
+[1.709s] --   With ORB OcTree           = YES (License: GPLv3)
+[1.709s] --   With SuperPoint          = NO (WITH_TORCH=OFF)
+[1.709s] --   With Python3              = NO (WITH_PYTHON=OFF)
+[1.710s] --   With Madgwick             = YES (License: GPL)
+[1.710s] --   With FastCV               = NO (FastCV not found)
+[1.710s] --   With PDAL                 = NO (PDAL not found)
+[1.710s] --   With libLAS               = NO (WITH_LIBLAS=OFF)
+[1.710s] --   With CudaSift             = NO (WITH_CUDASIFT=OFF)
+[1.710s] -- 
+[1.710s] --  Solvers:
+[1.710s] --   With TORO                 = YES (License: Creative Commons [Attribution-NonCommercial-ShareAlike])
+[1.710s] --  *With g2o                  = NO (g2o not found)
+[1.710s] --  *With GTSAM                = NO (GTSAM not found)
+[1.710s] --  *With Ceres                = NO (WITH_CERES=OFF)
+[1.711s] --   With MRPT                 = NO (MRPT not found)
+[1.711s] --   With VERTIGO              = NO (GTSAM or g2o required)
+[1.711s] --   With cvsba                = NO (WITH_CVSBA=OFF)
+[1.711s] --  *With libpointmatcher      = NO (libpointmatcher not found)
+[1.711s] --   With CCCoreLib            = NO (WITH_CCCORELIB=OFF)
+[1.711s] --   With Open3D               = NO (WITH_OPEN3D=OFF)
+[1.711s] --   With OpenGV               = NO (OpenGV not found)
+[1.712s] -- 
+[1.712s] --  Reconstruction Approaches:
+[1.712s] --   With OctoMap 1.9.3        = YES (License: BSD)
+[1.712s] --   With GridMap              = NO (grid_map_core not found)
+[1.712s] --   With CPUTSDF              = NO (WITH_CPUTSDF=OFF)
+[1.712s] --   With OpenChisel           = NO (WITH_OPENCHISEL=OFF)
+[1.712s] --   With AliceVision          = NO (WITH_ALICE_VISION=OFF)
+[1.712s] -- 
+[1.712s] --  Camera Drivers:
+[1.712s] --   With Freenect             = YES (License: Apache v2 and/or GPLv2)
+[1.712s] --   With OpenNI               = YES (License: Apache v2)
+[1.712s] --   With OpenNI2              = YES (License: Apache v2)
+[1.712s] --   With Freenect2            = NO (libfreenect2 not found)
+[1.712s] --   With Kinect for Windows 2 = NO (Kinect for Windows 2 SDK not found)
+[1.712s] --   With Kinect for Azure     = NO (Kinect for Azure SDK not found)
+[1.712s] --   With dc1394               = YES (License: LGPL)
+[1.713s] --   With FlyCapture2/Triclops = NO (Point Grey SDK not found)
+[1.713s] --   With ZED                  = NO (ZED sdk and/or cuda not found)
+[1.713s] --   With ZEDOC                = NO (ZED Open Capture not found)
+[1.713s] --   With RealSense            = NO (librealsense not found)
+[1.713s] --   With RealSense2 2.54.2    = YES (License: Apache-2)
+[1.713s] --   With MyntEyeS             = NO (mynteye s sdk not found)
+[1.713s] --   With DepthAI              = NO (WITH_DEPTHAI=OFF)
+[1.713s] --   With XVisio SDK           = NO (WITH_XVSDK=OFF)
+[1.713s] -- 
+[1.713s] --  Odometry Approaches:
+[1.713s] --   With loam_velodyne        = NO (WITH_LOAM=OFF)
+[1.713s] --   With floam                = NO (WITH_FLOAM=OFF)
+[1.713s] --   With libfovis             = NO (WITH_FOVIS=OFF)
+[1.713s] --   With libviso2             = NO (WITH_VISO2=OFF)
+[1.713s] --   With dvo_core             = NO (WITH_DVO=OFF)
+[1.713s] --   With okvis                = NO (WITH_OKVIS=OFF)
+[1.713s] --   With msckf_vio            = NO (WITH_MSCKF_VIO=OFF)
+[1.713s] --   With VINS-Fusion          = NO (WITH_VINS=OFF)
+[1.713s] --   With OpenVINS             = NO (WITH_OPENVINS=OFF)
+[1.713s] --   With ORB_SLAM             = NO (WITH_ORB_SLAM=OFF)
+[1.713s] -- Show all options with: cmake -LA | grep WITH_
+[1.713s] -- --------------------------------------------
+[1.713s] -- Configuring done
+[1.926s] -- Generating done
+[1.929s] -- Build files have been written to: /workspaces/isaac_ros-dev/build/rtabmap
+[1.962s] Invoked command in '/workspaces/isaac_ros-dev/build/rtabmap' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/workspaces/isaac_ros-dev/install/qcar2_perception:/workspaces/isaac_ros-dev/install/qcar2_autonomy:/workspaces/isaac_ros-dev/install/isaac_ros_test:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble _=/usr/bin/env /usr/bin/cmake /workspaces/isaac_ros-dev/Development/ros2/src/rtabmap -DCMAKE_INSTALL_PREFIX=/workspaces/isaac_ros-dev/install/rtabmap
+[1.966s] Invoking command in '/workspaces/isaac_ros-dev/build/rtabmap': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/workspaces/isaac_ros-dev/install/qcar2_perception:/workspaces/isaac_ros-dev/install/qcar2_autonomy:/workspaces/isaac_ros-dev/install/isaac_ros_test:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble _=/usr/bin/env /usr/bin/cmake --build /workspaces/isaac_ros-dev/build/rtabmap -- -j24 -l24
+[1.998s] [  0%] [32mBuilding CXX object utilite/src/CMakeFiles/rtabmap_utilite.dir/UEventsHandler.cpp.o[0m
+[1.998s] [  1%] [32mBuilding CXX object utilite/src/CMakeFiles/rtabmap_utilite.dir/UEventsManager.cpp.o[0m
+[1.999s] [  1%] [32mBuilding CXX object utilite/src/CMakeFiles/rtabmap_utilite.dir/UEventsSender.cpp.o[0m
+[1.999s] [  2%] [32mBuilding CXX object utilite/src/CMakeFiles/rtabmap_utilite.dir/UConversion.cpp.o[0m
+[2.000s] [  2%] [32mBuilding CXX object utilite/src/CMakeFiles/rtabmap_utilite.dir/ULogger.cpp.o[0m
+[2.002s] [  3%] [32mBuilding CXX object utilite/src/CMakeFiles/rtabmap_utilite.dir/UTimer.cpp.o[0m
+[2.002s] [  4%] [32mBuilding CXX object utilite/src/CMakeFiles/rtabmap_utilite.dir/UVariant.cpp.o[0m
+[2.002s] [  4%] [32mBuilding CXX object utilite/src/CMakeFiles/rtabmap_utilite.dir/UProcessInfo.cpp.o[0m
+[2.003s] [  5%] [32mBuilding CXX object utilite/src/CMakeFiles/rtabmap_utilite.dir/UFile.cpp.o[0m
+[2.003s] [  5%] [32mBuilding CXX object utilite/src/CMakeFiles/rtabmap_utilite.dir/UDirectory.cpp.o[0m
+[2.003s] [  5%] [32mBuilding CXX object utilite/src/CMakeFiles/rtabmap_utilite.dir/UThread.cpp.o[0m
+[2.545s] [  5%] [32m[1mLinking CXX shared library ../../bin/librtabmap_utilite.so[0m
+[2.619s] [  5%] Built target rtabmap_utilite
+[2.641s] [  5%] [32mBuilding CXX object utilite/resource_generator/CMakeFiles/res_tool.dir/main.cpp.o[0m
+[2.960s] [  5%] [32m[1mLinking CXX executable ../../bin/rtabmap-res_tool[0m
+[3.037s] [  5%] Built target res_tool
+[3.047s] [  6%] [34m[1m[Creating resources][0m
+[3.055s]  Using namespace=rtabmap
+[3.055s]  Using target directory=/workspaces/isaac_ros-dev/build/rtabmap/corelib/src
+[3.055s] Input file "/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap/corelib/src/resources/DatabaseSchema.sql" size = 5963 bytes
+[3.055s] Output file "/workspaces/isaac_ros-dev/build/rtabmap/corelib/src/DatabaseSchema_sql.h" size = 12153 bytes
+[3.055s] Input file "/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap/corelib/src/resources/backward_compatibility/DatabaseSchema_0_20_0.sql" size = 5900 bytes
+[3.056s] Output file "/workspaces/isaac_ros-dev/build/rtabmap/corelib/src/DatabaseSchema_0_20_0_sql.h" size = 12055 bytes
+[3.056s] Input file "/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap/corelib/src/resources/backward_compatibility/DatabaseSchema_0_18_3.sql" size = 5749 bytes
+[3.056s] Output file "/workspaces/isaac_ros-dev/build/rtabmap/corelib/src/DatabaseSchema_0_18_3_sql.h" size = 11753 bytes
+[3.056s] Input file "/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap/corelib/src/resources/backward_compatibility/DatabaseSchema_0_18_0.sql" size = 5749 bytes
+[3.056s] Output file "/workspaces/isaac_ros-dev/build/rtabmap/corelib/src/DatabaseSchema_0_18_0_sql.h" size = 11753 bytes
+[3.056s] Input file "/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap/corelib/src/resources/backward_compatibility/DatabaseSchema_0_17_0.sql" size = 5432 bytes
+[3.056s] Output file "/workspaces/isaac_ros-dev/build/rtabmap/corelib/src/DatabaseSchema_0_17_0_sql.h" size = 11119 bytes
+[3.056s] Input file "/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap/corelib/src/resources/backward_compatibility/DatabaseSchema_0_16_2.sql" size = 5362 bytes
+[3.056s] Output file "/workspaces/isaac_ros-dev/build/rtabmap/corelib/src/DatabaseSchema_0_16_2_sql.h" size = 10979 bytes
+[3.056s] Input file "/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap/corelib/src/resources/backward_compatibility/DatabaseSchema_0_16_1.sql" size = 5286 bytes
+[3.056s] Output file "/workspaces/isaac_ros-dev/build/rtabmap/corelib/src/DatabaseSchema_0_16_1_sql.h" size = 10827 bytes
+[3.056s] Input file "/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap/corelib/src/resources/backward_compatibility/DatabaseSchema_0_16_0.sql" size = 5273 bytes
+[3.056s] Output file "/workspaces/isaac_ros-dev/build/rtabmap/corelib/src/DatabaseSchema_0_16_0_sql.h" size = 10801 bytes
+[3.082s] [  6%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Memory.cpp.o[0m
+[3.087s] [  7%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/RtabmapThread.cpp.o[0m
+[3.087s] [  8%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/DBDriver.cpp.o[0m
+[3.087s] [  8%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraOpenNICV.cpp.o[0m
+[3.087s] [  7%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/DBDriverSqlite3.cpp.o[0m
+[3.087s] [  7%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Statistics.cpp.o[0m
+[3.087s] [  7%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/SensorCapture.cpp.o[0m
+[3.088s] [  8%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Camera.cpp.o[0m
+[3.091s] [  9%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/CameraModel.cpp.o[0m
+[3.092s] [ 10%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraImages.cpp.o[0m
+[3.092s] [ 10%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Rtabmap.cpp.o[0m
+[3.092s] [ 11%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/DBReader.cpp.o[0m
+[3.092s] [ 11%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraFreenect.cpp.o[0m
+[3.093s] [ 11%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Recovery.cpp.o[0m
+[3.094s] [ 12%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraK4A.cpp.o[0m
+[3.099s] [ 13%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraFreenect2.cpp.o[0m
+[3.099s] [ 13%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraOpenNI2.cpp.o[0m
+[3.099s] [ 13%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraK4W2.cpp.o[0m
+[3.099s] [ 14%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraRealSense2.cpp.o[0m
+[3.100s] [ 15%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/SensorCaptureThread.cpp.o[0m
+[3.104s] [ 15%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraRealSense.cpp.o[0m
+[3.108s] [ 16%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraStereoDC1394.cpp.o[0m
+[3.108s] [ 16%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraOpenni.cpp.o[0m
+[3.115s] [ 16%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraRGBDImages.cpp.o[0m
+[6.600s] [ 16%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraStereoFlyCapture2.cpp.o[0m
+[6.780s] [ 16%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraStereoImages.cpp.o[0m
+[7.434s] [ 17%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraStereoVideo.cpp.o[0m
+[9.802s] [ 17%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraStereoZed.cpp.o[0m
+[10.450s] [ 18%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraStereoZedOC.cpp.o[0m
+[10.639s] [ 18%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraStereoTara.cpp.o[0m
+[11.012s] [ 18%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraVideo.cpp.o[0m
+[11.398s] [ 19%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraMyntEye.cpp.o[0m
+[11.413s] [ 19%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraDepthAI.cpp.o[0m
+[12.092s] [ 20%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraSeerSense.cpp.o[0m
+[12.492s] [ 20%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/EpipolarGeometry.cpp.o[0m
+[12.624s] [ 20%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/VisualWord.cpp.o[0m
+[13.134s] [ 21%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/VWDictionary.cpp.o[0m
+[13.401s] [ 21%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Signature.cpp.o[0m
+[13.418s] [ 21%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Features2d.cpp.o[0m
+[13.449s] [ 21%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/BayesFilter.cpp.o[0m
+[13.456s] [ 22%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Parameters.cpp.o[0m
+[13.567s] [ 23%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Transform.cpp.o[0m
+[14.146s] [ 23%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/GeodeticCoords.cpp.o[0m
+[14.342s] [ 24%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/util2d.cpp.o[0m
+[14.584s] [ 24%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/util3d.cpp.o[0m
+[14.746s] [ 24%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/util3d_filtering.cpp.o[0m
+[14.839s] [ 25%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/util3d_mapping.cpp.o[0m
+[14.965s] [ 25%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/util3d_transforms.cpp.o[0m
+[15.877s] [ 26%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/util3d_registration.cpp.o[0m
+[15.919s] [ 26%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/util3d_surface.cpp.o[0m
+[15.967s] [ 26%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/util3d_features.cpp.o[0m
+[16.681s] [ 27%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/util3d_correspondences.cpp.o[0m
+[18.281s] [ 27%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/util3d_motion_estimation.cpp.o[0m
+[20.347s] [ 28%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/rvl_codec.cpp.o[0m
+[20.429s] [ 28%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/SensorData.cpp.o[0m
+[20.433s] [ 28%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Graph.cpp.o[0m
+[21.267s] [ 29%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Compression.cpp.o[0m
+[21.309s] [ 29%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Link.cpp.o[0m
+[21.548s] [ 30%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/LaserScan.cpp.o[0m
+[22.117s] [ 30%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Optimizer.cpp.o[0m
+[22.694s] [ 31%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/optimizer/OptimizerTORO.cpp.o[0m
+[22.935s] [ 31%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/optimizer/OptimizerG2O.cpp.o[0m
+[23.064s] [ 31%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/optimizer/OptimizerGTSAM.cpp.o[0m
+[23.239s] [ 32%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/optimizer/OptimizerCVSBA.cpp.o[0m
+[23.361s] [ 32%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/optimizer/OptimizerCeres.cpp.o[0m
+[23.559s] [ 33%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Registration.cpp.o[0m
+[23.974s] [ 33%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/RegistrationIcp.cpp.o[0m
+[24.844s] [ 33%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/RegistrationVis.cpp.o[0m
+[25.483s] [ 34%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Odometry.cpp.o[0m
+[25.571s] [ 34%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/OdometryThread.cpp.o[0m
+[25.815s] [ 35%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/OdometryInfo.cpp.o[0m
+[26.469s] [ 35%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryF2M.cpp.o[0m
+[26.605s] [ 35%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryMono.cpp.o[0m
+[27.019s] [ 36%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryF2F.cpp.o[0m
+[27.546s] [ 36%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryFovis.cpp.o[0m
+[29.146s] [ 37%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryViso2.cpp.o[0m
+[29.699s] [ 37%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryDVO.cpp.o[0m
+[29.935s] [ 37%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryOkvis.cpp.o[0m
+[30.066s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:780: corelib/src/CMakeFiles/rtabmap_core.dir/util3d_registration.cpp.o] Interrupt
+[30.066s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:640: corelib/src/CMakeFiles/rtabmap_core.dir/Parameters.cpp.o] Interrupt
+[30.066s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:724: corelib/src/CMakeFiles/rtabmap_core.dir/util3d.cpp.o] Interrupt
+[30.073s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:738: corelib/src/CMakeFiles/rtabmap_core.dir/util3d_filtering.cpp.o] Interrupt
+[30.075s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:878: corelib/src/CMakeFiles/rtabmap_core.dir/Graph.cpp.o] Interrupt
+[30.076s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:948: corelib/src/CMakeFiles/rtabmap_core.dir/optimizer/OptimizerTORO.cpp.o] Interrupt
+[30.076s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:990: corelib/src/CMakeFiles/rtabmap_core.dir/optimizer/OptimizerCVSBA.cpp.o] Interrupt
+[30.076s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:1032: corelib/src/CMakeFiles/rtabmap_core.dir/RegistrationIcp.cpp.o] Interrupt
+[30.076s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:1060: corelib/src/CMakeFiles/rtabmap_core.dir/Odometry.cpp.o] Interrupt
+[30.076s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:1074: corelib/src/CMakeFiles/rtabmap_core.dir/OdometryThread.cpp.o] Interrupt
+[30.076s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:1102: corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryF2M.cpp.o] Interrupt
+[30.076s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:1116: corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryMono.cpp.o] Interrupt
+[30.076s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:1130: corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryF2F.cpp.o] Interrupt
+[30.076s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:1144: corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryFovis.cpp.o] Interrupt
+[30.076s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:1158: corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryViso2.cpp.o] Interrupt
+[30.076s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:1046: corelib/src/CMakeFiles/rtabmap_core.dir/RegistrationVis.cpp.o] Interrupt
+[30.076s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:976: corelib/src/CMakeFiles/rtabmap_core.dir/optimizer/OptimizerGTSAM.cpp.o] Interrupt
+[30.076s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:1004: corelib/src/CMakeFiles/rtabmap_core.dir/optimizer/OptimizerCeres.cpp.o] Interrupt
+[30.076s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:1186: corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryOkvis.cpp.o] Interrupt
+[30.076s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:1172: corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryDVO.cpp.o] Interrupt
+[30.076s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:1018: corelib/src/CMakeFiles/rtabmap_core.dir/Registration.cpp.o] Interrupt
+[30.076s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:108: corelib/src/CMakeFiles/rtabmap_core.dir/Rtabmap.cpp.o] Interrupt
+[30.076s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:150: corelib/src/CMakeFiles/rtabmap_core.dir/Memory.cpp.o] Interrupt
+[30.076s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:794: corelib/src/CMakeFiles/rtabmap_core.dir/util3d_surface.cpp.o] Interrupt
+[30.076s] make[1]: *** [CMakeFiles/Makefile2:867: corelib/src/CMakeFiles/rtabmap_core.dir/all] Interrupt
+[30.076s] make: *** [Makefile:156: all] Interrupt
+[30.245s] Invoked command in '/workspaces/isaac_ros-dev/build/rtabmap' returned '-2': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/workspaces/isaac_ros-dev/install/qcar2_perception:/workspaces/isaac_ros-dev/install/qcar2_autonomy:/workspaces/isaac_ros-dev/install/isaac_ros_test:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble _=/usr/bin/env /usr/bin/cmake --build /workspaces/isaac_ros-dev/build/rtabmap -- -j24 -l24

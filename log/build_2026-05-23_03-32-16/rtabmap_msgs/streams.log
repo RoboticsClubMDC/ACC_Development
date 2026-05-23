@@ -1,0 +1,44 @@
+[0.279s] Invoking command in '/workspaces/isaac_ros-dev/build/rtabmap_msgs': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/workspaces/isaac_ros-dev/install/rtabmap_python:/workspaces/isaac_ros-dev/Development/ros2/install/qcar2_perception:/workspaces/isaac_ros-dev/Development/ros2/install/qcar2_autonomy:/workspaces/isaac_ros-dev/install/qcar2_perception:/workspaces/isaac_ros-dev/install/qcar2_autonomy:/workspaces/isaac_ros-dev/install/isaac_ros_test:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble _=/usr/bin/env /usr/bin/cmake --build /workspaces/isaac_ros-dev/build/rtabmap_msgs -- -j24 -l24
+[0.759s] [  0%] Built target rtabmap_msgs__cpp
+[0.759s] [ 12%] Built target rtabmap_msgs__rosidl_generator_c
+[0.759s] [ 12%] Built target ament_cmake_python_copy_rtabmap_msgs
+[0.759s] [ 24%] Built target rtabmap_msgs__rosidl_typesupport_cpp
+[0.759s] [ 37%] Built target rtabmap_msgs__rosidl_typesupport_introspection_cpp
+[0.759s] [ 50%] Built target rtabmap_msgs__rosidl_typesupport_c
+[0.759s] [ 62%] Built target rtabmap_msgs__rosidl_typesupport_fastrtps_cpp
+[0.759s] [ 75%] Built target rtabmap_msgs__rosidl_typesupport_introspection_c
+[0.759s] [ 88%] Built target rtabmap_msgs__rosidl_typesupport_fastrtps_c
+[0.759s] [ 88%] Built target rtabmap_msgs
+[0.759s] [ 88%] Built target rtabmap_msgs__py
+[0.759s] [35m[1mConsolidate compiler generated dependencies of target rtabmap_msgs__rosidl_generator_py[0m
+[0.759s] [100%] Built target rtabmap_msgs__rosidl_generator_py
+[0.759s] [35m[1mConsolidate compiler generated dependencies of target rtabmap_msgs__rosidl_typesupport_c__pyext[0m
+[0.759s] [35m[1mConsolidate compiler generated dependencies of target rtabmap_msgs__rosidl_typesupport_fastrtps_c__pyext[0m
+[0.759s] Traceback (most recent call last):
+[0.759s]   File "setup.py", line 1, in <module>
+[0.759s] make[2]: *** [CMakeFiles/rtabmap_msgs__rosidl_typesupport_introspection_c__pyext.dir/build.make:164: CMakeFiles/rtabmap_msgs__rosidl_typesupport_introspection_c__pyext.dir/depend] Interrupt
+[0.759s]     from setuptools import find_packages
+[0.759s]   File "/usr/local/lib/python3.8/dist-packages/setuptools/__init__.py", line 16, in <module>
+[0.760s] make[2]: *** [CMakeFiles/rtabmap_msgs__rosidl_typesupport_fastrtps_c__pyext.dir/build.make:164: CMakeFiles/rtabmap_msgs__rosidl_typesupport_fastrtps_c__pyext.dir/depend] Interrupt
+[0.760s]     import setuptools.version
+[0.760s]   File "/usr/local/lib/python3.8/dist-packages/setuptools/version.py", line 1, in <module>
+[0.760s] make[1]: *** [CMakeFiles/Makefile2:563: CMakeFiles/rtabmap_msgs__rosidl_typesupport_c__pyext.dir/all] Interrupt
+[0.760s] make[1]: *** [CMakeFiles/Makefile2:504: CMakeFiles/rtabmap_msgs__rosidl_typesupport_fastrtps_c__pyext.dir/all] Interrupt
+[0.760s] make[1]: *** [CMakeFiles/Makefile2:534: CMakeFiles/rtabmap_msgs__rosidl_typesupport_introspection_c__pyext.dir/all] Interrupt
+[0.760s]     import pkg_resources
+[0.760s]   File "/usr/local/lib/python3.8/dist-packages/pkg_resources/__init__.py", line 3260, in <module>
+[0.760s]     def _initialize_master_working_set():
+[0.760s]   File "/usr/local/lib/python3.8/dist-packages/pkg_resources/__init__.py", line 3234, in _call_aside
+[0.760s]     f(*args, **kwargs)
+[0.760s]   File "/usr/local/lib/python3.8/dist-packages/pkg_resources/__init__.py", line 3295, in _initialize_master_working_set
+[0.760s]     list(map(working_set.add_entry, sys.path))
+[0.760s]   File "/usr/local/lib/python3.8/dist-packages/pkg_resources/__init__.py", line 621, in add_entry
+[0.760s]     for dist in find_distributions(entry, True):
+[0.760s]   File "/usr/local/lib/python3.8/dist-packages/pkg_resources/__init__.py", line 2096, in find_on_path
+[0.760s]     for dist in factory(fullpath):
+[0.760s]   File "/usr/local/lib/python3.8/dist-packages/pkg_resources/__init__.py", line 2154, in distributions_from_metadata
+[0.760s]     if len(os.listdir(path)) == 0:
+[0.760s] KeyboardInterrupt
+[0.768s] make[2]: *** [CMakeFiles/ament_cmake_python_build_rtabmap_msgs_egg.dir/build.make:70: CMakeFiles/ament_cmake_python_build_rtabmap_msgs_egg] Interrupt
+[0.769s] make[1]: *** [CMakeFiles/Makefile2:447: CMakeFiles/ament_cmake_python_build_rtabmap_msgs_egg.dir/all] Interrupt
+[0.770s] make: *** [Makefile:146: all] Interrupt

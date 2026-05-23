@@ -1,0 +1,14 @@
+make[2]: *** Deleting file 'CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/rosidl_generator_py/rtabmap_msgs/srv/_remove_label_s.c.o'
+make[2]: *** [CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/build.make:440: CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/rosidl_generator_py/rtabmap_msgs/srv/_publish_map_s.c.o] Interrupt
+make[2]: *** [CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/build.make:552: CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/rosidl_generator_py/rtabmap_msgs/srv/_get_nodes_in_radius_s.c.o] Interrupt
+make[2]: *** [CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/build.make:608: CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/rosidl_generator_py/rtabmap_msgs/srv/_cleanup_local_grids_s.c.o] Interrupt
+make[2]: *** [CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/build.make:594: CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/rosidl_generator_py/rtabmap_msgs/srv/_global_bundle_adjustment_s.c.o] Interrupt
+make[2]: *** [CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/build.make:496: CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/rosidl_generator_py/rtabmap_msgs/srv/_remove_label_s.c.o] Interrupt
+make[2]: *** [CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/build.make:580: CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/rosidl_generator_py/rtabmap_msgs/srv/_detect_more_loop_closures_s.c.o] Interrupt
+make[2]: *** [CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/build.make:468: CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/rosidl_generator_py/rtabmap_msgs/srv/_set_goal_s.c.o] Interrupt
+make[2]: *** [CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/build.make:538: CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/rosidl_generator_py/rtabmap_msgs/srv/_get_node_data_s.c.o] Interrupt
+make[2]: *** wait: No child processes.  Stop.
+make[2]: *** Waiting for unfinished jobs....
+make[2]: *** wait: No child processes.  Stop.
+make[1]: *** [CMakeFiles/Makefile2:475: CMakeFiles/rtabmap_msgs__rosidl_generator_py.dir/all] Error 2
+make: *** [Makefile:146: all] Interrupt

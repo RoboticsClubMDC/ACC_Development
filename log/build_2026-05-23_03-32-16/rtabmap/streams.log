@@ -1,0 +1,53 @@
+[0.314s] Invoking command in '/workspaces/isaac_ros-dev/build/rtabmap': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/workspaces/isaac_ros-dev/install/rtabmap_python:/workspaces/isaac_ros-dev/Development/ros2/install/qcar2_perception:/workspaces/isaac_ros-dev/Development/ros2/install/qcar2_autonomy:/workspaces/isaac_ros-dev/install/qcar2_perception:/workspaces/isaac_ros-dev/install/qcar2_autonomy:/workspaces/isaac_ros-dev/install/isaac_ros_test:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble _=/usr/bin/env /usr/bin/cmake --build /workspaces/isaac_ros-dev/build/rtabmap -- -j24 -l24
+[0.792s] [  5%] Built target rtabmap_utilite
+[0.793s] [  5%] Built target res_tool
+[0.793s] [  5%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Rtabmap.cpp.o[0m
+[0.793s] [  5%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Memory.cpp.o[0m
+[0.793s] [  6%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Parameters.cpp.o[0m
+[0.794s] [  6%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/util3d_filtering.cpp.o[0m
+[0.796s] [  7%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/util3d_registration.cpp.o[0m
+[0.796s] [  8%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/optimizer/OptimizerCVSBA.cpp.o[0m
+[0.796s] [  8%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/optimizer/OptimizerGTSAM.cpp.o[0m
+[0.796s] [  8%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/util3d.cpp.o[0m
+[0.797s] [  8%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/RegistrationIcp.cpp.o[0m
+[0.798s] [  8%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/optimizer/OptimizerCeres.cpp.o[0m
+[0.799s] [  9%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Registration.cpp.o[0m
+[0.799s] [ 10%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/optimizer/OptimizerTORO.cpp.o[0m
+[0.799s] [ 10%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/util3d_surface.cpp.o[0m
+[0.799s] [ 10%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Graph.cpp.o[0m
+[0.799s] [ 10%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/RegistrationVis.cpp.o[0m
+[0.800s] [ 11%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryViso2.cpp.o[0m
+[0.800s] [ 12%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryF2F.cpp.o[0m
+[0.800s] [ 12%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryFovis.cpp.o[0m
+[0.800s] [ 12%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryF2M.cpp.o[0m
+[0.800s] [ 13%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryMono.cpp.o[0m
+[0.800s] [ 13%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Odometry.cpp.o[0m
+[0.800s] [ 13%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/OdometryThread.cpp.o[0m
+[0.800s] [ 13%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryOkvis.cpp.o[0m
+[0.800s] [ 13%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryDVO.cpp.o[0m
+[0.800s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:1172: corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryDVO.cpp.o] Interrupt
+[0.800s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:1004: corelib/src/CMakeFiles/rtabmap_core.dir/optimizer/OptimizerCeres.cpp.o] Interrupt
+[0.800s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:1102: corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryF2M.cpp.o] Interrupt
+[0.800s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:1186: corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryOkvis.cpp.o] Interrupt
+[0.800s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:1032: corelib/src/CMakeFiles/rtabmap_core.dir/RegistrationIcp.cpp.o] Interrupt
+[0.800s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:1018: corelib/src/CMakeFiles/rtabmap_core.dir/Registration.cpp.o] Interrupt
+[0.800s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:990: corelib/src/CMakeFiles/rtabmap_core.dir/optimizer/OptimizerCVSBA.cpp.o] Interrupt
+[0.800s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:948: corelib/src/CMakeFiles/rtabmap_core.dir/optimizer/OptimizerTORO.cpp.o] Interrupt
+[0.800s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:1158: corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryViso2.cpp.o] Interrupt
+[0.800s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:878: corelib/src/CMakeFiles/rtabmap_core.dir/Graph.cpp.o] Interrupt
+[0.800s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:1074: corelib/src/CMakeFiles/rtabmap_core.dir/OdometryThread.cpp.o] Interrupt
+[0.800s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:976: corelib/src/CMakeFiles/rtabmap_core.dir/optimizer/OptimizerGTSAM.cpp.o] Interrupt
+[0.800s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:794: corelib/src/CMakeFiles/rtabmap_core.dir/util3d_surface.cpp.o] Interrupt
+[0.800s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:724: corelib/src/CMakeFiles/rtabmap_core.dir/util3d.cpp.o] Interrupt
+[0.800s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:150: corelib/src/CMakeFiles/rtabmap_core.dir/Memory.cpp.o] Interrupt
+[0.800s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:1130: corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryF2F.cpp.o] Interrupt
+[0.800s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:1144: corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryFovis.cpp.o] Interrupt
+[0.800s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:1116: corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryMono.cpp.o] Interrupt
+[0.800s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:780: corelib/src/CMakeFiles/rtabmap_core.dir/util3d_registration.cpp.o] Interrupt
+[0.800s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:640: corelib/src/CMakeFiles/rtabmap_core.dir/Parameters.cpp.o] Interrupt
+[0.800s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:738: corelib/src/CMakeFiles/rtabmap_core.dir/util3d_filtering.cpp.o] Interrupt
+[0.801s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:108: corelib/src/CMakeFiles/rtabmap_core.dir/Rtabmap.cpp.o] Interrupt
+[0.801s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:1046: corelib/src/CMakeFiles/rtabmap_core.dir/RegistrationVis.cpp.o] Interrupt
+[0.801s] make[2]: *** [corelib/src/CMakeFiles/rtabmap_core.dir/build.make:1060: corelib/src/CMakeFiles/rtabmap_core.dir/Odometry.cpp.o] Interrupt
+[0.801s] make[1]: *** [CMakeFiles/Makefile2:867: corelib/src/CMakeFiles/rtabmap_core.dir/all] Interrupt
+[0.801s] make: *** [Makefile:156: all] Interrupt
