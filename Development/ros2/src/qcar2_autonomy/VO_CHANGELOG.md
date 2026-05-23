@@ -3,6 +3,267 @@
 This file tracks cleanup, calibration decisions, and test observations for
 the QCar2 visual odometry work.
 
+## 2026-05-22 Off-car RTAB-Map for KLT/PnP — humble-rtabmap Docker image + "every-frame backfires" baseline finding [baseline finding RETRACTED — see CORRECTION at end of this entry; map pipeline is nondeterministic]
+
+ENVIRONMENT: VO work moved off the QCar to Gabriel's Ubuntu 24.04 box
+(no native ROS; ROS Humble lives ONLY inside Docker). Source bag
+vslam_test12 (5.7 GB: /camera/{color_image,depth_image,camera_info},
+/tf, /tf_static, /vo/*; 22453 msgs, ~154 s) transferred by USB to
+~/Downloads/rtab_map_gabriel/.
+
+INSTALL (why a new image): the Isaac dev image isaac_ros_dev-x86_64 is
+ROS 2 Humble built on Ubuntu 20.04 (focal). packages.ros.org only builds
+Humble for 22.04 (jammy), so apt inside it offers only FOXY rtabmap
+(distro mismatch). Built an ISOLATED image `humble-rtabmap`
+(FROM ros:humble + ros-humble-rtabmap-ros + rviz2 + rosbag2 sqlite plugin
++ cv_bridge + python3-opencv/numpy/matplotlib). Verified: all 13 rtabmap
+pkgs + rtabmap / rtabmap-databaseViewer. Host ROS and the Isaac images are
+untouched. run_dev.sh / the Isaac container CANNOT serve rtabmap (no
+Humble rtabmap there).
+
+OFF-CAR MAP PIPELINE (per config): vo_node (camera_mode=physical,
+alignment_mode=auto, depth_scale=0.0, n_features=1200, feature_grid=8,
+vo_frontend/vo_estimator under test, force_cart_yaw:=false)
+-> vo_odom_tf_relay -> rtabmap_launch (visual_odometry:=false,
+odom_topic:=/vo/odom_relay, qos:=2, approx_sync, rgbd_sync, use_sim_time).
+CRITICAL TF point: do NOT play the bag's /tf — it carries Cartographer
+map->odom->base_link, which COLLIDES with the relay's odom->base_link and
+rtabmap's map->odom (the Test-12 "unconnected trees" / stuck at 1 node).
+Play only camera + /tf_static; force_cart_yaw:=false means vo_node needs
+no Cartographer yaw. Resulting clean tree:
+map->odom(rtabmap) -> base_link(relay) -> camera(tf_static). vo_node runs
+WITHOUT colcon build (pure rclpy; PYTHONPATH=.../src/qcar2_autonomy;
+vo_node imports no qcar2_interfaces types). Off-tree scripts on the Ubuntu
+box (NOT committed): /tmp/rtabmap_humble/{Dockerfile, run_config.sh,
+run_batch.sh, run_live.sh, analyze_db.py, analyze_all.py, tf_frames.py}.
+
+KEY FINDING — "process EVERY frame" BACKFIRES for this depth-VO (baseline
+collapse): lowering --rate makes vo_node process more of the 3202 color
+frames but SHRINKS the inter-frame baseline. At 0.25x the car moves ~5 mm
+per frame (0.1 m/s / ~20 Hz) — below the depth-noise floor on the white
+walls — so the motion estimate collapses toward zero and the trajectory
+shrinks. PROOF (same config, only rate changed): KLT+PnP = clean 10.84 m
+loop at 0.5x, collapsed to 0.43 m at 0.25x. Corollary: ORB+SVD looks BEST
+at 0.25x only because it is the slowest combo and processed just 54% of
+frames -> ~2x baseline -> full 15.4 m loop. i.e. dropping frames HELPED
+it. CONCLUSION: there is an OPTIMAL INTERMEDIATE baseline; maximizing
+frame coverage is NOT the best case. Matches why the car runs ~6 Hz
+(healthy baseline at driving speed) and points to keyframe-by-distance
+(process a frame only after enough motion) as the right policy — which is
+what RTAB-Map already does for its own keyframes.
+
+FRAME COVERAGE at 0.25x (of 3202 color frames): ORB+SVD 1729 (54%),
+KLT+SVD 2952 (92%), ORB+PnP 2963 (93%), KLT+PnP 2965 (93%).
+
+0.25x MAP RESULTS (kept for record as vo_map_<cfg>_r025.db; mostly
+baseline-collapse artifacts):
+  ORB+SVD  599 nodes / 15.40 m / 26 loop closures / max step 1.465 m  (good: low coverage, big baseline)
+  KLT+SVD  468 nodes /  2.36 m / 12 loop closures                     (collapsed)
+  ORB+PnP  305 nodes /  1.32 m /  5 loop closures                     (collapsed)
+  KLT+PnP  157 nodes /  0.43 m /  2 loop closures                     (collapsed)
+Pipeline sensitivity also noted: which configs chain cleanly
+(neighbor-link count) varied between 0.5x and 0.25x — live-relay odometry
+timing is fragile. The TRUSTWORTHY KLT/PnP comparison is the odometry 2x2
+(recorded directly from /vo, independent of rtabmap), NOT these maps.
+
+REGEN: re-running all 4 at 0.5x -> vo_map_<cfg>_r05.db (better baseline)
+for viewable, trustworthy KLT/PnP maps. The _r025 set is retained for the
+record (it documents the every-frame collapse).
+
+ODOMETRY 2x2 (trustworthy KLT/PnP-vs-default readings, earlier campaign):
+PnP cuts invalid-frame rate ~3x vs SVD (PnP needs valid depth on ONE
+frame; SVD on BOTH; our depth is noisy on white walls); KLT alone (on SVD)
+is WORSE than ORB (more invalid + jumps); KLT+PnP best on inliers/
+reliability; big jumps (2-4) persist across ALL configs = environmental
+(depth/rgb-sync/curve), not an algorithm choice. rgb/depth timestamps are
+misaligned 0.03-0.22 s (seen in rtabmap rgbd_sync warnings) — prime
+suspect for the jumps.
+
+VIEWING: existing trustworthy maps vo_node.db (variant B, ORB+SVD,
+force_cart_yaw=true, 3 loop closures) and cartographer.db (variant C, 14
+loop closures) open in rtabmap-databaseViewer (both carry full keyframe
+images for the Constraints/feature-match views). Live build viewable via
+run_live.sh (rtabmap_viz GUI). No repo code changed this session.
+
+CORRECTION (same day, after the 0.5x regeneration) — the "every-frame
+backfires / baseline-collapse" KEY FINDING above is **RETRACTED**; it was
+premature. Re-running showed the map pipeline is NONDETERMINISTIC: KLT+PnP
+at 0.5x gave a clean 10.84 m loop on the first single run but COLLAPSED to
+0.51 m on a later 0.5x batch run — same config, same rate, same bag. Same
+inputs -> different output => the collapse is a PIPELINE ARTIFACT, not a
+baseline/parallax law. Both 0.25x and 0.5x showed the identical pattern
+(ORB+SVD full ~15-17 m loop, ~84-91 neighbor links; the other three
+collapsed to <2.5 m, only 3-13 neighbor links). The differentiator is the
+rtabmap NEIGHBOR-LINK count = whether rtabmap chained the relayed odometry
+into the pose graph. UNKNOWN which: (a) vo_node's /vo/odometry itself
+collapsed, or (b) rtabmap failed to associate good odometry with keyframes
+(timing race) — the raw /vo/odometry was not retained to decide. Confound:
+the frame-counting `ros2 bag record /vo/odometry` was added AFTER the first
+(good) KLT+PnP run and present for all (collapsed) later runs; the extra
+subscriber/load may have shifted timing. The ORIGINAL working maps
+(vo_node.db, cartographer.db) used PRE-RECORDED odometry replayed at 1x
+(always on time), NOT live-recomputed odometry — the likely robust fix is
+TWO-STAGE: record the regenerated /vo/odometry first (no rtabmap, no timing
+pressure), then feed that recorded odometry + camera into rtabmap (as
+variant B did). CONSEQUENCE: none of the auto-generated vo_map_* maps
+(_r05 or _r025) are a trustworthy KLT/PnP comparison — DO NOT cite them or
+the baseline finding. The trustworthy KLT/PnP-vs-default comparison remains
+the odometry 2x2 (recorded directly from /vo, independent of rtabmap).
+
+DELETED (2026-05-22, operator-approved): the 8 untrustworthy
+vo_map_<cfg>_r025.db / _r05.db + their *_trajectory.png +
+vo_rtabmap_2x2_r025.png / _r05.png removed from
+~/Downloads/rtab_map_gabriel/ (~1.5 GB; nondeterministic-pipeline
+artifacts, reason recorded above). KEPT: originals (rtabmap_odom.db,
+vo_node.db, cartographer.db, the 4 vo_* odometry bags, the original PNGs,
+vslam_test12) + the operator's MANUAL live runs vo_map_live_*.db (run by
+the operator in rtabmap_viz, 1x). force_cart_yaw note: a live force_cart_yaw
+:=true re-run is NOT possible without the Test-12 TF collision (vo_node
+needs Cartographer yaw from the bag's /tf, whose map->odom + odom->base_link
+collide with rtabmap's map->odom and the relay's odom->base_link). The
+clean true-yaw path is two-stage: feed PRE-RECORDED odometry (the campaign
+vo_* bags were recorded at default force_cart_yaw=true) into rtabmap, as
+vo_node.db (variant B = ORB+SVD, true-yaw) already was.
+
+MANUAL LIVE RUNS (operator-driven in rtabmap_viz, 1x, force_cart_yaw=false):
+unlike the flaky headless batch, the manual workflow (launch rtabmap FIRST,
+let it come up, THEN play the bag at 1x, no frame-recorder load) chains
+cleanly. KLT+SVD -> vo_map_live_klt_svd.db = 131 nodes, 11.62 m full loop,
+164 neighbor links, 8 global loop closures, max step 0.238 m (NO jumps
+>0.3 m), planar. Path is accurate on the straights + early/left/top portion
+but DRIFTS PROGRESSIVELY (gradual = yaw accumulation, not jumps) so the end
+lands ~2.5 m off start; RTAB-Map's 8 loop closures bridge the gap. Drift is
+heading, not x/y scale, and concentrates in the later turns (operator
+reported the path is bad at the 2nd left turn + just before the 3rd) ->
+confirms force_cart_yaw=true (Cartographer/IMU yaw) would close the loop
+much better. OPERATOR OBSERVATION (logged for a future tuning pass):
+RTAB-Map's own ORB features cluster rather than spread — tunable via
+Vis/GridRows + Vis/GridCols (registration features) and Kp/GridRows +
+Kp/GridCols (loop-closure keypoints); the RTAB-Map analog of our
+feature_grid=8. Series in progress (operator runs one config at a time):
+KLT+SVD done. ORB+PnP -> vo_map_live_orb_pnp.db = 119 nodes, 11.14 m full
+loop, 140 neighbor links, 6 loop closures, ONE 1.77 m jump (relocalization/
+loop-closure snap), pose z exactly [0,0]. Smoother + rounder than KLT+SVD
+and closes much better (end ~1 m off start vs ~2.5 m) -> held heading
+better; consistent with PnP>SVD from the odometry 2x2 (still a skewed loop:
+left side over-extends to x~-2.3 vs true ~-1.1). The "rollercoaster"
+(points up/down) the operator saw is the 3D CLOUD only (both pose graphs
+exactly planar) = elevated/tilted camera mount projecting depth, NOT the
+trajectory. Cleaner-map plan (roadmap #7; works WITH the fixed bag because
+it is an RTAB-Map setting, not a bag property): view the 2D OCCUPANCY GRID
+instead of the 3D cloud + pass launch args:="--Reg/Force3DoF true
+--Grid/RangeMax 4.0 --Grid/MaxObstacleHeight 0.5" to flatten SLAM + cap
+height/range (cuts compute, drops high walls). KLT+PnP next (last), being
+run with those cleaner-map flags.
+
+COURSE NOTE (operator, applies to ALL interpretations): the recorded run
+does NOT return to the exact start — recording was stopped near the END of
+the 1st left turn (which sits just past the start). So a trajectory ending
+~1 m from start, at the end-of-1st-turn position, is EXPECTED/correct, not
+drift. Re-read accordingly: KLT+SVD's end ~2.5 m off = genuine drift;
+ORB+PnP (~1 m) and KLT+PnP (~1.06 m, end at (0.94,0.47)) = basically the
+correct stop point.
+
+KLT+PnP -> vo_map_live_klt_pnp.db (Force3DoF + Grid caps) = 122 nodes,
+11.19 m, 75 neighbor links, 3 loop closures, pose z exactly [0,0] (operator
+confirmed NO up/down on the nodes — the 2D/Force3DoF flags worked). BEST-
+SHAPED of the three (most rectangle-like, least skewed); end (0.94,0.47) =
+correct end-of-1st-turn stop point. ONE 1.62 m jump at node 119->120 right
+at the end (= operator's "2-3 s of missing nodes" — odometry snapped to the
+end without intermediate keyframes); everything else smooth (next step only
+0.17 m). Slight heading wobble during the 1st turn (operator: brief
+heavy-right before the 2nd left turn), small, no jump.
+
+FALSE-YAW SERIES COMPLETE (force_cart_yaw=false, 1x, manual, rtabmap_viz):
+  KLT+SVD : 131 nodes / 11.62 m / 8 LC / 0 jumps / end ~2.5 m off (most drift)
+  ORB+PnP : 119 nodes / 11.14 m / 6 LC / 1 jump 1.77 m / end ~1 m (closes well)
+  KLT+PnP : 122 nodes / 11.19 m / 3 LC / 1 jump 1.62 m / end ~1.06 m, BEST SHAPE
+All pose graphs exactly planar. PnP variants close the loop better than
+KLT+SVD (less yaw drift) -> map-level agreement with the odometry-2x2
+PnP>SVD finding. rtabmap_viz legend (operator asked): white line = raw
+odometry path; RGB-axis triad = live robot/camera pose; blue line+dots =
+optimized map graph; red = loop-closure links. NEXT: true-yaw
+(force_cart_yaw=true) comparison via a clean method (no live TF collision).
+
+YAW COMPARISON — KLT+PnP (camera only) vs Cartographer
+(compare_kltpnp_vs_cartographer_yaw.png): total heading turned KLT+PnP
+449.6 deg vs Cartographer 457.5 deg = within ~8 deg (~2%) over the whole
+loop. So the camera-only yaw is GLOBALLY close; the problem is LOCAL turn
+distribution — KLT+PnP's loop is rotated/skewed vs Cartographer's because
+turns happen at slightly wrong rates/places. Camera yaw = directionally
+solid globally, locally noisy at turns; Cartographer (IMU-fused) is the
+smooth local reference. Good redundancy story.
+
+LOOP-CLOSURE note: detection is RTAB-Map's OWN appearance matching
+(bag-of-words on its ORB features), independent of our VO frontend, so the
+LC count (KLT+SVD 8 / ORB+PnP 6 / KLT+PnP 3) is not a VO-frontend property.
+Two levers to use closures more: (1) more/spread features for RTAB-Map's
+detector — Kp/MaxFeatures (default 500), Kp/GridRows + Kp/GridCols; (2)
+better yaw — drifted odometry makes detected closures get REJECTED by the
+RGBD/OptimizeMaxError gate (observed earlier: a closure rejected at 44.9 deg
+implied correction), so less yaw drift => more closures accepted.
+
+OPERATOR ALGORITHM INSIGHT (future work, non-holonomic constraint): the VO
+produced kinematically IMPOSSIBLE motions — a near-pure sideways move at the
+end of the 1st turn and a backward step after the end jump. A car can only
+move along its heading. Proposed fix (sound): keep the VO step MAGNITUDE but
+correct its DIRECTION to the feasible heading (bicycle/Ackermann model +
+motor commands), instead of trusting a bad yaw. This is the motion-model
+constraint an EKF applies; force_cart_yaw=true is the crude version (borrow
+Cartographer yaw), the principled version constrains VO to the bicycle
+model. Adopt for a future VO improvement.
+
+EKF OFFLINE FEASIBILITY (roadmap "variant D"): doable on the bag with NO
+QCar. Install ros-humble-robot-localization; feed the EKF /vo/odometry (has
+honest covariance) + Cartographer pose (small relay: bagged map->base_link
+TF -> odom topic, or use /vo/cart_* scalars); play bag -> /odometry/filtered
+-> record + plot fused vs VO vs Cartographer. Caveat: bag has no separate
+IMU/wheel topic (Cartographer already fused those), so the offline EKF fuses
+VO + Cartographer-pose = the redundancy showcase. Pending operator go-ahead;
+operator pausing to study sensors/EKF/bicycle model first.
+
+EKF OFFLINE DEMO — DONE (variant D, off-car, no robot_localization needed).
+/tmp/rtabmap_humble/ekf_demo.py reuses nav_to_pose.py's QcarEKF (its exact
+bicycle-model f/Jf/prediction + covariance-weighted correction) verbatim, run
+on the vo_klt_pnp bag (2258 samples). Prediction driven by CARTOGRAPHER
+measured motion (v from delta-pos, delta from yaw-rate via inverse bicycle) as
+a proxy for the [speed,delta] motor commands the bag does NOT contain;
+CORRECTION = VO pose with its HONEST per-frame covariance straight from
+/vo/odometry. Result (ekf_demo_vo_plus_cartographer.png): fused trajectory
+(red) tracks the clean loop ~ Cartographer and is far smoother than raw VO
+(gray). VO honest 1-sigma swings 0.042 m (confident, straights) -> 7.07 m
+(blind, turns/bare-wall), mean 0.647 m, and the EKF down-weights VO exactly
+where that spikes -> demonstrates the redundancy thesis offline ("VO publishes
+honest uncertainty, the EKF does the right blend"), no QCar. CAVEATS:
+prediction uses Cartographer-motion as a motor-command proxy (the live EKF
+uses real [speed,delta]); the VO source was force_cart_yaw=true so its
+yaw ~= cart (fusion shown is mainly x,y); Q/R are rough demo values, untuned.
+This closes the off-car redundancy-showcase arc; live/tuned EKF + the
+non-holonomic VO constraint remain the on-car follow-ups.
+
+EKF NON-HOLONOMIC GATE — attempted offline (ekf_demo_nh.py, R-inflate + a
+"redirect to heading" variant) on the vo_klt_pnp bag. 17 sideways-violation
+samples flagged but all three modes (no-fix / R-inflate / redirect) produced
+ESSENTIALLY IDENTICAL trajectories because the flagged samples already
+coincided with VO honest-covariance spikes (EKF was already ignoring VO
+there). On this VO source the gate is correct in principle but redundant
+with the honest covariance; on pure-camera VO (force_cart_yaw=false) it
+would matter more, but no synchronized cart-bearing bag exists for that.
+Per operator decision, the NH-test artifacts were REVERTED (ekf_demo_nh.py
++ ekf_demo_nonholonomic.png deleted); the original ekf_demo.py +
+ekf_demo_vo_plus_cartographer.png stand. EKF/VO tuning deferred (no time).
+
+OPERATOR 2D-MAP QUESTION (resolved): Cartographer's native lidar 2D
+occupancy grid is NOT in vslam_test12 (no /map, no /scan recorded — only
+camera + /tf with Cartographer's pose + /vo/*), so it can't be
+reconstructed. However cartographer.db (variant C) DOES store an
+RTAB-Map-built 2D occupancy grid per node: Data.{ground_cells,
+obstacle_cells, empty_cells, cell_size} populated from the depth camera and
+registered to Cartographer's pose. Open cartographer.db in
+rtabmap-databaseViewer and use View -> Show 2D Map (or the grid toolbar
+button) to display it. That is the closest available 2D map of that
+environment riding Cartographer's reliable trajectory.
+
 ## 2026-05-21 Session wrap — cleanup, migration to Ubuntu, full roadmap
 
 Cleanup (file deletions, verified safe — not entry points, no code

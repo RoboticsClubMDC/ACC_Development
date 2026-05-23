@@ -6577,6 +6577,68 @@ for the cleanup + roadmap docs. Provided the push command for the
 operator's terminal (HTTPS -> GitHub username + PAT).
 
 
+Turn 136 - User
+Continued the off-car migration. Confirmed vslam_test12 (5.7 GB source
+bag) transferred by USB into ~/Downloads/rtab_map_gabriel/. Asked to get
+RTAB-Map installed and runnable on the Ubuntu box; to view the existing
+cartographer and vo_node maps (path + loop closures + keyframe/RANSAC
+image views) in rtabmap-databaseViewer; to generate the missing RTAB-Map
+maps for the KLT and PnP configs; and to do so processing as many camera
+frames as possible ("every frame" best case) instead of the ~6 Hz
+real-time VO rate. Also asked for the odometry-readings comparison of
+KLT/PnP vs the default ORB+SVD, a live RTAB-Map (rtabmap_viz) command to
+run himself, non-overwriting output names, and continuous logging for use
+with Codex.
+
+Turn 136 - Assistant
+Clarified bag-vs-map (the vo_<cfg> files are odometry-only recordings; the
+RTAB-Map .db files are the SLAM output with map + loop closures) and
+odometry-vs-SLAM ("the graph" IS the SLAM pose graph, not just odometry).
+Built an ISOLATED humble-rtabmap Docker image (FROM ros:humble +
+ros-humble-rtabmap-ros + rviz2 + rosbag2 sqlite + cv_bridge + opencv/numpy/
+matplotlib) because the Isaac dev image is Humble-on-focal and only has
+Foxy rtabmap; verified all 13 rtabmap pkgs + databaseViewer. Confirmed
+cartographer.db (14 loop closures) and vo_node.db (ORB+SVD, 3 loop
+closures) carry keyframe images and gave the databaseViewer launch command
+(xhost +local:root + docker run with X11). Built the off-car map pipeline
+(vo_node force_cart_yaw:=false -> vo_odom_tf_relay -> rtabmap_launch
+visual_odometry:=false odom_topic:=/vo/odom_relay; play camera + /tf_static
+ONLY to avoid the Cartographer /tf collision; vo_node run without colcon
+via PYTHONPATH). KEY FINDING: "process every frame" BACKFIRES — at 0.25x
+the ~5 mm/frame motion is below the depth-noise floor so the trajectory
+collapses (KLT+PnP 10.84 m at 0.5x -> 0.43 m at 0.25x); ORB+SVD traced the
+full 15.4 m loop only because it dropped ~half the frames (bigger
+baseline). Optimal is an INTERMEDIATE baseline (keyframe-by-distance),
+which is why the car runs ~6 Hz. Frame coverage at 0.25x: ORB+SVD 54%,
+others 92-93%. Kept the collapsed 0.25x maps as vo_map_<cfg>_r025.db for
+the record; re-ran all 4 at 0.5x as vo_map_<cfg>_r05.db. Restated the
+trustworthy odometry 2x2 verdict (PnP cuts invalid rate ~3x; KLT alone
+worse on SVD; KLT+PnP best; jumps are environmental; rgb/depth 0.03-0.22 s
+misalignment). Provided run_live.sh + the live rtabmap_viz docker command.
+Logged to VO_CHANGELOG.md (2026-05-22 entry) and here. No repo code
+changed.
+
+Turn 137 - User
+Asked at what playback rate the existing cartographer.db / vo_node.db maps
+were built, and for an explanation of why processing every/most frames
+hurts our VO.
+
+Turn 137 - Assistant
+Answered the rate: 1x (vo_node.db's odometry was computed live during the
+real drive and replayed at 1x; no --rate in the Easy_Start 7.x recipe).
+Initially explained the every-frame collapse as a baseline / signal-vs-noise
+effect, but the 0.5x regeneration REFUTED that and the explanation is
+RETRACTED: KLT+PnP gave 10.84 m on the first 0.5x run and 0.51 m on a later
+0.5x batch run (same config, rate, bag) -> the collapse is a NONDETERMINISTIC
+pipeline artifact (rtabmap intermittently not chaining the relayed odometry;
+neighbor-link count flips 3-13 vs 70-91 run to run), NOT a baseline law.
+Likely confound: the frame-counting recorder added after the first good run.
+Robust fix = two-stage (record /vo/odometry, then feed the recorded odometry
++ camera into rtabmap, as the working vo_node.db was made). Trustworthy
+KLT/PnP comparison remains the odometry 2x2; the auto-generated vo_map_*
+maps are NOT trustworthy. Corrected VO_CHANGELOG (retraction block).
+
+
 
 
 
