@@ -39,6 +39,32 @@ RUN echo "source /workspace/cartographer_ws/install/setup.bash" >> /home/admin/.
 
 ######### Install User Packages Here #########
 
+# 2026-05-22 17:58:56 EDT:
+# The Isaac/Quanser apt sources can fail to resolve ros-humble-rtabmap-ros.
+# Install only packages this ROS repository can resolve. Some RTAB ROS deps
+# like octomap_msgs may need to come from source if not already present.
+# message_filters is required by rtabmap_sync headers.
+RUN apt-get update && apt-get install -y \
+    libboost-all-dev \
+    libeigen3-dev \
+    libflann-dev \
+    liblz4-dev \
+    liboctomap-dev \
+    libopencv-dev \
+    libpcl-dev \
+    libproj-dev \
+    libsqlite3-dev \
+    zlib1g-dev \
+    ros-humble-diagnostic-updater \
+    ros-humble-image-geometry \
+    ros-humble-image-transport \
+    ros-humble-laser-geometry \
+    ros-humble-message-filters \
+    ros-humble-nav2-msgs \
+    ros-humble-tf2-eigen \
+    ros-humble-tf2-geometry-msgs \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install Python packages
 RUN pip3 install -U \
     pytransform3d \
@@ -46,10 +72,12 @@ RUN pip3 install -U \
     matplotlib \
     tqdm \
     ultralytics
-    
-    
-RUN python3 -m pip install --no-cache-dir --upgrade pip && \
-    python3 -m pip install --no-cache-dir \
-      --extra-index-url https://pypi.nvidia.com \
-      tensorrt
 
+# 2026-05-22 17:35:48 EDT:
+# TensorRT is intentionally disabled for now. It pulls very large NVIDIA wheels
+# and blocked the RTAB-Map Docker layer during the cleanup/smoke-test phase.
+# Re-enable only if LaneNet/TensorRT inference becomes required.
+# RUN python3 -m pip install --no-cache-dir --upgrade pip && \
+#     python3 -m pip install --no-cache-dir \
+#       --extra-index-url https://pypi.nvidia.com \
+#       tensorrt

@@ -31,6 +31,7 @@ import cv2
 import numpy as np
 
 import rclpy
+from ament_index_python.packages import PackageNotFoundError, get_package_share_directory
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 
@@ -62,6 +63,42 @@ add_mdc_paths()
 
 from pit.YOLO.nets import YOLOv8
 
+
+def find_default_model_path():
+    model_name = "quanser_yolov8s-seg.pt"
+    candidates = []
+
+    try:
+        autonomy_share = Path(get_package_share_directory("qcar2_autonomy"))
+        candidates.append(autonomy_share / "models" / model_name)
+    except PackageNotFoundError:
+        pass
+
+    candidates.extend([
+        Path("/workspaces/isaac_ros-dev/Development/ros2/src/qcar2_autonomy/models") / model_name,
+        Path("/workspaces/isaac_ros-dev/ros2/src/qcar2_autonomy/models") / model_name,
+        Path.cwd() / "src/qcar2_autonomy/models" / model_name,
+    ])
+
+    for candidate in candidates:
+        if candidate.exists():
+            return str(candidate)
+
+    return str(candidates[0] if candidates else Path(model_name))
+
+
+def resolve_model_path(model_path):
+    path = Path(model_path).expanduser()
+    if path.exists():
+        return str(path)
+
+    fallback = Path(find_default_model_path())
+    if fallback.exists():
+        return str(fallback)
+
+    return str(path)
+
+
 # ROS2 node responsible only for semantic 2D detection.
 # It subscribes to aligned RGB and publishes YOLO detections + annotated image.
 class SemanticYoloDetector(Node):
@@ -73,9 +110,13 @@ class SemanticYoloDetector(Node):
 
         self.bridge = CvBridge()
 
+        # Updated 2026-05-22 23:03:54 EDT:
+        # Resolve the model from qcar2_autonomy install/share or the active
+        # Development/ros2 source tree. Avoid the stale /workspaces/.../ros2
+        # absolute path because this workspace lives under Development/ros2.
         self.declare_parameter(
             "model_path",
-            "/workspaces/isaac_ros-dev/ros2/src/qcar2_autonomy/models/quanser_yolov8s-seg.pt",
+            find_default_model_path(),
         )
         self.declare_parameter("confidence", 0.30)
         self.declare_parameter("class_filter", "2,9,11")
@@ -89,7 +130,7 @@ class SemanticYoloDetector(Node):
         self.declare_parameter("annotated_topic", "/perception/yolo/image_annotated")
         self.declare_parameter("detections_topic", "/perception/yolo/detections_2d")
 
-        self.model_path = str(self.get_parameter("model_path").value)
+        self.model_path = resolve_model_path(str(self.get_parameter("model_path").value))
         self.confidence = float(self.get_parameter("confidence").value)
         self.class_filter = self.parse_class_filter(
             str(self.get_parameter("class_filter").value)

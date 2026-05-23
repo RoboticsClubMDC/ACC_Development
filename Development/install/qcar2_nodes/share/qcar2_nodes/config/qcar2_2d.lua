@@ -1,1 +1,0 @@
-/workspaces/isaac_ros-dev/ros2/src/qcar2_nodes/config/qcar2_2d.lua

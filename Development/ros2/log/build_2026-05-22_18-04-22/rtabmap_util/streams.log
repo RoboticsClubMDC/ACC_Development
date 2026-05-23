@@ -1,0 +1,66 @@
+[0.165s] Invoking command in '/workspaces/isaac_ros-dev/Development/ros2/build/rtabmap_util': AMENT_PREFIX_PATH=/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_conversions:/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_msgs:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_conversions:/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_msgs:/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap:/workspace/cartographer_ws/install/perception_pcl:/workspace/cartographer_ws/install/pcl_ros:/workspace/cartographer_ws/install/cartographer_rviz:/workspace/cartographer_ws/install/cartographer_ros:/workspace/cartographer_ws/install/pcl_conversions:/workspace/cartographer_ws/install/pcl_msgs:/workspace/cartographer_ws/install/isaac_ros_tensor_list_interfaces:/workspace/cartographer_ws/install/isaac_ros_pointcloud_interfaces:/workspace/cartographer_ws/install/isaac_ros_nova_interfaces:/workspace/cartographer_ws/install/isaac_ros_nitros_bridge_interfaces:/workspace/cartographer_ws/install/isaac_ros_common:/workspace/cartographer_ws/install/isaac_ros_bi3d_interfaces:/workspace/cartographer_ws/install/isaac_ros_apriltag_interfaces:/workspace/cartographer_ws/install/control_msgs:/workspace/cartographer_ws/install/cartographer_ros_msgs:/workspace/cartographer_ws/install/cartographer:/workspace/cartographer_ws/install/absl:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble LD_LIBRARY_PATH=/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_conversions/lib:/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_msgs/lib:/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/lib:${LD_LIBRARY_PATH} PATH=/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/bin:${PATH} PKG_CONFIG_PATH=/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/lib/x86_64-linux-gnu/pkgconfig:/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/lib/pkgconfig:${PKG_CONFIG_PATH} PYTHONPATH=/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_msgs/lib/python3.8/site-packages:${PYTHONPATH} /usr/bin/cmake --build /workspaces/isaac_ros-dev/Development/ros2/build/rtabmap_util -- -j24 -l24
+[0.224s] [  2%] [32mBuilding CXX object CMakeFiles/rtabmap_util_plugins.dir/src/MapsManager.cpp.o[0m
+[0.224s] [  5%] [32mBuilding CXX object CMakeFiles/rtabmap_util_plugins.dir/src/nodelets/disparity_to_depth.cpp.o[0m
+[0.224s] [  7%] [32mBuilding CXX object CMakeFiles/rtabmap_util_plugins.dir/src/nodelets/pointcloud_to_depthimage.cpp.o[0m
+[0.224s] [ 13%] [32mBuilding CXX object CMakeFiles/rtabmap_util_plugins.dir/src/nodelets/point_cloud_aggregator.cpp.o[0m
+[0.228s] [ 13%] [32mBuilding CXX object CMakeFiles/rtabmap_util_plugins.dir/src/nodelets/point_cloud_xyzrgb.cpp.o[0m
+[0.228s] [ 15%] [32mBuilding CXX object CMakeFiles/rtabmap_util_plugins.dir/src/nodelets/point_cloud_assembler.cpp.o[0m
+[0.229s] [ 18%] [32mBuilding CXX object CMakeFiles/rtabmap_util_plugins.dir/src/nodelets/point_cloud_xyz.cpp.o[0m
+[0.229s] [ 23%] [32mBuilding CXX object CMakeFiles/rtabmap_util_plugins.dir/src/nodelets/imu_to_tf.cpp.o[0m
+[0.229s] [ 23%] [32mBuilding CXX object CMakeFiles/rtabmap_util_plugins.dir/src/nodelets/obstacles_detection.cpp.o[0m
+[0.229s] [ 26%] [32mBuilding CXX object CMakeFiles/rtabmap_util_plugins.dir/src/nodelets/lidar_deskewing.cpp.o[0m
+[0.234s] [ 28%] [32mBuilding CXX object CMakeFiles/rtabmap_util_plugins.dir/src/nodelets/rgbd_relay.cpp.o[0m
+[0.236s] [ 31%] [32mBuilding CXX object CMakeFiles/rtabmap_util_plugins.dir/src/nodelets/map_assembler.cpp.o[0m
+[0.237s] [ 34%] [32mBuilding CXX object CMakeFiles/rtabmap_util_plugins.dir/src/nodelets/rgbd_split.cpp.o[0m
+[0.535s] In file included from [01m[K/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap_ros/rtabmap_util/src/nodelets/pointcloud_to_depthimage.cpp:28[m[K:
+[0.535s] [01m[K/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap_ros/rtabmap_util/include/rtabmap_util/pointcloud_to_depthimage.hpp:40:10:[m[K [01;31m[Kfatal error: [m[Kmessage_filters/sync_policies/approximate_time.hpp: No such file or directory
+[0.535s]    40 | #include [01;31m[K<message_filters/sync_policies/approximate_time.hpp>[m[K
+[0.535s]       |          [01;31m[K^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[m[K
+[0.535s] compilation terminated.
+[0.540s] make[2]: *** [CMakeFiles/rtabmap_util_plugins.dir/build.make:132: CMakeFiles/rtabmap_util_plugins.dir/src/nodelets/pointcloud_to_depthimage.cpp.o] Error 1
+[0.541s] make[2]: *** Waiting for unfinished jobs....
+[0.657s] In file included from [01m[K/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap_ros/rtabmap_util/src/nodelets/point_cloud_assembler.cpp:28[m[K:
+[0.657s] [01m[K/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap_ros/rtabmap_util/include/rtabmap_util/point_cloud_assembler.hpp:37:10:[m[K [01;31m[Kfatal error: [m[Kmessage_filters/subscriber.hpp: No such file or directory
+[0.657s]    37 | #include [01;31m[K<message_filters/subscriber.hpp>[m[K
+[0.657s]       |          [01;31m[K^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[m[K
+[0.657s] compilation terminated.
+[0.664s] make[2]: *** [CMakeFiles/rtabmap_util_plugins.dir/build.make:174: CMakeFiles/rtabmap_util_plugins.dir/src/nodelets/point_cloud_assembler.cpp.o] Error 1
+[0.668s] In file included from [01m[K/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap_ros/rtabmap_util/src/nodelets/point_cloud_aggregator.cpp:28[m[K:
+[0.668s] [01m[K/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap_ros/rtabmap_util/include/rtabmap_util/point_cloud_aggregator.hpp:36:10:[m[K [01;31m[Kfatal error: [m[Kmessage_filters/sync_policies/approximate_time.hpp: No such file or directory
+[0.668s]    36 | #include [01;31m[K<message_filters/sync_policies/approximate_time.hpp>[m[K
+[0.668s]       |          [01;31m[K^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[m[K
+[0.668s] compilation terminated.
+[0.672s] make[2]: *** [CMakeFiles/rtabmap_util_plugins.dir/build.make:160: CMakeFiles/rtabmap_util_plugins.dir/src/nodelets/point_cloud_aggregator.cpp.o] Error 1
+[0.688s] In file included from [01m[K/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap_ros/rtabmap_util/src/nodelets/point_cloud_xyzrgb.cpp:28[m[K:
+[0.688s] [01m[K/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap_ros/rtabmap_util/include/rtabmap_util/point_cloud_xyzrgb.hpp:41:10:[m[K [01;31m[Kfatal error: [m[Kmessage_filters/sync_policies/approximate_time.hpp: No such file or directory
+[0.688s]    41 | #include [01;31m[K<message_filters/sync_policies/approximate_time.hpp>[m[K
+[0.688s]       |          [01;31m[K^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[m[K
+[0.689s] compilation terminated.
+[0.696s] make[2]: *** [CMakeFiles/rtabmap_util_plugins.dir/build.make:90: CMakeFiles/rtabmap_util_plugins.dir/src/nodelets/point_cloud_xyzrgb.cpp.o] Error 1
+[0.704s] In file included from [01m[K/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap_ros/rtabmap_util/src/nodelets/point_cloud_xyz.cpp:28[m[K:
+[0.704s] [01m[K/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap_ros/rtabmap_util/include/rtabmap_util/point_cloud_xyz.hpp:39:10:[m[K [01;31m[Kfatal error: [m[Kmessage_filters/sync_policies/approximate_time.hpp: No such file or directory
+[0.704s]    39 | #include [01;31m[K<message_filters/sync_policies/approximate_time.hpp>[m[K
+[0.704s]       |          [01;31m[K^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[m[K
+[0.704s] compilation terminated.
+[0.709s] make[2]: *** [CMakeFiles/rtabmap_util_plugins.dir/build.make:104: CMakeFiles/rtabmap_util_plugins.dir/src/nodelets/point_cloud_xyz.cpp.o] Error 1
+[2.004s] [01m[K/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap_ros/rtabmap_util/src/nodelets/imu_to_tf.cpp:31:10:[m[K [01;31m[Kfatal error: [m[Ktf2/LinearMath/Transform.hpp: No such file or directory
+[2.004s]    31 | #include [01;31m[K<tf2/LinearMath/Transform.hpp>[m[K
+[2.004s]       |          [01;31m[K^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[m[K
+[2.004s] compilation terminated.
+[2.030s] make[2]: *** [CMakeFiles/rtabmap_util_plugins.dir/build.make:188: CMakeFiles/rtabmap_util_plugins.dir/src/nodelets/imu_to_tf.cpp.o] Error 1
+[12.224s] [01m[K/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap_ros/rtabmap_util/src/MapsManager.cpp:[m[K In member function ‘[01m[Kvoid rtabmap_util::MapsManager::publishMaps(const std::map<int, rtabmap::Transform>&, const rclcpp::Time&, const string&)[m[K’:
+[12.224s] [01m[K/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap_ros/rtabmap_util/src/MapsManager.cpp:852:27:[m[K [01;31m[Kerror: [m[K‘[01m[Kclass rtabmap::FlannIndex[m[K’ has no member named ‘[01m[KbuildKDTreeSingleIndex[m[K’
+[12.225s]   852 |     assembledGroundIndex_.[01;31m[KbuildKDTreeSingleIndex[m[K(tmpGroundPts, 15);
+[12.225s]       |                           [01;31m[K^~~~~~~~~~~~~~~~~~~~~~[m[K
+[12.225s] [01m[K/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap_ros/rtabmap_util/src/MapsManager.cpp:856:29:[m[K [01;31m[Kerror: [m[K‘[01m[Kclass rtabmap::FlannIndex[m[K’ has no member named ‘[01m[KbuildKDTreeSingleIndex[m[K’
+[12.225s]   856 |     assembledObstacleIndex_.[01;31m[KbuildKDTreeSingleIndex[m[K(tmpObstaclePts, 15);
+[12.225s]       |                             [01;31m[K^~~~~~~~~~~~~~~~~~~~~~[m[K
+[12.225s] [01m[K/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap_ros/rtabmap_util/src/MapsManager.cpp:897:31:[m[K [01;31m[Kerror: [m[K‘[01m[Kclass rtabmap::FlannIndex[m[K’ has no member named ‘[01m[KbuildKDTreeSingleIndex[m[K’
+[12.225s]   897 |         assembledGroundIndex_.[01;31m[KbuildKDTreeSingleIndex[m[K(pts, 15);
+[12.225s]       |                               [01;31m[K^~~~~~~~~~~~~~~~~~~~~~[m[K
+[12.238s] [01m[K/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap_ros/rtabmap_util/src/MapsManager.cpp:944:33:[m[K [01;31m[Kerror: [m[K‘[01m[Kclass rtabmap::FlannIndex[m[K’ has no member named ‘[01m[KbuildKDTreeSingleIndex[m[K’
+[12.238s]   944 |         assembledObstacleIndex_.[01;31m[KbuildKDTreeSingleIndex[m[K(pts, 15);
+[12.238s]       |                                 [01;31m[K^~~~~~~~~~~~~~~~~~~~~~[m[K
+[15.638s] make[2]: *** [CMakeFiles/rtabmap_util_plugins.dir/build.make:76: CMakeFiles/rtabmap_util_plugins.dir/src/MapsManager.cpp.o] Error 1
+[24.861s] make[1]: *** [CMakeFiles/Makefile2:161: CMakeFiles/rtabmap_util_plugins.dir/all] Error 2
+[24.861s] make: *** [Makefile:146: all] Error 2

@@ -1,0 +1,496 @@
+[0.094s] Invoking command in '/workspaces/isaac_ros-dev/Development/ros2/build/rtabmap_conversions': AMENT_PREFIX_PATH=/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_msgs:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_msgs:/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap:/workspace/cartographer_ws/install/perception_pcl:/workspace/cartographer_ws/install/pcl_ros:/workspace/cartographer_ws/install/cartographer_rviz:/workspace/cartographer_ws/install/cartographer_ros:/workspace/cartographer_ws/install/pcl_conversions:/workspace/cartographer_ws/install/pcl_msgs:/workspace/cartographer_ws/install/isaac_ros_tensor_list_interfaces:/workspace/cartographer_ws/install/isaac_ros_pointcloud_interfaces:/workspace/cartographer_ws/install/isaac_ros_nova_interfaces:/workspace/cartographer_ws/install/isaac_ros_nitros_bridge_interfaces:/workspace/cartographer_ws/install/isaac_ros_common:/workspace/cartographer_ws/install/isaac_ros_bi3d_interfaces:/workspace/cartographer_ws/install/isaac_ros_apriltag_interfaces:/workspace/cartographer_ws/install/control_msgs:/workspace/cartographer_ws/install/cartographer_ros_msgs:/workspace/cartographer_ws/install/cartographer:/workspace/cartographer_ws/install/absl:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble LD_LIBRARY_PATH=/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_msgs/lib:/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/lib:${LD_LIBRARY_PATH} PATH=/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/bin:${PATH} PKG_CONFIG_PATH=/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/lib/x86_64-linux-gnu/pkgconfig:/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/lib/pkgconfig:${PKG_CONFIG_PATH} PYTHONPATH=/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_msgs/lib/python3.8/site-packages:${PYTHONPATH} /usr/bin/cmake --build /workspaces/isaac_ros-dev/Development/ros2/build/rtabmap_conversions -- -j24 -l24
+[0.131s] -- Found ament_cmake: 1.3.5 (/opt/ros/humble/share/ament_cmake/cmake)
+[0.391s] -- Override CMake install command with custom implementation using symlinks instead of copying resources
+[0.407s] -- Found cv_bridge: 3.2.1 (/opt/ros/humble/share/cv_bridge/cmake)
+[0.470s] -- Found rosidl_generator_c: 3.1.5 (/opt/ros/humble/share/rosidl_generator_c/cmake)
+[0.474s] -- Found rosidl_adapter: 3.1.5 (/opt/ros/humble/share/rosidl_adapter/cmake)
+[0.484s] -- Found rosidl_generator_cpp: 3.1.5 (/opt/ros/humble/share/rosidl_generator_cpp/cmake)
+[0.503s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[0.527s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[0.814s] -- Found image_geometry: 3.2.1 (/opt/ros/humble/share/image_geometry/cmake)
+[0.825s] -- Found laser_geometry: 2.4.0 (/opt/ros/humble/share/laser_geometry/cmake)
+[0.912s] -- Found rmw_implementation_cmake: 6.1.1 (/opt/ros/humble/share/rmw_implementation_cmake/cmake)
+[0.917s] -- Found rmw_fastrtps_cpp: 6.2.4 (/opt/ros/humble/share/rmw_fastrtps_cpp/cmake)
+[1.216s] -- Using RMW implementation 'rmw_fastrtps_cpp' as default
+[1.434s] -- Found pcl_conversions: 2.4.5 (/workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake)
+[1.620s] -- Eigen found (include: /usr/include/eigen3, version: 3.3.7)
+[1.741s] -- The imported target "vtkParseOGLExt" references the file
+[1.741s]    "/usr/bin/vtkParseOGLExt-7.1"
+[1.741s] but this file does not exist.  Possible reasons include:
+[1.741s] * The file was deleted, renamed, or moved to another location.
+[1.741s] * An install or uninstall procedure did not complete successfully.
+[1.741s] * The installation package was faulty and contained
+[1.741s]    "/usr/lib/cmake/vtk-7.1/VTKTargets.cmake"
+[1.741s] but not all the files it references.
+[1.741s] 
+[1.741s] -- The imported target "vtkRenderingPythonTkWidgets" references the file
+[1.741s]    "/usr/lib/x86_64-linux-gnu/libvtkRenderingPythonTkWidgets.so"
+[1.741s] but this file does not exist.  Possible reasons include:
+[1.741s] * The file was deleted, renamed, or moved to another location.
+[1.742s] * An install or uninstall procedure did not complete successfully.
+[1.742s] * The installation package was faulty and contained
+[1.742s]    "/usr/lib/cmake/vtk-7.1/VTKTargets.cmake"
+[1.742s] but not all the files it references.
+[1.742s] 
+[1.742s] -- The imported target "vtk" references the file
+[1.742s]    "/usr/bin/vtk"
+[1.742s] but this file does not exist.  Possible reasons include:
+[1.742s] * The file was deleted, renamed, or moved to another location.
+[1.742s] * An install or uninstall procedure did not complete successfully.
+[1.742s] * The installation package was faulty and contained
+[1.742s]    "/usr/lib/cmake/vtk-7.1/VTKTargets.cmake"
+[1.742s] but not all the files it references.
+[1.742s] 
+[1.742s] -- The imported target "pvtk" references the file
+[1.742s]    "/usr/bin/pvtk"
+[1.742s] but this file does not exist.  Possible reasons include:
+[1.742s] * The file was deleted, renamed, or moved to another location.
+[1.742s] * An install or uninstall procedure did not complete successfully.
+[1.742s] * The installation package was faulty and contained
+[1.742s]    "/usr/lib/cmake/vtk-7.1/VTKTargets.cmake"
+[1.743s] but not all the files it references.
+[1.743s] 
+[1.767s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.767s]   The package name passed to `find_package_handle_standard_args` (USB_10)
+[1.767s]   does not match the name of the calling package (OpenNI).  This can lead to
+[1.767s]   problems in calling code that expects `find_package` result variables
+[1.767s]   (e.g., `_FOUND`) to follow a certain pattern.
+[1.767s] Call Stack (most recent call first):
+[1.767s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/Modules/FindOpenNI.cmake:28 (find_package_handle_standard_args)
+[1.767s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:179 (find_package)
+[1.767s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:322 (find_openni)
+[1.767s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:548 (find_external_library)
+[1.767s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/ament_cmake_export_dependencies-extras.cmake:21 (find_package)
+[1.767s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/pcl_conversionsConfig.cmake:41 (include)
+[1.767s]   CMakeLists.txt:23 (find_package)
+[1.767s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.768s] [0m
+[1.768s] -- OpenNI found (include: /usr/include/ni, lib: /usr/lib/libOpenNI.so)
+[1.786s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.787s]   The package name passed to `find_package_handle_standard_args` (USB_10)
+[1.787s]   does not match the name of the calling package (OpenNI2).  This can lead to
+[1.787s]   problems in calling code that expects `find_package` result variables
+[1.787s]   (e.g., `_FOUND`) to follow a certain pattern.
+[1.787s] Call Stack (most recent call first):
+[1.787s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/Modules/FindOpenNI2.cmake:28 (find_package_handle_standard_args)
+[1.787s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:193 (find_package)
+[1.787s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:324 (find_openni2)
+[1.787s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:548 (find_external_library)
+[1.787s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/ament_cmake_export_dependencies-extras.cmake:21 (find_package)
+[1.787s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/pcl_conversionsConfig.cmake:41 (include)
+[1.787s]   CMakeLists.txt:23 (find_package)
+[1.787s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.787s] [0m
+[1.789s] -- OpenNI2 found (include: /usr/include/openni2, lib: /usr/lib/libOpenNI2.so)
+[1.804s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.805s]   The package name passed to `find_package_handle_standard_args` (libusb-1.0)
+[1.805s]   does not match the name of the calling package (PCL).  This can lead to
+[1.805s]   problems in calling code that expects `find_package` result variables
+[1.805s]   (e.g., `_FOUND`) to follow a certain pattern.
+[1.805s] Call Stack (most recent call first):
+[1.805s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:291 (find_package_handle_standard_args)
+[1.805s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:338 (find_libusb)
+[1.805s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:548 (find_external_library)
+[1.805s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/ament_cmake_export_dependencies-extras.cmake:21 (find_package)
+[1.805s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/pcl_conversionsConfig.cmake:41 (include)
+[1.805s]   CMakeLists.txt:23 (find_package)
+[1.805s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.805s] [0m
+[1.814s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.815s]   The package name passed to `find_package_handle_standard_args` (USB_10)
+[1.815s]   does not match the name of the calling package (OpenNI).  This can lead to
+[1.815s]   problems in calling code that expects `find_package` result variables
+[1.815s]   (e.g., `_FOUND`) to follow a certain pattern.
+[1.815s] Call Stack (most recent call first):
+[1.815s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/Modules/FindOpenNI.cmake:28 (find_package_handle_standard_args)
+[1.815s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:179 (find_package)
+[1.815s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:322 (find_openni)
+[1.815s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:548 (find_external_library)
+[1.815s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/ament_cmake_export_dependencies-extras.cmake:21 (find_package)
+[1.815s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/pcl_conversionsConfig.cmake:41 (include)
+[1.815s]   CMakeLists.txt:23 (find_package)
+[1.815s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.815s] [0m
+[1.816s] -- OpenNI found (include: /usr/include/ni, lib: /usr/lib/libOpenNI.so)
+[1.826s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.826s]   The package name passed to `find_package_handle_standard_args` (USB_10)
+[1.827s]   does not match the name of the calling package (OpenNI2).  This can lead to
+[1.827s]   problems in calling code that expects `find_package` result variables
+[1.827s]   (e.g., `_FOUND`) to follow a certain pattern.
+[1.827s] Call Stack (most recent call first):
+[1.827s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/Modules/FindOpenNI2.cmake:28 (find_package_handle_standard_args)
+[1.827s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:193 (find_package)
+[1.827s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:324 (find_openni2)
+[1.827s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:548 (find_external_library)
+[1.827s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/ament_cmake_export_dependencies-extras.cmake:21 (find_package)
+[1.827s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/pcl_conversionsConfig.cmake:41 (include)
+[1.827s]   CMakeLists.txt:23 (find_package)
+[1.827s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.827s] [0m
+[1.828s] -- OpenNI2 found (include: /usr/include/openni2, lib: /usr/lib/libOpenNI2.so)
+[1.847s] -- QHULL found (include: /usr/include, lib: optimized;/usr/lib/x86_64-linux-gnu/libqhull.so;debug;/usr/lib/x86_64-linux-gnu/libqhull.so)
+[1.859s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.859s]   The package name passed to `find_package_handle_standard_args` (USB_10)
+[1.859s]   does not match the name of the calling package (OpenNI).  This can lead to
+[1.859s]   problems in calling code that expects `find_package` result variables
+[1.859s]   (e.g., `_FOUND`) to follow a certain pattern.
+[1.859s] Call Stack (most recent call first):
+[1.859s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/Modules/FindOpenNI.cmake:28 (find_package_handle_standard_args)
+[1.859s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:179 (find_package)
+[1.859s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:322 (find_openni)
+[1.859s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:548 (find_external_library)
+[1.860s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/ament_cmake_export_dependencies-extras.cmake:21 (find_package)
+[1.860s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/pcl_conversionsConfig.cmake:41 (include)
+[1.860s]   CMakeLists.txt:23 (find_package)
+[1.860s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.860s] [0m
+[1.861s] -- OpenNI found (include: /usr/include/ni, lib: /usr/lib/libOpenNI.so)
+[1.878s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.878s]   The package name passed to `find_package_handle_standard_args` (PCL_COMMON)
+[1.878s]   does not match the name of the calling package (PCL).  This can lead to
+[1.878s]   problems in calling code that expects `find_package` result variables
+[1.878s]   (e.g., `_FOUND`) to follow a certain pattern.
+[1.878s] Call Stack (most recent call first):
+[1.878s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[1.878s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/ament_cmake_export_dependencies-extras.cmake:21 (find_package)
+[1.878s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/pcl_conversionsConfig.cmake:41 (include)
+[1.878s]   CMakeLists.txt:23 (find_package)
+[1.879s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.879s] [0m
+[1.879s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.879s]   The package name passed to `find_package_handle_standard_args` (PCL_KDTREE)
+[1.879s]   does not match the name of the calling package (PCL).  This can lead to
+[1.879s]   problems in calling code that expects `find_package` result variables
+[1.879s]   (e.g., `_FOUND`) to follow a certain pattern.
+[1.879s] Call Stack (most recent call first):
+[1.879s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[1.879s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/ament_cmake_export_dependencies-extras.cmake:21 (find_package)
+[1.879s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/pcl_conversionsConfig.cmake:41 (include)
+[1.879s]   CMakeLists.txt:23 (find_package)
+[1.879s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.879s] [0m
+[1.879s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.879s]   The package name passed to `find_package_handle_standard_args` (PCL_OCTREE)
+[1.879s]   does not match the name of the calling package (PCL).  This can lead to
+[1.880s]   problems in calling code that expects `find_package` result variables
+[1.880s]   (e.g., `_FOUND`) to follow a certain pattern.
+[1.880s] Call Stack (most recent call first):
+[1.880s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[1.880s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/ament_cmake_export_dependencies-extras.cmake:21 (find_package)
+[1.880s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/pcl_conversionsConfig.cmake:41 (include)
+[1.880s]   CMakeLists.txt:23 (find_package)
+[1.880s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.880s] [0m
+[1.880s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.880s]   The package name passed to `find_package_handle_standard_args` (PCL_SEARCH)
+[1.880s]   does not match the name of the calling package (PCL).  This can lead to
+[1.880s]   problems in calling code that expects `find_package` result variables
+[1.880s]   (e.g., `_FOUND`) to follow a certain pattern.
+[1.880s] Call Stack (most recent call first):
+[1.880s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[1.880s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/ament_cmake_export_dependencies-extras.cmake:21 (find_package)
+[1.880s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/pcl_conversionsConfig.cmake:41 (include)
+[1.880s]   CMakeLists.txt:23 (find_package)
+[1.880s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.881s] [0m
+[1.881s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.881s]   The package name passed to `find_package_handle_standard_args`
+[1.881s]   (PCL_SAMPLE_CONSENSUS) does not match the name of the calling package
+[1.881s]   (PCL).  This can lead to problems in calling code that expects
+[1.881s]   `find_package` result variables (e.g., `_FOUND`) to follow a certain
+[1.881s]   pattern.
+[1.881s] Call Stack (most recent call first):
+[1.881s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[1.881s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/ament_cmake_export_dependencies-extras.cmake:21 (find_package)
+[1.881s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/pcl_conversionsConfig.cmake:41 (include)
+[1.881s]   CMakeLists.txt:23 (find_package)
+[1.881s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.881s] [0m
+[1.881s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.881s]   The package name passed to `find_package_handle_standard_args`
+[1.881s]   (PCL_FILTERS) does not match the name of the calling package (PCL).  This
+[1.881s]   can lead to problems in calling code that expects `find_package` result
+[1.882s]   variables (e.g., `_FOUND`) to follow a certain pattern.
+[1.882s] Call Stack (most recent call first):
+[1.882s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[1.882s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/ament_cmake_export_dependencies-extras.cmake:21 (find_package)
+[1.882s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/pcl_conversionsConfig.cmake:41 (include)
+[1.882s]   CMakeLists.txt:23 (find_package)
+[1.882s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.882s] [0m
+[1.882s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.882s]   The package name passed to `find_package_handle_standard_args` (PCL_2D)
+[1.882s]   does not match the name of the calling package (PCL).  This can lead to
+[1.882s]   problems in calling code that expects `find_package` result variables
+[1.882s]   (e.g., `_FOUND`) to follow a certain pattern.
+[1.882s] Call Stack (most recent call first):
+[1.882s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:619 (find_package_handle_standard_args)
+[1.882s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/ament_cmake_export_dependencies-extras.cmake:21 (find_package)
+[1.882s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/pcl_conversionsConfig.cmake:41 (include)
+[1.882s]   CMakeLists.txt:23 (find_package)
+[1.883s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.883s] [0m
+[1.883s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.883s]   The package name passed to `find_package_handle_standard_args`
+[1.883s]   (PCL_GEOMETRY) does not match the name of the calling package (PCL).  This
+[1.883s]   can lead to problems in calling code that expects `find_package` result
+[1.883s]   variables (e.g., `_FOUND`) to follow a certain pattern.
+[1.883s] Call Stack (most recent call first):
+[1.883s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:619 (find_package_handle_standard_args)
+[1.883s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/ament_cmake_export_dependencies-extras.cmake:21 (find_package)
+[1.883s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/pcl_conversionsConfig.cmake:41 (include)
+[1.883s]   CMakeLists.txt:23 (find_package)
+[1.883s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.883s] [0m
+[1.883s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.883s]   The package name passed to `find_package_handle_standard_args` (PCL_IO)
+[1.883s]   does not match the name of the calling package (PCL).  This can lead to
+[1.883s]   problems in calling code that expects `find_package` result variables
+[1.883s]   (e.g., `_FOUND`) to follow a certain pattern.
+[1.884s] Call Stack (most recent call first):
+[1.884s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[1.884s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/ament_cmake_export_dependencies-extras.cmake:21 (find_package)
+[1.884s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/pcl_conversionsConfig.cmake:41 (include)
+[1.884s]   CMakeLists.txt:23 (find_package)
+[1.884s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.884s] [0m
+[1.884s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.884s]   The package name passed to `find_package_handle_standard_args`
+[1.884s]   (PCL_FEATURES) does not match the name of the calling package (PCL).  This
+[1.884s]   can lead to problems in calling code that expects `find_package` result
+[1.884s]   variables (e.g., `_FOUND`) to follow a certain pattern.
+[1.884s] Call Stack (most recent call first):
+[1.884s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[1.884s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/ament_cmake_export_dependencies-extras.cmake:21 (find_package)
+[1.884s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/pcl_conversionsConfig.cmake:41 (include)
+[1.884s]   CMakeLists.txt:23 (find_package)
+[1.884s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.885s] [0m
+[1.885s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.885s]   The package name passed to `find_package_handle_standard_args` (PCL_ML)
+[1.885s]   does not match the name of the calling package (PCL).  This can lead to
+[1.885s]   problems in calling code that expects `find_package` result variables
+[1.885s]   (e.g., `_FOUND`) to follow a certain pattern.
+[1.885s] Call Stack (most recent call first):
+[1.885s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[1.885s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/ament_cmake_export_dependencies-extras.cmake:21 (find_package)
+[1.885s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/pcl_conversionsConfig.cmake:41 (include)
+[1.885s]   CMakeLists.txt:23 (find_package)
+[1.885s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.885s] [0m
+[1.885s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.885s]   The package name passed to `find_package_handle_standard_args`
+[1.885s]   (PCL_SEGMENTATION) does not match the name of the calling package (PCL).
+[1.885s]   This can lead to problems in calling code that expects `find_package`
+[1.885s]   result variables (e.g., `_FOUND`) to follow a certain pattern.
+[1.885s] Call Stack (most recent call first):
+[1.886s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[1.886s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/ament_cmake_export_dependencies-extras.cmake:21 (find_package)
+[1.886s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/pcl_conversionsConfig.cmake:41 (include)
+[1.886s]   CMakeLists.txt:23 (find_package)
+[1.886s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.886s] [0m
+[1.886s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.886s]   The package name passed to `find_package_handle_standard_args`
+[1.886s]   (PCL_VISUALIZATION) does not match the name of the calling package (PCL).
+[1.886s]   This can lead to problems in calling code that expects `find_package`
+[1.886s]   result variables (e.g., `_FOUND`) to follow a certain pattern.
+[1.886s] Call Stack (most recent call first):
+[1.886s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[1.886s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/ament_cmake_export_dependencies-extras.cmake:21 (find_package)
+[1.886s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/pcl_conversionsConfig.cmake:41 (include)
+[1.886s]   CMakeLists.txt:23 (find_package)
+[1.886s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.886s] [0m
+[1.887s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.887s]   The package name passed to `find_package_handle_standard_args`
+[1.887s]   (PCL_SURFACE) does not match the name of the calling package (PCL).  This
+[1.887s]   can lead to problems in calling code that expects `find_package` result
+[1.887s]   variables (e.g., `_FOUND`) to follow a certain pattern.
+[1.887s] Call Stack (most recent call first):
+[1.887s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[1.887s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/ament_cmake_export_dependencies-extras.cmake:21 (find_package)
+[1.887s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/pcl_conversionsConfig.cmake:41 (include)
+[1.887s]   CMakeLists.txt:23 (find_package)
+[1.887s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.887s] [0m
+[1.887s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.887s]   The package name passed to `find_package_handle_standard_args`
+[1.887s]   (PCL_REGISTRATION) does not match the name of the calling package (PCL).
+[1.887s]   This can lead to problems in calling code that expects `find_package`
+[1.887s]   result variables (e.g., `_FOUND`) to follow a certain pattern.
+[1.887s] Call Stack (most recent call first):
+[1.888s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[1.888s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/ament_cmake_export_dependencies-extras.cmake:21 (find_package)
+[1.888s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/pcl_conversionsConfig.cmake:41 (include)
+[1.888s]   CMakeLists.txt:23 (find_package)
+[1.888s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.888s] [0m
+[1.888s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.888s]   The package name passed to `find_package_handle_standard_args`
+[1.888s]   (PCL_KEYPOINTS) does not match the name of the calling package (PCL).  This
+[1.888s]   can lead to problems in calling code that expects `find_package` result
+[1.888s]   variables (e.g., `_FOUND`) to follow a certain pattern.
+[1.888s] Call Stack (most recent call first):
+[1.888s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[1.888s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/ament_cmake_export_dependencies-extras.cmake:21 (find_package)
+[1.888s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/pcl_conversionsConfig.cmake:41 (include)
+[1.888s]   CMakeLists.txt:23 (find_package)
+[1.888s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.888s] [0m
+[1.888s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.888s]   The package name passed to `find_package_handle_standard_args`
+[1.889s]   (PCL_TRACKING) does not match the name of the calling package (PCL).  This
+[1.889s]   can lead to problems in calling code that expects `find_package` result
+[1.889s]   variables (e.g., `_FOUND`) to follow a certain pattern.
+[1.889s] Call Stack (most recent call first):
+[1.889s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[1.889s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/ament_cmake_export_dependencies-extras.cmake:21 (find_package)
+[1.889s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/pcl_conversionsConfig.cmake:41 (include)
+[1.889s]   CMakeLists.txt:23 (find_package)
+[1.889s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.889s] [0m
+[1.889s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.889s]   The package name passed to `find_package_handle_standard_args`
+[1.889s]   (PCL_RECOGNITION) does not match the name of the calling package (PCL).
+[1.889s]   This can lead to problems in calling code that expects `find_package`
+[1.889s]   result variables (e.g., `_FOUND`) to follow a certain pattern.
+[1.889s] Call Stack (most recent call first):
+[1.889s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[1.889s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/ament_cmake_export_dependencies-extras.cmake:21 (find_package)
+[1.889s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/pcl_conversionsConfig.cmake:41 (include)
+[1.889s]   CMakeLists.txt:23 (find_package)
+[1.889s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.890s] [0m
+[1.890s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.890s]   The package name passed to `find_package_handle_standard_args` (PCL_STEREO)
+[1.890s]   does not match the name of the calling package (PCL).  This can lead to
+[1.890s]   problems in calling code that expects `find_package` result variables
+[1.890s]   (e.g., `_FOUND`) to follow a certain pattern.
+[1.890s] Call Stack (most recent call first):
+[1.890s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[1.890s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/ament_cmake_export_dependencies-extras.cmake:21 (find_package)
+[1.890s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/pcl_conversionsConfig.cmake:41 (include)
+[1.890s]   CMakeLists.txt:23 (find_package)
+[1.890s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.890s] [0m
+[1.891s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.891s]   The package name passed to `find_package_handle_standard_args` (PCL_APPS)
+[1.891s]   does not match the name of the calling package (PCL).  This can lead to
+[1.891s]   problems in calling code that expects `find_package` result variables
+[1.891s]   (e.g., `_FOUND`) to follow a certain pattern.
+[1.891s] Call Stack (most recent call first):
+[1.891s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[1.891s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/ament_cmake_export_dependencies-extras.cmake:21 (find_package)
+[1.891s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/pcl_conversionsConfig.cmake:41 (include)
+[1.891s]   CMakeLists.txt:23 (find_package)
+[1.891s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.891s] [0m
+[1.892s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.892s]   The package name passed to `find_package_handle_standard_args`
+[1.892s]   (PCL_IN_HAND_SCANNER) does not match the name of the calling package (PCL).
+[1.892s]   This can lead to problems in calling code that expects `find_package`
+[1.892s]   result variables (e.g., `_FOUND`) to follow a certain pattern.
+[1.892s] Call Stack (most recent call first):
+[1.892s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:619 (find_package_handle_standard_args)
+[1.892s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/ament_cmake_export_dependencies-extras.cmake:21 (find_package)
+[1.892s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/pcl_conversionsConfig.cmake:41 (include)
+[1.892s]   CMakeLists.txt:23 (find_package)
+[1.892s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.893s] [0m
+[1.893s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.893s]   The package name passed to `find_package_handle_standard_args`
+[1.893s]   (PCL_POINT_CLOUD_EDITOR) does not match the name of the calling package
+[1.893s]   (PCL).  This can lead to problems in calling code that expects
+[1.893s]   `find_package` result variables (e.g., `_FOUND`) to follow a certain
+[1.893s]   pattern.
+[1.893s] Call Stack (most recent call first):
+[1.893s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:619 (find_package_handle_standard_args)
+[1.893s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/ament_cmake_export_dependencies-extras.cmake:21 (find_package)
+[1.893s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/pcl_conversionsConfig.cmake:41 (include)
+[1.893s]   CMakeLists.txt:23 (find_package)
+[1.893s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.893s] [0m
+[1.893s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.893s]   The package name passed to `find_package_handle_standard_args`
+[1.893s]   (PCL_OUTOFCORE) does not match the name of the calling package (PCL).  This
+[1.893s]   can lead to problems in calling code that expects `find_package` result
+[1.893s]   variables (e.g., `_FOUND`) to follow a certain pattern.
+[1.893s] Call Stack (most recent call first):
+[1.893s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[1.893s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/ament_cmake_export_dependencies-extras.cmake:21 (find_package)
+[1.893s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/pcl_conversionsConfig.cmake:41 (include)
+[1.894s]   CMakeLists.txt:23 (find_package)
+[1.894s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.894s] [0m
+[1.894s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.894s]   The package name passed to `find_package_handle_standard_args` (PCL_PEOPLE)
+[1.894s]   does not match the name of the calling package (PCL).  This can lead to
+[1.894s]   problems in calling code that expects `find_package` result variables
+[1.894s]   (e.g., `_FOUND`) to follow a certain pattern.
+[1.894s] Call Stack (most recent call first):
+[1.894s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[1.894s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/ament_cmake_export_dependencies-extras.cmake:21 (find_package)
+[1.894s]   /workspace/cartographer_ws/install/pcl_conversions/share/pcl_conversions/cmake/pcl_conversionsConfig.cmake:41 (include)
+[1.894s]   CMakeLists.txt:23 (find_package)
+[1.894s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.894s] [0m
+[1.928s] -- Found rtabmap_msgs: 0.22.1 (/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_msgs/share/rtabmap_msgs/cmake)
+[2.029s] -- Found tf2_eigen: 0.25.4 (/opt/ros/humble/share/tf2_eigen/cmake)
+[2.484s] -- Found tf2_geometry_msgs: 0.25.4 (/opt/ros/humble/share/tf2_geometry_msgs/cmake)
+[2.492s] -- Ensuring Eigen3 include directory is part of orocos-kdl CMake target
+[2.503s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/CMakeFindDependencyMacro.cmake:47 (find_package):
+[2.504s]   Policy CMP0074 is not set: find_package uses <PackageName>_ROOT variables.
+[2.504s]   Run "cmake --help-policy CMP0074" for policy details.  Use the cmake_policy
+[2.504s]   command to set the policy and suppress this warning.
+[2.504s] 
+[2.504s]   CMake variable PCL_ROOT is set to:
+[2.504s] 
+[2.504s]     /usr
+[2.504s] 
+[2.504s]   For compatibility, CMake is ignoring the variable.
+[2.504s] Call Stack (most recent call first):
+[2.504s]   /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/lib/rtabmap-0.22/RTABMapConfig.cmake:18 (find_dependency)
+[2.504s]   CMakeLists.txt:32 (find_package)
+[2.504s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[2.504s] [0m
+[2.755s] -- Configuring done
+[2.801s] -- Generating done
+[2.803s] -- Build files have been written to: /workspaces/isaac_ros-dev/Development/ros2/build/rtabmap_conversions
+[2.849s] [35m[1mConsolidate compiler generated dependencies of target rtabmap_conversions[0m
+[2.918s] [ 50%] [32mBuilding CXX object CMakeFiles/rtabmap_conversions.dir/src/MsgConversion.cpp.o[0m
+[24.025s] [100%] [32m[1mLinking CXX shared library librtabmap_conversions.so[0m
+[24.802s] [100%] Built target rtabmap_conversions
+[24.812s] Invoked command in '/workspaces/isaac_ros-dev/Development/ros2/build/rtabmap_conversions' returned '0': AMENT_PREFIX_PATH=/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_msgs:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_msgs:/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap:/workspace/cartographer_ws/install/perception_pcl:/workspace/cartographer_ws/install/pcl_ros:/workspace/cartographer_ws/install/cartographer_rviz:/workspace/cartographer_ws/install/cartographer_ros:/workspace/cartographer_ws/install/pcl_conversions:/workspace/cartographer_ws/install/pcl_msgs:/workspace/cartographer_ws/install/isaac_ros_tensor_list_interfaces:/workspace/cartographer_ws/install/isaac_ros_pointcloud_interfaces:/workspace/cartographer_ws/install/isaac_ros_nova_interfaces:/workspace/cartographer_ws/install/isaac_ros_nitros_bridge_interfaces:/workspace/cartographer_ws/install/isaac_ros_common:/workspace/cartographer_ws/install/isaac_ros_bi3d_interfaces:/workspace/cartographer_ws/install/isaac_ros_apriltag_interfaces:/workspace/cartographer_ws/install/control_msgs:/workspace/cartographer_ws/install/cartographer_ros_msgs:/workspace/cartographer_ws/install/cartographer:/workspace/cartographer_ws/install/absl:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble LD_LIBRARY_PATH=/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_msgs/lib:/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/lib:${LD_LIBRARY_PATH} PATH=/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/bin:${PATH} PKG_CONFIG_PATH=/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/lib/x86_64-linux-gnu/pkgconfig:/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/lib/pkgconfig:${PKG_CONFIG_PATH} PYTHONPATH=/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_msgs/lib/python3.8/site-packages:${PYTHONPATH} /usr/bin/cmake --build /workspaces/isaac_ros-dev/Development/ros2/build/rtabmap_conversions -- -j24 -l24
+[24.877s] Invoking command in '/workspaces/isaac_ros-dev/Development/ros2/build/rtabmap_conversions': AMENT_PREFIX_PATH=/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_msgs:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_msgs:/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap:/workspace/cartographer_ws/install/perception_pcl:/workspace/cartographer_ws/install/pcl_ros:/workspace/cartographer_ws/install/cartographer_rviz:/workspace/cartographer_ws/install/cartographer_ros:/workspace/cartographer_ws/install/pcl_conversions:/workspace/cartographer_ws/install/pcl_msgs:/workspace/cartographer_ws/install/isaac_ros_tensor_list_interfaces:/workspace/cartographer_ws/install/isaac_ros_pointcloud_interfaces:/workspace/cartographer_ws/install/isaac_ros_nova_interfaces:/workspace/cartographer_ws/install/isaac_ros_nitros_bridge_interfaces:/workspace/cartographer_ws/install/isaac_ros_common:/workspace/cartographer_ws/install/isaac_ros_bi3d_interfaces:/workspace/cartographer_ws/install/isaac_ros_apriltag_interfaces:/workspace/cartographer_ws/install/control_msgs:/workspace/cartographer_ws/install/cartographer_ros_msgs:/workspace/cartographer_ws/install/cartographer:/workspace/cartographer_ws/install/absl:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble LD_LIBRARY_PATH=/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_msgs/lib:/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/lib:${LD_LIBRARY_PATH} PATH=/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/bin:${PATH} PKG_CONFIG_PATH=/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/lib/x86_64-linux-gnu/pkgconfig:/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/lib/pkgconfig:${PKG_CONFIG_PATH} PYTHONPATH=/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_msgs/lib/python3.8/site-packages:${PYTHONPATH} /usr/bin/cmake --install /workspaces/isaac_ros-dev/Development/ros2/build/rtabmap_conversions
+[24.883s] -- Install configuration: "Release"
+[24.884s] -- Execute custom install script
+[24.884s] -- Up-to-date symlink: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_conversions/share/rtabmap_conversions/environment/library_path.sh
+[24.884s] -- Up-to-date symlink: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_conversions/share/rtabmap_conversions/environment/library_path.dsv
+[24.885s] -- Up-to-date symlink: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_conversions/share/ament_index/resource_index/package_run_dependencies/rtabmap_conversions
+[24.885s] -- Up-to-date symlink: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_conversions/share/ament_index/resource_index/parent_prefix_path/rtabmap_conversions
+[24.885s] -- Up-to-date symlink: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_conversions/share/rtabmap_conversions/environment/ament_prefix_path.sh
+[24.885s] -- Up-to-date symlink: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_conversions/share/rtabmap_conversions/environment/ament_prefix_path.dsv
+[24.886s] -- Up-to-date symlink: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_conversions/share/rtabmap_conversions/environment/path.sh
+[24.886s] -- Up-to-date symlink: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_conversions/share/rtabmap_conversions/environment/path.dsv
+[24.886s] -- Up-to-date symlink: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_conversions/share/rtabmap_conversions/local_setup.bash
+[24.886s] -- Up-to-date symlink: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_conversions/share/rtabmap_conversions/local_setup.sh
+[24.886s] -- Up-to-date symlink: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_conversions/share/rtabmap_conversions/local_setup.zsh
+[24.886s] -- Up-to-date symlink: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_conversions/share/rtabmap_conversions/local_setup.dsv
+[24.887s] -- Symlinking: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_conversions/share/rtabmap_conversions/package.dsv
+[24.893s] -- Up-to-date symlink: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_conversions/share/ament_index/resource_index/packages/rtabmap_conversions
+[24.893s] -- Up-to-date symlink: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_conversions/share/rtabmap_conversions/cmake/ament_cmake_export_dependencies-extras.cmake
+[24.894s] -- Up-to-date symlink: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_conversions/share/rtabmap_conversions/cmake/ament_cmake_export_include_directories-extras.cmake
+[24.894s] -- Up-to-date symlink: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_conversions/share/rtabmap_conversions/cmake/ament_cmake_export_targets-extras.cmake
+[24.894s] -- Up-to-date symlink: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_conversions/share/rtabmap_conversions/cmake/ament_cmake_export_libraries-extras.cmake
+[24.894s] -- Up-to-date symlink: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_conversions/share/rtabmap_conversions/cmake/rtabmap_conversionsConfig.cmake
+[24.894s] -- Up-to-date symlink: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_conversions/share/rtabmap_conversions/cmake/rtabmap_conversionsConfig-version.cmake
+[24.894s] -- Up-to-date symlink: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_conversions/share/rtabmap_conversions/package.xml
+[24.896s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_conversions/lib/librtabmap_conversions.so
+[24.897s] -- Set runtime path of "/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_conversions/lib/librtabmap_conversions.so" to ""
+[24.897s] -- Up-to-date: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_conversions/include
+[24.897s] -- Up-to-date: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_conversions/include/rtabmap_conversions
+[24.897s] -- Up-to-date: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_conversions/include/rtabmap_conversions/MsgConversion.h
+[24.897s] -- Up-to-date: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_conversions/share/rtabmap_conversions/cmake/rtabmap_conversionsExport.cmake
+[24.897s] -- Up-to-date: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_conversions/share/rtabmap_conversions/cmake/rtabmap_conversionsExport-release.cmake
+[24.900s] Invoked command in '/workspaces/isaac_ros-dev/Development/ros2/build/rtabmap_conversions' returned '0': AMENT_PREFIX_PATH=/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_msgs:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_msgs:/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap:/workspace/cartographer_ws/install/perception_pcl:/workspace/cartographer_ws/install/pcl_ros:/workspace/cartographer_ws/install/cartographer_rviz:/workspace/cartographer_ws/install/cartographer_ros:/workspace/cartographer_ws/install/pcl_conversions:/workspace/cartographer_ws/install/pcl_msgs:/workspace/cartographer_ws/install/isaac_ros_tensor_list_interfaces:/workspace/cartographer_ws/install/isaac_ros_pointcloud_interfaces:/workspace/cartographer_ws/install/isaac_ros_nova_interfaces:/workspace/cartographer_ws/install/isaac_ros_nitros_bridge_interfaces:/workspace/cartographer_ws/install/isaac_ros_common:/workspace/cartographer_ws/install/isaac_ros_bi3d_interfaces:/workspace/cartographer_ws/install/isaac_ros_apriltag_interfaces:/workspace/cartographer_ws/install/control_msgs:/workspace/cartographer_ws/install/cartographer_ros_msgs:/workspace/cartographer_ws/install/cartographer:/workspace/cartographer_ws/install/absl:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble LD_LIBRARY_PATH=/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_msgs/lib:/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/lib:${LD_LIBRARY_PATH} PATH=/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/bin:${PATH} PKG_CONFIG_PATH=/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/lib/x86_64-linux-gnu/pkgconfig:/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/lib/pkgconfig:${PKG_CONFIG_PATH} PYTHONPATH=/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap_msgs/lib/python3.8/site-packages:${PYTHONPATH} /usr/bin/cmake --install /workspaces/isaac_ros-dev/Development/ros2/build/rtabmap_conversions

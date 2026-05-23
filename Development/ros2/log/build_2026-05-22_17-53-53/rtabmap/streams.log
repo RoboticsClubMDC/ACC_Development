@@ -1,0 +1,737 @@
+[0.093s] Invoking command in '/workspaces/isaac_ros-dev/Development/ros2/build/rtabmap': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble /usr/bin/cmake /workspaces/isaac_ros-dev/Development/ros2/src/rtabmap -DCMAKE_BUILD_TYPE=Release -DBUILD_APP=OFF -DBUILD_TOOLS=OFF -DBUILD_EXAMPLES=OFF -DWITH_QT=OFF -DWITH_G2O=OFF -DWITH_GTSAM=OFF -DWITH_POINTMATCHER=OFF -DCMAKE_INSTALL_PREFIX=/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap
+[0.197s] -- The C compiler identification is GNU 9.4.0
+[0.293s] -- The CXX compiler identification is GNU 9.4.0
+[0.305s] -- Detecting C compiler ABI info
+[0.398s] -- Detecting C compiler ABI info - done
+[0.409s] -- Check for working C compiler: /usr/bin/cc - skipped
+[0.409s] -- Detecting C compile features
+[0.410s] -- Detecting C compile features - done
+[0.415s] -- Detecting CXX compiler ABI info
+[0.527s] -- Detecting CXX compiler ABI info - done
+[0.538s] -- Check for working CXX compiler: /usr/bin/c++ - skipped
+[0.538s] -- Detecting CXX compile features
+[0.539s] -- Detecting CXX compile features - done
+[0.546s] -- MOBILE_BUILD=OFF
+[0.608s] -- Checking for module 'eigen3'
+[0.646s] --   Found eigen3, version 3.3.7
+[0.734s] -- Found Eigen: /usr/include/eigen3 (Required is at least version "3.1") 
+[0.735s] -- Eigen found (include: /usr/include/eigen3, version: 3.3.7)
+[0.844s] -- Checking for module 'libusb-1.0'
+[0.880s] --   Found libusb-1.0, version 1.0.23
+[0.967s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[0.968s]   The package name passed to `find_package_handle_standard_args` (USB_10)
+[0.968s]   does not match the name of the calling package (OpenNI).  This can lead to
+[0.968s]   problems in calling code that expects `find_package` result variables
+[0.968s]   (e.g., `_FOUND`) to follow a certain pattern.
+[0.968s] Call Stack (most recent call first):
+[0.968s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/Modules/FindOpenNI.cmake:28 (find_package_handle_standard_args)
+[0.968s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:179 (find_package)
+[0.968s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:322 (find_openni)
+[0.968s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:548 (find_external_library)
+[0.968s]   CMakeLists.txt:248 (FIND_PACKAGE)
+[0.968s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[0.968s] [0m
+[0.968s] -- Found USB_10: /usr/lib/x86_64-linux-gnu/libusb-1.0.so  
+[1.097s] -- OpenNI found (include: /usr/include/ni, lib: /usr/lib/libOpenNI.so)
+[1.153s] -- The imported target "vtkParseOGLExt" references the file
+[1.153s]    "/usr/bin/vtkParseOGLExt-7.1"
+[1.153s] but this file does not exist.  Possible reasons include:
+[1.153s] * The file was deleted, renamed, or moved to another location.
+[1.154s] * An install or uninstall procedure did not complete successfully.
+[1.154s] * The installation package was faulty and contained
+[1.154s]    "/usr/lib/cmake/vtk-7.1/VTKTargets.cmake"
+[1.154s] but not all the files it references.
+[1.154s] 
+[1.154s] -- The imported target "vtkRenderingPythonTkWidgets" references the file
+[1.154s]    "/usr/lib/x86_64-linux-gnu/libvtkRenderingPythonTkWidgets.so"
+[1.154s] but this file does not exist.  Possible reasons include:
+[1.154s] * The file was deleted, renamed, or moved to another location.
+[1.155s] * An install or uninstall procedure did not complete successfully.
+[1.155s] * The installation package was faulty and contained
+[1.155s]    "/usr/lib/cmake/vtk-7.1/VTKTargets.cmake"
+[1.155s] but not all the files it references.
+[1.155s] 
+[1.155s] -- The imported target "vtk" references the file
+[1.155s]    "/usr/bin/vtk"
+[1.155s] but this file does not exist.  Possible reasons include:
+[1.155s] * The file was deleted, renamed, or moved to another location.
+[1.155s] * An install or uninstall procedure did not complete successfully.
+[1.155s] * The installation package was faulty and contained
+[1.155s]    "/usr/lib/cmake/vtk-7.1/VTKTargets.cmake"
+[1.155s] but not all the files it references.
+[1.155s] 
+[1.156s] -- The imported target "pvtk" references the file
+[1.156s]    "/usr/bin/pvtk"
+[1.156s] but this file does not exist.  Possible reasons include:
+[1.156s] * The file was deleted, renamed, or moved to another location.
+[1.156s] * An install or uninstall procedure did not complete successfully.
+[1.156s] * The installation package was faulty and contained
+[1.156s]    "/usr/lib/cmake/vtk-7.1/VTKTargets.cmake"
+[1.156s] but not all the files it references.
+[1.156s] 
+[1.178s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.178s]   The package name passed to `find_package_handle_standard_args` (libusb-1.0)
+[1.178s]   does not match the name of the calling package (PCL).  This can lead to
+[1.178s]   problems in calling code that expects `find_package` result variables
+[1.178s]   (e.g., `_FOUND`) to follow a certain pattern.
+[1.178s] Call Stack (most recent call first):
+[1.178s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:291 (find_package_handle_standard_args)
+[1.178s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:338 (find_libusb)
+[1.178s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:548 (find_external_library)
+[1.178s]   CMakeLists.txt:248 (FIND_PACKAGE)
+[1.178s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.179s] [0m
+[1.179s] -- Found libusb-1.0: /usr/include  
+[1.238s] -- Checking for module 'flann'
+[1.275s] --   Found flann, version 1.9.1
+[1.377s] -- Found FLANN: /usr/lib/x86_64-linux-gnu/libflann_cpp.so  
+[1.401s] -- Found Qhull: optimized;/usr/lib/x86_64-linux-gnu/libqhull.so;debug;/usr/lib/x86_64-linux-gnu/libqhull.so  
+[1.401s] -- QHULL found (include: /usr/include, lib: optimized;/usr/lib/x86_64-linux-gnu/libqhull.so;debug;/usr/lib/x86_64-linux-gnu/libqhull.so)
+[1.427s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.427s]   The package name passed to `find_package_handle_standard_args` (PCL_COMMON)
+[1.427s]   does not match the name of the calling package (PCL).  This can lead to
+[1.428s]   problems in calling code that expects `find_package` result variables
+[1.428s]   (e.g., `_FOUND`) to follow a certain pattern.
+[1.428s] Call Stack (most recent call first):
+[1.428s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[1.428s]   CMakeLists.txt:248 (FIND_PACKAGE)
+[1.428s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.428s] [0m
+[1.428s] -- Found PCL_COMMON: /usr/lib/x86_64-linux-gnu/libpcl_common.so  
+[1.428s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.428s]   The package name passed to `find_package_handle_standard_args` (PCL_OCTREE)
+[1.429s]   does not match the name of the calling package (PCL).  This can lead to
+[1.429s]   problems in calling code that expects `find_package` result variables
+[1.429s]   (e.g., `_FOUND`) to follow a certain pattern.
+[1.429s] Call Stack (most recent call first):
+[1.429s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[1.429s]   CMakeLists.txt:248 (FIND_PACKAGE)
+[1.429s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.429s] [0m
+[1.429s] -- Found PCL_OCTREE: /usr/lib/x86_64-linux-gnu/libpcl_octree.so  
+[1.430s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.430s]   The package name passed to `find_package_handle_standard_args` (PCL_IO)
+[1.430s]   does not match the name of the calling package (PCL).  This can lead to
+[1.430s]   problems in calling code that expects `find_package` result variables
+[1.430s]   (e.g., `_FOUND`) to follow a certain pattern.
+[1.430s] Call Stack (most recent call first):
+[1.430s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[1.430s]   CMakeLists.txt:248 (FIND_PACKAGE)
+[1.430s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.430s] [0m
+[1.430s] -- Found PCL_IO: /usr/lib/x86_64-linux-gnu/libpcl_io.so  
+[1.431s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.431s]   The package name passed to `find_package_handle_standard_args` (PCL_KDTREE)
+[1.431s]   does not match the name of the calling package (PCL).  This can lead to
+[1.431s]   problems in calling code that expects `find_package` result variables
+[1.431s]   (e.g., `_FOUND`) to follow a certain pattern.
+[1.431s] Call Stack (most recent call first):
+[1.431s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[1.432s]   CMakeLists.txt:248 (FIND_PACKAGE)
+[1.432s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.432s] [0m
+[1.432s] -- Found PCL_KDTREE: /usr/lib/x86_64-linux-gnu/libpcl_kdtree.so  
+[1.432s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.432s]   The package name passed to `find_package_handle_standard_args` (PCL_SEARCH)
+[1.432s]   does not match the name of the calling package (PCL).  This can lead to
+[1.433s]   problems in calling code that expects `find_package` result variables
+[1.433s]   (e.g., `_FOUND`) to follow a certain pattern.
+[1.433s] Call Stack (most recent call first):
+[1.433s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[1.433s]   CMakeLists.txt:248 (FIND_PACKAGE)
+[1.433s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.433s] [0m
+[1.433s] -- Found PCL_SEARCH: /usr/lib/x86_64-linux-gnu/libpcl_search.so  
+[1.434s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.434s]   The package name passed to `find_package_handle_standard_args`
+[1.434s]   (PCL_SURFACE) does not match the name of the calling package (PCL).  This
+[1.434s]   can lead to problems in calling code that expects `find_package` result
+[1.434s]   variables (e.g., `_FOUND`) to follow a certain pattern.
+[1.434s] Call Stack (most recent call first):
+[1.434s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[1.434s]   CMakeLists.txt:248 (FIND_PACKAGE)
+[1.434s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.434s] [0m
+[1.434s] -- Found PCL_SURFACE: /usr/lib/x86_64-linux-gnu/libpcl_surface.so  
+[1.435s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.435s]   The package name passed to `find_package_handle_standard_args`
+[1.435s]   (PCL_FILTERS) does not match the name of the calling package (PCL).  This
+[1.435s]   can lead to problems in calling code that expects `find_package` result
+[1.435s]   variables (e.g., `_FOUND`) to follow a certain pattern.
+[1.435s] Call Stack (most recent call first):
+[1.435s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[1.436s]   CMakeLists.txt:248 (FIND_PACKAGE)
+[1.436s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.436s] [0m
+[1.436s] -- Found PCL_FILTERS: /usr/lib/x86_64-linux-gnu/libpcl_filters.so  
+[1.436s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.436s]   The package name passed to `find_package_handle_standard_args` (PCL_2D)
+[1.436s]   does not match the name of the calling package (PCL).  This can lead to
+[1.436s]   problems in calling code that expects `find_package` result variables
+[1.436s]   (e.g., `_FOUND`) to follow a certain pattern.
+[1.436s] Call Stack (most recent call first):
+[1.436s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:619 (find_package_handle_standard_args)
+[1.436s]   CMakeLists.txt:248 (FIND_PACKAGE)
+[1.436s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.436s] [0m
+[1.437s] -- Found PCL_2D: /usr/include/pcl-1.10  
+[1.437s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.437s]   The package name passed to `find_package_handle_standard_args`
+[1.437s]   (PCL_FEATURES) does not match the name of the calling package (PCL).  This
+[1.437s]   can lead to problems in calling code that expects `find_package` result
+[1.437s]   variables (e.g., `_FOUND`) to follow a certain pattern.
+[1.437s] Call Stack (most recent call first):
+[1.437s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[1.437s]   CMakeLists.txt:248 (FIND_PACKAGE)
+[1.438s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.438s] [0m
+[1.438s] -- Found PCL_FEATURES: /usr/lib/x86_64-linux-gnu/libpcl_features.so  
+[1.438s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.438s]   The package name passed to `find_package_handle_standard_args`
+[1.438s]   (PCL_REGISTRATION) does not match the name of the calling package (PCL).
+[1.438s]   This can lead to problems in calling code that expects `find_package`
+[1.439s]   result variables (e.g., `_FOUND`) to follow a certain pattern.
+[1.439s] Call Stack (most recent call first):
+[1.439s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[1.439s]   CMakeLists.txt:248 (FIND_PACKAGE)
+[1.439s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.439s] [0m
+[1.439s] -- Found PCL_REGISTRATION: /usr/lib/x86_64-linux-gnu/libpcl_registration.so  
+[1.440s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.440s]   The package name passed to `find_package_handle_standard_args`
+[1.440s]   (PCL_SAMPLE_CONSENSUS) does not match the name of the calling package
+[1.440s]   (PCL).  This can lead to problems in calling code that expects
+[1.440s]   `find_package` result variables (e.g., `_FOUND`) to follow a certain
+[1.440s]   pattern.
+[1.440s] Call Stack (most recent call first):
+[1.440s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[1.440s]   CMakeLists.txt:248 (FIND_PACKAGE)
+[1.440s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.441s] [0m
+[1.441s] -- Found PCL_SAMPLE_CONSENSUS: /usr/lib/x86_64-linux-gnu/libpcl_sample_consensus.so  
+[1.441s] -- Found PCL_GEOMETRY: /usr/include/pcl-1.10  
+[1.441s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.441s]   The package name passed to `find_package_handle_standard_args`
+[1.441s]   (PCL_GEOMETRY) does not match the name of the calling package (PCL).  This
+[1.441s]   can lead to problems in calling code that expects `find_package` result
+[1.441s]   variables (e.g., `_FOUND`) to follow a certain pattern.
+[1.441s] Call Stack (most recent call first):
+[1.441s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:619 (find_package_handle_standard_args)
+[1.441s]   CMakeLists.txt:248 (FIND_PACKAGE)
+[1.441s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.441s] [0m
+[1.442s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.442s]   The package name passed to `find_package_handle_standard_args` (PCL_ML)
+[1.442s]   does not match the name of the calling package (PCL).  This can lead to
+[1.442s]   problems in calling code that expects `find_package` result variables
+[1.442s]   (e.g., `_FOUND`) to follow a certain pattern.
+[1.442s] Call Stack (most recent call first):
+[1.442s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[1.442s]   CMakeLists.txt:248 (FIND_PACKAGE)
+[1.442s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.442s] [0m
+[1.442s] -- Found PCL_ML: /usr/lib/x86_64-linux-gnu/libpcl_ml.so  
+[1.443s] [33mCMake Warning (dev) at /usr/share/cmake-3.22/Modules/FindPackageHandleStandardArgs.cmake:438 (message):
+[1.443s]   The package name passed to `find_package_handle_standard_args`
+[1.443s]   (PCL_SEGMENTATION) does not match the name of the calling package (PCL).
+[1.443s]   This can lead to problems in calling code that expects `find_package`
+[1.443s]   result variables (e.g., `_FOUND`) to follow a certain pattern.
+[1.443s] Call Stack (most recent call first):
+[1.443s]   /usr/lib/x86_64-linux-gnu/cmake/pcl/PCLConfig.cmake:616 (find_package_handle_standard_args)
+[1.443s]   CMakeLists.txt:248 (FIND_PACKAGE)
+[1.443s] This warning is for project developers.  Use -Wno-dev to suppress it.
+[1.443s] [0m
+[1.443s] -- Found PCL_SEGMENTATION: /usr/lib/x86_64-linux-gnu/libpcl_segmentation.so  
+[1.444s] -- PCL definitions don't contain "-march=native", make sure all libraries using Eigen are also compiled without that flag to avoid some segmentation faults (with gdb referring to some Eigen functions).
+[1.464s] -- Found SQLite3: /usr/include /usr/lib/x86_64-linux-gnu/libsqlite3.so
+[1.812s] -- Found OpenMP_C: -fopenmp (found version "4.5") 
+[1.930s] -- Found OpenMP_CXX: -fopenmp (found version "4.5") 
+[1.931s] -- Found OpenMP: TRUE (found version "4.5") found components: C CXX 
+[1.931s] -- Found OpenMP: /usr/lib/gcc/x86_64-linux-gnu/9/libgomp.so;/usr/lib/x86_64-linux-gnu/libpthread.so
+[1.931s] -- Add PCL_OMP to definitions
+[1.931s] -- Found OpenCV: /usr/include/opencv4
+[1.931s] -- Found PCL: /usr/include/pcl-1.10;/usr/include/eigen3;/usr/include;/usr/include/ni;/usr/include/vtk-7.1;/usr/include/freetype2;/usr/include/x86_64-linux-gnu
+[1.931s] -- Found ZLIB: /usr/include
+[1.972s] -- Found Freenect: /usr/include
+[2.076s] -- Found OpenNI2: /usr/include/openni2
+[2.079s] -- Found DC1394: /usr/include/dc1394
+[2.115s] -- FlyCapture2_INCLUDE_DIR=FlyCapture2_INCLUDE_DIR-NOTFOUND
+[2.115s] -- FlyCapture2_LIBRARY=FlyCapture2_LIBRARY-NOTFOUND
+[2.116s] -- Triclops_INCLUDE_DIR=Triclops_INCLUDE_DIR-NOTFOUND
+[2.116s] -- Triclops_LIBRARY=Triclops_LIBRARY-NOTFOUND
+[2.116s] -- FlyCaptureBridge_LIBRARY=FlyCaptureBridge_LIBRARY-NOTFOUND
+[2.170s] -- Found RealSense2: 
+[2.219s] -- Found octomap 1.9.3: /usr/include
+[2.224s] -- Architecture: x86_64
+[2.261s] -- Performing Test COMPILER_SUPPORTS_CXX14
+[2.364s] -- Performing Test COMPILER_SUPPORTS_CXX14 - Success
+[2.372s] -- Found Pthreads
+[2.374s] -- Performing Test COMPILER_HAS_HIDDEN_VISIBILITY
+[2.479s] -- Performing Test COMPILER_HAS_HIDDEN_VISIBILITY - Success
+[2.480s] -- Performing Test COMPILER_HAS_HIDDEN_INLINE_VISIBILITY
+[2.589s] -- Performing Test COMPILER_HAS_HIDDEN_INLINE_VISIBILITY - Success
+[2.591s] -- Performing Test COMPILER_HAS_DEPRECATED_ATTR
+[2.696s] -- Performing Test COMPILER_HAS_DEPRECATED_ATTR - Success
+[2.733s] -- --------------------------------------------
+[2.734s] -- Info :
+[2.734s] --   RTAB-Map Version =     0.23.6
+[2.734s] --   CMAKE_VERSION =        3.22.1
+[2.734s] --   CMAKE_INSTALL_PREFIX = /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap
+[2.734s] --   CMAKE_BUILD_TYPE =     Release
+[2.734s] --   CMAKE_INSTALL_LIBDIR = lib
+[2.734s] --   BUILD_APP =            OFF
+[2.734s] --   BUILD_TOOLS =          OFF
+[2.734s] --   BUILD_EXAMPLES =       OFF
+[2.734s] --   BUILD_SHARED_LIBS =    ON
+[2.734s] --   CMAKE_CXX_FLAGS =  -fmessage-length=0  -fopenmp -std=c++14
+[2.734s] --   FLANN_KDTREE_MEM_OPT = OFF
+[2.735s] --   PCL_DEFINITIONS = -DDISABLE_OPENNI2;-DDISABLE_PCAP;-DDISABLE_PNG;-DDISABLE_LIBUSB_1_0
+[2.735s] --   PCL_VERSION = 1.10.0
+[2.735s] -- 
+[2.735s] -- Optional dependencies ('*' affects some default parameters) :
+[2.735s] --  *With OpenCV 4.2.0 xfeatures2d = NO, nonfree = NO (License: BSD)
+[2.735s] --   With Qt                   = NO (WITH_QT=OFF)
+[2.735s] --   With external SQLite3     = YES (License: Public Domain)
+[2.735s] --   With ORB OcTree           = YES (License: GPLv3)
+[2.735s] --   With SuperPoint           = NO (WITH_TORCH=OFF)
+[2.735s] --   With Superpoint Rpautrat  = NO (WITH_TORCH=OFF)
+[2.735s] --   With Python3              = NO (WITH_PYTHON=OFF)
+[2.735s] --   With Madgwick             = YES (License: GPL)
+[2.735s] --   With FastCV               = NO (FastCV not found)
+[2.735s] --   With PDAL                 = NO (PDAL not found)
+[2.736s] --   With libLAS               = NO (WITH_LIBLAS=OFF)
+[2.736s] --   With CudaSift             = NO (WITH_CUDASIFT=OFF)
+[2.736s] -- 
+[2.736s] --  Solvers:
+[2.736s] --   With TORO                 = YES (License: Creative Commons [Attribution-NonCommercial-ShareAlike])
+[2.736s] --  *With g2o                  = NO (WITH_G2O=OFF)
+[2.736s] --  *With GTSAM                = NO (WITH_GTSAM=OFF)
+[2.736s] --  *With Ceres                = NO (WITH_CERES=OFF)
+[2.736s] --   With MRPT                 = NO (MRPT not found)
+[2.736s] --   With VERTIGO              = NO (GTSAM or g2o required)
+[2.736s] --   With cvsba                = NO (WITH_CVSBA=OFF)
+[2.736s] --  *With libpointmatcher      = NO (WITH_POINTMATCHER=OFF)
+[2.736s] --   With CCCoreLib            = NO (WITH_CCCORELIB=OFF)
+[2.736s] --   With Open3D               = NO (WITH_OPEN3D=OFF)
+[2.737s] --   With OpenGV               = NO (OpenGV not found)
+[2.737s] -- 
+[2.737s] --  Reconstruction Approaches:
+[2.737s] --   With OctoMap 1.9.3        = YES (License: BSD)
+[2.737s] --   With GridMap              = NO (WITH_GRIDMAP=OFF)
+[2.737s] --   With CPUTSDF              = NO (WITH_CPUTSDF=OFF)
+[2.737s] --   With OpenChisel           = NO (WITH_OPENCHISEL=OFF)
+[2.737s] --   With AliceVision          = NO (WITH_ALICE_VISION=OFF)
+[2.737s] -- 
+[2.737s] --  Camera Drivers:
+[2.737s] --   With Freenect             = YES (License: Apache v2 and/or GPLv2)
+[2.737s] --   With OpenNI               = YES (License: Apache v2)
+[2.737s] --   With OpenNI2              = YES (License: Apache v2)
+[2.737s] --   With Freenect2            = NO (libfreenect2 not found)
+[2.738s] --   With Kinect for Windows 2 = NO (Kinect for Windows 2 SDK not found)
+[2.738s] --   With Kinect for Azure     = NO (Kinect for Azure SDK not found)
+[2.738s] --   With dc1394               = YES (License: LGPL)
+[2.738s] --   With FlyCapture2/Triclops = NO (Point Grey SDK not found)
+[2.738s] --   With ZED                  = NO (ZED sdk and/or cuda not found)
+[2.738s] --   With ZEDOC                = NO (ZED Open Capture not found)
+[2.738s] --   With RealSense            = NO (librealsense not found)
+[2.738s] --   With RealSense2 2.54.2    = YES (License: Apache-2)
+[2.738s] --   With MyntEyeS             = NO (mynteye s sdk not found)
+[2.738s] --   With DepthAI              = NO (WITH_DEPTHAI=OFF)
+[2.738s] --   With XVisio SDK           = NO (WITH_XVSDK=OFF)
+[2.738s] --   With Orbbec SDK           = NO (WITH_ORBBEC_SDK=OFF)
+[2.738s] -- 
+[2.738s] --  Odometry Approaches:
+[2.738s] --   With loam_velodyne        = NO (WITH_LOAM=OFF)
+[2.739s] --   With floam                = NO (WITH_FLOAM=OFF)
+[2.739s] --   With lio_sam              = NO (WITH_LIOSAM=OFF)
+[2.739s] --   With libfovis             = NO (WITH_FOVIS=OFF)
+[2.739s] --   With libviso2             = NO (WITH_VISO2=OFF)
+[2.739s] --   With dvo_core             = NO (WITH_DVO=OFF)
+[2.739s] --   With okvis                = NO (WITH_OKVIS=OFF)
+[2.739s] --   With msckf_vio            = NO (WITH_MSCKF_VIO=OFF)
+[2.739s] --   With VINS-Fusion          = NO (WITH_VINS_FUSION=OFF)
+[2.739s] --   With OpenVINS             = NO (WITH_OPENVINS=OFF)
+[2.739s] --   With ORB_SLAM             = NO (WITH_ORB_SLAM=OFF)
+[2.739s] --   With cuVSLAM              = NO (WITH_CUVSLAM=OFF)
+[2.739s] -- Show all options with: cmake -LA | grep WITH_
+[2.739s] -- --------------------------------------------
+[2.739s] -- Configuring done
+[2.791s] -- Generating done
+[2.794s] -- Build files have been written to: /workspaces/isaac_ros-dev/Development/ros2/build/rtabmap
+[2.812s] Invoked command in '/workspaces/isaac_ros-dev/Development/ros2/build/rtabmap' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble /usr/bin/cmake /workspaces/isaac_ros-dev/Development/ros2/src/rtabmap -DCMAKE_BUILD_TYPE=Release -DBUILD_APP=OFF -DBUILD_TOOLS=OFF -DBUILD_EXAMPLES=OFF -DWITH_QT=OFF -DWITH_G2O=OFF -DWITH_GTSAM=OFF -DWITH_POINTMATCHER=OFF -DCMAKE_INSTALL_PREFIX=/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap
+[2.818s] Invoking command in '/workspaces/isaac_ros-dev/Development/ros2/build/rtabmap': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble /usr/bin/cmake --build /workspaces/isaac_ros-dev/Development/ros2/build/rtabmap -- -j24 -l24
+[2.861s] [  1%] [32mBuilding CXX object utilite/src/CMakeFiles/rtabmap_utilite.dir/UEventsHandler.cpp.o[0m
+[2.861s] [  2%] [32mBuilding CXX object utilite/src/CMakeFiles/rtabmap_utilite.dir/UEventsManager.cpp.o[0m
+[2.861s] [  3%] [32mBuilding CXX object utilite/src/CMakeFiles/rtabmap_utilite.dir/UEventsSender.cpp.o[0m
+[2.861s] [  3%] [32mBuilding CXX object utilite/src/CMakeFiles/rtabmap_utilite.dir/UFile.cpp.o[0m
+[2.861s] [  4%] [32mBuilding CXX object utilite/src/CMakeFiles/rtabmap_utilite.dir/UConversion.cpp.o[0m
+[2.861s] [  4%] [32mBuilding CXX object utilite/src/CMakeFiles/rtabmap_utilite.dir/UDirectory.cpp.o[0m
+[2.862s] [  5%] [32mBuilding CXX object utilite/src/CMakeFiles/rtabmap_utilite.dir/ULogger.cpp.o[0m
+[2.862s] [  6%] [32mBuilding CXX object utilite/src/CMakeFiles/rtabmap_utilite.dir/UThread.cpp.o[0m
+[2.862s] [  6%] [32mBuilding CXX object utilite/src/CMakeFiles/rtabmap_utilite.dir/UTimer.cpp.o[0m
+[2.862s] [  7%] [32mBuilding CXX object utilite/src/CMakeFiles/rtabmap_utilite.dir/UProcessInfo.cpp.o[0m
+[2.863s] [  8%] [32mBuilding CXX object utilite/src/CMakeFiles/rtabmap_utilite.dir/UVariant.cpp.o[0m
+[3.738s] [  9%] [32m[1mLinking CXX shared library ../../bin/librtabmap_utilite.so[0m
+[3.867s] [  9%] Built target rtabmap_utilite
+[3.888s] [  9%] [32mBuilding CXX object utilite/resource_generator/CMakeFiles/res_tool.dir/main.cpp.o[0m
+[4.522s] [ 10%] [32m[1mLinking CXX executable ../../bin/rtabmap-res_tool[0m
+[4.643s] [ 10%] Built target res_tool
+[4.657s] [ 11%] [34m[1m[Creating resources][0m
+[4.663s]  Using namespace=rtabmap
+[4.663s]  Using target directory=/workspaces/isaac_ros-dev/Development/ros2/build/rtabmap/corelib/src
+[4.663s] Input file "/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap/corelib/src/resources/DatabaseSchema.sql" size = 6020 bytes
+[4.664s] Output file "/workspaces/isaac_ros-dev/Development/ros2/build/rtabmap/corelib/src/DatabaseSchema_sql.h" size = 12267 bytes
+[4.665s] Input file "/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap/corelib/src/resources/backward_compatibility/DatabaseSchema_0_22_0.sql" size = 5963 bytes
+[4.665s] Output file "/workspaces/isaac_ros-dev/Development/ros2/build/rtabmap/corelib/src/DatabaseSchema_0_22_0_sql.h" size = 12181 bytes
+[4.665s] Input file "/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap/corelib/src/resources/backward_compatibility/DatabaseSchema_0_20_0.sql" size = 5900 bytes
+[4.665s] Output file "/workspaces/isaac_ros-dev/Development/ros2/build/rtabmap/corelib/src/DatabaseSchema_0_20_0_sql.h" size = 12055 bytes
+[4.665s] Input file "/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap/corelib/src/resources/backward_compatibility/DatabaseSchema_0_18_3.sql" size = 5749 bytes
+[4.665s] Output file "/workspaces/isaac_ros-dev/Development/ros2/build/rtabmap/corelib/src/DatabaseSchema_0_18_3_sql.h" size = 11753 bytes
+[4.665s] Input file "/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap/corelib/src/resources/backward_compatibility/DatabaseSchema_0_18_0.sql" size = 5749 bytes
+[4.665s] Output file "/workspaces/isaac_ros-dev/Development/ros2/build/rtabmap/corelib/src/DatabaseSchema_0_18_0_sql.h" size = 11753 bytes
+[4.665s] Input file "/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap/corelib/src/resources/backward_compatibility/DatabaseSchema_0_17_0.sql" size = 5432 bytes
+[4.665s] Output file "/workspaces/isaac_ros-dev/Development/ros2/build/rtabmap/corelib/src/DatabaseSchema_0_17_0_sql.h" size = 11119 bytes
+[4.665s] Input file "/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap/corelib/src/resources/backward_compatibility/DatabaseSchema_0_16_2.sql" size = 5362 bytes
+[4.666s] Output file "/workspaces/isaac_ros-dev/Development/ros2/build/rtabmap/corelib/src/DatabaseSchema_0_16_2_sql.h" size = 10979 bytes
+[4.666s] Input file "/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap/corelib/src/resources/backward_compatibility/DatabaseSchema_0_16_1.sql" size = 5286 bytes
+[4.666s] Output file "/workspaces/isaac_ros-dev/Development/ros2/build/rtabmap/corelib/src/DatabaseSchema_0_16_1_sql.h" size = 10827 bytes
+[4.666s] Input file "/workspaces/isaac_ros-dev/Development/ros2/src/rtabmap/corelib/src/resources/backward_compatibility/DatabaseSchema_0_16_0.sql" size = 5273 bytes
+[4.666s] Output file "/workspaces/isaac_ros-dev/Development/ros2/build/rtabmap/corelib/src/DatabaseSchema_0_16_0_sql.h" size = 10801 bytes
+[4.697s] [ 11%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Rtabmap.cpp.o[0m
+[4.698s] [ 14%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Statistics.cpp.o[0m
+[4.698s] [ 14%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/RtabmapThread.cpp.o[0m
+[4.698s] [ 14%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Memory.cpp.o[0m
+[4.699s] [ 15%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/DBDriverSqlite3.cpp.o[0m
+[4.699s] [ 15%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/DBDriver.cpp.o[0m
+[4.699s] [ 16%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/DBReader.cpp.o[0m
+[4.699s] [ 16%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Recovery.cpp.o[0m
+[4.699s] [ 17%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/SensorCapture.cpp.o[0m
+[4.700s] [ 17%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/CameraModel.cpp.o[0m
+[4.701s] [ 18%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/SensorCaptureThread.cpp.o[0m
+[4.702s] [ 20%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Camera.cpp.o[0m
+[4.702s] [ 20%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraFreenect.cpp.o[0m
+[4.703s] [ 21%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraImages.cpp.o[0m
+[4.703s] [ 21%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraFreenect2.cpp.o[0m
+[4.703s] [ 22%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraK4W2.cpp.o[0m
+[4.703s] [ 22%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraOpenNI2.cpp.o[0m
+[4.704s] [ 24%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraK4A.cpp.o[0m
+[4.704s] [ 24%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraOpenni.cpp.o[0m
+[4.705s] [ 25%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraOpenNICV.cpp.o[0m
+[4.706s] [ 26%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraRealSense.cpp.o[0m
+[4.707s] [ 26%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraRealSense2.cpp.o[0m
+[4.722s] [ 27%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraStereoDC1394.cpp.o[0m
+[4.724s] [ 28%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraRGBDImages.cpp.o[0m
+[9.410s] [ 29%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraStereoFlyCapture2.cpp.o[0m
+[9.413s] [ 29%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraStereoImages.cpp.o[0m
+[10.841s] [ 30%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraStereoVideo.cpp.o[0m
+[10.947s] [ 31%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraStereoZed.cpp.o[0m
+[11.341s] [ 31%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraStereoZedOC.cpp.o[0m
+[11.808s] [ 32%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraStereoTara.cpp.o[0m
+[12.152s] [ 33%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraVideo.cpp.o[0m
+[12.288s] [ 34%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraMyntEye.cpp.o[0m
+[13.122s] [ 34%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraDepthAI.cpp.o[0m
+[13.138s] [ 35%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraSeerSense.cpp.o[0m
+[13.245s] [ 36%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/camera/CameraOrbbecSDK.cpp.o[0m
+[14.212s] [ 36%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/EpipolarGeometry.cpp.o[0m
+[14.437s] [ 37%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/VisualWord.cpp.o[0m
+[14.811s] [ 38%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/VWDictionary.cpp.o[0m
+[15.200s] [ 39%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/BayesFilter.cpp.o[0m
+[15.333s] [ 39%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Parameters.cpp.o[0m
+[15.448s] [ 40%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Signature.cpp.o[0m
+[15.557s] [ 41%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Features2d.cpp.o[0m
+[16.216s] [ 41%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Transform.cpp.o[0m
+[17.281s] [ 42%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/GeodeticCoords.cpp.o[0m
+[17.400s] [ 43%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/util2d.cpp.o[0m
+[17.588s] [ 44%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/util3d.cpp.o[0m
+[18.057s] [ 44%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/util3d_filtering.cpp.o[0m
+[18.125s] [ 45%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/util3d_mapping.cpp.o[0m
+[18.304s] [ 46%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/util3d_transforms.cpp.o[0m
+[18.442s] [ 46%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/util3d_registration.cpp.o[0m
+[18.719s] [ 47%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/util3d_surface.cpp.o[0m
+[19.148s] [ 48%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/util3d_features.cpp.o[0m
+[19.303s] [ 49%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/util3d_correspondences.cpp.o[0m
+[19.475s] [ 49%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/util3d_motion_estimation.cpp.o[0m
+[19.954s] [ 50%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/rvl_codec.cpp.o[0m
+[20.082s] [ 51%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/SensorData.cpp.o[0m
+[21.879s] [ 51%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Graph.cpp.o[0m
+[22.266s] [ 52%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Compression.cpp.o[0m
+[23.987s] [ 53%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Link.cpp.o[0m
+[25.050s] [ 54%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/LaserScan.cpp.o[0m
+[26.292s] [ 54%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Optimizer.cpp.o[0m
+[26.835s] [ 55%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/optimizer/OptimizerTORO.cpp.o[0m
+[27.387s] [ 56%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/optimizer/OptimizerG2O.cpp.o[0m
+[27.661s] [ 56%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/optimizer/OptimizerGTSAM.cpp.o[0m
+[27.771s] [ 57%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/optimizer/OptimizerCVSBA.cpp.o[0m
+[27.825s] [ 58%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/optimizer/OptimizerCeres.cpp.o[0m
+[28.007s] [ 59%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Registration.cpp.o[0m
+[28.355s] [ 59%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/RegistrationIcp.cpp.o[0m
+[28.822s] [ 60%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/RegistrationVis.cpp.o[0m
+[29.465s] [ 61%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Odometry.cpp.o[0m
+[29.923s] [ 61%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/OdometryThread.cpp.o[0m
+[30.273s] [ 62%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/OdometryInfo.cpp.o[0m
+[32.382s] [ 63%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryF2M.cpp.o[0m
+[32.912s] [ 64%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryMono.cpp.o[0m
+[33.366s] [ 64%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryF2F.cpp.o[0m
+[33.569s] [ 65%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryFovis.cpp.o[0m
+[34.951s] [ 66%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryViso2.cpp.o[0m
+[35.089s] [ 66%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryDVO.cpp.o[0m
+[36.616s] [ 67%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryOkvis.cpp.o[0m
+[37.307s] [ 68%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryORBSLAM2.cpp.o[0m
+[38.147s] [ 69%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryORBSLAM3.cpp.o[0m
+[38.178s] [ 69%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryLOAM.cpp.o[0m
+[38.252s] [ 70%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryFLOAM.cpp.o[0m
+[38.633s] [ 71%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryLIOSAM.cpp.o[0m
+[39.258s] [ 71%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryMSCKF.cpp.o[0m
+[40.577s] [ 72%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryVINSFusion.cpp.o[0m
+[41.739s] [ 73%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryOpenVINS.cpp.o[0m
+[42.649s] [ 74%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryOpen3D.cpp.o[0m
+[42.833s] [ 74%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/odometry/OdometryCuVSLAM.cpp.o[0m
+[43.300s] [ 75%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/IMU.cpp.o[0m
+[43.407s] [ 76%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/IMUThread.cpp.o[0m
+[43.988s] [ 76%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/IMUFilter.cpp.o[0m
+[44.933s] [ 77%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/imufilter/ComplementaryFilter.cpp.o[0m
+[46.189s] [ 78%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/Stereo.cpp.o[0m
+[46.282s] [ 79%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/StereoDense.cpp.o[0m
+[47.062s] [ 79%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/StereoCameraModel.cpp.o[0m
+[47.886s] [ 80%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/stereo/StereoBM.cpp.o[0m
+[48.014s] [ 81%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/stereo/StereoSGBM.cpp.o[0m
+[48.082s] [ 81%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/GlobalMap.cpp.o[0m
+[48.160s] [ 82%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/LocalGridMaker.cpp.o[0m
+[48.318s] [ 83%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/LocalGrid.cpp.o[0m
+[48.565s] [ 84%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/global_map/OccupancyGrid.cpp.o[0m
+[48.619s] [ 84%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/global_map/CloudMap.cpp.o[0m
+[49.202s] [ 85%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/MarkerDetector.cpp.o[0m
+[49.474s] [ 86%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/GlobalDescriptorExtractor.cpp.o[0m
+[49.802s] [ 86%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/GainCompensator.cpp.o[0m
+[50.614s] [ 87%] [32mBuilding C object corelib/src/CMakeFiles/rtabmap_core.dir/rtflann/ext/lz4.c.o[0m
+[51.069s] [ 88%] [32mBuilding C object corelib/src/CMakeFiles/rtabmap_core.dir/rtflann/ext/lz4hc.c.o[0m
+[51.601s] [ 89%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/FlannIndex.cpp.o[0m
+[53.134s] [ 89%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/clams/discrete_depth_distortion_model_helpers.cpp.o[0m
+[53.167s] [ 90%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/clams/discrete_depth_distortion_model.cpp.o[0m
+[53.698s] [ 91%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/clams/frame_projector.cpp.o[0m
+[53.760s] [ 91%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/clams/slam_calibrator.cpp.o[0m
+[53.827s] [ 92%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/opencv/ORBextractor.cc.o[0m
+[54.490s] [ 93%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/opencv/solvepnp.cpp.o[0m
+[54.495s] [ 94%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/opencv/five-point.cpp.o[0m
+[54.515s] [ 94%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/lidar/LidarVLP16.cpp.o[0m
+[55.304s] [ 95%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/optimizer/toro3d/posegraph3.cpp.o[0m
+[55.574s] [ 96%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/optimizer/toro3d/treeoptimizer3_iteration.cpp.o[0m
+[55.704s] [ 96%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/optimizer/toro3d/treeoptimizer3.cpp.o[0m
+[55.709s] [ 97%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/optimizer/toro3d/posegraph2.cpp.o[0m
+[56.292s] [ 98%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/optimizer/toro3d/treeoptimizer2.cpp.o[0m
+[56.337s] [ 99%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/global_map/OctoMap.cpp.o[0m
+[56.409s] [ 99%] [32mBuilding CXX object corelib/src/CMakeFiles/rtabmap_core.dir/imufilter/MadgwickFilter.cpp.o[0m
+[75.333s] [100%] [32m[1mLinking CXX shared library ../../bin/librtabmap_core.so[0m
+[80.765s] [100%] Built target rtabmap_core
+[80.780s] Invoked command in '/workspaces/isaac_ros-dev/Development/ros2/build/rtabmap' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble /usr/bin/cmake --build /workspaces/isaac_ros-dev/Development/ros2/build/rtabmap -- -j24 -l24
+[80.833s] Invoking command in '/workspaces/isaac_ros-dev/Development/ros2/build/rtabmap': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble /usr/bin/cmake --install /workspaces/isaac_ros-dev/Development/ros2/build/rtabmap
+[80.840s] -- Install configuration: "Release"
+[80.841s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/lib/librtabmap_utilite.so.0.23.6
+[80.841s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/lib/librtabmap_utilite.so.0.23
+[80.841s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/lib/librtabmap_utilite.so
+[80.842s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap
+[80.842s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/utilite
+[80.842s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/utilite/UDestroyer.h
+[80.842s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/utilite/UFile.h
+[80.842s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/utilite/UVariant.h
+[80.842s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/utilite/UMath.h
+[80.842s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/utilite/UMutex.h
+[80.842s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/utilite/UConversion.h
+[80.843s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/utilite/UObjDeletionThread.h
+[80.843s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/utilite/UProcessInfo.h
+[80.844s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/utilite/ULogger.h
+[80.844s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/utilite/UEventsSender.h
+[80.844s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/utilite/UEvent.h
+[80.844s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/utilite/UTimer.h
+[80.844s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/utilite/Win32
+[80.844s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/utilite/Win32/UThreadC.h
+[80.844s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/utilite/Win32/UWin32.h
+[80.844s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/utilite/UEventsManager.h
+[80.845s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/utilite/UThreadC.h
+[80.845s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/utilite/UException.h
+[80.845s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/utilite/UThreadNode.h
+[80.845s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/utilite/UEventsHandler.h
+[80.845s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/utilite/UStl.h
+[80.845s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/utilite/UDirectory.h
+[80.845s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/utilite/USemaphore.h
+[80.846s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/utilite/UtiLite.h
+[80.846s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/utilite/UThread.h
+[80.846s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/utilite/Posix
+[80.846s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/utilite/Posix/UThreadC.h
+[80.846s] -- Up-to-date: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap
+[80.846s] -- Up-to-date: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/utilite
+[80.846s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/utilite/utilite_export.h
+[80.846s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/lib/rtabmap-0.23/RTABMap_utiliteTargets.cmake
+[80.846s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/lib/rtabmap-0.23/RTABMap_utiliteTargets-release.cmake
+[80.847s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/bin/rtabmap-res_tool-0.3.0
+[80.847s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/bin/rtabmap-res_tool
+[80.848s] -- Set runtime path of "/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/bin/rtabmap-res_tool-0.3.0" to ""
+[80.848s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/lib/librtabmap_core.so.0.23.6
+[80.859s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/lib/librtabmap_core.so.0.23
+[80.859s] -- Set runtime path of "/workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/lib/librtabmap_core.so.0.23.6" to ""
+[80.859s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/lib/librtabmap_core.so
+[80.860s] -- Up-to-date: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap
+[80.860s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core
+[80.860s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/Registration.h
+[80.860s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/LaserScan.h
+[80.860s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/OdometryEvent.h
+[80.860s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/camera
+[80.860s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/camera/CameraStereoZed.h
+[80.860s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/camera/CameraStereoTara.h
+[80.860s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/camera/CameraStereoFlyCapture2.h
+[80.861s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/camera/CameraImages.h
+[80.861s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/camera/CameraStereoDC1394.h
+[80.861s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/camera/CameraOrbbecSDK.h
+[80.861s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/camera/CameraK4W2.h
+[80.861s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/camera/CameraStereoZedOC.h
+[80.861s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/camera/CameraSeerSense.h
+[80.861s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/camera/CameraRGBDImages.h
+[80.861s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/camera/CameraRealSense.h
+[80.861s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/camera/CameraVideo.h
+[80.862s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/camera/CameraStereoImages.h
+[80.862s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/camera/CameraOpenNI2.h
+[80.862s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/camera/CameraOpenNICV.h
+[80.862s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/camera/CameraRealSense2.h
+[80.862s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/camera/CameraDepthAI.h
+[80.862s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/camera/CameraStereoVideo.h
+[80.862s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/camera/CameraOpenni.h
+[80.862s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/camera/CameraFreenect.h
+[80.862s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/camera/CameraMyntEye.h
+[80.862s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/camera/CameraFreenect2.h
+[80.863s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/camera/CameraK4A.h
+[80.863s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/util3d.h
+[80.863s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/IMUThread.h
+[80.863s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/CameraModel.h
+[80.863s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/GlobalDescriptorExtractor.h
+[80.863s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/util3d_filtering.h
+[80.863s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/GPS.h
+[80.864s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/stereo
+[80.864s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/stereo/StereoSGBM.h
+[80.864s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/stereo/stereoRectifyFisheye.h
+[80.864s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/stereo/StereoBM.h
+[80.864s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/BayesFilter.h
+[80.864s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/Stereo.h
+[80.864s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/GlobalMap.h
+[80.864s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/Recovery.h
+[80.864s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/Features2d.h
+[80.865s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/EnvSensor.h
+[80.865s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/OdometryInfo.h
+[80.865s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/GainCompensator.h
+[80.865s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/Optimizer.h
+[80.865s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/CameraThread.h
+[80.866s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/IMUFilter.h
+[80.866s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/RegistrationInfo.h
+[80.866s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/DBReader.h
+[80.866s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/util3d_motion_estimation.h
+[80.866s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/impl
+[80.867s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/impl/util3d.hpp
+[80.867s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/impl/LocalMapMaker.hpp
+[80.867s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/impl/util3d_mapping.hpp
+[80.867s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/impl/util3d_surface.hpp
+[80.867s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/LocalGridMaker.h
+[80.867s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/util3d_registration.h
+[80.867s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/util2d.h
+[80.868s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/UserDataEvent.h
+[80.868s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/CameraInfo.h
+[80.868s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/PDALWriter.h
+[80.868s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/Landmark.h
+[80.868s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/ParticleFilter.h
+[80.868s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/OdometryThread.h
+[80.868s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/rvl_codec.h
+[80.868s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/util3d_features.h
+[80.868s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/GlobalDescriptor.h
+[80.868s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/Compression.h
+[80.869s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/Rtabmap.h
+[80.869s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/RegistrationIcp.h
+[80.869s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/Odometry.h
+[80.869s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/ProgressState.h
+[80.869s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/Parameters.h
+[80.869s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/OctoMap.h
+[80.869s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/lidar
+[80.869s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/lidar/LidarVLP16.h
+[80.870s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/SensorCaptureInfo.h
+[80.870s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/LASWriter.h
+[80.870s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/RegistrationVis.h
+[80.870s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/Transform.h
+[80.870s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/ParamEvent.h
+[80.870s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/Graph.h
+[80.870s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/Signature.h
+[80.870s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/optimizer
+[80.870s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/optimizer/OptimizerGTSAM.h
+[80.871s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/optimizer/OptimizerCVSBA.h
+[80.871s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/optimizer/OptimizerG2O.h
+[80.871s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/optimizer/OptimizerTORO.h
+[80.871s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/optimizer/OptimizerCeres.h
+[80.871s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/RtabmapEvent.h
+[80.871s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/util3d_surface.h
+[80.871s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/MarkerDetector.h
+[80.871s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/CameraEvent.h
+[80.872s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/CameraStereo.h
+[80.872s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/global_map
+[80.872s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/global_map/OctoMap.h
+[80.872s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/global_map/OccupancyGrid.h
+[80.872s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/global_map/CloudMap.h
+[80.872s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/global_map/GridMap.h
+[80.872s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/EpipolarGeometry.h
+[80.873s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/OccupancyGrid.h
+[80.873s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/DBDriver.h
+[80.873s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/SensorEvent.h
+[80.873s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/LocalGrid.h
+[80.873s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/Statistics.h
+[80.873s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/Camera.h
+[80.873s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/util3d_correspondences.h
+[80.873s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/VWDictionary.h
+[80.874s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/StereoDense.h
+[80.874s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/Memory.h
+[80.874s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/CameraRGBD.h
+[80.874s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/SensorCapture.h
+[80.874s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/util3d_mapping.h
+[80.874s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/GeodeticCoords.h
+[80.874s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/Link.h
+[80.874s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/util3d_transforms.h
+[80.874s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/DBDriverSqlite3.h
+[80.874s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/Image.h
+[80.875s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/SensorData.h
+[80.875s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/VisualWord.h
+[80.875s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/StereoCameraModel.h
+[80.875s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/RtabmapThread.h
+[80.875s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/odometry
+[80.875s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/odometry/OdometryOkvis.h
+[80.875s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/odometry/OdometryMono.h
+[80.875s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/odometry/OdometryF2M.h
+[80.876s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/odometry/OdometryLIOSAM.h
+[80.876s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/odometry/OdometryORBSLAM3.h
+[80.876s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/odometry/OdometryF2F.h
+[80.876s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/odometry/OdometryORBSLAM2.h
+[80.876s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/odometry/OdometryVINSFusion.h
+[80.876s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/odometry/OdometryOpen3D.h
+[80.876s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/odometry/OdometryFLOAM.h
+[80.876s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/odometry/OdometryViso2.h
+[80.876s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/odometry/OdometryLOAM.h
+[80.876s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/odometry/OdometryMSCKF.h
+[80.877s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/odometry/OdometryFovis.h
+[80.877s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/odometry/OdometryVINS.h
+[80.877s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/odometry/OdometryCuVSLAM.h
+[80.877s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/odometry/OdometryDVO.h
+[80.877s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/odometry/OdometryOpenVINS.h
+[80.877s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/CameraRGB.h
+[80.877s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/IMU.h
+[80.877s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/PythonInterface.h
+[80.878s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/clams
+[80.878s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/clams/slam_calibrator.h
+[80.878s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/clams/frame_projector.h
+[80.878s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/clams/discrete_depth_distortion_model.h
+[80.878s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/Lidar.h
+[80.878s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/FlannIndex.h
+[80.878s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/SensorCaptureThread.h
+[80.879s] -- Up-to-date: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap
+[80.879s] -- Up-to-date: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core
+[80.879s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/rtabmap_core_export.h
+[80.879s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/include/rtabmap-0.23/rtabmap/core/Version.h
+[80.879s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/lib/rtabmap-0.23/RTABMap_coreTargets.cmake
+[80.879s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/lib/rtabmap-0.23/RTABMap_coreTargets-release.cmake
+[80.879s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/lib/rtabmap-0.23/RTABMapTargets.cmake
+[80.880s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/lib/rtabmap-0.23/RTABMapConfig.cmake
+[80.880s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/lib/rtabmap-0.23/RTABMapConfigVersion.cmake
+[80.880s] -- Installing: /workspaces/isaac_ros-dev/Development/ros2/install/rtabmap/share/rtabmap/package.xml
+[80.886s] Invoked command in '/workspaces/isaac_ros-dev/Development/ros2/build/rtabmap' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble /usr/bin/cmake --install /workspaces/isaac_ros-dev/Development/ros2/build/rtabmap
