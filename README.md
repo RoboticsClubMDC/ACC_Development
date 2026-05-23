@@ -60,18 +60,4 @@ All in [`Development/ros2/src/qcar2_autonomy/autonomy/`](Development/ros2/src/qc
 
 ---
 
-## What's *not* in this repo
-
-Large data files (the 5.7 GB source bag, the RTAB-Map `.db` maps, intermediate run artifacts) are not committed — they live on the work machine (off-car: in `~/Downloads/rtab_map_gabriel/`). The `humble-rtabmap` Docker image is built locally and not pushed to a registry. Build outputs (`Development/build/`, `install/`, `log/`) are ignored by `.gitignore`.
-
----
-
-## Branches in this repo
-
-- **`Gabriel`** — this branch, the VO redundancy line of work.
-- **`main`** — the team baseline; never push directly here.
-- **`Physical_Arturo`** — a teammate's separate branch; off-limits from this one.
-
----
-
 For step-by-step run instructions, the canonical reference is [`Easy_Start.txt`](Easy_Start.txt). For *why* anything is the way it is, read [`VO_CHANGELOG.md`](Development/ros2/src/qcar2_autonomy/VO_CHANGELOG.md) — newest entries are at the top.
