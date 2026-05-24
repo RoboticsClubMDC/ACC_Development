@@ -55,6 +55,29 @@ Quick check:
 ros2 pkg list | grep qcar2
 ```
 
+Optional terminal tab/window title:
+
+```bash
+echo -ne "\033]0;QCar2 Cartographer\007"
+```
+
+Reusable helper for `~/.bashrc`:
+
+```bash
+termname() {
+  echo -ne "\033]0;$1\007"
+}
+```
+
+After reloading `~/.bashrc`, name terminals like this:
+
+```bash
+source ~/.bashrc
+termname "QCar2 AMCL"
+termname "QCar2 Perception"
+termname "Foxglove Bridge"
+```
+
 ## Start QLabs / Virtual QCar2
 
 Host terminal:
@@ -858,6 +881,373 @@ Observed during testing after the EKF + max_range fixes: Cartographer's live SLA
 2. Use `cartographer_pbstream_to_ros_map` rather than `map_saver_cli` when accuracy matters — `write_state` forces a final SPA pass before export, producing a cleaner PGM.
 3. Treat AMCL as **filter localization for race-time tracking**, not as a map-quality improver. It is fast and deterministic; that is its job.
 4. Future work: implement landmark-based map alignment so AMCL operates in competition coordinates instead of Cartographer's abstract frame.
+
+### 2026-05-24 EDT — unified control modes in path_follower (manual_drive folded in)
+
+`path_follower` is now the **single owner** of `/cmd_vel_nav`. No more double-publisher tug-of-war when both `path_follower` and `manual_drive` are running. Manual-drive's WASD keystroke logic has been folded into `path_follower` as a thread, so there is exactly one node that ever publishes the steering bus.
+
+**New parameter: `control_mode`** (string, default `"idle"`):
+
+| Mode | What `path_follower` does | Use case |
+|---|---|---|
+| `idle` | Nothing — does NOT publish `/cmd_vel_nav` at all. Diagnostics still publish. | Default safe state. Lets you launch path_follower without it driving immediately. |
+| `manual` | Spawns a daemon thread that reads WASD keystrokes from path_follower's terminal and publishes commands via `self.publisher` (the same one autonomous mode uses). | Drive the car by hand with the keyboard, in the same terminal that's running path_follower. |
+| `autonomous` | Existing pure-pursuit behavior; computes PD steering from `/qcar2_pose_fused` + waypoints. | Normal driving along a path. |
+
+**How to switch modes:**
+
+```bash
+# Idle (default) — does nothing
+ros2 run qcar2_autonomy path_follower
+
+# Manual — keystrokes from this terminal control the car
+ros2 param set /path_follower control_mode "manual"
+# WASD = steer, space/x = stop, +/- = speed, [/] = turn rate, q = exit to idle
+
+# Autonomous — drive the path (default node_values = [0, 8, 10])
+ros2 param set /path_follower control_mode "autonomous"
+```
+
+**Auto-switching:** the mode switches automatically into `autonomous` when:
+- `/cmd_waypoints` arrives with a Path message (BO script, trip_planner, manual `ros2 topic pub`)
+- `node_values` parameter changes (`ros2 param set /path_follower node_values "[...]"`)
+
+These are explicit "I want to drive" intents.
+
+**Manual-mode controls (WASD, same as the old `manual_drive` node):**
+
+```
+  w : forward    s : reverse
+  a : steer left d : steer right
+  space/x : stop
+  + / - : change forward/reverse speed by 0.05
+  [ / ] : change turn rate by 0.05
+  q : exit manual mode → switch back to idle
+```
+
+Manual-mode tunables (all parameters):
+- `manual_forward_speed` (default 0.25 m/s)
+- `manual_reverse_speed` (default 0.20 m/s)
+- `manual_turn_rate`     (default 0.50 rad)
+- `manual_speed_step`    (default 0.05)
+
+**Standalone `manual_drive` node still exists** — kept for backward compatibility and physical-hardware use cases. But if you run BOTH `manual_drive` AND `path_follower` in `manual` mode, they will fight again. **Use ONE OR THE OTHER**: either folded-in manual mode (preferred — single ownership) or the standalone `manual_drive` node with `path_follower` in `idle` mode.
+
+**Implementation notes:**
+
+- The keystroke thread requires path_follower's terminal to be a TTY. If stdin isn't a TTY (e.g., launched via launch file in background), `manual` mode logs a warning and degrades to behaving like `idle`. Best practice: run `ros2 run qcar2_autonomy path_follower` in a foreground terminal you can type into.
+- `nav_command()` (line 655) early-returns if `control_mode != 'autonomous'`. This is the kill-switch that prevents the tug-of-war.
+- Switching INTO `manual` runs `_setup_terminal()` (cbreak mode on stdin). Switching OUT runs `_restore_terminal()`. If path_follower crashes in manual mode, the terminal may need `reset` typed to recover.
+
+**Implications for BO:**
+
+The BO script (`scripts/bo_pd_tune.py`) publishes `/cmd_waypoints`, which now also auto-switches path_follower into `autonomous` mode. So the BO workflow becomes even simpler:
+
+```bash
+ros2 run qcar2_autonomy path_follower            # starts IDLE — does nothing
+ros2 param set /path_follower control_mode "manual"
+# Drive the car around for 30s to warm Cartographer (in this terminal)
+# Press 'q' → returns to idle
+
+python3 /workspaces/isaac_ros-dev/ros2/scripts/bo_pd_tune.py
+# Press ENTER when ready
+# /cmd_waypoints arrives → path_follower auto-switches to autonomous
+# 15 trials run, then it goes back to idle when complete (final waypoint reached)
+```
+
+No second `manual_drive` terminal needed.
+
+### 2026-05-24 EDT — path_follower idle by default + BO Enter-to-start gate
+
+Two related changes that fix the manual-vs-autonomous bus fight and add a Cartographer warm-up window for BO.
+
+**1. `path_follower` now starts in IDLE mode.** The `start_path` parameter default flipped from `True` to `False`. While idle, `path_follower`'s `enable` (line 565) is 0 → it publishes `/cmd_vel_nav` with zero linear/angular commands → does not fight `manual_drive` for the bus. Three ways to enter autonomous mode:
+
+```bash
+# Method 1 — send a path (BO uses this, also any /cmd_waypoints client)
+ros2 topic pub --once /cmd_waypoints nav_msgs/msg/Path "..."
+
+# Method 2 — toggle the start_path parameter
+ros2 param set /path_follower start_path "[true]"
+
+# Method 3 — set node_values (treated as "I want to drive these nodes")
+ros2 param set /path_follower node_values "[0, 8, 10]"
+```
+
+All three set `self.path_execute_flag = True` internally. To exit autonomous mode:
+
+```bash
+ros2 param set /path_follower start_path "[false]"
+```
+
+**Implication for workflow:** you can now start `path_follower` early and `manual_drive` later (or vice versa) without them stepping on each other. Only when you explicitly issue a path command does the controller take over.
+
+**2. `bo_pd_tune.py` now waits for ENTER before starting trials.** This is the Cartographer warm-up gate — manually drive the car around for ~30 s with `manual_drive` to give Cartographer a stable map, then return to the BO terminal and press ENTER. The script prints clear instructions:
+
+```
+======================================================================
+  BO is READY but PAUSED.
+
+  Before pressing ENTER:
+    1. Run `ros2 run qcar2_autonomy manual_drive` in another terminal.
+    2. Drive the car around the test area for ~30 s so
+       Cartographer builds a stable local map.
+    3. (Optional) Drive the car back near (0, 0) in map frame.
+    4. Stop manual_drive (Ctrl-C) so the steering bus is free.
+
+  Once you press ENTER:
+    - 15 BO trials will run back-to-back (~12 min total).
+    - Each trial drives the test triangle in map frame.
+    - Do NOT interfere unless something goes wrong (Ctrl-C this script).
+======================================================================
+
+  Press ENTER when ready (or Ctrl-C to abort)...
+```
+
+**Full Cartographer + BO workflow (final form for tonight):**
+
+```bash
+# Build
+colcon build --symlink-install --packages-select qcar2_autonomy qcar2_nodes
+source install/setup.bash && export ROS_DOMAIN_ID=69
+ros2_killall
+
+# Stack
+ros2 launch qcar2_nodes qcar2_cartographer_virtual_launch.py     # SLAM + base
+ros2 run qcar2_autonomy ekf_fusor                                  # filtered pose
+ros2 launch qcar2_nodes foxglove_bridge_launch.py                  # bridge + watchdog
+ros2 run qcar2_autonomy path_follower                              # IDLE (doesn't drive)
+
+# (Optional) Tkinter slider for ad-hoc tuning
+python3 /workspaces/isaac_ros-dev/ros2/scripts/pd_tuner.py
+
+# BO — paused waiting for warm-up
+python3 /workspaces/isaac_ros-dev/ros2/scripts/bo_pd_tune.py
+
+# In another terminal: warm up Cartographer
+ros2 run qcar2_autonomy manual_drive
+# Drive ~30s, Ctrl-C manual_drive
+# Return to BO terminal, press ENTER
+# Wait ~12 minutes
+cat /tmp/bo_pd_tune_result.json
+```
+
+### 2026-05-24 EDT — Controller watchdog + PD tuner GUI + Bayesian Optimization
+
+Three new pieces of infrastructure, all wired to the existing path_follower diagnostic topics. No path_follower / EKF / Cartographer changes required to use any of them.
+
+**1. `controller_watchdog` node (`qcar2_autonomy/autonomy/controller_watchdog.py`)**
+
+Mirrors the pattern of `ekf_fusor` health: passive observer that subscribes to `/nav/blended_delta`, `/nav/psi`, `/nav/steering_saturation_rate` and publishes `/nav/controller_health` (`std_msgs/String`) at 2 Hz. States:
+
+| State | Trigger |
+|---|---|
+| `healthy` | No issues |
+| `warming_up` | Not enough samples yet (first ~250 ms) |
+| `saturated` | `steering_saturation_rate > 0.5` (controller fighting hardware limit) |
+| `wiggling` | `std(blended_delta) over 1s > 0.20 rad` (high-freq oscillation) |
+| `late_reaction` | `|psi| > 0.5 rad` AND `|blended_delta| < 0.10 rad` for >0.5 s (target ahead, controller not steering enough → Kp too low or Kd too high) |
+
+Run:
+```bash
+ros2 run qcar2_autonomy controller_watchdog
+```
+
+In Foxglove → add **Indicator** panel → topic `/nav/controller_health` → field `.data` → set color rules: `healthy`=green, `warming_up`=blue, `saturated`=red, `wiggling`=orange, `late_reaction`=yellow.
+
+Thresholds are ROS parameters (`sat_threshold`, `wiggle_std_threshold`, `late_psi_threshold`, `late_delta_threshold`, `late_min_duration`) so you can adjust without editing code.
+
+Intentionally NOT implemented: `off_path` (requires cross-track computation) and `stuck` (longer time window). Add these if you observe symptoms that match.
+
+**2. `pd_tuner.py` Tkinter slider GUI (`scripts/pd_tuner.py`)**
+
+Foxglove's Publish panel only fires on button click, not on slider drag. This script gives you continuous-drag slider control:
+
+```bash
+python3 /workspaces/isaac_ros-dev/ros2/scripts/pd_tuner.py
+```
+
+Opens a small window with two sliders (Kp 0–2, Kd 0–1). Drag → publishes to `/nav/kp_steering_set` / `/nav/kd_steering_set` → path_follower picks up the change on the next 80 Hz tick. Watch path_follower log for `kp_steering (topic) -> X.XXX` confirmation.
+
+Requires X forwarding / desktop environment.
+
+**3. `bo_pd_tune.py` — Bayesian Optimization automatic PD tuner (`scripts/bo_pd_tune.py`)**
+
+Automatically finds the (Kp, Kd) pair that minimizes a controller-quality cost function. Wires into the existing system as a peer node — no controller/EKF/SLAM modifications.
+
+How it wires:
+
+```
+┌──────────────────┐     publish (Float32)         ┌──────────────────┐
+│  bo_pd_tune.py   │ ─── /nav/kp_steering_set ──▶ │  path_follower   │
+│                  │ ─── /nav/kd_steering_set ──▶ │                  │
+│                  │ ─── /cmd_waypoints (Path) ──▶│                  │
+│   skopt          │                              └──────────────────┘
+│   gp_minimize    │
+│   surrogate(GP)  │   subscribe
+│   acquisition(EI)│ ◀── /nav/blended_delta
+│                  │ ◀── /nav/steering_saturation_rate
+│                  │ ◀── /nav/distance_to_final
+│                  │ ◀── /path_status (Bool)
+│                  │ ◀── /qcar2_pose_fused
+└──────────────────┘
+```
+
+Each trial runs the same fixed test path (4-waypoint triangle, ~3 m) and computes:
+```
+J = W_ARRIVAL * arrival_error
+  + W_SATURATION * mean(saturation_rate)
+  + W_DELTA_STD * std(blended_delta)
+  + W_DURATION * trial_duration
+  + W_DIST_MEAN * mean(distance_to_final)
+```
+
+Default weights (top of file): `1.0 / 2.0 / 0.5 / 0.1 / 0.3`. Lower J = better tune.
+
+BO procedure:
+- 5 random sample points (initial exploration)
+- 10 acquisition-driven samples using Gaussian Process surrogate + Expected Improvement
+- 15 trials total, ~12 minutes on QLabs
+- Output: `/tmp/bo_pd_tune_result.json` with best (Kp, Kd) + full trial log
+- Best gains are auto-applied at the end so the car drives with them immediately
+
+Dependencies:
+```bash
+pip install scikit-optimize numpy
+```
+
+Run:
+```bash
+# First start the normal stack: cartographer + ekf_fusor + foxglove + path_follower
+# Then in another sourced terminal:
+python3 /workspaces/isaac_ros-dev/ros2/scripts/bo_pd_tune.py
+```
+
+**Why Bayesian Optimization, full name + reading list:**
+
+Also called **Sequential Model-Based Optimization (SMBO)** or **Gaussian Process Optimization**. Core idea: when each trial is expensive (driving a car, training a neural network, etc.), don't grid-search blindly — model the cost function `J(Kp, Kd)` as a stochastic process (typically a Gaussian Process) and use that model to decide where to sample next. Balances exploration (try where uncertainty is high) and exploitation (try near known good points) via an acquisition function (default here: Expected Improvement).
+
+Foundational reading, in order of usefulness for engineers:
+1. **Frazier 2018** — "A Tutorial on Bayesian Optimization" (arXiv:1807.02811) — best intro
+2. **Snoek, Larochelle, Adams 2012** — "Practical Bayesian Optimization of Machine Learning Algorithms" — application to hyperparameter tuning
+3. **Jones, Schonlau, Welch 1998** — "Efficient Global Optimization of Expensive Black-Box Functions" — the EGO algorithm, modern BO's foundation
+4. **Mockus 1975** — original Bayesian extremum-seeking formulation (historical)
+
+Library used: [`scikit-optimize`](https://scikit-optimize.github.io/) — open source, ~200 LOC integration, GP surrogate + EI acquisition by default.
+
+### 2026-05-24 EDT — Live-tunable PD gains + controller diagnostics for Foxglove
+
+`path_follower` (`nav_to_pose.py`) now exposes its pure-pursuit damping PD gains as ROS 2 parameters and publishes a controller-health diagnostic set. Three things you can do that you couldn't before:
+
+**1. Tune Kp / Kd live during a drive** — no rebuild, no restart. From any sourced terminal:
+
+```bash
+ros2 param set /path_follower kp_steering 1.2
+ros2 param set /path_follower kd_steering 0.4
+```
+
+Or in Foxglove → add a **Parameters** panel → expand `/path_follower` → drag the `kp_steering` and `kd_steering` sliders. Changes take effect on the next path_planner tick.
+
+**Defaults** (lowered after the deg→rad unit bug fix; see prior change log entry):
+- `kp_steering = 1.0`
+- `kd_steering = 0.3`
+
+**Tuning rules of thumb:**
+
+| Behavior | Action |
+|---|---|
+| Car wiggles at nodes | Raise `kd_steering` by 0.1 |
+| Car turns sluggishly, scrapes walls on inside of curve | Lower `kd_steering` by 0.1 |
+| Car undershoots curves | Raise `kp_steering` by 0.1 |
+| Car overshoots / oscillates | Lower `kp_steering` by 0.1 OR raise `kd_steering` |
+
+Hard limits: `0.0 ≤ Kd ≤ 1.5`, `0.5 ≤ Kp ≤ 1.8`. Outside these ranges the controller becomes unstable.
+
+**2. New controller-health topics** (all `std_msgs/Float32`, accessible via `.data` in Foxglove Plot panels):
+
+| Topic | Meaning | Healthy values |
+|---|---|---|
+| `/nav/distance_to_waypoint` | m to current target waypoint | decreases steadily toward 0.3, then jumps to next waypoint |
+| `/nav/distance_to_final` | m to last waypoint of path | monotonically decreasing |
+| `/nav/psi` | rad, angle from car nose to target | bounded ±0.5 in healthy operation; near ±π means "target behind car" |
+| `/nav/steering_saturation_rate` | 0..1, fraction of last ~1s at the ±0.52 limit | should be near 0; >0.3 means controller is fighting the limit |
+| `/nav/speed_cmd` | m/s commanded forward speed (after cos² scaling) | matches `desired_speed` on straights, drops in turns |
+| `/nav/yaw_rate_imu` | rad/s, raw IMU gyro | should track `/nav/blended_delta * speed / wheelbase` |
+| `/nav/progress_rate` | m/s, d(dist_to_final)/dt | should be ~ -speed when on path; near 0 means stuck |
+| `/nav/wpi` | float-encoded current waypoint index | monotonically increasing through the path |
+| `/nav/controller_mode` | 0=PP, 1=blended, 2=stopping (within 0.5m), 3=complete | 0 most of the time, 2 briefly, 3 at end |
+
+**3. Recommended Foxglove dashboard for tuning**
+
+Six Plot panels in a 2×3 grid, all in sliding-window mode (X axis: current time, 30s window):
+
+```
+┌──────────────────────────┬──────────────────────────┐
+│ Plot: Distance            │ Plot: PD Output           │
+│   /nav/distance_to_wp    │   /nav/pp_delta           │
+│   /nav/distance_to_final │   /nav/blended_delta      │
+│   /nav/progress_rate     │   /nav/yaw_rate_imu       │
+├──────────────────────────┼──────────────────────────┤
+│ Plot: Geometry            │ Plot: Saturation          │
+│   /nav/psi               │   /nav/steering_saturation_rate │
+│                          │   (reference line at 0.3)  │
+├──────────────────────────┼──────────────────────────┤
+│ Parameters panel          │ Plot: Speed               │
+│   /path_follower/kp_steering   /nav/speed_cmd       │
+│   /path_follower/kd_steering   /nav/wpi              │
+└──────────────────────────┴──────────────────────────┘
+```
+
+The Parameters panel is the key one — that's how you tune live without touching the terminal.
+
+**Repeatability test (separate procedure, run when controller is tuned):**
+
+1. Drive (manually or with planner) to some point. Record pose:
+   ```bash
+   ros2 run tf2_ros tf2_echo map base_link --once
+   # Note: target_x, target_y
+   ```
+2. Send the car elsewhere via `/cmd_waypoints` (a point ~1m away).
+3. When it arrives, send it back to (target_x, target_y) via `/cmd_waypoints`:
+   ```bash
+   ros2 topic pub --once /cmd_waypoints nav_msgs/msg/Path \
+     "{header: {frame_id: 'map'}, poses: [{pose: {position: {x: TARGET_X, y: TARGET_Y, z: 0.0}}}]}"
+   ```
+4. When it arrives, record actual pose. Compute `e_i = sqrt((x_actual - target_x)² + (y_actual - target_y)²)`.
+5. Repeat 5–10 times.
+
+Stats to compute:
+- Mean error `μ_e` = accuracy (systematic offset)
+- Std deviation `σ_e` = repeatability (random scatter)
+
+Interpretation buckets:
+- `σ_e < 5cm`: excellent
+- `5–15cm`: healthy
+- `15–30cm`: marginal — may fail precision tasks like pickup
+- `>30cm`: localization drift or PP oscillation; needs investigation
+
+### 2026-05-24 EDT — QLabs spawn pose at SDCSRoadMap node 0 (empirical calibration)
+
+To spawn the virtual QCar 2 at SDCSRoadMap **node 0** (the default start of the path_follower's `node_values = [0, 8, 10]`), edit either `Setup_Competition_Map.py` or `Setup_Real_Scenario.py` inside the QLabs container (`/home/qcar2_scripts/python/Base_Scenarios_Python/`) — both ship with the same defaults.
+
+Change the `initialPosition` and `initialOrientation` defaults (function signature **and** the call site) to:
+
+```python
+initialPosition    = [0.000, 0.130, 0.005]
+initialOrientation = [0, 0, -33]   # empirical; NOT -90 like SDCSRoadMap says
+```
+
+**Why -33° and not -90°:** SDCSRoadMap reports node 0 yaw as `-π/2 = -90°`, but that's in the roadmap's own pixel-derived frame. Three rotation conventions stack between SDCSRoadMap and what QLabs renders:
+
+1. **SDCSRoadMap node** yaw = `-90°` (roadmap frame)
+2. **QLabs floor** is spawned with `rotation = [0, 0, -90]` (the roadmap image is laid down rotated -90° from QLabs world)
+3. **`nav_to_pose.py:rotation_offset`** parameter = `83°` default (the QLabs→ROS frame correction inside `R_QLabs_ROS` at lines 408-411)
+
+Combined, the QLabs world-frame yaw at which the car aligns nose-along-road at node 0 is `-33°` (validated by spawning at that orientation and observing the car sit straight on the lane in the QLabs viewer). Do not try to derive it analytically — the rotation_offset is itself a calibration value that depends on how Cartographer's `map` frame happens to settle, and the practical answer is the one that works.
+
+**For other nodes**, the same `-33° vs -90°` offset (`+57°` correction) should apply if you want to spawn at a different node's nominal pose. So for any SDCSRoadMap node with yaw `θ_node`, the QLabs spawn yaw is approximately `θ_node + 57°`.
+
+**Root cause to fix later (not now):** `nav_to_pose.py:auto_align_roadmap_to_current_pose()` exists to handle exactly this — automatically compute the rigid alignment between the SDCSRoadMap waypoints and the car's actual measured pose. If that worked cleanly, no spawn-pose hand-calibration would be needed. Revisit after Day 4 validation if there's time before competition.
 
 ### 2026-05-24 EDT — nav_to_pose now consumes /qcar2_pose_fused (Day 4 of EKF refactor)
 

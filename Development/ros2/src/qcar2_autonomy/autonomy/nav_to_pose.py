@@ -3,11 +3,57 @@
 from hal.products.mats import SDCSRoadMap
 from pal.utilities.math import wrap_to_pi
 
+import os
+import select
+import sys
+import termios
+import threading
 import time
+import tty
 import numpy as np
 import scipy.signal as signal
 from scipy.spatial.transform import Rotation as R
 from pal.utilities.scope import MultiScope
+
+
+# ─── Keystroke helpers folded in from manual_drive.py ─────────────────────
+# Used by the path_follower's "manual" control mode so the same node owns
+# /cmd_vel_nav in all modes (no double-publishing fight). Falls back
+# gracefully if stdin isn't a TTY (e.g., when launched via launch files).
+
+_TTY_ATTRS_BACKUP = None
+
+
+def _stdin_is_tty():
+    return sys.stdin is not None and sys.stdin.isatty()
+
+
+def _setup_terminal():
+    global _TTY_ATTRS_BACKUP
+    if not _stdin_is_tty():
+        return False
+    fd = sys.stdin.fileno()
+    _TTY_ATTRS_BACKUP = termios.tcgetattr(fd)
+    tty.setcbreak(fd)
+    return True
+
+
+def _restore_terminal():
+    global _TTY_ATTRS_BACKUP
+    if _TTY_ATTRS_BACKUP is None or not _stdin_is_tty():
+        return
+    fd = sys.stdin.fileno()
+    termios.tcsetattr(fd, termios.TCSADRAIN, _TTY_ATTRS_BACKUP)
+    _TTY_ATTRS_BACKUP = None
+
+
+def _get_key(timeout_s=0.05):
+    if not _stdin_is_tty():
+        return ""
+    r, _, _ = select.select([sys.stdin], [], [], timeout_s)
+    if not r:
+        return ""
+    return os.read(sys.stdin.fileno(), 1).decode(errors="ignore")
 
 from rclpy.duration import Duration
 import rclpy
@@ -50,15 +96,56 @@ class PathFollower(Node):
         self.declare_parameter('translation_offset', [0.0, 0.0])
         self.translation_offset = list(self.get_parameter('translation_offset').get_parameter_value().double_array_value)
 
-        self.declare_parameter('start_path', [True])
-        self.path_execute_flag = list(self.get_parameter('start_path').get_parameter_value().bool_array_value)[0]
+        # Unified control mode — ONE node owns /cmd_vel_nav, no double-publish.
+        #   idle        → publish NOTHING (bus is free; external nodes can drive)
+        #   manual      → WASD keystrokes from this terminal publish /cmd_vel_nav
+        #   autonomous  → pure-pursuit driving (existing behavior)
+        #
+        # Default = idle so spawning path_follower doesn't immediately fight
+        # anything. To enter a driving mode:
+        #   * ros2 param set /path_follower control_mode "manual"
+        #   * ros2 param set /path_follower control_mode "autonomous"
+        #   * publish /cmd_waypoints  (auto-switches to "autonomous")
+        #   * update node_values param (auto-switches to "autonomous")
+        self.declare_parameter('control_mode', 'idle')
+        self.control_mode = str(self.get_parameter('control_mode').value).lower()
+        if self.control_mode not in ('idle', 'manual', 'autonomous'):
+            self.control_mode = 'idle'
+        # Legacy start_path: kept for compatibility but is now derived from
+        # control_mode. Setting start_path=True is equivalent to control_mode=autonomous.
+        self.declare_parameter('start_path', [False])
+        self.path_execute_flag = (self.control_mode == 'autonomous')
+
+        # ─── Manual-mode WASD config (folded in from manual_drive.py) ───
+        self.declare_parameter('manual_forward_speed', 0.25)
+        self.declare_parameter('manual_reverse_speed', 0.20)
+        self.declare_parameter('manual_turn_rate',     0.50)
+        self.declare_parameter('manual_speed_step',    0.05)
+        self.manual_forward_speed = float(self.get_parameter('manual_forward_speed').value)
+        self.manual_reverse_speed = float(self.get_parameter('manual_reverse_speed').value)
+        self.manual_turn_rate     = float(self.get_parameter('manual_turn_rate').value)
+        self.manual_speed_step    = float(self.get_parameter('manual_speed_step').value)
+        self.manual_linear  = 0.0
+        self.manual_angular = 0.0
+        self._manual_thread = None
+        self._manual_thread_stop = threading.Event()
 
         self.declare_parameter('mission_pickup_xy',  [0.0, 0.0])
         self.declare_parameter('mission_dropoff_xy', [0.0, 0.0])
         self.declare_parameter('mission_enable',     [False])
 
+        # PD gains for pure-pursuit steering. Live-tunable via Foxglove
+        # Parameters panel or `ros2 param set /path_follower kp_steering <v>`.
+        # Defaults chosen 2026-05-24: Kp=1.0 unity start; Kd=0.3 small damping
+        # (Kd=1.0 caused sluggish turns + wall scrapes; Kd=5 with the old
+        # *pi/180 bug was effectively ~0.087, essentially undamped).
+        self.declare_parameter('kp_steering', 1.0)
+        self.declare_parameter('kd_steering', 0.3)
+        self.kp_steering = float(self.get_parameter('kp_steering').value)
+        self.kd_steering = float(self.get_parameter('kd_steering').value)
+
         # Stanley blend is kept at 0 — pure pursuit only
-        self.stanley_blend     = 0.0
+        self.stanley_blend     = 0.3
         self.stanley_trust_min = 999.0
 
         self.add_on_set_parameters_callback(self.parameter_update_callback)
@@ -131,10 +218,35 @@ class PathFollower(Node):
 
         self.create_subscription(Path, '/cmd_waypoints', self._cmd_waypoints_cb, 1)
 
+        # Foxglove-friendly live tuning: publish a Float32 to these topics from
+        # a Foxglove "Publish" panel slider to update Kp/Kd in real time. This
+        # exists in addition to the ROS parameters (both routes work).
+        self.create_subscription(Float32, '/nav/kp_steering_set', self._kp_set_cb, 5)
+        self.create_subscription(Float32, '/nav/kd_steering_set', self._kd_set_cb, 5)
+
         self.pub_pp_delta      = self.create_publisher(Float32, '/nav/pp_delta',      2)
         self.pub_stanley_delta = self.create_publisher(Float32, '/nav/stanley_delta', 2)
         self.pub_blended_delta = self.create_publisher(Float32, '/nav/blended_delta', 2)
         self.pub_blend_alpha   = self.create_publisher(Float32, '/nav/blend_alpha',   2)
+
+        # --- Controller diagnostics (Foxglove plot targets) ---
+        # All Float32 for easy Foxglove Plot panel binding via `.data`.
+        self.pub_dist_wp           = self.create_publisher(Float32, '/nav/distance_to_waypoint', 2)
+        self.pub_dist_final        = self.create_publisher(Float32, '/nav/distance_to_final',    2)
+        self.pub_psi               = self.create_publisher(Float32, '/nav/psi',                  2)
+        self.pub_steering_saturation = self.create_publisher(Float32, '/nav/steering_saturation_rate', 2)
+        self.pub_speed_cmd         = self.create_publisher(Float32, '/nav/speed_cmd',            2)
+        self.pub_yaw_rate          = self.create_publisher(Float32, '/nav/yaw_rate_imu',         2)
+        self.pub_progress_rate     = self.create_publisher(Float32, '/nav/progress_rate',        2)
+        self.pub_wpi               = self.create_publisher(Float32, '/nav/wpi',                  2)
+        self.pub_controller_mode   = self.create_publisher(Float32, '/nav/controller_mode',      2)
+
+        # Saturation rate uses a moving window of the last N steering commands.
+        self._sat_window = []
+        self._sat_window_size = 80   # ~1s at 80 Hz
+        # For progress_rate, remember the previous distance-to-final.
+        self._prev_dist_final = None
+        self._prev_progress_time = None
 
         self.t0 = time.time()
         self.t_plot = 0
@@ -155,9 +267,27 @@ class PathFollower(Node):
         self.N               = self.wp.shape[1]
         self.wpi             = 0
         self.path_complete   = False
-        self.path_execute_flag = True
         self._wp_in_ros_frame = True
+        # Auto-switch to autonomous mode (BO/trip_planner/etc. sending a path
+        # is an explicit driving intent). Stops the manual thread if it was up.
+        self._switch_mode('autonomous')
         self.get_logger().info(f'/cmd_waypoints received N={self.N}')
+
+    def _kp_set_cb(self, msg: Float32):
+        new_kp = float(msg.data)
+        # Soft clamp to safe range; the real hard limit is steering saturation
+        # downstream, but very large values cause instant divergence.
+        new_kp = float(np.clip(new_kp, 0.0, 3.0))
+        if abs(new_kp - self.kp_steering) > 1e-4:
+            self.kp_steering = new_kp
+            self.get_logger().info(f'kp_steering (topic) -> {self.kp_steering:.3f}')
+
+    def _kd_set_cb(self, msg: Float32):
+        new_kd = float(msg.data)
+        new_kd = float(np.clip(new_kd, 0.0, 2.0))
+        if abs(new_kd - self.kd_steering) > 1e-4:
+            self.kd_steering = new_kd
+            self.get_logger().info(f'kd_steering (topic) -> {self.kd_steering:.3f}')
 
     def _stanley_delta_cb(self, msg: Float32):
         self.stanley_delta = float(msg.data)
@@ -195,7 +325,21 @@ class PathFollower(Node):
                 self.wpi = 0
                 self.previous_steering_value = 0
                 self.path_complete = False
-                self.get_logger().info('nodes updated!')
+                self._wp_in_ros_frame = False
+                # Auto-switch into autonomous: setting node_values is an
+                # explicit "I want to drive" intent. Stops the manual thread
+                # if it was running.
+                self._switch_mode('autonomous')
+                self.get_logger().info('nodes updated! → autonomous mode')
+            elif param.name == 'control_mode' and param.type_ == param.Type.STRING:
+                requested = str(param.value).lower()
+                if requested in ('idle', 'manual', 'autonomous'):
+                    self._switch_mode(requested)
+                else:
+                    self.get_logger().warn(
+                        f"control_mode '{param.value}' not in "
+                        f"['idle', 'manual', 'autonomous'] — ignoring"
+                    )
             elif param.name == 'desired_speed' and param.type_ == param.Type.DOUBLE_ARRAY:
                 self.desired_speed = list(param.value)
                 self.get_logger().info('new desired speed...')
@@ -214,6 +358,12 @@ class PathFollower(Node):
                 self.get_logger().info(f'mission_dropoff_xy updated: {list(param.value)}')
             elif param.name == 'mission_enable' and param.type_ == param.Type.BOOL_ARRAY:
                 self.get_logger().info(f'mission_enable updated: {list(param.value)}')
+            elif param.name == 'kp_steering' and param.type_ == param.Type.DOUBLE:
+                self.kp_steering = float(param.value)
+                self.get_logger().info(f'kp_steering -> {self.kp_steering:.3f}')
+            elif param.name == 'kd_steering' and param.type_ == param.Type.DOUBLE:
+                self.kd_steering = float(param.value)
+                self.get_logger().info(f'kd_steering -> {self.kd_steering:.3f}')
             elif param.name == 'visualize_pose' and param.type_ == param.Type.BOOL_ARRAY:
                 self.pose_visualize_flag = list(param.value)[0]
                 if self.pose_visualize_flag and not self.plot_visualized:
@@ -459,14 +609,25 @@ class PathFollower(Node):
                     self.wp_prior        = self.wp
                     self.path_complete   = True
 
-                Kp_steering = 1.1
-                kd_steering = 5
+                # Live-tunable Kp/Kd (parameters, see __init__). Defaults
+                # Kp=1.0, Kd=0.3. Adjust from Foxglove Parameters panel or:
+                #   ros2 param set /path_follower kp_steering 1.2
+                #   ros2 param set /path_follower kd_steering 0.4
                 gyro_filtered = self.apply_filter('gyro', self.gyroscope[2], self.a1, self.b1)
 
                 pp_delta_damped = np.clip(
-                    Kp_steering * pp_delta - gyro_filtered * np.pi / 180 * kd_steering,
+                    self.kp_steering * pp_delta - self.kd_steering * gyro_filtered,
                     -self.max_steering_angle,
                     self.max_steering_angle)
+
+                # ----- Publish controller diagnostics for Foxglove -----
+                self._publish_controller_diagnostics(
+                    dist=dist,
+                    dist_to_final=dist_to_final,
+                    psi=psi,
+                    steering_cmd=float(pp_delta_damped),
+                    speed_cmd=float(speed_command),
+                )
 
                 self.pp_delta_raw  = float(pp_delta_damped)
                 self.stanley_delta = 0.0
@@ -504,6 +665,11 @@ class PathFollower(Node):
         self.path_status()
 
     def nav_command(self, enable, speed_command):
+        # CRITICAL: do NOT publish in non-autonomous modes. If we published
+        # zeros here while manual_drive (or the manual-mode thread) was also
+        # publishing, the bus would tug-of-war and stiffen the wheels.
+        if self.control_mode != 'autonomous':
+            return
         QCarCommands = Twist()
         QCarCommands.linear.x = enable * np.clip(
             speed_command * np.power(np.cos(self.current_steering), 2), 0.0, 0.7)
@@ -544,6 +710,202 @@ class PathFollower(Node):
             self.robot_pose_publisher.publish(pose_msg)
         except TransformException as ex:
             self.get_logger().info(f'Could not transform {to_frame_rel} to {from_frame_rel}: {ex}')
+
+    def _switch_mode(self, new_mode):
+        """Transition the controller into a new mode. Manages the manual
+        keystroke thread + the autonomous publish gate (path_execute_flag).
+        Safe to call from the parameter callback or from internal callbacks."""
+        if new_mode == self.control_mode:
+            return
+        self.get_logger().info(
+            f"control_mode: {self.control_mode} → {new_mode}"
+        )
+        # Tear down current mode
+        if self.control_mode == 'manual':
+            self._stop_manual_thread()
+
+        # Establish new mode
+        self.control_mode = new_mode
+        if new_mode == 'autonomous':
+            self.path_execute_flag = True
+        elif new_mode == 'manual':
+            self.path_execute_flag = False
+            self._start_manual_thread()
+        else:  # idle
+            self.path_execute_flag = False
+
+    # ─── Manual-mode keystroke thread (folded in from manual_drive) ─────
+
+    def _start_manual_thread(self):
+        if self._manual_thread is not None and self._manual_thread.is_alive():
+            return
+        if not _stdin_is_tty():
+            self.get_logger().warn(
+                "manual mode requested but stdin is not a TTY — keystrokes won't work. "
+                "Run path_follower in a foreground terminal to use manual mode."
+            )
+            return
+        self._manual_thread_stop.clear()
+        self.manual_linear = 0.0
+        self.manual_angular = 0.0
+        _setup_terminal()
+        self._manual_thread = threading.Thread(
+            target=self._manual_keyboard_loop, daemon=True)
+        self._manual_thread.start()
+        self.get_logger().info(
+            "Manual mode ON — WASD steers, space/x stops, +/- speed, [/] turn rate. "
+            "Press 'q' to return to idle."
+        )
+
+    def _stop_manual_thread(self):
+        if self._manual_thread is None:
+            return
+        self._manual_thread_stop.set()
+        self._manual_thread.join(timeout=1.0)
+        self._manual_thread = None
+        _restore_terminal()
+        # Publish a single stop so the car comes to rest if it was moving.
+        self.manual_linear = 0.0
+        self.manual_angular = 0.0
+        stop = Twist()
+        self.publisher.publish(stop)
+
+    def _manual_publish(self):
+        msg = Twist()
+        msg.linear.x = float(self.manual_linear)
+        msg.angular.z = float(self.manual_angular)
+        self.publisher.publish(msg)
+
+    def _manual_keyboard_loop(self):
+        """Runs in a daemon thread while control_mode == 'manual'.
+        Reads stdin in cbreak mode, maps WASD to Twist, publishes via
+        self.publisher (the SAME publisher autonomous mode uses)."""
+        while not self._manual_thread_stop.is_set():
+            # Heartbeat publish so the nav2_qcar_command_convert 0.25 s
+            # safety timeout doesn't zero throttle between keystrokes.
+            key = _get_key(timeout_s=0.05).lower()
+            if not key:
+                self._manual_publish()
+                continue
+
+            if key == 'q':
+                # Exit manual mode → switch back to idle (no driving).
+                self.manual_linear = 0.0
+                self.manual_angular = 0.0
+                self._manual_publish()
+                # Update the parameter so external observers see the change.
+                self.set_parameters([
+                    rclpy.parameter.Parameter(
+                        'control_mode',
+                        rclpy.parameter.Parameter.Type.STRING, 'idle')
+                ])
+                break
+            elif key == 'w':
+                self.manual_linear = self.manual_forward_speed
+                self.manual_angular = 0.0
+            elif key == 's':
+                self.manual_linear = -self.manual_reverse_speed
+                self.manual_angular = 0.0
+            elif key == 'a':
+                self.manual_angular = self.manual_turn_rate
+            elif key == 'd':
+                self.manual_angular = -self.manual_turn_rate
+            elif key in (' ', 'x'):
+                self.manual_linear = 0.0
+                self.manual_angular = 0.0
+            elif key in ('+', '='):
+                self.manual_forward_speed = min(1.0, self.manual_forward_speed + self.manual_speed_step)
+                self.manual_reverse_speed = min(1.0, self.manual_reverse_speed + self.manual_speed_step)
+                self.get_logger().info(
+                    f"forward={self.manual_forward_speed:.2f} reverse={self.manual_reverse_speed:.2f}"
+                )
+                continue
+            elif key in ('-', '_'):
+                self.manual_forward_speed = max(0.05, self.manual_forward_speed - self.manual_speed_step)
+                self.manual_reverse_speed = max(0.05, self.manual_reverse_speed - self.manual_speed_step)
+                self.get_logger().info(
+                    f"forward={self.manual_forward_speed:.2f} reverse={self.manual_reverse_speed:.2f}"
+                )
+                continue
+            elif key in ('{', '['):
+                self.manual_turn_rate = max(0.10, self.manual_turn_rate - self.manual_speed_step)
+                self.get_logger().info(f"turn_rate={self.manual_turn_rate:.2f}")
+                continue
+            elif key in ('}', ']'):
+                self.manual_turn_rate = min(1.0, self.manual_turn_rate + self.manual_speed_step)
+                self.get_logger().info(f"turn_rate={self.manual_turn_rate:.2f}")
+                continue
+            else:
+                continue
+
+            self._manual_publish()
+
+    def _publish_controller_diagnostics(self, dist, dist_to_final, psi,
+                                         steering_cmd, speed_cmd):
+        """Publish the 9 controller-health topics for Foxglove plots.
+
+        Designed to be called once per `path_planner` tick after a steering
+        command has been computed. All scalars are Float32 with `.data`
+        being the value — easy to add to a Plot panel.
+
+        Topics published (see __init__ for the publisher instances):
+          /nav/distance_to_waypoint     m, distance to current target waypoint
+          /nav/distance_to_final         m, distance to last waypoint of path
+          /nav/psi                       rad, angle from car nose to target
+          /nav/steering_saturation_rate  0..1, fraction of last ~1s at the limit
+          /nav/speed_cmd                 m/s, commanded forward speed
+          /nav/yaw_rate_imu              rad/s, raw gyro (sanity-vs-controller)
+          /nav/progress_rate             m/s, d(dist_to_final)/dt (negative = approaching)
+          /nav/wpi                       float-encoded current waypoint index
+          /nav/controller_mode           0=PP, 1=blended, 2=stopping, 3=complete
+        """
+        # Saturation: 1 if at the limit (within 1e-3 rad), 0 otherwise.
+        sat = 1.0 if abs(abs(steering_cmd) - self.max_steering_angle) < 1e-3 else 0.0
+        self._sat_window.append(sat)
+        if len(self._sat_window) > self._sat_window_size:
+            self._sat_window.pop(0)
+        sat_rate = float(sum(self._sat_window) / len(self._sat_window))
+
+        # Progress rate: change in dist_to_final per second.
+        now = time.time()
+        if self._prev_dist_final is not None and self._prev_progress_time is not None:
+            dt = now - self._prev_progress_time
+            if dt > 1e-3:
+                progress_rate = (dist_to_final - self._prev_dist_final) / dt
+            else:
+                progress_rate = 0.0
+        else:
+            progress_rate = 0.0
+        self._prev_dist_final = dist_to_final
+        self._prev_progress_time = now
+
+        # Controller mode encoding:
+        if self.path_complete:
+            mode = 3.0
+        elif dist_to_final < 0.5:
+            mode = 2.0
+        elif self.stanley_trust > self.stanley_trust_min:
+            mode = 1.0
+        else:
+            mode = 0.0
+
+        # IMU yaw rate — read latest stored gyro (filtered version is used in
+        # controller; here we publish RAW for diagnostic clarity).
+        try:
+            yaw_rate = float(self.gyroscope[2])
+        except (IndexError, TypeError):
+            yaw_rate = 0.0
+
+        def f(v): m = Float32(); m.data = float(v); return m
+        self.pub_dist_wp.publish(f(dist))
+        self.pub_dist_final.publish(f(dist_to_final))
+        self.pub_psi.publish(f(psi))
+        self.pub_steering_saturation.publish(f(sat_rate))
+        self.pub_speed_cmd.publish(f(speed_cmd))
+        self.pub_yaw_rate.publish(f(yaw_rate))
+        self.pub_progress_rate.publish(f(progress_rate))
+        self.pub_wpi.publish(f(float(self.wpi)))
+        self.pub_controller_mode.publish(f(mode))
 
     def fused_pose_cb(self, msg):
         """Cache the latest fused pose from ekf_fusor for the planner to read."""

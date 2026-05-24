@@ -41,6 +41,7 @@ setup(
             'pose_estimator = autonomy.pose_estimator:main',
             'qcar2_ekf_odometry = autonomy.pose_estimator:main',
             'ekf_fusor = autonomy.ekf_fusor:main',
+            'controller_watchdog = autonomy.controller_watchdog:main',
         ],
     },
 )
