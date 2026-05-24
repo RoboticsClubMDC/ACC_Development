@@ -22,79 +22,9 @@ from sensor_msgs.msg import Imu, JointState
 from rcl_interfaces.msg import SetParametersResult
 from std_msgs.msg import Bool, Float32
 
-
-
-class QcarEKF:
-
-    def __init__(self, x0, P0, Q, R):
-        self.L = 0.257
-        self.I = np.eye(3)
-        self.xHat = x0
-        self.P = P0
-        self.Q = Q
-        self.R = R
-        self.C = np.eye(3)
-
-    def f(self, X, u, dt):
-        return X + dt * u[0] * np.array([
-            [np.cos(X[2, 0])],
-            [np.sin(X[2, 0])],
-            [np.tan(u[1]) / self.L]
-        ])
-
-    def Jf(self, X, u, dt):
-        return np.array([
-            [1, 0, -dt * u[0] * np.sin(X[2, 0])],
-            [0, 1,  dt * u[0] * np.cos(X[2, 0])],
-            [0, 0, 1]
-        ])
-
-    def prediction(self, dt, u):
-        F = self.Jf(self.xHat, u, dt)
-        self.P = F @ self.P @ F.T + self.Q
-        self.xHat = self.f(self.xHat, u, dt)
-        self.xHat[2] = wrap_to_pi(self.xHat[2])
-
-    def correction(self, y):
-        H = self.C
-        PH = self.P @ H.T
-        S = H @ PH + self.R
-        K = PH @ np.linalg.inv(S)
-        z = y - H @ self.xHat
-        if len(y) > 1:
-            z[2] = wrap_to_pi(z[2])
-        else:
-            z = wrap_to_pi(z)
-        self.xHat += K @ z
-        self.xHat[2] = wrap_to_pi(self.xHat[2])
-        self.P = (self.I - K @ H) @ self.P
-
-
-class GyroKF:
-
-    def __init__(self, x0, P0, Q, R):
-        self.I = np.eye(2)
-        self.xHat = x0
-        self.P = P0
-        self.Q = Q
-        self.R = R
-        self.A = np.array([[0, -1], [0, 0]])
-        self.B = np.array([[1], [0]])
-        self.C = np.array([[1, 0]])
-
-    def prediction(self, dt, u):
-        Ad = self.I + self.A * dt
-        self.xHat = Ad @ self.xHat + dt * self.B * u
-        self.P = Ad @ self.P @ Ad.T + self.Q
-
-    def correction(self, y):
-        PC = self.P @ self.C.T
-        S = self.C @ PC + self.R
-        K = PC @ np.linalg.inv(S)
-        z = wrap_to_pi(y - self.C @ self.xHat)
-        self.xHat += K @ z
-        self.xHat[0] = wrap_to_pi(self.xHat[0])
-        self.P = (self.I - K @ self.C) @ self.P
+# QcarEKF + GyroKF moved to autonomy.estimation.filters so ekf_fusor (and any
+# other consumer) can share the same math. Behavior is unchanged.
+from autonomy.estimation import QcarEKF, GyroKF
 
 
 class PathFollower(Node):
@@ -178,7 +108,8 @@ class PathFollower(Node):
 
         self.publisher = self.create_publisher(Twist, '/cmd_vel_nav', 1)
         self.cyclic = False
-        self.max_steering_angle = 0.6
+        # ±0.52 rad = ±30°, max steering angle per QCar 2 hardware spec (Table 11).
+        self.max_steering_angle = 0.52
 
         self.joint_state_subscriber = self.create_subscription(
             JointState, '/qcar2_joint', self.joint_state_callback, 1)

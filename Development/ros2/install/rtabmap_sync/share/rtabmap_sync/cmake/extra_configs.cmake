@@ -1,1 +1,0 @@
-/workspaces/isaac_ros-dev/Development/ros2/build/rtabmap_sync/cmake/extra_configs.cmake

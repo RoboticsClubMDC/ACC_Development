@@ -21,10 +21,14 @@ from sensor_msgs.msg import Imu, JointState
 from tf2_ros import TransformBroadcaster
 
 
+# Hardware constants from QCar 2 User Manual - System Hardware v1.0 (2024-10-01).
+# Encoder: US Digital E8T-720-125, 720 counts/rev, quadrature mode → 2880 counts/rev.
+# Drive train: motor pinion → differential (13/70) → wheel (19/37).
+# Wheel radius: 0.033 m. Wheelbase: 0.256 m (Table 11).
 ENCODER_TICKS_PER_REV = 720.0 * 4.0
-GEAR_RATIO = (13.0 * 19.0) / (70.0 * 30.0)
+GEAR_RATIO = (13.0 * 19.0) / (70.0 * 37.0)
 WHEEL_RADIUS = 0.033
-WHEELBASE = 0.257
+WHEELBASE = 0.256
 
 
 def wrap_to_pi(angle):
@@ -50,7 +54,8 @@ class PoseEstimator(Node):
         self.declare_parameter("odom_topic", "/odom")
         self.declare_parameter("frequency", 80.0)
         self.declare_parameter("max_dt", 0.25)
-        self.declare_parameter("steering_limit", 0.6)
+        # ±0.52 rad = ±30°, max steering angle per QCar 2 hardware spec (Table 11).
+        self.declare_parameter("steering_limit", 0.52)
         self.declare_parameter("gyro_weight", 0.65)
         self.declare_parameter("publish_tf", True)
 

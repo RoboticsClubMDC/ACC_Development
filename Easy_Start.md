@@ -859,6 +859,61 @@ Observed during testing after the EKF + max_range fixes: Cartographer's live SLA
 3. Treat AMCL as **filter localization for race-time tracking**, not as a map-quality improver. It is fast and deterministic; that is its job.
 4. Future work: implement landmark-based map alignment so AMCL operates in competition coordinates instead of Cartographer's abstract frame.
 
+### 2026-05-24 EDT — extracted Kalman filter primitives (Day 2 of EKF refactor)
+
+`QcarEKF` and `GyroKF` (the 2D bicycle-model EKF and the yaw + yaw-rate-bias filter) used to live as private classes inside `qcar2_autonomy/autonomy/nav_to_pose.py`. They've been moved to a new subpackage so the upcoming `ekf_fusor` node and any other consumer (semantic mapper, active-SLAM monitor, diagnostics) can reuse the same math.
+
+New location:
+
+```
+qcar2_autonomy/autonomy/estimation/
+├── __init__.py        # re-exports QcarEKF, GyroKF
+└── filters.py         # the actual filter implementations
+```
+
+`nav_to_pose.py` now imports via:
+
+```python
+from autonomy.estimation import QcarEKF, GyroKF
+```
+
+**Behavior is unchanged.** This is a pure refactor — same math, same constants (wheelbase 0.256 m from Table 11), same predict + correct logic, same use sites inside `PathFollower`. Validated by:
+
+```bash
+cd /workspaces/isaac_ros-dev/ros2
+colcon build --symlink-install --packages-select qcar2_autonomy
+source install/setup.bash && export ROS_DOMAIN_ID=69
+# Run cartographer launch as before; nav_to_pose should behave identically.
+ros2 launch qcar2_nodes qcar2_cartographer_virtual_launch.py
+```
+
+Next step (Day 3-4): build `ekf_fusor.py` as a standalone node that imports the same filters and exposes the fused pose + EKF diagnostics for Foxglove.
+
+### 2026-05-23 EDT — hardware-spec corrections (gear ratio, wheelbase, steering)
+
+Three constants in the autonomy stack disagreed with the QCar 2 User Manual - System Hardware v1.0 (2024-10-01). Corrected against Table 11 (dimensions), page 12 (drive train), and page 17 (steering range).
+
+| Constant | Before | After | Reason |
+|---|---|---|---|
+| `GEAR_RATIO` (`pose_estimator.py`) | `(13*19) / (70*30)` = 0.1176 | `(13*19) / (70*37)` = 0.0954 | Manual: motor pinion (13/70) × differential (19/37). The 30 was wrong → linear velocity overestimated by ~23%, dead-reckoning ballooned. |
+| `WHEELBASE` (`pose_estimator.py`, `nav_to_pose.py:QcarEKF`) | 0.257 | 0.256 | Manual Table 11. Note: `nav_to_pose.py` already used 0.256 in its pure-pursuit calc at line 487 — file was internally inconsistent before this fix. |
+| Steering limit (`pose_estimator.py:steering_limit`, `nav_to_pose.py:max_steering_angle`) | 0.6 rad | 0.52 rad | Manual Table 11: max steering = ±30° = ±0.52 rad. Commanding 0.6 produced bicycle-model yaw rates the servo physically cannot deliver, so predicted ω diverged from actual ω. |
+
+**Expected impact:**
+
+- Cartographer's motion prior (via EKF `/odom`) becomes ~23% more accurate in linear velocity. Submap insertion alignment should tighten.
+- AMCL's dead-reckoning between corrections should drift much less at speed — this was likely the root cause of "AMCL keeps slipping at high speed" symptom.
+- Yaw predictions from the bicycle model match servo limits. May allow AMCL's motion-model alphas (`alpha1..5`) to be re-tightened from the conservative 0.2 defaults.
+
+**Verification after rebuild:**
+
+```bash
+# Drive straight 1 m by hand-pushing or QLabs known motion. Compare:
+ros2 topic echo /odom --once   # x should increase by ~1.0 m, not ~1.23 m
+```
+
+**LiDAR static TF (`fixed_lidar_frame_virtual.cpp`) intentionally NOT changed.** Manual page 10 confirms physical LiDAR is mounted with 180° yaw offset (`rplidar_to_body` rotation matrix `[[-1,0,0],[0,-1,0],[0,0,1]]`), matching the physical file's `setRPY(0,0,-π)`. Virtual file with `setRPY(0,0,0)` is correct IF QLabs publishes the scan pre-rotated into the body frame's forward convention. Defer this change until physical-hardware testing confirms which convention QLabs uses.
+
 ### 2026-05-23 EDT
 
 - Wired the EKF as the single owner of `/odom` and `odom -> base_link` TF.

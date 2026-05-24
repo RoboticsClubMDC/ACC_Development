@@ -1,1 +1,0 @@
-/workspaces/isaac_ros-dev/Development/ros2/build/rtabmap_msgs/rosidl_generator_c/rtabmap_msgs/srv/detail/get_node_data__type_support.h
