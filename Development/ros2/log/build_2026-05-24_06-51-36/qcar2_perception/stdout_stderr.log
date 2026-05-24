@@ -1,0 +1,20 @@
+running develop
+running egg_info
+writing qcar2_perception.egg-info/PKG-INFO
+writing dependency_links to qcar2_perception.egg-info/dependency_links.txt
+writing entry points to qcar2_perception.egg-info/entry_points.txt
+writing requirements to qcar2_perception.egg-info/requires.txt
+writing top-level names to qcar2_perception.egg-info/top_level.txt
+reading manifest file 'qcar2_perception.egg-info/SOURCES.txt'
+writing manifest file 'qcar2_perception.egg-info/SOURCES.txt'
+running build_ext
+Creating /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/lib/python3.8/site-packages/qcar2-perception.egg-link (link to .)
+Installing d435_aligned_source script to /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/lib/qcar2_perception
+Installing object_3d_estimator script to /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/lib/qcar2_perception
+Installing perception_behavior_interface script to /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/lib/qcar2_perception
+Installing semantic_consistency_monitor script to /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/lib/qcar2_perception
+Installing semantic_landmark_mapper script to /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/lib/qcar2_perception
+Installing semantic_yolo_detector script to /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/lib/qcar2_perception
+
+Installed /workspaces/isaac_ros-dev/ros2/build/qcar2_perception
+running install_data

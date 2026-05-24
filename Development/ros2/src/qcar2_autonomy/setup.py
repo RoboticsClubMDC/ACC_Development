@@ -40,6 +40,7 @@ setup(
             'visual_odometry = autonomy.vo_node:main',
             'pose_estimator = autonomy.pose_estimator:main',
             'qcar2_ekf_odometry = autonomy.pose_estimator:main',
+            'ekf_fusor = autonomy.ekf_fusor:main',
         ],
     },
 )

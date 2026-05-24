@@ -859,6 +859,167 @@ Observed during testing after the EKF + max_range fixes: Cartographer's live SLA
 3. Treat AMCL as **filter localization for race-time tracking**, not as a map-quality improver. It is fast and deterministic; that is its job.
 4. Future work: implement landmark-based map alignment so AMCL operates in competition coordinates instead of Cartographer's abstract frame.
 
+### 2026-05-24 EDT — nav_to_pose now consumes /qcar2_pose_fused (Day 4 of EKF refactor)
+
+`nav_to_pose.py` (the path follower) used to instantiate its own `QcarEKF` + `GyroKF` privately, run both prediction (`ekf_filter_timer`) and correction (`tf_timer` calling `qcar2_ekf.correction`) internally, and read state from `self.qcar2_ekf.xHat` for pure-pursuit. That meant the EKF was hidden inside one node, with no diagnostics, no Foxglove visibility, and no other consumer could share the same filtered pose.
+
+Day 4 retires the embedded EKF in favor of consuming `/qcar2_pose_fused` from the `ekf_fusor` node built on Day 3.
+
+**Concrete changes inside `nav_to_pose.py`:**
+
+| Before | After |
+|---|---|
+| `self.qcar2_ekf = QcarEKF(...)` in `__init__` | Deleted. Replaced with subscription to `/qcar2_pose_fused` and three cache fields (`fused_pose_x/y/yaw`). |
+| `self.gyro_kf = GyroKF(...)` in `__init__` | Deleted. ekf_fusor owns the gyro KF internally now. |
+| `self.gyro_kf.correction(...)` + `self.qcar2_ekf.correction(...)` calls inside `tf_timer` | Deleted. ekf_fusor handles correction. `tf_timer` now only caches raw TF as a startup fallback and republishes `/robot_pose`. |
+| `def ekf_filter_timer(self): ... qcar2_ekf.prediction(...)` | **Deleted entirely.** Prediction is now done at 80 Hz by ekf_fusor. |
+| `self.ekf_filter_timer()` call at top of `path_planner` | Removed (was a no-op now). |
+| `th = self.qcar2_ekf.xHat[2, 0]; p = [...xHat[0, 0], ...xHat[1, 0]]` inside pure-pursuit loop | Replaced with `p, th = self._read_pose_for_planner()` — new helper with priority chain. |
+| Two `self.qcar2_ekf.xHat` reads inside `scopeDataTimer` (visualization) | Replaced with reads from the fused-pose cache. |
+| `from autonomy.estimation import QcarEKF, GyroKF` | Removed (unused). |
+
+**New pose-source priority chain (`_read_pose_for_planner`):**
+
+```python
+if self.fused_pose_x is not None:
+    return (fused_pose_x, fused_pose_y), fused_pose_yaw   # PRIMARY
+try:
+    return (translation.x, translation.y), self.yaw       # FALLBACK 1: raw TF
+except AttributeError:
+    return (0.0, 0.0), 0.0                                # FALLBACK 2: origin
+```
+
+This means the path follower automatically degrades gracefully:
+- Once ekf_fusor bootstraps and publishes `/qcar2_pose_fused`, it's the source of truth
+- If ekf_fusor isn't running, the planner uses raw `map -> base_link` TF directly (Cartographer/AMCL feeding it)
+- If TF is also missing, it stays at origin until something arrives
+
+**What this unlocks:**
+
+1. **Single point of truth.** Whatever pose ekf_fusor settles on is what the controller drives against. Diagnostics on `/qcar2_ekf/*` directly reflect what the controller sees.
+2. **Outlier rejection benefits the controller.** When ekf_fusor's Mahalanobis gate rejects a bad measurement, the path planner doesn't see a spike — it sees a smooth pose. The gain we observed in the stress test (maha=150 rejections) now protects pure pursuit.
+3. **Other consumers can use the same pose.** Semantic mapper, active-SLAM monitor, or future arbiter nodes can subscribe to `/qcar2_pose_fused` and have all of them see the same world state.
+4. **Smaller `nav_to_pose.py`.** ~40 lines deleted. Easier to maintain and reason about.
+
+**Compatibility:**
+
+- `/robot_pose` still publishes (raw TF, unchanged behavior for any external subscribers)
+- `tf_buffer` / `tf_listener` still active for `/robot_pose` and as the fallback path
+- `auto_align_roadmap_to_current_pose()` and other helpers unchanged
+- Pure-pursuit math unchanged
+- Stanley blend, scope visualization, parameter callbacks unchanged
+
+**Smoke test:**
+
+```bash
+cd /workspaces/isaac_ros-dev/ros2
+colcon build --symlink-install --packages-select qcar2_autonomy qcar2_nodes qcar2_interfaces qcar2_perception
+source install/setup.bash && export ROS_DOMAIN_ID=69
+ros2_killall
+
+# Terminal A: Cartographer + base hardware + pose_estimator
+ros2 launch qcar2_nodes qcar2_cartographer_virtual_launch.py
+# Terminal B: ekf_fusor (TF correction mode)
+ros2 run qcar2_autonomy ekf_fusor
+# Terminal C: foxglove
+ros2 launch qcar2_nodes foxglove_bridge_launch.py
+# Terminal D: autonomy
+ros2 launch qcar2_autonomy autonomy_planner_launch.py
+```
+
+Expected: path follower drives waypoints exactly as before. The only invisible-to-user change is *which topic the planner reads its pose from*. If the path is jittery or skews unexpectedly, it's because the fused pose is feeding it slightly different values than raw TF — which is the whole point (better filtered pose) but might require minor pure-pursuit tuning if it overcorrects.
+
+**Next (Day 5):** integrate manual_drive as a *mode* of nav_to_pose rather than a separate node, so the path follower becomes the single command authority with autonomous/manual switching via parameter. This was the "matrix B" framing from earlier — manual_drive becomes the input-mapping function called when `control_mode:=manual`.
+
+### 2026-05-24 EDT — ekf_fusor node (Day 3 of EKF refactor)
+
+New ROS 2 node `qcar2_autonomy/autonomy/ekf_fusor.py` implements the Quanser-spec `ekf_fusor` from "ROS 2 For QCar 2" doc. Wraps the extracted `QcarEKF` + `GyroKF` filters into a standalone node that fuses encoder + IMU + steering (prediction) with Cartographer or AMCL pose (correction).
+
+**Architecture position:** ekf_fusor is a **downstream consumer** of Cartographer/AMCL. It does NOT publish anything that feeds back into them — `pose_estimator.py` still owns `/odom` and `odom -> base_link` for the SLAM motion prior. Avoids the circular-reasoning bug we removed earlier.
+
+**Run modes** (via `correction_source` param):
+
+- `tf` — polls TF `map -> base_link` at 10 Hz. Use during Cartographer mapping.
+- `amcl_pose` — subscribes to `/amcl_pose`, uses AMCL's published covariance. Use during AMCL runtime.
+- `none` — prediction only, no correction. Debug only.
+
+**Outputs:**
+
+- `/qcar2_pose_fused` — `PoseWithCovarianceStamped`, main consumer-facing output
+- `/qcar2_ekf/odometry_fused` — `nav_msgs/Odometry` with twist (speed + yaw rate)
+- `/qcar2_ekf/p_diag` — diagonal of state covariance (Foxglove plot: watch this shrink after corrections)
+- `/qcar2_ekf/k_diag` — diagonal of last Kalman gain (Foxglove plot: K converging means filter is settling)
+- `/qcar2_ekf/innovation` — last innovation vector `[Δx, Δy, Δθ]`
+- `/qcar2_ekf/innovation_mahalanobis` — scalar test statistic for outlier gating
+- `/qcar2_ekf/health` — string status (`healthy` / `degraded` / `prediction_only` / `outlier_streak` / `bootstrapping`)
+- `/qcar2_ekf/mode` — current correction source
+
+**Operational safety details** (the difference between demo-grade and competition-reliable):
+
+1. **Outlier gate** — Mahalanobis distance `y^T S^-1 y` compared against χ²_3 threshold (default 11.345 at 99% confidence). Bad corrections (e.g. AMCL momentary glitch) are rejected, logged, and counted.
+2. **Stale-correction detection** — tracks time since last accepted correction. Transitions to `degraded` after 2 s, `prediction_only` after 5 s. In `prediction_only` mode, covariance is actively inflated so downstream consumers can see uncertainty growing.
+3. **Bootstrap** — does not predict before either the first correction arrives OR a non-zero `initial_pose` param is set. Avoids integrating noise from (0,0,0) before a real pose is known.
+4. **dt clamp** — skips predict step if `dt > max_dt` (default 0.25 s) to avoid bad linearization.
+5. **TF broadcast optional** — default `publish_tf: false` so we don't fight Cartographer/AMCL/pose_estimator for the same TF edge. If enabled, broadcasts `map -> base_link_fused` (separate child frame to avoid conflict).
+6. **AMCL covariance pass-through** — uses `pose.covariance` from `/amcl_pose` if non-zero, falls back to a configurable default otherwise. So R adapts to AMCL's own confidence.
+
+**Parameters** (sensible defaults; tune in launch file):
+
+```yaml
+ekf_fusor:
+  ros__parameters:
+    wheelbase: 0.256                          # m, from manual Table 11
+    predict_rate: 80.0                        # Hz
+    map_frame: "map"
+    base_frame: "base_link"
+    correction_source: "tf"                   # tf | amcl_pose | none
+    amcl_pose_topic: "/amcl_pose"
+    use_gyro_kf: true
+    q_diag: [0.0005, 0.0005, 0.002]
+    r_carto_diag: [0.02, 0.02, 0.01]
+    r_amcl_default_diag: [0.05, 0.05, 0.03]
+    max_dt: 0.25
+    tf_correction_rate: 10.0
+    stale_correction_warning_sec: 2.0
+    stale_correction_predict_only_sec: 5.0
+    mahalanobis_gate_chi2: 11.345
+    publish_tf: false
+    fused_child_frame: "base_link_fused"
+    initial_pose: [0.0, 0.0, 0.0]
+    steering_limit: 0.52
+```
+
+**Registered as console script** in `setup.py`:
+
+```bash
+ros2 run qcar2_autonomy ekf_fusor
+ros2 run qcar2_autonomy ekf_fusor --ros-args -p correction_source:=amcl_pose
+```
+
+**Smoke test:**
+
+```bash
+cd /workspaces/isaac_ros-dev/ros2
+colcon build --symlink-install --packages-select qcar2_autonomy qcar2_nodes qcar2_interfaces qcar2_perception
+source install/setup.bash && export ROS_DOMAIN_ID=69
+ros2_killall
+
+# Terminal A: Cartographer
+ros2 launch qcar2_nodes qcar2_cartographer_virtual_launch.py
+
+# Terminal B: ekf_fusor in TF mode
+ros2 run qcar2_autonomy ekf_fusor
+
+# Terminal C: watch the filter converge
+ros2 topic echo /qcar2_ekf/p_diag           # diagonal should drop after first correction
+ros2 topic echo /qcar2_ekf/innovation_mahalanobis  # should be small after bootstrap
+ros2 topic echo /qcar2_ekf/health           # should be "bootstrapping" then "healthy"
+
+# Terminal D (Foxglove): add Plot panels for /qcar2_ekf/{p_diag, k_diag, innovation_mahalanobis}
+```
+
+**Next step (Day 4):** refactor `nav_to_pose.py` to consume `/qcar2_pose_fused` instead of computing its own EKF internally. After that the embedded EKF inside the path follower becomes redundant and can be deleted (the QcarEKF instance in nav_to_pose's `PathFollower.__init__` stays as a dead path until then).
+
 ### 2026-05-24 EDT — extracted Kalman filter primitives (Day 2 of EKF refactor)
 
 `QcarEKF` and `GyroKF` (the 2D bicycle-model EKF and the yaw + yaw-rate-bias filter) used to live as private classes inside `qcar2_autonomy/autonomy/nav_to_pose.py`. They've been moved to a new subpackage so the upcoming `ekf_fusor` node and any other consumer (semantic mapper, active-SLAM monitor, diagnostics) can reuse the same math.

@@ -11,7 +11,7 @@ from pal.utilities.scope import MultiScope
 
 from rclpy.duration import Duration
 import rclpy
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
 from rclpy.node import Node
 from nav_msgs.msg import Path
 from tf2_ros import TransformException
@@ -22,9 +22,10 @@ from sensor_msgs.msg import Imu, JointState
 from rcl_interfaces.msg import SetParametersResult
 from std_msgs.msg import Bool, Float32
 
-# QcarEKF + GyroKF moved to autonomy.estimation.filters so ekf_fusor (and any
-# other consumer) can share the same math. Behavior is unchanged.
-from autonomy.estimation import QcarEKF, GyroKF
+# Pose source: subscribe to /qcar2_pose_fused, produced by the standalone
+# ekf_fusor node. The embedded QcarEKF/GyroKF instances that used to live in
+# this file have been retired — ekf_fusor owns the EKF math now, and the
+# filtered pose comes in via topic. See Easy_Start.md change log.
 
 
 class PathFollower(Node):
@@ -70,18 +71,18 @@ class PathFollower(Node):
 
         self.dt = 1 / 80
 
-        x0 = np.zeros((3, 1))
-        P0 = np.eye(3)
-        R_combined = np.diagflat([0.1, 0.1, 0.01])
-
-        self.qcar2_ekf = QcarEKF(x0=x0, P0=P0,
-                                  Q=np.diagflat([0.0001, 0.0001, 0.001]),
-                                  R=R_combined)
-        self.pose_ekf = np.zeros((3, 1))
-
-        self.gyro_kf = GyroKF(x0=np.zeros((2, 1)), P0=np.eye(2),
-                               Q=np.diagflat([0.01, 0.01]),
-                               R=np.diagflat([.1]))
+        # Fused-pose cache, populated by /qcar2_pose_fused subscriber. Until
+        # the first message arrives these stay None and the path planner falls
+        # back to raw TF (see _read_pose_for_planner).
+        self.fused_pose_x = None
+        self.fused_pose_y = None
+        self.fused_pose_yaw = None
+        self.create_subscription(
+            PoseWithCovarianceStamped,
+            '/qcar2_pose_fused',
+            self.fused_pose_cb,
+            10,
+        )
 
         self.yaw = 0
         self.cutoff_frequency_filter = 15.0
@@ -387,7 +388,8 @@ class PathFollower(Node):
         skip_index = 1
 
         self.t_plot = time.time() - self.t0
-        self.ekf_filter_timer()
+        # ekf_filter_timer() removed: prediction is now done by the external
+        # ekf_fusor node; this node only consumes the fused pose.
 
         #----CHANGE N3--------------
         if self.auto_align_start and not self.auto_aligned:
@@ -417,15 +419,11 @@ class PathFollower(Node):
 
                 L = 0.256
 
-                th = self.qcar2_ekf.xHat[2, 0]
-                p = [self.qcar2_ekf.xHat[0, 0], self.qcar2_ekf.xHat[1, 0]]
-
-                try:
-                    p = [self.translation.x, self.translation.y]
-                    th = self.yaw
-                except AttributeError:
-                    p = [0, 0]
-                    th = 0
+                # Pose source priority: fused (ekf_fusor) → raw TF → origin.
+                # Once /qcar2_pose_fused starts publishing (after bootstrap)
+                # we use it as the controller's reference frame, since it
+                # carries the EKF correction and outlier rejection.
+                p, th = self._read_pose_for_planner()
 
                 v = [wp_1_mod[0] - p[0], wp_1_mod[1] - p[1]]
                 Rot = np.array([[np.cos(th), -np.sin(th)], [np.sin(th), np.cos(th)]])
@@ -518,6 +516,13 @@ class PathFollower(Node):
         self.path_status_publisher.publish(msg)
 
     def tf_timer(self):
+        """Look up map -> base_link, cache translation/yaw, publish /robot_pose.
+
+        EKF correction calls used to live here. They were removed when
+        ekf_fusor took over the EKF math; this method now only handles raw TF
+        caching (still needed as a fallback for the path planner before
+        /qcar2_pose_fused starts publishing) and the /robot_pose echo.
+        """
         from_frame_rel = 'map'
         to_frame_rel = self.target_frame
         try:
@@ -526,9 +531,6 @@ class PathFollower(Node):
             rotation = [t.transform.rotation.x, t.transform.rotation.y,
                         t.transform.rotation.z, t.transform.rotation.w]
             roll, pitch, self.yaw = R.from_quat(rotation).as_euler('xyz')
-            self.gyro_kf.correction(self.yaw)
-            y = np.array([[self.translation.x], [self.translation.y], [self.gyro_kf.xHat[0, 0]]])
-            self.qcar2_ekf.correction(y)
 
             pose_msg = PoseStamped()
             pose_msg.header.stamp = self.get_clock().now().to_msg()
@@ -543,15 +545,29 @@ class PathFollower(Node):
         except TransformException as ex:
             self.get_logger().info(f'Could not transform {to_frame_rel} to {from_frame_rel}: {ex}')
 
-    def ekf_filter_timer(self):
-        speed = self.qcar2_measurred_speed
-        delta = self.current_steering
-        self.qcar2_ekf.prediction(self.dt, [speed, delta])
+    def fused_pose_cb(self, msg):
+        """Cache the latest fused pose from ekf_fusor for the planner to read."""
+        self.fused_pose_x = float(msg.pose.pose.position.x)
+        self.fused_pose_y = float(msg.pose.pose.position.y)
+        q = msg.pose.pose.orientation
+        siny_cosp = 2.0 * (q.w * q.z + q.x * q.y)
+        cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.z * q.z)
+        self.fused_pose_yaw = float(np.arctan2(siny_cosp, cosy_cosp))
+
+    def _read_pose_for_planner(self):
+        """Return (p, th) for pure-pursuit, preferring the EKF-fused pose.
+
+        Priority:
+          1. /qcar2_pose_fused (best — EKF-corrected, outlier-gated)
+          2. Raw map->base_link TF (fallback while ekf_fusor warms up)
+          3. Origin (fallback before any source has produced data)
+        """
+        if self.fused_pose_x is not None:
+            return [self.fused_pose_x, self.fused_pose_y], self.fused_pose_yaw
         try:
-            th_gyro = self.gyroscope[2]
+            return [self.translation.x, self.translation.y], self.yaw
         except AttributeError:
-            th_gyro = 0
-        self.gyro_kf.prediction(self.dt, th_gyro)
+            return [0.0, 0.0], 0.0
 
     def scopeDataTimer(self):
         if not getattr(self, 'pose_visualize_flag', False):
@@ -559,7 +575,12 @@ class PathFollower(Node):
         if not hasattr(self, 'steeringScope') or self.steeringScope is None:
             return
         if self.pose_visualize_flag:
-            p = [self.qcar2_ekf.xHat[0, 0], self.qcar2_ekf.xHat[1, 0], self.qcar2_ekf.xHat[2, 0]]
+            # Read fused pose (or zeros if not yet received) for visualization.
+            p = [
+                self.fused_pose_x if self.fused_pose_x is not None else 0.0,
+                self.fused_pose_y if self.fused_pose_y is not None else 0.0,
+                self.fused_pose_yaw if self.fused_pose_yaw is not None else 0.0,
+            ]
             if self.t_plot > 200:
                 self.t0 = time.time()
                 for ax in self.steeringScope.axes:
@@ -579,7 +600,8 @@ class PathFollower(Node):
                 self.current_steering,
                 0.0
             ])
-            self.steeringScope.axes[3].sample(self.t_plot, [self.yaw, self.qcar2_ekf.xHat[2, 0]])
+            fused_yaw_plot = self.fused_pose_yaw if self.fused_pose_yaw is not None else 0.0
+            self.steeringScope.axes[3].sample(self.t_plot, [self.yaw, fused_yaw_plot])
             MultiScope.refreshAll()
         else:
             try:
