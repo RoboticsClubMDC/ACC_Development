@@ -9,6 +9,12 @@ Math sources:
 - Bicycle-model state propagation: QCar 2 User Manual - System Hardware v1.0.
 - 2D EKF predict/correct: standard formulation (Thrun, Probabilistic Robotics).
 - Wheelbase L: 0.256 m (manual Table 11).
+
+    LC Commentary: Yes, maybe I went too far to strip EKF to here with bycicle motion model
+        but I wanted to make test, and this is easier to test in isolation. 
+        Also all of this is an pretty good start point architecture-wise for sensor fusion
+            Prob used further and edited for Research At mdc with inclusion of camera vision
+            sensor addition.
 """
 
 import numpy as np

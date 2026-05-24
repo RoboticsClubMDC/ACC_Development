@@ -3,8 +3,8 @@
 Updated: 2026-05-22 19:00:55 EDT
 
 This is the copy-paste runbook for the ACC QCar2 workspace. It is split into
-startup flow, builds, perception, RTAB-Map, logs/debugging, and architecture
-notes so the commands stay easy to scan while testing.
+startup flow, builds, perception, logs/debugging, physical-hardware reference,
+and architecture notes so the commands stay easy to scan while testing.
 
 ## Table Of Contents
 
@@ -16,9 +16,9 @@ notes so the commands stay easy to scan while testing.
 6. [Base QCar2 Nodes](#base-qcar2-nodes)
 7. [Autonomy Commands](#autonomy-commands)
 8. [Perception Layer](#perception-layer)
-9. [RTAB-Map Source Build](#rtab-map-source-build)
-10. [RTAB-Map RGB-D + LiDAR Mapping Launch](#rtab-map-rgb-d--lidar-mapping-launch)
-11. [Logs, Bags, And Debug Checks](#logs-bags-and-debug-checks)
+9. [Logs, Bags, And Debug Checks](#logs-bags-and-debug-checks)
+10. [Scripts Reference (`Development/ros2/scripts/`)](#scripts-reference-developmentros2scripts)
+11. [Physical QCar 2 Reference: Sensor Extrinsics & Body Frame](#physical-qcar-2-reference-sensor-extrinsics--body-frame-convention)
 12. [Killing Stale ROS Nodes Between Runs](#killing-stale-ros-nodes-between-runs)
 13. [Odometry Architecture (EKF owns odom)](#odometry-architecture-ekf-owns-odom)
 14. [Architecture Direction](#architecture-direction)
@@ -176,7 +176,7 @@ export ROS_DOMAIN_ID=69
 ros2 launch qcar2_nodes qcar2_virtual_launch.py
 ```
 
-Cartographer virtual launch:
+Cartographer virtual launch (bundles `pose_estimator` + `ekf_fusor` + cartographer + occupancy grid + nav2 converter):
 
 ```bash
 source install/setup.bash
@@ -184,7 +184,15 @@ export ROS_DOMAIN_ID=69
 ros2 launch qcar2_nodes qcar2_cartographer_virtual_launch.py
 ```
 
-Foxglove bridge:
+Cartographer physical launch (same bundle, real-hardware variant):
+
+```bash
+source install/setup.bash
+export ROS_DOMAIN_ID=69
+ros2 launch qcar2_nodes qcar2_cartographer_launch.py
+```
+
+Foxglove bridge (also bundles `controller_watchdog`):
 
 ```bash
 source install/setup.bash
@@ -218,35 +226,28 @@ export ROS_DOMAIN_ID=69
 ros2 run qcar2_autonomy path_follower
 ```
 
-Old autonomy YOLO prototype:
+Manual drive — two ways:
 
 ```bash
-colcon build --symlink-install --packages-select qcar2_autonomy
-source install/setup.bash
-export ROS_DOMAIN_ID=69
-ros2 run qcar2_autonomy yolo_detector
-```
-
-Manual drive:
-
-```bash
-colcon build --symlink-install --packages-select qcar2_autonomy
-source install/setup.bash
-export ROS_DOMAIN_ID=69
+# Way 1: standalone manual_drive node (backward compat, still works)
+source install/setup.bash && export ROS_DOMAIN_ID=69
 ros2 run qcar2_autonomy manual_drive
+
+# Way 2 (preferred): use path_follower's built-in manual mode.
+# Avoids the double-publish fight on /cmd_vel_nav.
+ros2 param set /path_follower control_mode "manual"
+# (focus the path_follower terminal, WASD to drive, 'q' to return to idle)
 ```
 
-Note:
+Notes for Way 1:
 
-- Added 2026-05-22 22:18:54 EDT: `manual_drive` publishes `/cmd_vel_nav`.
-- If no QCar command converter is running, `manual_drive` starts
-  `qcar2_nodes nav2_qcar2_converter`.
+- `manual_drive` publishes `/cmd_vel_nav`.
+- If no QCar command converter is running, `manual_drive` auto-starts `qcar2_nodes nav2_qcar2_converter`.
 - If a launch file already started the converter, `manual_drive` reuses it.
 - Disable converter auto-start if needed:
-
-```bash
-ros2 run qcar2_autonomy manual_drive --ros-args -p auto_start_converter:=false
-```
+  ```bash
+  ros2 run qcar2_autonomy manual_drive --ros-args -p auto_start_converter:=false
+  ```
 
 ## Perception Layer
 
@@ -384,228 +385,14 @@ ros2 topic echo /perception/yolo/detections_2d
 ros2 run tf2_ros tf2_echo base_link aligned_camera_optical_frame
 ```
 
-## RTAB-Map Source Build
+## RTAB-Map (retired)
 
-Updated: 2026-05-22 18:52:41 EDT
-
-Why source build:
-
-- This Isaac/Quanser apt setup can fail to resolve `ros-humble-rtabmap-ros`.
-- Some ROS dependency packages can also be missing from apt here.
-- `pcl_conversions` and `pcl_ros` may come from `/workspace/cartographer_ws/install`.
-- `octomap_msgs` can be missing, but RTAB can still build enough for RGB-D smoke tests.
-
-Dockerfile note:
-
-- `Dockerfile.quanser` installs RTAB-Map source-build dependencies.
-- TensorRT is commented out during this phase because huge NVIDIA wheels can stop the image before RTAB dependencies install.
-- `ros-humble-message-filters` must be installed for `rtabmap_sync`.
-
-RTAB source compatibility notes:
-
-- Use matching RTAB core and ROS wrapper versions. For this workspace, `rtabmap_ros` is `0.22.1`, so RTAB core should match `0.22.1-humble`.
-- This container needed Humble header-name compatibility patches:
-  - `message_filters/*.hpp` includes become `*.h`
-  - `tf2/utils.hpp` becomes `tf2/utils.h`
-- RTAB must be built headless here:
-  - `BUILD_APP=OFF`
-  - `BUILD_TOOLS=OFF`
-  - `BUILD_EXAMPLES=OFF`
-  - `WITH_QT=OFF`
-
-Check dependency visibility:
-
-```bash
-ros2 pkg prefix octomap_msgs
-ros2 pkg prefix pcl_conversions
-ros2 pkg prefix pcl_ros
-ros2 pkg prefix message_filters
-```
-
-Ignore RTAB source while building only normal QCar2 packages:
-
-```bash
-cd /workspaces/isaac_ros-dev/Development/ros2
-touch src/rtabmap/COLCON_IGNORE
-touch src/rtabmap_ros/COLCON_IGNORE
-```
-
-Enable and build RTAB-Map smoke-test packages:
-
-```bash
-cd /workspaces/isaac_ros-dev/Development/ros2
-rm -f src/rtabmap/COLCON_IGNORE
-rm -f src/rtabmap_ros/COLCON_IGNORE
-source /opt/ros/humble/setup.bash
-source /workspace/cartographer_ws/install/setup.bash
-colcon build --symlink-install \
-  --parallel-workers 2 \
-  --packages-up-to rtabmap_slam rtabmap_odom rtabmap_sync \
-  --cmake-args \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DBUILD_APP=OFF \
-    -DBUILD_TOOLS=OFF \
-    -DBUILD_EXAMPLES=OFF \
-    -DWITH_QT=OFF \
-    -DWITH_G2O=OFF \
-    -DWITH_GTSAM=OFF \
-    -DWITH_POINTMATCHER=OFF
-source install/setup.bash
-export ROS_DOMAIN_ID=69
-```
-
-Verify RTAB executables:
-
-```bash
-ros2 pkg executables rtabmap_sync
-ros2 pkg executables rtabmap_odom
-ros2 pkg executables rtabmap_slam
-```
-
-Important executable names in this source branch:
-
-```text
-rtabmap_sync: rgbd_sync, rgbdx_sync, stereo_sync, rgb_sync
-rtabmap_odom: rgbd_odometry, stereo_odometry, icp_odometry
-rtabmap_slam: rtabmap
-```
-
-Do not use these names with `ros2 run` in this branch:
-
-```text
-rtabmap_rgbd_sync
-rtabmap_rgbd_odometry
-rtabmap_node
-```
-
-## RTAB-Map RGB-D + LiDAR Mapping Launch
-
-Goal:
-
-1. Prove RTAB can receive aligned D435 RGB-D.
-2. Prove RTAB RGB-D odometry can publish `/rtabmap/odom`.
-3. Keep RTAB connected to the normal QCar robot frames.
-4. Prove RTAB SLAM can consume RGB-D, odom, and 2D LiDAR `/scan`.
-5. Record a small bag for offline mapping.
-
-Frame contract:
-
-```text
-rtab_map -> rtab_odom -> base_link
-base_link -> base_scan
-base_link -> aligned_camera_optical_frame
-```
-
-Important:
-
-- `rtab_map` is a root frame during RTAB mapping. It does not get a static
-  parent in `semantic_tf_launch.py`.
-- RTAB SLAM publishes `rtab_map -> rtab_odom`.
-- RTAB odometry publishes `rtab_odom -> base_link`.
-- The static TF launch files publish only physical robot sensor transforms.
-- Do not use `aligned_camera_optical_frame` as RTAB odometry `frame_id` for the
-  mapping run. That makes RTAB publish `rtab_odom -> aligned_camera_optical_frame`
-  and conflicts with our static `base_link -> aligned_camera_optical_frame`.
-- RTAB odometry and SLAM should use `frame_id:=base_link`.
-- The D435 image messages can still be stamped in `aligned_camera_optical_frame`;
-  RTAB can transform them through the static camera TF.
-- The 2D LiDAR scan is in `base_scan`, so `base_link -> base_scan` must be alive.
-
-Build the launch package after edits:
-
-```bash
-colcon build --symlink-install --packages-select qcar2_perception qcar2_autonomy
-source install/setup.bash
-export ROS_DOMAIN_ID=69
-```
-
-Start full virtual RTAB mapping stack:
-
-```bash
-ros2 launch qcar2_perception qcar2_rtabmap_mapping_virtual.launch.py
-```
-
-Start full physical RTAB mapping stack:
-
-```bash
-ros2 launch qcar2_perception qcar2_rtabmap_mapping_physical.launch.py
-```
-
-What this launch starts:
-
-```text
-qcar2_nodes lidar
-qcar2_nodes qcar2_hardware
-base_link -> base_scan TF
-base_link -> aligned_camera_optical_frame TF
-qcar2_perception d435_aligned_source
-rtabmap_sync rgbd_sync
-rtabmap_odom rgbd_odometry
-rtabmap_slam rtabmap
-```
-
-What this launch intentionally does not start:
-
-```text
-Cartographer
-qcar2_nodes rgbd
-YOLO / semantic mapper
-Nav2
-```
-
-Verify the robot frame tree and data flow:
-
-```bash
-ros2 run tf2_ros tf2_echo base_link aligned_camera_optical_frame
-ros2 run tf2_ros tf2_echo base_link base_scan
-ros2 run tf2_ros tf2_echo rtab_odom base_link
-ros2 run tf2_ros tf2_echo rtab_map rtab_odom
-ros2 topic list | grep d435
-ros2 topic hz /perception/d435/rgb/image_raw
-ros2 topic hz /perception/d435/depth/image_rect
-ros2 topic echo /perception/d435/camera_info --once
-ros2 topic hz /scan
-ros2 topic hz /rtabmap/rgbd_image
-ros2 topic hz /rtabmap/odom
-ros2 topic echo /rtabmap/odom --once
-ros2 topic hz /rtabmap/info
-```
-
-Note:
-
-- RTAB internal parameters like `RGBD/CreateOccupancyGrid` and
-  `Rtabmap/DetectionRate` are declared as strings by this ROS wrapper. Keep the
-  nested quotes or ROS 2 will parse `true` as a bool and abort with
-  `InvalidParameterTypeException`.
-- `rgbd_sync` only publishes the heavy RGB-D message when something subscribes.
-- Running `ros2 topic hz /rtabmap/rgbd_image` is both a check and a subscriber.
-
-Check RTAB SLAM:
-
-```bash
-ros2 topic list | grep rtabmap
-ros2 topic echo /rtabmap/info --once
-ros2 run tf2_ros tf2_echo rtab_map rtab_odom
-```
-
-Record first smoke-test bag:
-
-```bash
-mkdir -p ~/qcar2_rtab_bags
-ros2 bag record -o ~/qcar2_rtab_bags/rtab_lidar_rgbd_01 \
-  /scan \
-  /tf \
-  /tf_static \
-  /perception/d435/rgb/image_raw \
-  /perception/d435/depth/image_rect \
-  /perception/d435/camera_info \
-  /rtabmap/rgbd_image \
-  /rtabmap/odom \
-  /rtabmap/odom_info \
-  /rtabmap/info \
-  /rtabmap/mapData \
-  /rtabmap/mapGraph
-```
+RTAB-Map source build + launch sections were removed 2026-05-24. The vendored
+`Development/ros2/src/rtabmap/` and `Development/ros2/src/rtabmap_ros/` source
+trees were deleted along with their launches. RTAB-Map is not part of the
+active stack — Cartographer + ekf_fusor + AMCL is the chosen SLAM/localization
+path. If RTAB-Map is ever revived, restore the deleted launch files from git
+history (`git log --diff-filter=D --name-only`) and re-vendor the package.
 
 ## Logs, Bags, And Debug Checks
 
@@ -641,7 +428,7 @@ Common graph checks:
 ros2 node list
 ros2 topic list
 ros2 topic list | grep perception
-ros2 topic list | grep rtabmap
+ros2 topic list | grep nav
 ros2 run tf2_ros tf2_echo map base_link
 ros2 run tf2_ros tf2_echo base_link aligned_camera_optical_frame
 ```
@@ -695,6 +482,291 @@ Debug meanings:
 - If stable landmarks look mixed with candidates, check the separate semantic marker topics instead of one combined layer.
 - If YOLO detects the QCar body/dead image region, check that `/perception/yolo/image_annotated` shows the red `NA` polygon.
 - If map-frame semantic landmarks warn about transforms, start Cartographer before the perception core launch.
+
+## Scripts Reference (`Development/ros2/scripts/`)
+
+Six helper scripts live in `Development/ros2/scripts/`. Each block below is copy-paste-ready — source the env first, then the script.
+
+**Standard source-the-env preamble** (paste into every new container terminal before running any script):
+
+```bash
+cd /workspaces/isaac_ros-dev/ros2
+source /opt/ros/humble/setup.bash
+source /workspace/cartographer_ws/install/setup.bash
+source install/setup.bash
+export ROS_DOMAIN_ID=69
+```
+
+---
+
+### 1. `termname.sh` — name your terminal window/tab
+
+Sets the title of the terminal so you can tell `Foxglove` / `Cartographer` / `Manual Drive` apart at a glance.
+
+```bash
+source /workspaces/isaac_ros-dev/ros2/scripts/termname.sh
+termname "QCar2 Cartographer"
+```
+
+To make it permanent (no need to source every shell):
+
+```bash
+echo 'source /workspaces/isaac_ros-dev/ros2/scripts/termname.sh' >> ~/.bashrc
+source ~/.bashrc
+```
+
+Then in any future terminal: just `termname "Foxglove Bridge"` etc.
+
+---
+
+### 2. `ros2_killall.sh` — kill all stale ROS 2 processes between runs
+
+Sweeps every QCar2-related ROS process (path_follower, ekf_fusor, cartographer, AMCL, lifecycle managers, map_server, foxglove_bridge, manual_drive, etc.) with INT → TERM → KILL escalation, then restarts the discovery daemon.
+
+```bash
+source /workspaces/isaac_ros-dev/ros2/scripts/ros2_killall.sh
+ros2_killall
+```
+
+To make it permanent:
+
+```bash
+echo 'source /workspaces/isaac_ros-dev/ros2/scripts/ros2_killall.sh' >> ~/.bashrc
+source ~/.bashrc
+```
+
+Then between any two `ros2 launch` sessions: just `ros2_killall`.
+
+**Note:** does NOT touch processes inside the `virtual-qcar2` (QLabs) Docker container. To clean those:
+
+```bash
+sudo docker exec virtual-qcar2 pkill -f "csi_camera|foxglove_bridge|ros2"
+```
+
+---
+
+### 3. `carto_to_amcl.sh` — end-to-end map → AMCL workflow
+
+One terminal does the whole record-Cartographer-lap → press-ENTER-to-freeze → save-map → kill-Cartographer → launch-AMCL → seed-initial-pose flow. Mode default is `virtual`; pass `physical` for the real robot.
+
+```bash
+# Source env, then:
+/workspaces/isaac_ros-dev/ros2/scripts/carto_to_amcl.sh            # virtual (default)
+# or:
+/workspaces/isaac_ros-dev/ros2/scripts/carto_to_amcl.sh physical   # real QCar 2
+```
+
+What you do while it's running:
+
+1. The script launches Cartographer (in its own process group via `setsid` so it can be cleanly killed). Wait for the `/map` topic to appear.
+2. Open another terminal to drive (manual_drive, joystick, or path_follower).
+3. Drive a lap. Watch in Foxglove.
+4. When the map looks good, **press ENTER in the carto_to_amcl terminal**.
+5. Script captures final pose from `map → base_link` TF, saves the map via `map_saver_cli`, kills Cartographer cleanly, launches AMCL on the saved map, and publishes the captured pose to `/initialpose` so AMCL bootstraps instantly.
+6. AMCL keeps running in the foreground. Ctrl-C to stop it.
+
+Files produced: `~/qcar2_maps/competition_map.{pgm,yaml}` and `/tmp/final_pose.txt`. Logs at `/tmp/carto.log` and `/tmp/amcl.log`.
+
+---
+
+### 4. `pd_tuner.py` — Tkinter sliders for live PD tuning
+
+Continuous-drag GUI sliders that publish to `/nav/kp_steering_set` and `/nav/kd_steering_set`. Use while `path_follower` is running to feel out Kp/Kd by hand.
+
+```bash
+# Requires X forwarding / desktop environment
+python3 /workspaces/isaac_ros-dev/ros2/scripts/pd_tuner.py
+```
+
+Watch the path_follower terminal — every slider drag logs `kp_steering (topic) -> X.XXX`. Effect is immediate on the next 80 Hz tick.
+
+Slider ranges:
+- **Kp**: 0.0 – 2.0, step 0.01, default 1.0
+- **Kd**: 0.0 – 1.0, step 0.01, default 0.30
+
+---
+
+### 5. `bo_pd_tune.py` — Bayesian Optimization of Kp/Kd
+
+Automatically finds the (Kp, Kd) pair minimizing a multi-term cost function over 15 driving trials. Each trial = approach to TEST_ORIGIN (safe gains) + measurement on a fixed L-shape test path (BO-suggested gains). Result saved to `/tmp/bo_pd_tune_result.json`.
+
+Prerequisite (install once):
+
+```bash
+pip install scikit-optimize
+```
+
+Run it:
+
+```bash
+# 1. Make sure cartographer + ekf_fusor + foxglove_bridge + path_follower are running.
+# 2. Then in another terminal:
+python3 /workspaces/isaac_ros-dev/ros2/scripts/bo_pd_tune.py
+```
+
+The script will pause and print a warm-up checklist. While paused:
+
+1. Put path_follower in manual mode: `ros2 param set /path_follower control_mode "manual"`
+2. Drive ~30 s with WASD to give Cartographer scan data, ending the car in an OPEN spot (≥1.5 m clear ahead AND to the left).
+3. Press `q` in path_follower's terminal to exit manual.
+4. Return to the BO terminal and **press ENTER**.
+
+BO runs ~8 min, then auto-applies the best gains and exits. Read the result:
+
+```bash
+cat /tmp/bo_pd_tune_result.json
+```
+
+---
+
+### 6. `stress_test_for_EKF_and_mahalanobis.py` — outlier-gate validation
+
+Publishes alternating GOOD/BAD `/amcl_pose` messages to verify ekf_fusor's Mahalanobis outlier gate is rejecting bad measurements (χ²_3 = 11.345 at 99% confidence).
+
+Prerequisite: ekf_fusor must be running in `amcl_pose` correction mode (NOT the default `tf` mode):
+
+```bash
+ros2 run qcar2_autonomy ekf_fusor --ros-args -p correction_source:=amcl_pose
+```
+
+Then in another terminal:
+
+```bash
+python3 /workspaces/isaac_ros-dev/ros2/scripts/stress_test_for_EKF_and_mahalanobis.py
+```
+
+The script publishes a pattern of good/bad poses (default `Test="Hard"` = 5 good then 10 bad in a row; switch to `Test="Easy"` for the alternating pattern). Watch:
+
+```bash
+# In another terminal — see Mahalanobis values spike on BAD
+ros2 topic echo /qcar2_ekf/innovation_mahalanobis
+# Look for ekf_fusor's "Outlier rejected" warnings
+ros2 topic echo /qcar2_ekf/health
+```
+
+Healthy behavior:
+- `maha` ≈ 0–3 on GOOD pose injections (accepted)
+- `maha` jumps to 100+ on BAD pose injections (rejected, logged as "Outlier rejected")
+- `/qcar2_ekf/health` flips to `outlier_streak` after 5+ consecutive rejections (only in `Test="Hard"` mode)
+
+Ctrl-C the script when done. Switch ekf_fusor back to `tf` mode (or restart it with no overrides) before resuming normal operation.
+
+---
+
+### Quick reference table
+
+| Script | Type | What it does |
+|---|---|---|
+| `termname.sh` | source helper | Sets terminal title |
+| `ros2_killall.sh` | source helper | Kills all stale ROS 2 procs |
+| `carto_to_amcl.sh` | bash | Cartographer → save → AMCL pipeline |
+| `pd_tuner.py` | python | Tkinter sliders for live Kp/Kd |
+| `bo_pd_tune.py` | python | Bayesian Optimization of Kp/Kd |
+| `stress_test_for_EKF_and_mahalanobis.py` | python | Outlier-gate validation |
+
+## Physical QCar 2 Reference: Sensor Extrinsics & Body Frame Convention
+
+Source: **QCar 2 User Manual – System Hardware v1.0 (2024-10-01), pages 10–11.**
+
+This section is **PHYSICAL ONLY**. The virtual QCar 2 in QLabs uses a 10× scale on all distances and may not exactly match the physical extrinsics. When you move from QLabs to the actual QCar 2 hardware, these are the rigid-body transforms the manual documents — use them as the ground truth for any TF / camera-painting / kinematic work that depends on sensor placement.
+
+### Body frame `{B}` convention
+
+The body frame is located **between the front and rear axles on the ground plane**.
+
+| Axis | Direction |
+|---|---|
+| **x** | longitudinally forward (toward front of car) |
+| **y** | toward the left side of the vehicle |
+| **z** | upward |
+
+Right-handed frame.
+
+### Camera frame `{C}` convention (for any onboard camera — CSI or RealSense)
+
+Facing any camera from outside, looking at the lens:
+
+| Axis | Direction |
+|---|---|
+| **x** | toward the LEFT of the camera |
+| **y** | DOWNWARD |
+| **z** | straight outward from the lens |
+
+This is the standard OpenCV / ROS camera frame. Determinant of each camera's rotation block is **−1** because the camera-to-body transform flips handedness.
+
+### Extrinsic matrices `T_<sensor>_to_body` (each transforms a point in the sensor frame into body frame coordinates)
+
+```
+front_axle_to_body                  rear_axle_to_body
+[ 1  0  0   0.130 ]                 [ 1  0  0  -0.130 ]
+[ 0  1  0   0     ]                 [ 0  1  0   0     ]
+[ 0  0  1   0.031 ]                 [ 0  0  1   0.031 ]
+[ 0  0  0   1     ]                 [ 0  0  0   1     ]
+
+csi_front_to_body                   csi_rear_to_body
+[  0  0  1   0.183 ]                [  0  0 -1  -0.152 ]
+[ -1  0  0   0     ]                [  1  0  0   0     ]
+[  0 -1  0   0.110 ]                [  0 -1  0   0.110 ]
+[  0  0  0   1     ]                [  0  0  0   1     ]
+
+csi_left_to_body  (battery side)    csi_right_to_body  (passenger side)
+[  1  0  0   0.012 ]                [ -1  0  0   0.012 ]
+[  0  0  1   0.033 ]                [  0  0 -1  -0.053 ]
+[  0 -1  0   0.110 ]                [  0 -1  0   0.110 ]
+[  0  0  0   1     ]                [  0  0  0   1     ]
+
+imu_to_body                         realsense_to_body (D435 RGB-D)
+[ 1  0  0   0.011 ]                 [  0  0  1   0.095 ]
+[ 0  1  0   0     ]                 [ -1  0  0   0.032 ]
+[ 0  0  1   0.089 ]                 [  0 -1  0   0.172 ]
+[ 0  0  0   1     ]                 [  0  0  0   1     ]
+
+rplidar_to_body  (note the 180° yaw flip)
+[ -1  0  0  -0.012 ]
+[  0 -1  0   0     ]
+[  0  0  1   0.193 ]
+[  0  0  0   1     ]
+
+cg_to_body  (center of gravity offset from body origin)
+[ 1  0  0  -0.011  ]
+[ 0  1  0   0.0029 ]
+[ 0  0  1   0.0814 ]
+[ 0  0  0   1      ]
+```
+
+### Key things to notice
+
+1. **The LiDAR is mounted 180° yaw-rotated** in body coordinates. The rotation block `[[-1,0,0],[0,-1,0],[0,0,1]]` is a yaw of π. This is why `fixed_lidar_frame.cpp` uses `q.setRPY(0, 0, -π)` — to bring scan points back into the body's forward convention. The virtual file (`fixed_lidar_frame_virtual.cpp`) uses `setRPY(0, 0, 0)`, which is correct IF QLabs internally publishes scans already rotated into the body frame (untested assumption; verify on first real-hardware run).
+
+2. **The IMU is at (0.011, 0, 0.089) with identity rotation.** Its axes already align with the body frame, so `/qcar2_imu.angular_velocity.z` is directly the body-frame yaw rate in rad/s. No conversion needed — this is what justified deleting the `* π/180` bug in `nav_to_pose.py`.
+
+3. **Wheelbase = 0.260 m** (front-to-rear axle x-distance = 0.130 − (−0.130) = 0.260). Manual Table 11 lists **0.256 m**. The 4 mm difference is likely manufacturing tolerance; use 0.256 (the spec value in the manual) for consistency with the rest of the project.
+
+4. **D435 at (0.095, 0.032, 0.172) in body**, looking forward and slightly to the right. Rotation puts the camera's `+z` (lens optical axis) along body `+x` (forward). When painting camera detections into the map, transform via `T_map_from_body × T_body_from_realsense × p_cam`.
+
+5. **For virtual QCar 2, all distances are 10×.** So `csi_front_to_body` in QLabs world coordinates becomes `(1.83, 0, 1.10)` instead of `(0.183, 0, 0.110)`. If you ever need to spawn a sensor or accessory in QLabs at a body-relative position, scale by 10. ROS-side TF should always be in real meters regardless of QLabs.
+
+### Example: project a 1 m point ahead of the car (in CSI-front frame) into the body frame
+
+A point 1 m straight out from the front camera, `p_cam = [0, 0, 1, 1]^T`:
+
+```
+B_x = T_csi_front_to_body × p_cam
+    = [[0,0,1,0.183],[-1,0,0,0],[0,-1,0,0.110],[0,0,0,1]] × [0,0,1,1]^T
+    = [1.183, 0, 0.110, 1]^T
+```
+
+So the point appears 1.183 m ahead of the body origin, on the centerline, 0.11 m above ground. (Matches the manual's worked example on page 11.)
+
+### When you'd use this
+
+- Wiring the D435 / CSI cameras into TF for the perception stack on physical hardware
+- Camera painting: transforming RGB-D detections into the map frame
+- Validating the LiDAR static-TF flip on the physical robot
+- Bumper / collision bounds (need cg_to_body + dimensions Table 11)
+- Any custom sensor you add — express its mount as `T_sensor_to_body` and follow the same pattern
+
+If you find any extrinsic on physical that doesn't match the manual (e.g., the LiDAR was remounted), document the override here so the team knows the source-of-truth value.
 
 ## Killing Stale ROS Nodes Between Runs
 
@@ -783,7 +855,7 @@ steering      ──┘                                                │
 Rules:
 
 - `pose_estimator` (`qcar2_autonomy/autonomy/pose_estimator.py`) is the **only** node that publishes `odom -> base_link` and `/odom`.
-- The C++ node `qcar2_odometry` is **retired**. Do not launch it. It is no longer referenced in `qcar2_virtual_launch.py`, `qcar2_amcl_localization_launch.py`, or `qcar2_amcl_localization_virtual_launch.py`. The source file in `qcar2_nodes/src/qcar2_odometry.cpp` remains for reference only.
+- The C++ node `qcar2_odometry` is **retired** and its source file `qcar2_nodes/src/qcar2_odometry.cpp` was deleted on 2026-05-24. The `pose_estimator` (Python) + `ekf_fusor` (Python) pair owns odometry entirely now.
 - Cartographer reads `/odom` (`use_odometry = true` in `qcar2_2d.lua`) as its motion prior.
 - AMCL reads `odom -> base_link` from TF — same EKF source, no changes to AMCL.
 - The EKF fuses wheel speed (encoders via `/qcar2_joint`) with IMU yaw rate (`/qcar2_imu`) using `gyro_weight` (default 0.65). Steering from `/cmd_vel_nav` / `/qcar2_motor_speed_cmd` feeds the bicycle-model term.
@@ -809,15 +881,33 @@ ros2 run qcar2_autonomy pose_estimator --ros-args -p publish_tf:=false
 
 ## Architecture Direction
 
-Final target:
+Final target (updated 2026-05-24 after RTAB-Map retirement):
 
 ```text
-RTAB-Map offline builds/optimizes the map
-  -> BEV PNG aligns that map to ideal competition coordinates
-  -> AMCL localizes live against the frozen wall map
-  -> roadmap/path follower drives in that fixed frame
-  -> reward grid + lane safety + semantic watchdog audit the run
-  -> motion arbiter sends the only final motor command
+Cartographer (build phase, offline-style)  →  saved map.pgm/.yaml
+   |
+   +-→  LCroadmap_alignment_node (Procrustes/Kabsch)
+          →  golden_map.yaml in competition coordinates
+                |
+                ▼
+   AMCL (runtime localization on frozen golden_map)
+       + ekf_fusor (encoder + IMU + AMCL pose fusion)
+                |
+                ▼
+   path_follower (single owner of /cmd_vel_nav)
+       - idle | manual | autonomous modes
+       - PD pure pursuit (Kp=1.10, Kd=0.20 from BO + Option-B safety margin)
+       - consumes /qcar2_pose_fused, /cmd_waypoints
+                |
+                ▼
+   trip_planner (taxi mission state machine)
+       HUB → pickup → dropoff → HUB → repeat
+                |
+                ▼
+   reward grid + lane safety + semantic watchdog  (audit only)
+                |
+                ▼
+   motion arbiter (NOT BUILT YET — the only node that should publish to QCar2 hardware)
 ```
 
 Rules:
@@ -827,25 +917,84 @@ Rules:
 - Semantics audits world consistency but does not directly move pose.
 - Lane detector does not directly command steering.
 - Reward grid does not directly drive the motor.
-- Motion arbiter is the only final command authority.
+- Motion arbiter is the only final command authority (today path_follower fills that role; arbiter will sit between path_follower and hardware once built).
 
-Immediate execution order:
+Immediate execution order (remaining work toward competition):
 
-1. RTAB-Map RGB-D smoke test.
-2. Record small bag with `/scan`, D435 RGB-D, TF, camera info, odom if available.
-3. Replay bag into RTAB offline.
-4. Export/inspect occupancy map and graph.
-5. Attach YOLO semantic observations to RTAB keyframes.
-6. Align exported map with BEV PNG.
-7. Generate `golden_map.yaml` and `golden_map.pgm`.
-8. Launch AMCL on frozen map.
-9. Verify scan overlay and covariance.
-10. Add roadmap/path follower.
-11. Add reward grid.
-12. Add semantic watchdog events.
-13. Add motion arbiter.
+1. ✅ Cartographer + ekf_fusor + path_follower validated on QLabs (this session).
+2. ⏳ Bring up physical QCar 2; verify the same stack runs there.
+3. ⏳ Drive a clean Cartographer map on physical; save with `cartographer_pbstream_to_ros_map`.
+4. ⏳ Wire `LCroadmap_alignment_node` to produce `golden_map.yaml` in competition coords.
+5. ⏳ Launch AMCL on the golden map; verify scan-vs-map overlay and `/qcar2_ekf/innovation_mahalanobis` stays small.
+6. ⏳ Plug `qcar2_perception/semantic_yolo_detector` into the autonomy launch (replaces the retired `yolo_detector` prototype).
+7. ⏳ Build the reward grid (currently no node).
+8. ⏳ Build the motion arbiter (currently path_follower owns /cmd_vel_nav directly).
+9. ⏳ Wire trip_planner's pickup/dropoff states to the reward grid.
 
 ## Change Log
+
+### 2026-05-24 EDT — ekf_fusor bundled into Cartographer launches + Scripts Reference section
+
+- `qcar2_cartographer_virtual_launch.py` and `qcar2_cartographer_launch.py` (physical) now include `ekf_fusor` as a Node with `correction_source='tf'`. Launching Cartographer is now sufficient to get `/qcar2_pose_fused` published — no separate `ros2 run qcar2_autonomy ekf_fusor` needed.
+- Added a "Scripts Reference" section to Easy_Start.md documenting all 6 helper scripts in `Development/ros2/scripts/` (`termname.sh`, `ros2_killall.sh`, `carto_to_amcl.sh`, `pd_tuner.py`, `bo_pd_tune.py`, `stress_test_for_EKF_and_mahalanobis.py`) with copy-paste-ready invocations and prerequisites.
+- Updated TOC and the "Base QCar2 Nodes" section to reflect what each launch actually starts now.
+
+### 2026-05-24 EDT — workspace cleanup + entering physical QCar 2
+
+**Cleanup (deleted files + setup pruning):**
+
+- `Development/ros2/src/rtabmap/` and `Development/ros2/src/rtabmap_ros/` — vendored RTAB-Map source trees removed (~170 MB, 1692 files). Not used by any active node; Cartographer is the chosen SLAM backend.
+- `qcar2_perception/launch/qcar2_rtabmap_mapping_virtual.launch.py` and `_physical.launch.py` — RTAB mapping launches removed alongside the source.
+- `qcar2_autonomy/autonomy/yolo_detector_MARKERS_CPU_ABC.py` — old YOLO prototype, replaced by `qcar2_perception/semantic_yolo_detector`. Console-script entry pruned from `setup.py`. References removed from `autonomy_planner_launch.py`.
+- `qcar2_autonomy/autonomy/teleop_csi.py` — Quanser QLabs-API-direct keyboard teleop. Bypassed ROS entirely; superseded by `manual_drive` (ROS) and `path_follower`'s `control_mode="manual"`. Won't work on physical hardware. Console-script entry pruned.
+- `qcar2_nodes/src/qcar2_odometry.cpp` — retired C++ encoder-only odometry; replaced by `pose_estimator` + `ekf_fusor` (Python). Removed from CMakeLists.txt build target.
+- `Easy_Start.txt` and `nav_to_pose references.txt` — stray root-level scratch files. Markdown / repo docs supersede them.
+
+**Easy_Start.md restructure:**
+
+- Removed sections 9 and 10 ("RTAB-Map Source Build" and "RTAB-Map RGB-D + LiDAR Mapping Launch") — replaced with a single short "RTAB-Map (retired)" stub pointing at git history for revival.
+- Renumbered TOC (was 16 entries, now 14).
+- Removed "Old autonomy YOLO prototype" run snippet from "Autonomy Commands" — that executable no longer exists.
+- Updated "Manual drive" section to recommend `path_follower control_mode=manual` (single bus owner) and document the standalone `manual_drive` as backward-compat.
+- Updated "Architecture Direction" to reflect the current Cartographer → `LCroadmap_alignment_node` → `golden_map` → AMCL + ekf_fusor → path_follower → trip_planner pipeline. RTAB references removed.
+- Removed `ros2 topic list | grep rtabmap` from the debug snippet; replaced with `grep nav`.
+- **All historical change-log entries preserved** — only operational/runbook content was pruned. Logs are the source of truth for what happened when.
+
+**Entering physical QCar 2 (transition log):**
+
+The QLabs/virtual phase has produced a complete, validated software stack:
+
+- ✅ Cartographer mapping with EKF motion prior (encoder + IMU, gear ratio + wheelbase fixed per manual)
+- ✅ `ekf_fusor` standalone node consuming Cartographer pose + EKF predict, publishing `/qcar2_pose_fused`
+- ✅ `controller_watchdog` publishing `/nav/controller_health`
+- ✅ `path_follower` with unified `control_mode` (idle | manual | autonomous), `/cmd_vel_nav` single-owner
+- ✅ Bayesian Optimization tuned PD gains: `Kp=1.10, Kd=0.20` (Option B middle of robust cluster)
+- ✅ Pure pursuit + gyro damping correctly using rad/s (deg→rad bug fixed)
+- ✅ Two-phase BO with TEST_ORIGIN anchor + L-shape path far from completion radius
+- ✅ Stress test script demonstrates Mahalanobis outlier gate (χ²₃ at 99% = 11.345) catching ~150 maha bad poses
+- ✅ Foxglove dashboards for EKF diagnostics + controller health + live PD tuning sliders
+
+What's expected to need re-tuning or re-validation on physical hardware:
+
+| Component | Why it may differ from sim | How to handle |
+|---|---|---|
+| LiDAR static TF | `fixed_lidar_frame.cpp` uses `setRPY(0, 0, -π)` — confirmed correct per manual page 10's `rplidar_to_body` extrinsic. Should "just work" but verify first scan with `tf2_echo base_link base_scan` and visual `/scan` overlay on a wall. | Sanity-check before any autonomy launch. |
+| EKF Q/R noise tuning | Physical encoders slip on turns, physical IMU has temperature-dependent bias. Sim has none of this. | Watch `/qcar2_ekf/p_diag` and `/qcar2_ekf/innovation_mahalanobis` during the first physical Cartographer run. If maha values consistently > 5 during normal driving, bump Q or loosen R. |
+| PD gains (Kp=1.10, Kd=0.20) | Real wheel/servo dynamics differ from QLabs. Sluggish servo response will need higher Kp or lower Kd. | Use `pd_tuner.py` live-slider for quick adjustments. Re-run `bo_pd_tune.py` if a clean QCar2 + battery setup is available. |
+| Cartographer scan-match | Real RPLidar has glare/dropouts that QLabs doesn't model. `max_range = 10` may be too optimistic. | If submaps look noisy, lower `max_range` to 7-8 m. |
+| AMCL particle count | Real LiDAR noise + occlusions need more particles than the tuned sim values. | If `/particle_cloud` shows clouds that don't tighten, bump `max_particles` to 8000. |
+| Camera calibration (D435, CSI) | Physical lens distortion + lighting differ from QLabs. YOLO confidence thresholds may need adjustment. | Defer to perception-layer integration after the path follower works on physical. |
+
+**Validation gate before physical drive:** run the same Cartographer → ekf_fusor → path_follower → trip_planner stack on physical hardware. Confirm:
+1. `ros2 topic hz /qcar2_imu` ≈ 100 Hz
+2. `ros2 topic hz /scan` ≈ 10 Hz (RPLidar A2 default)
+3. `ros2 topic hz /odom` ≈ 80 Hz (from pose_estimator)
+4. `tf2_echo map base_link` updates smoothly with hand-pushing
+5. `manual_drive` (or `control_mode=manual`) moves the wheels in WASD direction
+6. `/qcar2_ekf/health` reads `healthy` for the first 30 s of driving
+
+If all six pass, autonomous lap with `node_values:=[0,8,10]` should drive smoothly. If anything fails, debug from that point — don't move to autonomous until the basics are solid.
+
 
 ### 2026-05-23 EDT — discovery: Cartographer precision over AMCL
 
@@ -1573,7 +1722,7 @@ ros2 topic echo /odom --once   # x should increase by ~1.0 m, not ~1.23 m
 
 - Wired the EKF as the single owner of `/odom` and `odom -> base_link` TF.
 - Rewrote `qcar2_autonomy/autonomy/pose_estimator.py` to publish `nav_msgs/Odometry` on `/odom` and broadcast `odom -> base_link`. Removed the `map -> base_link` correction loop that made the EKF a downstream observer of SLAM.
-- Retired the `qcar2_odometry` C++ node from active launches: removed from `qcar2_amcl_localization_launch.py` and `qcar2_amcl_localization_virtual_launch.py`. Already commented out of `qcar2_virtual_launch.py`.
+- Retired the `qcar2_odometry` C++ node from active launches: removed from `qcar2_amcl_localization_launch.py` and `qcar2_amcl_localization_virtual_launch.py`. Already commented out of `qcar2_virtual_launch.py`.  [SOURCE FILE qcar2_odometry.cpp DELETED 2026-05-24]
 - Enabled `use_odometry = true` in `qcar2_nodes/config/qcar2_2d.lua` so Cartographer fuses the EKF `/odom` as a motion prior.
 - Reason: Cartographer was running on LiDAR-only scan matching with no motion prior, causing drift in open stretches between distinctive geometry. The homemade EKF existed but was a sidecar publishing `/robot_pose` that nobody consumed.
 
@@ -1584,32 +1733,32 @@ ros2 topic echo /odom --once   # x should increase by ~1.0 m, not ~1.23 m
 - Added a dedicated logs/debugging section for build logs, ROS run logs, launch log capture, graph checks, topic checks, semantic marker layers, and bag commands.
 - Kept the current QCar2 perception, Cartographer, RTAB, Docker, and architecture notes.
 
-### 2026-05-22 18:52:41 EDT
+### 2026-05-22 18:52:41 EDT  [RTAB-Map references DELETED 2026-05-24]
 
 - Reorganized this file into Markdown-style sections for copy-paste use.
 - Added corrected RTAB executable names for this source branch:
-  - `ros2 run rtabmap_sync rgbd_sync`
-  - `ros2 run rtabmap_odom rgbd_odometry`
-  - `ros2 run rtabmap_slam rtabmap`
+  - `ros2 run rtabmap_sync rgbd_sync`  [DELETED]
+  - `ros2 run rtabmap_odom rgbd_odometry`  [DELETED]
+  - `ros2 run rtabmap_slam rtabmap`  [DELETED]
 - Added RTAB RGB-D smoke-test commands wired to the current D435 topics:
   - `/perception/d435/rgb/image_raw`
   - `/perception/d435/depth/image_rect`
   - `/perception/d435/camera_info`
 - Kept the QCar2 perception, Cartographer, Docker, and architecture notes in grouped sections.
 
-### 2026-05-22 19:08:34 EDT
+### 2026-05-22 19:08:34 EDT  [RTAB-Map references DELETED 2026-05-24]
 
 - Fixed RTAB SLAM copy-paste command so RTAB internal parameters are passed as
   strings:
-  - `RGBD/CreateOccupancyGrid:="true"`
-  - `Rtabmap/DetectionRate:="1.0"`
+  - `RGBD/CreateOccupancyGrid:="true"`  [DELETED]
+  - `Rtabmap/DetectionRate:="1.0"`  [DELETED]
 - Reason: ROS 2 otherwise parses `true` as a bool, but this RTAB wrapper
   declares those slash-style RTAB parameters as strings.
 
-### 2026-05-22 21:46:48 EDT
+### 2026-05-22 21:46:48 EDT  [RTAB-Map references DELETED 2026-05-24]
 
 - Corrected RTAB smoke-test frame contract:
-  - `rtab_map -> rtab_odom -> base_link`
+  - `rtab_map -> rtab_odom -> base_link`  [DELETED]
   - `base_link -> base_scan`
   - `base_link -> aligned_camera_optical_frame`
 - Updated RTAB odometry/SLAM commands to use `frame_id:=base_link` and
@@ -1618,7 +1767,7 @@ ros2 topic echo /odom --once   # x should increase by ~1.0 m, not ~1.23 m
   the final plan where LiDAR provides wall/track geometry and D435 provides
   visual/semantic evidence.
 
-### 2026-05-22 21:52:25 EDT
+### 2026-05-22 21:52:25 EDT  [RTAB-Map references DELETED 2026-05-24]
 
 - Added RTAB mapping TF launch files, later replaced by the full RTAB mapping
   launch files below.
@@ -1626,11 +1775,11 @@ ros2 topic echo /odom --once   # x should increase by ~1.0 m, not ~1.23 m
   SLAM publishes `rtab_map -> rtab_odom`, and RTAB odometry publishes
   `rtab_odom -> base_link`.
 
-### 2026-05-22 22:26:31 EDT
+### 2026-05-22 22:26:31 EDT  [RTAB-Map launches DELETED 2026-05-24]
 
 - Replaced the TF-only RTAB launch files with full mapping launches:
-  - `qcar2_perception qcar2_rtabmap_mapping_virtual.launch.py`
-  - `qcar2_perception qcar2_rtabmap_mapping_physical.launch.py`
+  - `qcar2_perception qcar2_rtabmap_mapping_virtual.launch.py`  [DELETED]
+  - `qcar2_perception qcar2_rtabmap_mapping_physical.launch.py`  [DELETED]
 - The full launches start LiDAR, hardware, static sensor TFs, D435 aligned
   source, RGB-D sync, RTAB odometry, and RTAB SLAM.
 - They intentionally do not start Cartographer, `qcar2_nodes rgbd`, YOLO,
@@ -1655,11 +1804,11 @@ ros2 topic echo /odom --once   # x should increase by ~1.0 m, not ~1.23 m
   `manual_drive` still publishes `/cmd_vel_nav` and the QCar hardware consumes
   `qcar2_motor_speed_cmd`.
 
-### 2026-05-22 18:20:44 EDT
+### 2026-05-22 18:20:44 EDT  [RTAB-Map source DELETED 2026-05-24]
 
-- RTAB-Map local source build reached `rtabmap_sync`, `rtabmap_odom`, and `rtabmap_slam`.
-- Patched Humble header-name compatibility issues in local `rtabmap_ros`.
-- Disabled RTAB GUI/tools/examples for headless Docker build.
+- RTAB-Map local source build reached `rtabmap_sync`, `rtabmap_odom`, and `rtabmap_slam`.  [DELETED]
+- Patched Humble header-name compatibility issues in local `rtabmap_ros`.  [DELETED]
+- Disabled RTAB GUI/tools/examples for headless Docker build.  [DELETED]
 
 ### 2026-05-20
 

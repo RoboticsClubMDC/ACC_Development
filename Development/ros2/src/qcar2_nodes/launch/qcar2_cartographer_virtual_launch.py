@@ -44,6 +44,19 @@ def generate_launch_description():
             output='screen',
             parameters=[{'use_sim_time': use_sim}])
 
+    # ekf_fusor consumes pose_estimator's /odom + Cartographer's map → base_link
+    # TF and publishes the fused pose on /qcar2_pose_fused. This is the single
+    # source of truth that path_follower (and any other autonomy consumer)
+    # should read. Bundled here so launching cartographer always gives you the
+    # fused pose topic too.
+    ekf_fusor = Node(
+            package='qcar2_autonomy',
+            executable='ekf_fusor',
+            name='ekf_fusor',
+            output='screen',
+            parameters=[{'use_sim_time': use_sim,
+                         'correction_source': 'tf'}])
+
     configuration_basename_la = DeclareLaunchArgument(
             'configuration_basename',
             default_value='qcar2_2d.lua',
@@ -96,6 +109,7 @@ def generate_launch_description():
         qcar2_launch,
         qcar2_nav2_converter,
         pose_estimator,
+        ekf_fusor,
         cartographer_node,
         cartographer_occupancy_grid_node,
         qcar2_to_lidar_tf_node,

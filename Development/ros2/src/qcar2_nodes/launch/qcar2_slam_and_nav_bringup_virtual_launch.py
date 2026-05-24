@@ -96,7 +96,7 @@ def generate_launch_description():
 
     # Specify the actions
     bringup_cmd_group = GroupAction([
-        PushRosNamespace(
+        PushRosNamespace(867yu8rtgv
             condition=IfCondition(use_namespace),
             namespace=namespace),
 

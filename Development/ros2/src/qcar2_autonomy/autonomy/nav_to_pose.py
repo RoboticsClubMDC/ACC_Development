@@ -136,9 +136,11 @@ class PathFollower(Node):
 
         # PD gains for pure-pursuit steering. Live-tunable via Foxglove
         # Parameters panel or `ros2 param set /path_follower kp_steering <v>`.
-        # Defaults chosen 2026-05-24: Kp=1.0 unity start; Kd=0.3 small damping
-        # (Kd=1.0 caused sluggish turns + wall scrapes; Kd=5 with the old
-        # *pi/180 bug was effectively ~0.087, essentially undamped).
+        # Defaults 2026-05-24 (Option B from BO post-analysis):
+        #   Kp=1.10, Kd=0.20 — "robust cluster" middle. BO's literal best was
+        #   Kp=1.08, Kd=0.08 but that's effectively undamped; the BO test
+        #   path didn't exercise tight corners. Kd=0.20 gives a safety margin
+        #   for real competition driving without sacrificing responsiveness.
         self.declare_parameter('kp_steering', 1.100)
         self.declare_parameter('kd_steering', 0.20)
         self.kp_steering = float(self.get_parameter('kp_steering').value)
