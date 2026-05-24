@@ -882,6 +882,110 @@ Observed during testing after the EKF + max_range fixes: Cartographer's live SLA
 3. Treat AMCL as **filter localization for race-time tracking**, not as a map-quality improver. It is fast and deterministic; that is its job.
 4. Future work: implement landmark-based map alignment so AMCL operates in competition coordinates instead of Cartographer's abstract frame.
 
+### 2026-05-24 EDT — BO test path must END FAR FROM TEST_ORIGIN (instant-complete fix)
+
+After two failed BO runs, the recurring failure mode was finally pinned down:
+
+**Symptom:** Most trials report `dur=0.0` with `arr` near 0.12 m and `std=0.000`. BO converges to a fake "best" point whose J was computed from zero seconds of driving.
+
+**Cause:** The test path's FINAL waypoint was too close to TEST_ORIGIN (0.3 m). After APPROACH leaves the car within 0.30 m of TEST_ORIGIN, the car is often within 0.25 m of the final waypoint. `path_follower`'s `dist_to_final < 0.25` trigger fires on the first measurement tick → `/path_status = True` → measurement loop exits with no telemetry.
+
+**The geometric constraint that must hold:**
+```
+distance(final_waypoint, TEST_ORIGIN) > APPROACH_ARRIVAL_RAD + 0.25 + margin
+                                       0.30                + 0.25 + 0.30 = 0.85 m
+```
+With the L-shape final at (-0.5, 1.0) → 1.12 m from origin, we're 0.27 m above the floor. Safe.
+
+**Updated test path geometry (in `scripts/bo_pd_tune.py`):**
+```python
+TEST_PATH_OFFSETS = [
+    (1.0,  0.0),    # forward 1.0 m
+    (1.0,  1.0),    # left    1.0 m
+    (-0.5, 1.0),    # back    1.5 m   → FINAL at 1.12 m from TEST_ORIGIN
+]
+```
+
+This is an OPEN L-shape, not a closed loop. Each trial ends at TEST_ORIGIN + (-0.5, 1.0). The next trial's APPROACH then drives the car ~1.1 m back to TEST_ORIGIN (~4 s) before starting measurement. So:
+- Trial 1: APPROACH (instant, car already there) → MEASUREMENT (3 legs, ~25 s)
+- Trial 2: APPROACH (~4 s drive back) → MEASUREMENT (~25 s)
+- ... and so on, ~30 s per trial × 15 trials ≈ 8 min total.
+
+**Other compounding fixes from the same debugging session:**
+- `_drive_to` switched from `/path_status` wait (which can lag, queue, or never fire) to **position-based** completion: car within radius for N seconds.
+- Measurement loop drains pending callbacks (`spin_once × 10`) before resetting `path_complete` to clear any stale /path_status from approach.
+- Measurement loop ALSO has a position-based fallback (dist to final < 0.30 m for >0.5 s).
+- APPROACH_ARRIVAL_RAD = 0.30 m, MUST be > path_follower's 0.25 m completion threshold — otherwise car stops driving before script considers it arrived → 25 s timeout every approach.
+- APPROACH gains bumped to Kp=1.2, Kd=0.20 (was 1.0/0.30, too sluggish to reach 0.20 m in 20 s).
+
+**Diagnostic log lines to watch for** (in BO terminal):
+```
+APPROACH arrived in 4.2s, final dist=0.18m                   ← good (took time, ended close)
+Trial (kp=..., kd=...) → arr=0.15 sat=0.05 std=0.18 dur=22.4 dmean=0.61 | J=1.85
+```
+vs. broken:
+```
+APPROACH arrived in 0.3s, final dist=0.12m                   ← bad if happens trial 2+
+Trial (...) → arr=0.18 std=0.000 dur=0.0 | J=0.22            ← instant-complete bug
+```
+
+If you see ALL trials with `dur=0.0`, the test path geometry is broken again (final waypoint too close to TEST_ORIGIN or to approach end-point). Re-check the table above.
+
+### 2026-05-24 EDT — two-phase BO trials: APPROACH + MEASUREMENT
+
+After the first BO run crashed the car and produced mostly junk J values (instant-complete or no-telemetry trials), the BO script (`scripts/bo_pd_tune.py`) was rewritten to run each trial in two distinct phases:
+
+**Phase 1 — APPROACH (safe gains, not measured):**
+- Drive the car back to TEST_ORIGIN with `APPROACH_KP=1.0, APPROACH_KD=0.30` (known-safe gains)
+- Single-waypoint path = `[TEST_ORIGIN]`
+- Timeout: 20 s
+- Telemetry NOT counted toward J
+
+**Phase 2 — MEASUREMENT (trial gains, measured):**
+- Switch path_follower to the BO-suggested `(Kp, Kd)`
+- Drive the 4-waypoint test path absolutely-anchored at TEST_ORIGIN
+- All `/nav/*` telemetry during this phase contributes to cost function J
+- Timeout: 45 s
+
+**TEST_ORIGIN is captured when the user presses ENTER**, not hardcoded. The flow:
+
+1. User starts BO script — it pauses and prints instructions
+2. User puts path_follower in `manual` mode, drives car to a safe open spot
+3. User exits manual mode (`q`) and presses ENTER in BO terminal
+4. BO captures the current `/qcar2_pose_fused` as TEST_ORIGIN
+5. All 15 trials use that origin as their anchor
+
+This eliminates three issues from the first run:
+- **Crashes**: user picks a safe open spot before BO starts
+- **Drift across trials**: every trial returns to the SAME origin before measuring
+- **Instant-complete trials**: the test path's final waypoint is reliably 0.3 m from origin (above the 0.25 m threshold), and the approach phase guarantees the car is AT the origin at trial start
+
+**Test path geometry (offsets from TEST_ORIGIN):**
+
+```
+TEST_PATH_OFFSETS = [
+    (1.0, 0.0),     # forward 1 m
+    (1.0, 1.0),     # left  1 m
+    (0.0, 1.0),     # back  1 m
+    (0.0, 0.3),     # FINAL — 0.3 m north of TEST_ORIGIN
+]
+```
+
+Total path length ~3.7 m. Segment lengths all ≥ 0.7 m (above lookahead at 0.4 m/s default speed). Drive time per trial: ~18 s. Combined with the approach phase (~10 s avg), each trial is ~30 s × 15 trials = ~8 min total BO time.
+
+**Space requirements:** at least 1.5 m of clear space ahead and to the LEFT of TEST_ORIGIN. The test path forms a 1 m × 1 m square in that direction.
+
+**Crash recovery:** if a trial crashes the car (e.g., BO picked a very aggressive Kp/Kd that ran into a wall), Ctrl-C the BO script, manually drive the car free, restart BO. Past trials are NOT preserved (skopt doesn't checkpoint by default).
+
+**Per-trial log lines now print:**
+
+```
+[APPROACH] done in 8.2s, arrived 0.12m from target
+Trial (kp=1.097, kd=0.267) → arr=0.18 sat=0.00 std=0.11 dur=16.4 dmean=0.65 | J=2.41
+```
+
+If you see `dur=0.0` consistently, the path_follower is still hitting instant-complete. If you see `[APPROACH] TIMEOUT`, the approach gains can't reach the origin — check path_follower's controller_mode is actually switching to autonomous when BO publishes /cmd_waypoints.
+
 ### 2026-05-24 EDT — unified control modes in path_follower (manual_drive folded in)
 
 `path_follower` is now the **single owner** of `/cmd_vel_nav`. No more double-publisher tug-of-war when both `path_follower` and `manual_drive` are running. Manual-drive's WASD keystroke logic has been folded into `path_follower` as a thread, so there is exactly one node that ever publishes the steering bus.

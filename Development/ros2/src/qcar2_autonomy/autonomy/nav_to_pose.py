@@ -139,8 +139,8 @@ class PathFollower(Node):
         # Defaults chosen 2026-05-24: Kp=1.0 unity start; Kd=0.3 small damping
         # (Kd=1.0 caused sluggish turns + wall scrapes; Kd=5 with the old
         # *pi/180 bug was effectively ~0.087, essentially undamped).
-        self.declare_parameter('kp_steering', 1.0)
-        self.declare_parameter('kd_steering', 0.3)
+        self.declare_parameter('kp_steering', 1.100)
+        self.declare_parameter('kd_steering', 0.20)
         self.kp_steering = float(self.get_parameter('kp_steering').value)
         self.kd_steering = float(self.get_parameter('kd_steering').value)
 
