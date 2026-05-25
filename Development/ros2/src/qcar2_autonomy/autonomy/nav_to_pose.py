@@ -146,9 +146,21 @@ class PathFollower(Node):
         self.kp_steering = float(self.get_parameter('kp_steering').value)
         self.kd_steering = float(self.get_parameter('kd_steering').value)
 
-        # Stanley blend is kept at 0 — pure pursuit only
-        self.stanley_blend     = 0.3
-        self.stanley_trust_min = 999.0
+        # Lane Stanley is a bounded visual bias on top of the existing
+        # pure-pursuit + gyro-damped steering. This node remains the only
+        # /cmd_vel_nav publisher.
+        self.declare_parameter('lane_bias_gain', 0.70)
+        self.declare_parameter('lane_bias_max', 0.10)
+        self.declare_parameter('lane_bias_turn_start', 0.18)
+        self.declare_parameter('lane_bias_turn_end', 0.38)
+        self.declare_parameter('stanley_trust_min', 0.35)
+        self.declare_parameter('stanley_timeout_sec', 0.40)
+        self.lane_bias_gain = float(self.get_parameter('lane_bias_gain').value)
+        self.lane_bias_max = float(self.get_parameter('lane_bias_max').value)
+        self.lane_bias_turn_start = float(self.get_parameter('lane_bias_turn_start').value)
+        self.lane_bias_turn_end = float(self.get_parameter('lane_bias_turn_end').value)
+        self.stanley_trust_min = float(self.get_parameter('stanley_trust_min').value)
+        self.stanley_timeout_sec = float(self.get_parameter('stanley_timeout_sec').value)
 
         self.add_on_set_parameters_callback(self.parameter_update_callback)
 
@@ -194,7 +206,10 @@ class PathFollower(Node):
 
         self.stanley_delta = 0.0
         self.stanley_trust = 0.0
+        self.stanley_last_t = 0.0
         self.pp_delta_raw  = 0.0
+        self.lane_bias_last = 0.0
+        self.lane_bias_weight = 0.0
 
         self.publisher = self.create_publisher(Twist, '/cmd_vel_nav', 1)
         self.cyclic = False
@@ -225,6 +240,8 @@ class PathFollower(Node):
         # exists in addition to the ROS parameters (both routes work).
         self.create_subscription(Float32, '/nav/kp_steering_set', self._kp_set_cb, 5)
         self.create_subscription(Float32, '/nav/kd_steering_set', self._kd_set_cb, 5)
+        self.create_subscription(Float32, '/lane_keeping/delta', self._stanley_delta_cb, 5)
+        self.create_subscription(Float32, '/lane_keeping/trust', self._stanley_trust_cb, 5)
 
         self.pub_pp_delta      = self.create_publisher(Float32, '/nav/pp_delta',      2)
         self.pub_stanley_delta = self.create_publisher(Float32, '/nav/stanley_delta', 2)
@@ -256,8 +273,10 @@ class PathFollower(Node):
         self.scopeTimer = self.create_timer(0.1, self.scopeDataTimer)
 
         self.get_logger().info(
-            f'PathFollower ready | PURE PURSUIT BASELINE | '
-            f'stanley_blend={self.stanley_blend} trust_min={self.stanley_trust_min}')
+            f'PathFollower ready | PP+PD with bounded lane bias | '
+            f'lane_bias_gain={self.lane_bias_gain} '
+            f'lane_bias_max={self.lane_bias_max} '
+            f'trust_min={self.stanley_trust_min}')
 
     def _cmd_waypoints_cb(self, msg: Path):
         if not msg.poses:
@@ -296,27 +315,49 @@ class PathFollower(Node):
 
     def _stanley_trust_cb(self, msg: Float32):
         self.stanley_trust = float(msg.data)
+        self.stanley_last_t = time.time()
 
-    def _blend_steering(self, pp_delta: float) -> float:
+    def _lane_turn_scale(self, pp_delta: float) -> float:
+        start = max(0.0, self.lane_bias_turn_start)
+        end = max(start + 1e-3, self.lane_bias_turn_end)
+        abs_pp = abs(pp_delta)
+        if abs_pp <= start:
+            return 1.0
+        if abs_pp >= end:
+            return 0.0
+        return float(1.0 - (abs_pp - start) / (end - start))
+
+    def _apply_lane_bias(self, pp_delta: float) -> float:
         self.pp_delta_raw = pp_delta
 
-        if self.stanley_trust < self.stanley_trust_min:
-            alpha = 0.0
+        stanley_is_fresh = (time.time() - self.stanley_last_t) <= self.stanley_timeout_sec
+        if not stanley_is_fresh or self.stanley_trust < self.stanley_trust_min:
+            weight = 0.0
         else:
-            alpha = np.clip(self.stanley_blend * self.stanley_trust, 0.0, 1.0)
+            trust_range = max(1e-6, 1.0 - self.stanley_trust_min)
+            trust_scale = np.clip((self.stanley_trust - self.stanley_trust_min) / trust_range, 0.0, 1.0)
+            turn_scale = self._lane_turn_scale(pp_delta)
+            weight = float(np.clip(self.lane_bias_gain * trust_scale * turn_scale, 0.0, 1.0))
 
-        blended = (1.0 - alpha) * pp_delta + alpha * self.stanley_delta
-        blended = float(np.clip(blended, -self.max_steering_angle, self.max_steering_angle))
+        lane_bias = float(np.clip(self.stanley_delta, -self.lane_bias_max, self.lane_bias_max))
+        applied_bias = weight * lane_bias
+        steering = float(np.clip(
+            pp_delta + applied_bias,
+            -self.max_steering_angle,
+            self.max_steering_angle))
+
+        self.lane_bias_last = applied_bias
+        self.lane_bias_weight = weight
 
         def f32(v):
             m = Float32(); m.data = float(v); return m
 
         self.pub_pp_delta.publish(f32(pp_delta))
         self.pub_stanley_delta.publish(f32(self.stanley_delta))
-        self.pub_blended_delta.publish(f32(blended))
-        self.pub_blend_alpha.publish(f32(alpha))
+        self.pub_blended_delta.publish(f32(steering))
+        self.pub_blend_alpha.publish(f32(weight))
 
-        return blended
+        return steering
 
     def parameter_update_callback(self, params):
         for param in params:
@@ -352,8 +393,24 @@ class PathFollower(Node):
             elif param.name == 'start_path' and param.type_ == param.Type.BOOL_ARRAY:
                 self.path_execute_flag = list(param.value)[0]
                 self.get_logger().info('path status changed!')
-            elif param.name == 'stanley_blend' or param.name == 'stanley_trust_min':
-                self.get_logger().warn(f'{param.name} is hardcoded — ignoring')
+            elif param.name == 'lane_bias_gain' and param.type_ == param.Type.DOUBLE:
+                self.lane_bias_gain = float(np.clip(param.value, 0.0, 1.0))
+                self.get_logger().info(f'lane_bias_gain -> {self.lane_bias_gain:.3f}')
+            elif param.name == 'lane_bias_max' and param.type_ == param.Type.DOUBLE:
+                self.lane_bias_max = float(np.clip(param.value, 0.0, self.max_steering_angle))
+                self.get_logger().info(f'lane_bias_max -> {self.lane_bias_max:.3f}')
+            elif param.name == 'lane_bias_turn_start' and param.type_ == param.Type.DOUBLE:
+                self.lane_bias_turn_start = float(np.clip(param.value, 0.0, self.max_steering_angle))
+                self.get_logger().info(f'lane_bias_turn_start -> {self.lane_bias_turn_start:.3f}')
+            elif param.name == 'lane_bias_turn_end' and param.type_ == param.Type.DOUBLE:
+                self.lane_bias_turn_end = float(np.clip(param.value, 0.0, self.max_steering_angle))
+                self.get_logger().info(f'lane_bias_turn_end -> {self.lane_bias_turn_end:.3f}')
+            elif param.name == 'stanley_trust_min' and param.type_ == param.Type.DOUBLE:
+                self.stanley_trust_min = float(np.clip(param.value, 0.0, 1.0))
+                self.get_logger().info(f'stanley_trust_min -> {self.stanley_trust_min:.3f}')
+            elif param.name == 'stanley_timeout_sec' and param.type_ == param.Type.DOUBLE:
+                self.stanley_timeout_sec = float(np.clip(param.value, 0.05, 2.0))
+                self.get_logger().info(f'stanley_timeout_sec -> {self.stanley_timeout_sec:.3f}')
             elif param.name == 'mission_pickup_xy' and param.type_ == param.Type.DOUBLE_ARRAY:
                 self.get_logger().info(f'mission_pickup_xy updated: {list(param.value)}')
             elif param.name == 'mission_dropoff_xy' and param.type_ == param.Type.DOUBLE_ARRAY:
@@ -622,30 +679,17 @@ class PathFollower(Node):
                     -self.max_steering_angle,
                     self.max_steering_angle)
 
+                steering = self._apply_lane_bias(float(pp_delta_damped))
+                self.current_steering = steering
+
                 # ----- Publish controller diagnostics for Foxglove -----
                 self._publish_controller_diagnostics(
                     dist=dist,
                     dist_to_final=dist_to_final,
                     psi=psi,
-                    steering_cmd=float(pp_delta_damped),
+                    steering_cmd=float(steering),
                     speed_cmd=float(speed_command),
                 )
-
-                self.pp_delta_raw  = float(pp_delta_damped)
-                self.stanley_delta = 0.0
-                self.stanley_trust = 0.0
-
-                steering = float(np.clip(pp_delta_damped,
-                                         -self.max_steering_angle,
-                                         self.max_steering_angle))
-                self.current_steering = steering
-
-                def f32(v):
-                    m = Float32(); m.data = float(v); return m
-                self.pub_pp_delta.publish(f32(self.pp_delta_raw))
-                self.pub_stanley_delta.publish(f32(0.0))
-                self.pub_blended_delta.publish(f32(self.current_steering))
-                self.pub_blend_alpha.publish(f32(0.0))
 
                 if int(self.t_plot * 5) != int((self.t_plot - self.dt) * 5):
                     self.get_logger().info(
@@ -886,7 +930,9 @@ class PathFollower(Node):
             mode = 3.0
         elif dist_to_final < 0.5:
             mode = 2.0
-        elif self.stanley_trust > self.stanley_trust_min:
+        elif (
+            self.lane_bias_weight > 1e-3
+        ):
             mode = 1.0
         else:
             mode = 0.0

@@ -1,5 +1,3 @@
-import subprocess
-
 from launch import LaunchDescription
 from launch_ros.actions import Node
 
@@ -14,7 +12,15 @@ def generate_launch_description():
         package='qcar2_autonomy',
         executable='path_follower',
         name='path_follower',
-        parameters=[{'visualize_pose': [True]}],
+        parameters=[{
+            'visualize_pose': [True],
+            'lane_bias_gain': 0.70,
+            'lane_bias_max': 0.10,
+            'lane_bias_turn_start': 0.18,
+            'lane_bias_turn_end': 0.38,
+            'stanley_trust_min': 0.35,
+            'stanley_timeout_sec': 0.40,
+        }],
     )
 
     trip_planner = Node(
@@ -31,18 +37,24 @@ def generate_launch_description():
         package='qcar2_autonomy',
         executable='lane_detection',
         name='lane_detection',
+        parameters=[{
+            'image_topic': '/camera/csi_image',
+            'config_file': 'csi_front_config.json',
+        }],
     )
 
-    lane_stanley_node = Node(
+    lane_keeping = Node(
         package='qcar2_autonomy',
-        executable='lane_stanley_node',
-        name='lane_stanley_node',
-    )
-
-    bev_csi_node = Node(
-        package='qcar2_autonomy',
-        executable='bev_csi_node',
-        name='bev_csi_node',
+        executable='lane_keeping',
+        name='lane_keeping',
+        parameters=[{
+            'input_cmd_topic': '/cmd_vel_nav',
+            'mask_topic': '/lane_detection/road_mask',
+            'publish_cmd': False,
+            'k_cte': 1.15,
+            'k_heading': 0.95,
+            'max_steering': 0.52,
+        }],
     )
 
     sidewalk_detection = Node(
@@ -51,14 +63,7 @@ def generate_launch_description():
         name='sidewalk_detection',
     )
 
-    bev_csi_seg = Node(
-        package='qcar2_autonomy',
-        executable='bev_csi_seg',
-        name='bev_csi_seg',
-    )
-
     ''' TODO: Once finished this launch file must also include
-    - Lane detector to help smooth out tracking of lanes while driving
     - Planner server to coordinate which LEDs on the QCar should be on based on trip logic
     - Hook into qcar2_perception's semantic_yolo_detector for traffic-light/stop-sign awareness
     '''
@@ -66,9 +71,7 @@ def generate_launch_description():
     return LaunchDescription([
         path_follower,
         trip_planner,
-        bev_csi_node,
         lane_detection,
-        lane_stanley_node,
+        lane_keeping,
         sidewalk_detection,
-        bev_csi_seg,
     ])
