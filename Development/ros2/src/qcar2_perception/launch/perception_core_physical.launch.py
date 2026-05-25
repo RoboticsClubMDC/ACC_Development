@@ -39,6 +39,9 @@ def jetson_torch_env():
 def launch_setup(context, *args, **kwargs):
     mode = LaunchConfiguration("mode").perform(context).strip().lower()
     source_only = LaunchConfiguration("source_only").perform(context).strip().lower() == "true"
+    enable_landmark_correction = (
+        LaunchConfiguration("enable_landmark_correction").perform(context).strip().lower() == "true"
+    )
     if mode not in ("internal", "external"):
         raise RuntimeError(
             "perception_core_physical.launch.py mode must be 'internal' or 'external'. "
@@ -109,6 +112,10 @@ def launch_setup(context, *args, **kwargs):
             "load_only_permanent": True,
             "visible_timeout_sec": 2.0,
             "max_marker_radius": 0.50,
+            # Phase-4 flag (added 2026-05-25). Forwarded from the launch
+            # argument so callers can flip it via `enable_landmark_correction:=true`
+            # instead of needing per-node --ros-args -p gymnastics.
+            "enable_landmark_correction": enable_landmark_correction,
         }],
         output="screen",
     )
@@ -198,6 +205,20 @@ def generate_launch_description():
                 "The default-stack-on-Jetson flow is the supported one; use Foxglove on the laptop "
                 "but only subscribe to lightweight diagnostic/marker topics — pulling raw D435 images "
                 "over the AP saturates the link and stalls Cartographer."
+            ),
+        ),
+        DeclareLaunchArgument(
+            "enable_landmark_correction",
+            default_value="false",
+            choices=["true", "false"],
+            description=(
+                "Phase-4: turn ON the landmark->EKF pose-correction publisher inside "
+                "semantic_landmark_mapper. When this is true, the mapper publishes "
+                "/perception/landmark_pose_correction on stable-landmark matches. "
+                "You ALSO need ekf_fusor's correction_source set to 'landmark' "
+                "(use `qcar2_cartographer_launch.py use_landmark_correction:=true`). "
+                "DO NOT enable until the three prerequisites are cleared (see "
+                "Easy_Start.md change log 2026-05-25 Phase-4 entry)."
             ),
         ),
         OpaqueFunction(function=launch_setup),

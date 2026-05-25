@@ -13,8 +13,14 @@ from launch.substitutions import (PathJoinSubstitution, LaunchConfiguration)
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
-def generate_launch_description():    
+def generate_launch_description():
     use_sim = LaunchConfiguration('use_sim')
+    # Phase-4 (added 2026-05-25): when true, ekf_fusor's correction_source is
+    # set to 'landmark' so it consumes /perception/landmark_pose_correction
+    # from the semantic_landmark_mapper. ALSO requires the mapper to be
+    # launched with enable_landmark_correction:=true. Default OFF so the
+    # existing tf-only flow is unchanged.
+    use_landmark_correction = LaunchConfiguration('use_landmark_correction')
 
     cartographer_config_dir = PathJoinSubstitution(
         [
@@ -49,13 +55,20 @@ def generate_launch_description():
     # source of truth that path_follower (and any other autonomy consumer)
     # should read. Bundled here so launching cartographer always gives you the
     # fused pose topic too.
+    # If `use_landmark_correction:=true` is passed, switch ekf_fusor's
+    # correction source from 'tf' (Cartographer) to 'landmark'. We use a
+    # PythonExpression so the value is resolved at launch time.
+    from launch.substitutions import PythonExpression
+    correction_source_expr = PythonExpression([
+        "'landmark' if '", use_landmark_correction, "' == 'true' else 'tf'",
+    ])
     ekf_fusor = Node(
             package='qcar2_autonomy',
             executable='ekf_fusor',
             name='ekf_fusor',
             output='screen',
             parameters=[{'use_sim_time': use_sim,
-                         'correction_source': 'tf'}])
+                         'correction_source': correction_source_expr}])
 
     configuration_basename_la = DeclareLaunchArgument(
             'configuration_basename',
@@ -76,6 +89,17 @@ def generate_launch_description():
             'publish_period_sec',
             default_value='1.0',
             description='Publishing period')
+
+    use_landmark_correction_la = DeclareLaunchArgument(
+            'use_landmark_correction',
+            default_value='false',
+            description=(
+                'Phase-4: set ekf_fusor correction_source to "landmark" so it '
+                'consumes /perception/landmark_pose_correction from the mapper. '
+                'Requires the mapper to be launched with '
+                'enable_landmark_correction:=true. DO NOT enable until stable '
+                'landmarks have been validated across multiple drives.'
+            ))
 
     cartographer_node = Node(
             package='cartographer_ros',
@@ -102,6 +126,7 @@ def generate_launch_description():
         use_sim_la,
         resolution_la,
         publish_period_sec_la,
+        use_landmark_correction_la,
         qcar2_launch,
         qcar2_nav2_converter,
         pose_estimator,

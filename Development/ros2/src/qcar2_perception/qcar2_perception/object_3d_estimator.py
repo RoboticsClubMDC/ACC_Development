@@ -78,7 +78,11 @@ class Object3DEstimator(Node):
         self.declare_parameter("markers_topic", "/perception/object_markers")
 
         self.declare_parameter("min_depth", 0.05)
-        self.declare_parameter("max_depth", 2.0)
+        # Raised 2026-05-25 from 2.0 to 6.0 so traffic lights / stop signs are
+        # still detectable at a useful approach distance. The depth-sigma model
+        # (sigma_d = a + b*d^2) naturally widens R_obs for far detections, so
+        # far observations are noisier but still usable.
+        self.declare_parameter("max_depth", 6.0)
         self.declare_parameter("depth_crop_ratio", 0.5)
         self.declare_parameter("min_valid_pixels", 10)
         self.declare_parameter("min_valid_ratio", 0.10)
@@ -278,7 +282,12 @@ class Object3DEstimator(Node):
     def build_R_obs(self, u, v, d, conf, bbox, fx, fy, cx, cy, camera_frame):
         """
         Build the full observation covariance in the map frame and return
-        (position_map_xyz, R_obs_3x3) or (None, None) if anything is missing.
+        (position_map_xyz, R_obs_3x3, position_base_xyz)
+        or (None, None, None) if anything is missing.
+
+        position_base is needed by Phase 4 (landmark -> EKF correction):
+        ekf_fusor uses it together with the known stable landmark position
+        to back-solve the implied robot pose.
 
         Spec §11:
           R_obs = R_map<-cam * J_cam * R_m * J_cam^T * R_map<-cam^T
@@ -286,7 +295,7 @@ class Object3DEstimator(Node):
                 + R_extrinsic + R_align
         """
         if self.latest_pose_xy_theta is None or self.latest_pose_cov_3x3 is None:
-            return None, None
+            return None, None, None
 
         # 1) pixel + depth sigmas → R_m
         su, sv = self.pixel_sigmas(bbox["x1"], bbox["y1"], bbox["x2"], bbox["y2"], conf)
@@ -304,7 +313,7 @@ class Object3DEstimator(Node):
         # 3) T_base<-cam (static)
         t_bc, R_bc = self.lookup_base_from_cam(camera_frame)
         if R_bc is None:
-            return None, None
+            return None, None, None
         p_b = R_bc @ p_c + t_bc          # point in base frame
 
         # 4) compose to map frame using latest robot pose (2D yaw + z trans = 0)
@@ -331,8 +340,8 @@ class Object3DEstimator(Node):
         R_obs = 0.5 * (R_obs + R_obs.T)
 
         if not np.all(np.isfinite(p_m)) or not np.all(np.isfinite(R_obs)):
-            return None, None
-        return p_m, R_obs
+            return None, None, None
+        return p_m, R_obs, p_b
 
     def depth_cb(self, msg):
         """
@@ -436,13 +445,14 @@ class Object3DEstimator(Node):
                 u_c = 0.5 * (float(bbox["x1"]) + float(bbox["x2"]))
                 v_c = 0.5 * (float(bbox["y1"]) + float(bbox["y2"]))
                 d_med = float(estimate["median_depth"])
-                p_m, R_obs = self.build_R_obs(
+                p_m, R_obs, p_b = self.build_R_obs(
                     u_c, v_c, d_med,
                     float(det.get("confidence", 0.0)),
                     bbox, fx, fy, cx, cy, frame_id,
                 )
                 if p_m is not None:
                     obj["position_map"] = [float(p_m[0]), float(p_m[1]), float(p_m[2])]
+                    obj["position_base"] = [float(p_b[0]), float(p_b[1]), float(p_b[2])]
                     obj["R_obs"] = [[float(R_obs[i, j]) for j in range(3)] for i in range(3)]
                     obj["map_frame"] = self.map_frame
                     obj["pixel_uv"] = [float(u_c), float(v_c)]

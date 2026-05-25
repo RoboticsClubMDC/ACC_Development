@@ -1732,7 +1732,152 @@ Immediate execution order (remaining work toward competition):
 
 ## Change Log
 
-### 2026-05-24 EDT — physical QCar 2 SSH+rsync workflow added
+### 2026-05-25 EDT — Phase 4 landmark→EKF pose correction (gated OFF by default)
+
+**Closes the loop:** stable landmarks (Phase 1+2+3 output) can now publish implied robot-pose corrections that `ekf_fusor` consumes via the existing `correction_source` interface. **Default is OFF** — must be explicitly opted-in on both the mapper and the cartographer launch. Built so the code path is in place; turn it on later when stable-landmark validation is done.
+
+**Files touched:**
+
+- [`object_3d_estimator.py`](Development/ros2/src/qcar2_perception/qcar2_perception/object_3d_estimator.py) — `build_R_obs()` now also returns `position_base` (3D point in base_link frame). Each emitted object JSON carries `position_base: [x,y,z]` alongside the existing fields.
+- [`semantic_landmark_mapper.py`](Development/ros2/src/qcar2_perception/qcar2_perception/semantic_landmark_mapper.py) — new params `enable_landmark_correction` (bool, **default false**), `landmark_correction_topic` (default `/perception/landmark_pose_correction`), `min_stable_hits_for_correction` (default 12, extra safety margin on top of stable promotion), `correction_yaw_variance` (default 1e6, tells EKF "ignore yaw from this correction"). New `publish_landmark_pose_correction()` method runs only after a successful Joseph-form update on a stable landmark.
+- [`ekf_fusor.py`](Development/ros2/src/qcar2_autonomy/autonomy/ekf_fusor.py) — new `correction_source` value `landmark`, new params `landmark_pose_topic`, `r_landmark_default_diag`, new `landmark_pose_cb()` that mirrors `amcl_pose_cb` (same outlier-gate, bootstrap, streak handling via `apply_correction()`). NaN guard included.
+- [`qcar2_cartographer_launch.py`](Development/ros2/src/qcar2_nodes/launch/qcar2_cartographer_launch.py) — new launch arg `use_landmark_correction` (default `false`). When `true`, sets `ekf_fusor` `correction_source` from `'tf'` (Cartographer) to `'landmark'` (mapper-derived corrections).
+
+**The math (spec §1 closure):**
+
+When Phase 1 emits a detection with `position_map = z`, the mapper runs the Kalman gate (Phase 2). If it matches a **stable** landmark `L` with `P_L`:
+
+```
+delta        = L - z                    # innovation in map frame
+implied_xy   = current_robot_xy + delta # back-solve robot pose
+cov_xy       = P_L + R_obs              # innovation covariance
+```
+
+Mapper publishes `PoseWithCovarianceStamped` with `implied_xy` in position, current yaw in orientation, `cov_xy` in the 2×2 block of the 6×6 covariance, **huge variance on yaw / z / roll / pitch** (so the EKF ignores those). `ekf_fusor` applies the same Mahalanobis outlier gate it uses for AMCL.
+
+**How to enable (when you're ready — read the warnings first):**
+
+```bash
+ros2 launch qcar2_nodes qcar2_cartographer_launch.py use_landmark_correction:=true
+ros2 launch qcar2_perception perception_core_physical.launch.py mode:=internal \
+    --ros-args -p /semantic_landmark_mapper:enable_landmark_correction:=true
+```
+
+Verify:
+
+```bash
+ros2 topic hz /perception/landmark_pose_correction   # only ticks when stable matches
+ros2 topic echo /qcar2_ekf/mode --once               # should mention "landmark"
+ros2 topic echo /qcar2_ekf/innovation_mahalanobis    # spikes = outlier rejections
+```
+
+**Prerequisites before flipping the flag (do not skip):**
+
+1. **Cartographer geometry-anchoring drift must be understood.** User reports Cartographer's map gets "strange" with heavy motion but stabilizes when stopped. If Cartographer drifts during a drive and the mapper promotes a landmark to stable based on the drifted pose, Phase 4 then feeds that drifted reference back to ekf_fusor → reinforcement of drift. Validate Cartographer first.
+2. **Stable landmarks must land in the same map coords across multiple laps.** Drive 3+ laps, save `semantic_map.json` after each, diff positions. Should be within `sqrt(P_l)`.
+3. **YOLO false-class rate must be near zero on the stable set.** A wrong class slipping into a stable landmark would corrupt pose corrections globally. The χ² gate + ambiguity rule reduce this risk but don't eliminate it.
+
+**What Phase 4 buys you:**
+
+- Periodic absolute position fixes from known landmarks → counteracts motion-induced Cartographer drift
+- Lower jitter on `/qcar2_pose_fused` when near a known landmark cluster
+- Existing AMCL outlier gate (χ²₃ = 11.345) protects against bad corrections sneaking through
+- Yaw is intentionally untouched — Phase 4 is x/y-only. Multi-landmark yaw triangulation is future work.
+
+**Class IDs in current YOLO filter** (`class_filter = "2,9,11"`, model `quanser_yolov8s-seg.pt`, COCO labels):
+
+- **2** = car
+- **9** = traffic light
+- **11** = stop sign
+
+Cones do not exist in COCO. To detect cones requires a custom-trained model. Other useful COCO IDs: `0` (person), `1` (bicycle), `3` (motorcycle), `5` (bus), `7` (truck). Override at launch via `--ros-args -p /semantic_yolo_detector:class_filter:='"0,2,9,11"'`.
+
+### 2026-05-25 EDT — IMU NaN guards + perception covariance pipeline (Phase 1+2+3) + range bumps
+
+**The Cartographer SIGABRT was IMU NaN, not memory.** All session.
+
+- Earlier crashes showed `cartographer_node terminate called after throwing 'std::bad_alloc'` and then later `imu_tracker.cc:67 Check failed: (orientation_ * gravity_vector_).z() > 0 (nan vs 0)`. Tegrastats showed RAM at 2.7/30 GB — **not OOM**. Root cause: one `NaN` from Quanser PIT IMU's `/qcar2_imu` propagates through `pose_estimator` → `/odom` → Cartographer's `PoseExtrapolator.imu_tracker_`, which can't survive NaN orientation and SIGABRTs the whole node.
+- **Added NaN guards** on every input that flows toward `/odom`:
+  - [`pose_estimator.py:imu_callback`](Development/ros2/src/qcar2_autonomy/autonomy/pose_estimator.py) drops non-finite `angular_velocity.z`.
+  - [`pose_estimator.py:joint_state_callback`](Development/ros2/src/qcar2_autonomy/autonomy/pose_estimator.py) drops non-finite encoder ticks.
+  - [`pose_estimator.py:predict`](Development/ros2/src/qcar2_autonomy/autonomy/pose_estimator.py) skips the tick if `dt`, `speed`, `yaw`, `yaw_rate`, or `steering` is non-finite.
+  - [`ekf_fusor.py`](Development/ros2/src/qcar2_autonomy/autonomy/ekf_fusor.py) same guards on `joint_state_cb`, `imu_cb`, `cmd_vel_cb`, `motor_cmd_cb`.
+- Each guard throttle-warns "Dropping non-finite IMU sample" so we can see when the QCar IMU misbehaves.
+- After a QCar power-cycle + NaN guards, Cartographer ran clean for >2 minutes at the rates we expected (`odom 80 Hz / scan 19.78 Hz`, zero crash). The guards survive future IMU glitches without requiring a power-cycle.
+
+**Foxglove visibility / DDS gotchas hit during testing:**
+
+- `ROS_DOMAIN_ID` is per-shell, and an unset/empty value silently falls back to domain 0 — your Cartographer publishes invisibly. Cure: `echo 'export ROS_DOMAIN_ID=69' >> ~/.bashrc` on the QCar (Docker's `~/.bashrc` is read-only in the dev container, so write to `/workspaces/isaac_ros-dev/ros_env.sh` and source that instead).
+- Foxglove bridge subscribes to every topic any client panel requests. Subscribing to `/camera/csi_image` (raw 820×616×3 @ 30 Hz ≈ 360 Mbps) saturated the laptop's wifi and killed SSH+internet whenever it was on. **Never add raw-image panels in Foxglove for a physical run unless you accept the bandwidth cost.** Safe Foxglove topic set is documented in the perception section.
+- `Failed to subscribe to topic /qcar2_pose_fused (PoseWithCovarianceStamped): could not create subscription: invalid allocator` — symptom of mismatched-schema cached state in Foxglove bridge. Fix: disconnect → hard-refresh browser → reconnect. Doesn't indicate a real publisher problem.
+- The `Found bond ... map_rotated → map` static TF in `qcar2_cartographer_launch.py` was a stale leftover from the LiDAR 180° flip experimentation. **Deleted.** Foxglove's Fixed-Frame dropdown no longer offers a misleading `map_rotated` option.
+
+**Camera-landmark math — full Phase 1+2+3 implementation per spec.**
+
+The architecture is **one-way: EKF/Cartographer pose → camera landmarks**. No pose correction back into EKF (yet). Goal: a semantic layer on the geometric map answering "what did I see, where in map coords, how uncertain, have I seen this before, is it still here?".
+
+Phase 1 — `R_obs` build in `object_3d_estimator` ([file](Development/ros2/src/qcar2_perception/qcar2_perception/object_3d_estimator.py)):
+
+- Subscribes to `/qcar2_pose_fused`, looks up `T_base←aligned_camera_optical_frame` from TF.
+- For each YOLO detection, builds **`R_obs = R_map←cam · J_cam · R_m · J_camᵀ · R_map←camᵀ + J_r · P_r · J_rᵀ + R_extrinsic + R_align`** (spec §11) where:
+  - `R_m = diag(σu², σv², σd²)`, `σu/σv` from bbox+confidence (spec §3), `σd = a + b·d²` (spec §4)
+  - `J_cam` = ∂p_c/∂[u,v,d] (spec §6)
+  - `J_r` = ∂p_m/∂[x,y,θ] (spec §9)
+  - `R_extrinsic + R_align` from launch params (spec §10)
+- Each emitted object now has `position_map: [x,y,z]`, `R_obs: [[3x3]]`, `map_frame`, `pixel_uv`, `sigma_pixel`, `sigma_depth` alongside the legacy `pose_camera` / `uncertainty_radius` (so Phase-1 detections don't break the legacy mapper path).
+- New parameter `emit_map_frame_covariance` (default `true`) lets you toggle the new behavior off for debugging.
+
+Phase 2 — Kalman landmark filter + visibility check in `semantic_landmark_mapper` ([file](Development/ros2/src/qcar2_perception/qcar2_perception/semantic_landmark_mapper.py)):
+
+- Per detection cycle: **predict step** `P_l += Q_l` (spec §13) → **same-class Mahalanobis 3D gate** with `χ²₃,₀.₉₉ = 11.345` (spec §14) → **0.6 ambiguity rule** (skip update if `d²_best ≥ 0.6 · d²_second`, spec §15) → **Joseph-form Kalman update** (spec §16) → **new candidate** if no match (spec §17).
+- **Promotion (spec §18):** `candidate→confirmed` at `hit_count ≥ 3`; `→stable` at `hit_count ≥ 8` AND `sqrt(P_xx) < 0.08 m`, `sqrt(P_yy) < 0.08 m`, `sqrt(P_zz) < 0.12 m`, `confidence_avg > 0.70`.
+- **Visibility check (new — beyond spec):** answers "is my stop sign still there?". After each detection batch, for each Kalman landmark not observed this cycle: transform map→base→cam using `/qcar2_pose_fused` + TF, check `Z_cam>0`, in-range, and within the camera's horizontal/vertical FOV. If predicted-visible but not seen → `miss_count++`. Thresholds:
+  - `stable + miss ≥ 10` → demote to confirmed
+  - `confirmed + miss ≥ 6` → demote to candidate
+  - `candidate + miss ≥ 4` → remove
+- Fresh candidates (`hit_count < 2`) are exempt so a one-off false positive doesn't immediately self-prune.
+- **`semantic_map.json` schema v2 (spec §22):** Kalman landmarks save with `position_map`, `covariance` (3×3), `hit_count`, `miss_count`, `last_seen`, `last_d2`, `confidence_avg`. Legacy landmarks keep their original shape.
+
+Phase 3 — covariance ellipsoid markers (spec §20-A):
+
+- New topic `/perception/semantic_landmark_cov_markers` publishes one translucent `Marker.SPHERE` per Kalman landmark, scaled and oriented from the eigendecomposition of `P_l`. Diameter = `2 · 2σ` by default (`covariance_sigma_scale = 2.0`, ~95% in 1D).
+- Color encodes status (orange candidate / blue confirmed / green stable).
+- Per-detection gate ellipsoids (`S = P_l + R_obs`) are intentionally not visualized — they're stochastic per detection and add noise. Future work if needed.
+
+**Range bumps for traffic light / stop sign approaches (2026-05-25):**
+
+- `object_3d_estimator.max_depth` raised from **2.0 → 6.0 m**. The depth filter was masking far valid pixels and rejecting detections.
+- `semantic_landmark_mapper.max_visibility_range_m` raised from **3.0 → 6.0 m** so the visibility check matches the new detection horizon.
+- The depth-sigma model `σd = 0.01 + 0.02·d²` naturally widens `R_obs` at range (at 6 m: σd ≈ 0.73 m), so far observations contribute noise-weighted updates correctly.
+
+**CUDA-on-Jetson decision (and revert):**
+
+- Tried enabling CUDA for YOLO via the new `QCAR2_FORCE_CPU` gate. The cartographer crashes we initially blamed on CUDA memory pressure turned out to be the IMU-NaN bug — so CUDA stays enabled by default, falls back to CPU automatically in laptop Docker without GPU passthrough.
+- Set `QCAR2_FORCE_CPU=1` to force CPU (debugging or limited Jetson power mode).
+
+**Suspected map deanchoring across repeated runs:** [open]
+
+- Cartographer appears to produce slightly worse maps across successive cold launches in the same session — the user reported "Cartographer seems kind of worse" after restarts. Not investigated yet. Possible sources: (a) `qcar2_2d.lua` motion filter accumulating drift in pose graph; (b) `qcar2_hardware`'s odom rate ramp during warm-up corrupts early submaps; (c) saved state from previous runs not actually being cleared. Reproduce by running cartographer 3+ times in a row and saving `/tmp/carto.log` from each — diff `Inserted submap` timing and constraint counts. Long-term cure is to move to `carto → save → AMCL` for repeatability (which is already the documented path, just not used yet in physical testing). Track this separately.
+
+**Safe Foxglove topic subscription set (use this layout):**
+
+```text
+/map  /tf  /tf_static
+/odom  /scan_matched_points2
+/qcar2_pose_fused  /qcar2_ekf/*
+/perception/semantic_landmark_markers
+/perception/semantic_hypothesis_markers
+/perception/semantic_current_markers
+/perception/semantic_landmark_cov_markers   ← NEW (Phase 3)
+/perception/object_markers
+/perception/yolo/detections_2d
+/perception/behavior_events  /perception/health
+/nav/*
+```
+
+Do NOT subscribe to `/camera/csi_image`, `/perception/d435/rgb/image_raw`, or `/perception/d435/depth/image_rect` over the AP — saturates ~100 Mbps and stalls everything.
+
+
 
 - Added section 12 "Physical QCar 2 Bring-Up (SSH + rsync)" to Easy_Start.md. Covers the laptop-as-editor / Jetson-as-executor split: laptop runs VSCode + Claude, QCar 2 (`192.168.2.207`, user `nvidia`) runs only ROS. Files travel laptop → QCar 2 via rsync; we deliberately avoid VSCode Remote-SSH because `vscode-server` is heavy on the Jetson.
 - Added `~/.ssh/config` alias `Host qcar2` → `192.168.2.207` with `ServerAliveInterval 30`. One-time `ssh-copy-id qcar2` removes password prompts.

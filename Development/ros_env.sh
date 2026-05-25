@@ -1,0 +1,2 @@
+export ROS_DOMAIN_ID=69
+export ROS_LOCALHOST_ONLY=0

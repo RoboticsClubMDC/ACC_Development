@@ -1,0 +1,20 @@
+[0.000000] (-) TimerEvent: {}
+[0.000195] (-) JobUnselected: {'identifier': 'isaac_ros_apriltag_interfaces'}
+[0.000457] (-) JobUnselected: {'identifier': 'isaac_ros_bi3d_interfaces'}
+[0.000487] (-) JobUnselected: {'identifier': 'isaac_ros_common'}
+[0.000533] (-) JobUnselected: {'identifier': 'isaac_ros_nitros_bridge_interfaces'}
+[0.000546] (-) JobUnselected: {'identifier': 'isaac_ros_nova_interfaces'}
+[0.000561] (-) JobUnselected: {'identifier': 'isaac_ros_pointcloud_interfaces'}
+[0.000571] (-) JobUnselected: {'identifier': 'isaac_ros_tensor_list_interfaces'}
+[0.000708] (-) JobUnselected: {'identifier': 'isaac_ros_test'}
+[0.000739] (-) JobUnselected: {'identifier': 'qcar2_interfaces'}
+[0.000756] (qcar2_perception) JobQueued: {'identifier': 'qcar2_perception', 'dependencies': OrderedDict()}
+[0.000844] (qcar2_autonomy) JobQueued: {'identifier': 'qcar2_autonomy', 'dependencies': OrderedDict({'qcar2_interfaces': '/home/bp02-ubuntu/Documents/GitHub/ACC_Development/install/qcar2_interfaces'})}
+[0.000864] (qcar2_nodes) JobQueued: {'identifier': 'qcar2_nodes', 'dependencies': OrderedDict({'qcar2_interfaces': '/home/bp02-ubuntu/Documents/GitHub/ACC_Development/install/qcar2_interfaces', 'qcar2_autonomy': '/home/bp02-ubuntu/Documents/GitHub/ACC_Development/install/qcar2_autonomy'})}
+[0.000981] (qcar2_autonomy) JobStarted: {'identifier': 'qcar2_autonomy'}
+[0.004146] (qcar2_perception) JobStarted: {'identifier': 'qcar2_perception'}
+[0.099888] (-) TimerEvent: {}
+[0.121623] (qcar2_autonomy) JobEnded: {'identifier': 'qcar2_autonomy', 'rc': 1}
+[0.122073] (qcar2_perception) JobEnded: {'identifier': 'qcar2_perception', 'rc': 'SIGINT'}
+[0.132271] (qcar2_nodes) JobSkipped: {'identifier': 'qcar2_nodes'}
+[0.132311] (-) EventReactorShutdown: {}

@@ -248,6 +248,66 @@ The −33° value is empirical, accounting for: SDCSRoadMap node yaw + QLabs flo
 - Do NOT run the standalone `manual_drive` node AND `path_follower` with `control_mode=manual` simultaneously — both publish `/cmd_vel_nav`.
 - AMCL launches start a fresh `qcar2_virtual_launch.py` internally; do NOT also start it manually beforehand or you'll have duplicate `qcar2_hardware` nodes fighting QLabs.
 
+### 5.7 IMU NaN guards (added 2026-05-25 — DO NOT REMOVE)
+
+The Quanser PIT IMU on physical QCar 2 occasionally emits `NaN` in `angular_velocity.z`. A single bad sample propagates `pose_estimator` → `/odom` → Cartographer's `PoseExtrapolator.imu_tracker_`. That CHECK-fails at `imu_tracker.cc:67` (`(orientation_ * gravity_vector_).z() > 0`, gets NaN) and SIGABRTs the whole `cartographer_node`. **This was misdiagnosed as `std::bad_alloc` / OOM for hours; it is NOT — RAM is fine.**
+
+Guards are in place:
+- [`pose_estimator.imu_callback`](Development/ros2/src/qcar2_autonomy/autonomy/pose_estimator.py) — drops non-finite IMU samples.
+- [`pose_estimator.joint_state_callback`](Development/ros2/src/qcar2_autonomy/autonomy/pose_estimator.py) — drops non-finite encoder ticks.
+- [`pose_estimator.predict`](Development/ros2/src/qcar2_autonomy/autonomy/pose_estimator.py) — freezes the tick if `dt/speed/yaw/yaw_rate/steering` is non-finite.
+- [`ekf_fusor`](Development/ros2/src/qcar2_autonomy/autonomy/ekf_fusor.py) — same guards on its joint / IMU / cmd_vel / motor_cmd callbacks.
+
+Each guard logs `Dropping non-finite IMU sample` (throttled). **If you see that line, the IMU misbehaved — Cartographer survived because of the guard.** Do not remove these. If you ever rewrite these callbacks, port the `np.isfinite()` checks.
+
+### 5.8 Camera-landmark math (Phase 1+2+3, added 2026-05-25)
+
+The semantic-landmark pipeline is **strictly one-way**: `EKF/Cartographer pose → camera landmarks`. No feedback into EKF (yet). Spec is the math doc in the Easy_Start change-log entry for 2026-05-25.
+
+**`object_3d_estimator`** (Phase 1) — builds the 3×3 observation covariance `R_obs` in the **map frame** per detection:
+```
+R_obs = R_map←cam · J_cam · R_m · J_camᵀ · R_map←camᵀ
+      + J_r · P_r · J_rᵀ
+      + R_extrinsic + R_align
+```
+- `R_m = diag(σu², σv², σd²)`, with `σu/σv` confidence-weighted bbox fractions, `σd = a + b·d²`.
+- `J_cam` = 3×3 Jacobian of `(X_c, Y_c, Z_c)` w.r.t. `(u, v, d)`.
+- `J_r` = 3×3 Jacobian of `p_m` w.r.t. `(x, y, θ)` of robot pose.
+- `P_r` comes from `/qcar2_pose_fused.pose.covariance` (planar 3×3 block).
+- `R_extrinsic + R_align` are conservative mount/RGB-depth alignment defaults; tunable via launch params.
+
+Each detection in `/perception/objects_3d` now carries `position_map: [x,y,z]` + `R_obs: [[3x3]]` alongside legacy `pose_camera` fields. Toggle off via `emit_map_frame_covariance:=false`.
+
+**`semantic_landmark_mapper`** (Phase 2) — replaces the legacy distance-gate + blended-average path with a proper Kalman landmark filter when `position_map`/`R_obs` are present:
+- Predict step: `P_l += Q_l` per tick (static landmark).
+- Same-class **Mahalanobis 3D gate**: `d² = (z-l̂)ᵀ(P_l + R_obs)⁻¹(z-l̂) ≤ 11.345` (χ²₃,₀.₉₉).
+- **0.6 ambiguity rule**: only accept best match if `d²_best < 0.6 · d²_second_best`. Prevents two nearby same-class signs from being collapsed.
+- **Joseph-form update**: `P = (I-K)P(I-K)ᵀ + K R_obs Kᵀ`, symmetrized.
+- New candidate if no match: `P₀ = R_obs + diag(0.02², 0.02², 0.03²)`.
+- **Promotion** uses both hit count AND covariance sqrt diagonal thresholds: stable requires `hit≥8 AND σ_xx,σ_yy<0.08 AND σ_zz<0.12 AND confidence_avg>0.70`.
+
+**Visibility check (extension, not in spec):** answers "is my stop sign still there?". Per detection batch, for each Kalman landmark not observed this cycle: compute `p_cam = R_cb·R_bm·(l̂ - x_r)`, check in-front+in-range+in-FOV, bump `miss_count`. Demote `stable→confirmed` at 10 misses, `confirmed→candidate` at 6, **remove candidate** at 4. Fresh candidates (`hit<2`) exempt.
+
+**Phase 3 — covariance ellipsoid markers**: `/perception/semantic_landmark_cov_markers` publishes one translucent `SPHERE` per Kalman landmark scaled by the eigenvalues of `P_l`. Color = state (orange/blue/green = candidate/confirmed/stable).
+
+**Distance horizon (raised 2026-05-25):**
+- `object_3d_estimator.max_depth`: 2.0 → **6.0 m** (depth-filter for far traffic lights).
+- `semantic_landmark_mapper.max_visibility_range_m`: 3.0 → **6.0 m** (visibility tick FOV check).
+
+**Saved schema (`semantic_map.json` v2, spec §22):** Kalman landmarks save `id`, `class`, `state`, `position_map` (3-vec), `covariance` (3×3), `hit_count`, `miss_count`, `last_seen`, `last_d2`, `confidence_avg`. Legacy landmarks keep their original schema.
+
+**Phase 4 — landmark → EKF correction (wired 2026-05-25, gated OFF):**
+
+- Mapper, on a successful Joseph update against a **stable** landmark with `hit_count ≥ 12`, computes `implied_robot_xy = current_robot_xy + (L − z)` and publishes `PoseWithCovarianceStamped` on `/perception/landmark_pose_correction`. Yaw variance is huge in the message so the EKF treats it as x/y-only.
+- ekf_fusor's `landmark_pose_cb` mirrors `amcl_pose_cb`: applies the same Mahalanobis outlier gate (χ²₃ = 11.345), same bootstrap, same streak handling.
+- To turn on: launch `qcar2_cartographer_launch.py use_landmark_correction:=true` AND set `enable_landmark_correction:=true` on the mapper. Both must be on.
+- See roadmap item 9 for the three prerequisites that must be cleared first.
+
+**What is still NOT in this pipeline (deliberate v1 constraint):**
+- Phase 4 is x/y only. Multi-landmark yaw triangulation is future work.
+- No per-class FOV tuning (e.g., traffic lights might want a tighter cone than stop signs). Single global `fov_horizontal_deg` / `max_visibility_range_m`.
+- No gate-ellipsoid (`S = P_l + R_obs`) markers — only the landmark covariance ellipsoid. The per-detection gate is stochastic and adds visualization noise.
+
 ---
 
 ## 6. What's deleted / retired (do NOT recreate)
@@ -278,6 +338,9 @@ The runtime stack is complete enough to drive a node-to-node lap in QLabs and (p
 5. **Traffic light state classifier** — `semantic_yolo_detector` can detect a light, but classifying RED/YELLOW/GREEN from the cropped image isn't wired into a stop/go state machine yet.
 6. **HUB re-localization on trip end** — single highest-ROI runtime safety net for multi-trip drift. When `trip_planner` detects "arrived at HUB", publish `/initialpose` with HUB's known coordinates. Resets accumulated drift between trips. ~50 lines of code.
 7. **Stop-line precision for pickup/dropoff** — pure pursuit doesn't stop precisely. For the taxi pickup/dropoff (judges need the car within ~10 cm), add a "creep phase" inside `trip_planner` when within 0.5 m of pickup/dropoff.
+8. **Cartographer "deanchoring" across repeated runs** (observed 2026-05-25, not investigated). User reports successive cold launches of Cartographer in the same session produce progressively worse maps. Could be motion-filter drift, odom warm-up corrupting early submaps, or stale saved state. Reproduce with 3+ back-to-back launches and diff the `Inserted submap` constraint counts. Long-term cure is the carto→save→AMCL path already documented but not used yet on physical.
+9. **Phase 4: landmarks → EKF pose correction — wired but gated OFF** (2026-05-25). Code is in place: mapper publishes `/perception/landmark_pose_correction` on stable matches, `ekf_fusor` accepts `correction_source:='landmark'`. Enable via TWO flags: `qcar2_cartographer_launch.py use_landmark_correction:=true` AND `semantic_landmark_mapper:enable_landmark_correction:=true`. **Do not enable until the three prerequisites in Easy_Start.md change-log 2026-05-25 are cleared** (Cartographer drift understood, stable landmarks repeatable across laps, YOLO false-class rate ≈0). A circular feedback loop with bad landmark covariance is much worse than no correction. Yaw is intentionally not corrected from a single landmark in v1 — multi-landmark yaw triangulation is future work.
+10. **YOLO model tuning** — current YOLOv8s-seg has poor traffic-light recall and zero cone recall on the QCar's training set. Either retrain on competition-specific data, swap to a model fine-tuned on stop/traffic/cone classes, or extend the class filter. Until then, the `χ²₃ = 11.345` (99%) Mahalanobis gate is intentional — gives noisy detections room to associate. Could be BO-tuned (`bo_mahalanobis_tune.py` not built yet).
 
 ---
 
@@ -305,6 +368,9 @@ Full copy-paste recipes are in `Easy_Start.md` § "Scripts Reference". Summary:
 - `/nav/{distance_to_waypoint, distance_to_final, psi, steering_saturation_rate, speed_cmd, yaw_rate_imu, progress_rate, wpi, controller_mode}` — controller diagnostics. All Float32 with `.data`. Foxglove Plot bindings.
 - `/nav/kp_steering_set`, `/nav/kd_steering_set` (Float32) — live PD tuning. Receivers in path_follower.
 - Perception topics on `/perception/d435/{rgb/image_raw, depth/image_rect, camera_info}` and `/perception/semantic_{landmark_markers, hypothesis_markers, current_markers, residual_markers}` — keep these four marker streams **separate** in Foxglove; collapsing destroys debugging signal.
+- `/perception/objects_3d` (String/JSON) — now also carries `position_map` (3-vec, map frame) and `R_obs` (3×3 covariance) per detection. Consumers should use these instead of `pose_camera` going forward.
+- `/perception/semantic_landmark_cov_markers` (MarkerArray) — Phase-3 ellipsoid markers showing each Kalman landmark's `P_l`. Color = state (orange/blue/green = candidate/confirmed/stable).
+- **Foxglove bandwidth warning**: subscribing to `/camera/csi_image`, `/perception/d435/rgb/image_raw`, or `/perception/d435/depth/image_rect` over the wifi/AP saturates ~100 Mbps and kills SSH + everything else. Use only the marker/diagnostic topics in Foxglove during physical runs. Full safe list in Easy_Start.md change-log entry 2026-05-25.
 
 ---
 
@@ -340,6 +406,9 @@ The previous Claude Code session built up project memories about the user's role
 - **Don't set `WaypointDist` floor in path_planner below 0.05 m** — pure pursuit's `δ = atan(2L sin(ψ)/Ld)` denominator blows up.
 - **Don't run two `pose_estimator` instances.** We've hit this several times; the second one comes from forgetting to kill the previous Cartographer launch. Use `ros2_killall` between sessions.
 - **Don't enable Cartographer's `provide_odom_frame=true`** with an external odometry source. The combo creates dual ownership of `odom → base_link`. Current config is `provide_odom_frame=false` + `published_frame="odom"`.
+- **Don't remove the NaN guards in `pose_estimator` or `ekf_fusor`** (§5.7). They are the only thing keeping Cartographer alive against the Quanser IMU's occasional NaN bursts. The bug looks like `imu_tracker.cc:67 CHECK failed (nan vs 0)` and SIGABRTs the entire `cartographer_node` after ~2 minutes of running.
+- **Don't subscribe to raw image topics in Foxglove during a physical run.** `/camera/csi_image` alone is ~360 Mbps uncompressed and saturates wifi. Use `/perception/yolo/image_annotated` only when actively debugging YOLO and accept the bandwidth hit.
+- **Don't feed perception landmarks back into `ekf_fusor` yet** (roadmap item 9). Phase 1-3 keep the data path strictly one-way (`pose → landmarks`). The reverse path is Phase 4, gated on the landmarks being demonstrably stable across multiple runs.
 
 ---
 

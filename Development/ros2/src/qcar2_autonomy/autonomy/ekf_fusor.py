@@ -88,8 +88,13 @@ class EkfFusor(Node):
         self.declare_parameter("predict_rate", 80.0)
         self.declare_parameter("map_frame", "map")
         self.declare_parameter("base_frame", "base_link")
-        self.declare_parameter("correction_source", "tf")  # tf | amcl_pose | none
+        self.declare_parameter("correction_source", "tf")  # tf | amcl_pose | landmark | none
         self.declare_parameter("amcl_pose_topic", "/amcl_pose")
+        # Phase-4 (added 2026-05-25): consume stable-landmark-derived robot pose
+        # corrections published by semantic_landmark_mapper. The mapper
+        # publishes only when `enable_landmark_correction:=true` over there.
+        self.declare_parameter("landmark_pose_topic", "/perception/landmark_pose_correction")
+        self.declare_parameter("r_landmark_default_diag", [0.10, 0.10, 1.0e6])  # x, y, yaw
         self.declare_parameter("use_gyro_kf", True)
         self.declare_parameter("q_diag", [0.0005, 0.0005, 0.002])
         self.declare_parameter("r_carto_diag", [0.02, 0.02, 0.01])
@@ -110,6 +115,8 @@ class EkfFusor(Node):
         self.base_frame = self.get_parameter("base_frame").value
         self.correction_source = self.get_parameter("correction_source").value
         self.amcl_topic = self.get_parameter("amcl_pose_topic").value
+        self.landmark_topic = self.get_parameter("landmark_pose_topic").value
+        self.r_landmark_default_diag = list(self.get_parameter("r_landmark_default_diag").value)
         self.use_gyro_kf = bool(self.get_parameter("use_gyro_kf").value)
         self.q_diag = list(self.get_parameter("q_diag").value)
         self.r_carto_diag = list(self.get_parameter("r_carto_diag").value)
@@ -169,6 +176,14 @@ class EkfFusor(Node):
         if self.correction_source == "amcl_pose":
             self.create_subscription(
                 PoseWithCovarianceStamped, self.amcl_topic, self.amcl_pose_cb, amcl_qos
+            )
+        elif self.correction_source == "landmark":
+            # Phase-4: same QoS pattern as AMCL. The mapper publishes
+            # PoseWithCovarianceStamped on /perception/landmark_pose_correction
+            # only when it matches a stable landmark and the user opted in
+            # via `enable_landmark_correction:=true` on the mapper side.
+            self.create_subscription(
+                PoseWithCovarianceStamped, self.landmark_topic, self.landmark_pose_cb, amcl_qos
             )
 
         # --- Publishers ---
@@ -252,6 +267,36 @@ class EkfFusor(Node):
         var_t = c[35] if c[35] > 1e-9 else self.r_amcl_default_diag[2]
         R_amcl = np.diag([var_x, var_y, var_t])
         self.apply_correction(z, R_amcl, source="amcl_pose")
+
+    def landmark_pose_cb(self, msg):
+        """
+        Phase-4: landmark-derived implied robot pose correction.
+
+        The mapper publishes implied x,y with a tiny covariance block AND a
+        huge yaw variance (we cannot extract yaw from a single point
+        landmark). We pass that yaw variance through verbatim — the EKF then
+        weights yaw nearly to zero in this update, leaving the predicted
+        yaw effectively unchanged.
+
+        Same outlier gate / bootstrap / streak handling as AMCL via
+        `apply_correction`. Yaw value comes from the mapper but should match
+        the EKF's own current yaw anyway since the mapper reads
+        /qcar2_pose_fused.
+        """
+        z = np.array([
+            msg.pose.pose.position.x,
+            msg.pose.pose.position.y,
+            yaw_from_quaternion(msg.pose.pose.orientation),
+        ])
+        if not np.all(np.isfinite(z)):
+            self.get_logger().warn("Dropping non-finite landmark pose correction", throttle_duration_sec=2.0)
+            return
+        c = msg.pose.covariance
+        var_x = c[0]  if c[0]  > 1e-9 else self.r_landmark_default_diag[0]
+        var_y = c[7]  if c[7]  > 1e-9 else self.r_landmark_default_diag[1]
+        var_t = c[35] if c[35] > 1e-9 else self.r_landmark_default_diag[2]
+        R_lm = np.diag([var_x, var_y, var_t])
+        self.apply_correction(z, R_lm, source="landmark")
 
     # ===== Predict =====
 
