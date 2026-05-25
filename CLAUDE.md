@@ -20,7 +20,7 @@ Handoff briefing for the next Claude Code session on the **Quanser ACC 2026 QCar
 
 ## 1. Where work happens
 
-- All ROS 2 source: [`Development/ros2/src/`](Development/ros2/src/). Inside the dev container this is mounted at `/workspaces/isaac_ros-dev/Development/ros2`.
+- All ROS 2 source: [`Development/ros2/src/`](Development/ros2/src/). Inside the Isaac ROS dev container this workspace is mounted at `/workspaces/isaac_ros-dev/ros2`.
 - `colcon build` runs from `Development/ros2` (NOT the repo root).
 - The active packages (only **4**, not 18 — the old RTAB-Map vendored 14 sub-packages got deleted):
   - `qcar2_nodes` (C++ hardware) — lidar, qcar2_hardware, rgbd, csi, nav2_qcar_command_convert, fixed_lidar_frame[_virtual], + launches
@@ -40,7 +40,7 @@ Follow `Easy_Start.md` § "Normal Startup Order":
 2. Enter the Isaac dev container: `./isaac_ros_common/scripts/run_dev.sh ~/Documents/GitHub/ACC_Development/Development`.
 3. In **every** new ROS terminal:
    ```bash
-   cd /workspaces/isaac_ros-dev/Development/ros2
+   cd /workspaces/isaac_ros-dev/ros2
    source /opt/ros/humble/setup.bash
    source /workspace/cartographer_ws/install/setup.bash
    source install/setup.bash
@@ -113,6 +113,68 @@ Minimal stack for autonomous driving in QLabs (3 terminals + QLabs):
 ros2 launch qcar2_nodes qcar2_cartographer_virtual_launch.py    # SLAM + base + pose stack
 ros2 launch qcar2_nodes foxglove_bridge_launch.py               # viz + watchdog
 ros2 run qcar2_autonomy path_follower                            # idle by default
+```
+
+### Physical perception mode contract (updated 2026-05-25)
+
+`qcar2_perception/launch/perception_core_physical.launch.py` is one launch file
+with explicit physical modes. **Decision (2026-05-25): the full perception
+stack runs on the QCar2 Jetson AGX Orin by default.** Split-flow (laptop runs
+compute) is supported but discouraged — DDS-over-AP saturates the link with
+raw D435 images and stalls Cartographer. The Jetson + CUDA can handle the
+whole stack with headroom.
+
+| Mode | Where it runs | Starts D435 hardware source? | Starts YOLO/landmarks? | Use case |
+|---|---|---:|---:|---|
+| `mode:=internal` (default `source_only:=false`) | QCar 2 native `~/ros2` | yes | yes | **Recommended.** All perception on the Jetson. |
+| `mode:=internal source_only:=true` | QCar 2 native `~/ros2` | yes | no | Discouraged. Only pair with `mode:=external` on laptop. |
+| `mode:=external` | laptop Docker `/workspaces/isaac_ros-dev/ros2` | no | yes | Discouraged. Only pair with `mode:=internal source_only:=true` on the QCar. |
+
+**Never run `mode:=internal source_only:=false` (default) on the QCar AND
+`mode:=external` on the laptop simultaneously** — every perception node ends
+up double-published, the `semantic_landmark_mapper` races on
+`semantic_map.json`, and Foxglove sees garbled output. (See §5.6.)
+
+Do not run `mode:=internal` from the laptop Docker for physical hardware. The
+D435 aligned source talks to the QCar-local Quanser/PIT backend; in laptop
+Docker it will point at the laptop/container, not the physical QCar hardware.
+
+For the default (all-on-Jetson) flow, on the laptop use Foxglove **only**, and
+only subscribe to lightweight diagnostic/marker topics — never raw
+`/perception/d435/rgb/image_raw` or `/perception/d435/depth/image_rect` over
+the AP unless actively debugging YOLO. Safe Foxglove subscriptions:
+`/map`, `/tf`, `/tf_static`, `/perception/semantic_*_markers`,
+`/perception/object_markers`, `/perception/health`, `/perception/behavior_events`,
+`/perception/yolo/detections_2d`, `/nav/*`, `/qcar2_ekf/*`.
+
+If you do run split mode, external mode assumes these already exist:
+
+```text
+/perception/d435/rgb/image_raw
+/perception/d435/depth/image_rect
+/perception/d435/camera_info
+/qcar2_pose_fused
+map -> odom -> base_link -> aligned_camera_optical_frame
+```
+
+If `mode:=external` sees no camera topics, the problem is upstream QCar
+publishing or DDS/network visibility, not YOLO.
+
+### CUDA on the Jetson (added 2026-05-25)
+
+`d435_aligned_source.py` and `semantic_yolo_detector.py` previously hard-coded
+`os.environ["CUDA_VISIBLE_DEVICES"] = ""`, forcing YOLO onto the CPU even on
+the Jetson. As of 2026-05-25, CUDA is **enabled by default** — those two
+files now only disable CUDA when `QCAR2_FORCE_CPU=1` is exported. On the QCar
+Jetson leave the env var unset to use the Ampere GPU. In a laptop container
+without GPU passthrough, torch detects no CUDA device and falls back to CPU
+automatically; no env var needed.
+
+Force CPU (debugging, regression isolation):
+
+```bash
+export QCAR2_FORCE_CPU=1
+ros2 launch qcar2_perception perception_core_physical.launch.py
 ```
 
 ---

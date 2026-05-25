@@ -32,12 +32,6 @@ def generate_launch_description():
         )
     )
 
-    qcar2_cartographer_transform_publisher = Node(
-        package='tf2_ros',
-        executable = 'static_transform_publisher',
-        arguments = ['0', '0', '0', '3.14159', '0', '0','map_rotated','map'],
-        output = 'screen')
-    
     qcar2_to_lidar_tf_node = Node(
             package='qcar2_nodes',
             executable='fixed_lidar_frame',
@@ -108,7 +102,6 @@ def generate_launch_description():
         use_sim_la,
         resolution_la,
         publish_period_sec_la,
-        qcar2_cartographer_transform_publisher,
         qcar2_launch,
         qcar2_nav2_converter,
         pose_estimator,

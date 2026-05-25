@@ -101,6 +101,9 @@ class PoseEstimator(Node):
             return
 
         motor_ticks_per_sec = float(msg.velocity[0])
+        if not np.isfinite(motor_ticks_per_sec):
+            self.get_logger().warn("Dropping non-finite encoder sample", throttle_duration_sec=2.0)
+            return
         self.speed = (
             motor_ticks_per_sec
             / ENCODER_TICKS_PER_REV
@@ -110,7 +113,15 @@ class PoseEstimator(Node):
         )
 
     def imu_callback(self, msg):
-        self.yaw_rate = float(msg.angular_velocity.z)
+        # Drop NaN/Inf IMU samples. The Quanser PIT IMU driver occasionally
+        # emits a bad sample; if it propagates into /odom, Cartographer's
+        # imu_tracker.cc:67 CHECK trips ("(orientation_ * gravity_vector_).z()
+        # > 0 (nan vs 0)") and the whole cartographer_node SIGABRTs.
+        z = float(msg.angular_velocity.z)
+        if not np.isfinite(z):
+            self.get_logger().warn("Dropping non-finite IMU sample", throttle_duration_sec=2.0)
+            return
+        self.yaw_rate = z
 
     def cmd_vel_callback(self, msg):
         self.steering = self.clip_steering(msg.angular.z)
@@ -140,6 +151,19 @@ class PoseEstimator(Node):
         self.publish(now)
 
     def predict(self, dt):
+        # Belt-and-suspenders NaN guard. If any input is bad, freeze state for
+        # this tick rather than corrupt /odom — a NaN here SIGABRTs Cartographer
+        # in imu_tracker.cc:67 (see imu_callback comment).
+        if not (
+            np.isfinite(dt)
+            and np.isfinite(self.speed)
+            and np.isfinite(self.yaw)
+            and np.isfinite(self.yaw_rate)
+            and np.isfinite(self.steering)
+        ):
+            self.get_logger().warn("Skipping predict tick due to non-finite input", throttle_duration_sec=2.0)
+            return
+
         # Blend gyro yaw rate with bicycle-model yaw rate from steering+speed.
         steering_omega = self.speed * math.tan(self.steering) / WHEELBASE
         self.omega = self.gyro_weight * self.yaw_rate + (1.0 - self.gyro_weight) * steering_omega

@@ -1,10 +1,30 @@
 import os
+from pathlib import Path
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
+
+
+def semantic_map_path():
+    override = os.environ.get("QCAR2_SEMANTIC_MAP_PATH", "").strip()
+    if override:
+        return override
+
+    candidates = [
+        Path("/workspaces/isaac_ros-dev/ros2/src/qcar2_perception/maps/semantic_map.json"),
+        Path("/workspaces/isaac_ros-dev/Development/ros2/src/qcar2_perception/maps/semantic_map.json"),
+        Path.home() / "Documents/GitHub/ACC_Development/Development/ros2/src/qcar2_perception/maps/semantic_map.json",
+        Path.cwd() / "src/qcar2_perception/maps/semantic_map.json",
+    ]
+
+    for candidate in candidates:
+        if candidate.parent.exists():
+            return str(candidate)
+
+    return str(candidates[0])
 
 
 def generate_launch_description():
@@ -53,7 +73,7 @@ def generate_launch_description():
         executable="semantic_landmark_mapper",
         name="semantic_landmark_mapper",
         parameters=[{
-            "semantic_map_path": "/workspaces/isaac_ros-dev/ros2/src/qcar2_perception/maps/semantic_map.json",
+            "semantic_map_path": semantic_map_path(),
             # Added 2026-05-20 16:08:30 EDT:
             # Keep stable map markers separate from hypotheses/current sightings.
             "markers_topic": "/perception/semantic_landmark_markers",
@@ -68,6 +88,20 @@ def generate_launch_description():
             "load_only_permanent": True,
             "visible_timeout_sec": 2.0,
             "max_marker_radius": 0.50,
+        }],
+        output="screen",
+    )
+
+    perception_behavior_interface = Node(
+        package="qcar2_perception",
+        executable="perception_behavior_interface",
+        name="perception_behavior_interface",
+        parameters=[{
+            "pose_topic": "/qcar2_pose_fused",
+            "track_classes": ["stop sign", "traffic light"],
+            "active_statuses": ["confirmed", "stable"],
+            "max_event_distance_m": 1.50,
+            "forward_fov_deg": 100.0,
         }],
         output="screen",
     )
@@ -91,4 +125,5 @@ def generate_launch_description():
         object_3d_estimator,
         semantic_landmark_mapper,
         semantic_consistency_monitor,
+        perception_behavior_interface,
     ])

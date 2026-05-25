@@ -81,9 +81,9 @@ ament_target_dependencies(fixed_lidar_frame_virtual geometry_msgs rclcpp tf2_ros
 add_executable(nav2_qcar2_converter src/nav2_qcar_command_convert.cpp)
 ament_target_dependencies(nav2_qcar2_converter rclcpp geometry_msgs qcar2_interfaces)
 
-# odometry
-add_executable(qcar2_odometry src/qcar2_odometry.cpp)
-ament_target_dependencies(qcar2_odometry rclcpp sensor_msgs nav_msgs geometry_msgs tf2_ros qcar2_interfaces)
+# qcar2_odometry was retired on 2026-05-24. Odometry now comes from
+# qcar2_autonomy pose_estimator + ekf_fusor, so this package no longer builds
+# the deleted encoder-only C++ node.
 
 # # Install Python modules
 # ament_python_install_package(${PROJECT_NAME})
@@ -116,9 +116,6 @@ install(TARGETS command
   DESTINATION lib/${PROJECT_NAME})
 
 install(TARGETS nav2_qcar2_converter
-  DESTINATION lib/${PROJECT_NAME})
-
-install(TARGETS qcar2_odometry
   DESTINATION lib/${PROJECT_NAME})
 
 # Install TF

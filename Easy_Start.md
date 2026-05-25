@@ -1,6 +1,6 @@
 # QCar2 ACC Easy Start
 
-Updated: 2026-05-22 19:00:55 EDT
+Updated: 2026-05-24 18:56:17 EDT
 
 This is the copy-paste runbook for the ACC QCar2 workspace. It is split into
 startup flow, builds, perception, logs/debugging, physical-hardware reference,
@@ -19,10 +19,11 @@ and architecture notes so the commands stay easy to scan while testing.
 9. [Logs, Bags, And Debug Checks](#logs-bags-and-debug-checks)
 10. [Scripts Reference (`Development/ros2/scripts/`)](#scripts-reference-developmentros2scripts)
 11. [Physical QCar 2 Reference: Sensor Extrinsics & Body Frame](#physical-qcar-2-reference-sensor-extrinsics--body-frame-convention)
-12. [Killing Stale ROS Nodes Between Runs](#killing-stale-ros-nodes-between-runs)
-13. [Odometry Architecture (EKF owns odom)](#odometry-architecture-ekf-owns-odom)
-14. [Architecture Direction](#architecture-direction)
-15. [Change Log](#change-log)
+12. [Physical QCar 2 Bring-Up (SSH + rsync)](#physical-qcar-2-bring-up-ssh--rsync)
+13. [Killing Stale ROS Nodes Between Runs](#killing-stale-ros-nodes-between-runs)
+14. [Odometry Architecture (EKF owns odom)](#odometry-architecture-ekf-owns-odom)
+15. [Architecture Direction](#architecture-direction)
+16. [Change Log](#change-log)
 
 ## Normal Startup Order
 
@@ -42,7 +43,7 @@ Use this order for a normal virtual QCar2 ACC run:
 Run this inside every new ROS container terminal:
 
 ```bash
-cd /workspaces/isaac_ros-dev/Development/ros2
+cd /workspaces/isaac_ros-dev/ros2
 source /opt/ros/humble/setup.bash
 source /workspace/cartographer_ws/install/setup.bash
 source install/setup.bash
@@ -135,7 +136,7 @@ pip3 show ultralytics tqdm
 Use this after ordinary QCar2 source changes:
 
 ```bash
-cd /workspaces/isaac_ros-dev/Development/ros2
+cd /workspaces/isaac_ros-dev/ros2
 source /opt/ros/humble/setup.bash
 source /workspace/cartographer_ws/install/setup.bash
 colcon build --symlink-install
@@ -259,6 +260,7 @@ Purpose:
 - Does not touch the old working `qcar2_autonomy` YOLO prototype.
 - Publishes aligned D435 RGB/depth/camera_info.
 - Publishes YOLO detections, 3D object estimates, semantic landmarks, and monitor output.
+- Publishes advisory behavior events from landmarks; these are not drive commands.
 
 Important:
 
@@ -269,27 +271,150 @@ Important:
 Build:
 
 ```bash
-cd /workspaces/isaac_ros-dev/Development/ros2
+cd /workspaces/isaac_ros-dev/ros2
 colcon build --symlink-install --packages-select qcar2_perception
 source install/setup.bash
 export ROS_DOMAIN_ID=69
 ```
 
-Virtual QLabs perception:
+If `qcar2_autonomy` is in the same overlay, rebuild it too after entrypoint
+changes:
 
 ```bash
+colcon build --symlink-install --packages-select qcar2_autonomy qcar2_perception
+source install/setup.bash
+export ROS_DOMAIN_ID=69
+```
+
+### Perception: virtual QLabs
+
+Use this only for the virtual QCar/QLabs flow. It starts the virtual aligned
+D435 source plus YOLO, 3D object estimation, semantic mapper, consistency
+monitor, and behavior advisories in the same machine/container.
+
+```bash
+cd /workspaces/isaac_ros-dev/ros2
 source install/setup.bash
 export ROS_DOMAIN_ID=69
 ros2 launch qcar2_perception perception_core_virtual.launch.py
 ```
 
-Physical QCar2 perception:
+### Perception: physical QCar, all on QCar (RECOMMENDED, 2026-05-25)
+
+Default flow. The Jetson AGX Orin runs the full perception stack (D435 source
++ YOLO + landmarks + behavior). Do not run this from the laptop Docker —
+`d435_aligned_source` must talk to the QCar-local Quanser/PIT backend.
 
 ```bash
+ssh qcar2
+cd ~/ros2
+source /opt/ros/humble/setup.bash
 source install/setup.bash
 export ROS_DOMAIN_ID=69
-ros2 launch qcar2_perception perception_core_physical.launch.py
+export ROS_LOCALHOST_ONLY=0
+ros2 launch qcar2_perception perception_core_physical.launch.py mode:=internal
 ```
+
+Laptop side: run Foxglove only and subscribe to lightweight topics. Safe
+subscriptions over the AP:
+
+```text
+/map  /tf  /tf_static
+/perception/semantic_landmark_markers
+/perception/semantic_hypothesis_markers
+/perception/semantic_current_markers
+/perception/semantic_residual_markers
+/perception/object_markers
+/perception/health
+/perception/behavior_events
+/perception/yolo/detections_2d
+/nav/*  /qcar2_ekf/*
+```
+
+Do NOT pull `/perception/d435/rgb/image_raw` or `/perception/d435/depth/image_rect`
+across the AP — those raw streams saturate the link and stall Cartographer.
+For visual YOLO debugging, prefer `/perception/yolo/image_annotated` (already
+annotated, smaller than raw RGB at the same resolution) or temporarily reduce
+`publish_rate` on `d435_aligned_source` to 2–3 Hz.
+
+CUDA note: `d435_aligned_source` and `semantic_yolo_detector` use CUDA by
+default on the Jetson. To force CPU (debugging): `export QCAR2_FORCE_CPU=1`
+before the launch.
+
+### Perception: physical QCar source plus laptop Docker compute (DISCOURAGED)
+
+Split flow: QCar publishes hardware topics only, laptop Docker runs YOLO and
+landmark compute. **Discouraged 2026-05-25**: pulling raw D435 over the AP
+saturates ~100 Mbps and stalls Cartographer. Use only as a fallback when the
+Jetson is genuinely saturated (verify with `top` / `tegrastats` first).
+
+Mode contract, updated 2026-05-25:
+
+| Command args | Run location | D435 source | YOLO / landmarks |
+| --- | --- | --- | --- |
+| `mode:=internal` (default `source_only:=false`) | QCar 2 native `~/ros2` | yes | yes |
+| `mode:=internal source_only:=true` | QCar 2 native `~/ros2` | yes | no |
+| `mode:=external` | laptop Docker `/workspaces/isaac_ros-dev/ros2` | no | yes |
+
+**Never run `mode:=internal` (default) on the QCar AND `mode:=external` on the
+laptop at the same time.** Every YOLO / object_3d / landmark / consistency /
+behavior node ends up running twice, both publishing to the same topics, and
+the landmark mapper races on `semantic_map.json`. Symptom: Foxglove garbled,
+Cartographer freezes in the laptop's view, QCar CPU only ~68% (bottleneck is
+DDS bandwidth, not compute). If you take the split flow, you MUST pass
+`source_only:=true` on the QCar.
+
+Do not run `mode:=internal` from laptop Docker for physical hardware. It starts
+`d435_aligned_source`, and that source must talk to the QCar-local
+Quanser/PIT backend.
+
+QCar terminal: publish the real D435 topics only.
+
+```bash
+ssh qcar2
+cd ~/ros2
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+export ROS_DOMAIN_ID=69
+export ROS_LOCALHOST_ONLY=0
+ros2 launch qcar2_perception perception_core_physical.launch.py mode:=internal source_only:=true
+```
+
+Laptop Docker terminal: listen to QCar topics and run compute. The Docker ROS
+workspace is `/workspaces/isaac_ros-dev/ros2`, not
+`/workspaces/isaac_ros-dev/Development/ros2`.
+
+```bash
+cd /workspaces/isaac_ros-dev/ros2
+source /opt/ros/humble/setup.bash
+source /workspace/cartographer_ws/install/setup.bash
+source install/setup.bash
+export ROS_DOMAIN_ID=69
+export ROS_LOCALHOST_ONLY=0
+
+ros2 topic hz /perception/d435/rgb/image_raw
+ros2 launch qcar2_perception perception_core_physical.launch.py mode:=external
+```
+
+`mode:=internal` starts the real D435 source and must run on the physical QCar. `source_only:=true` keeps the QCar from also running YOLO/landmarks. `mode:=external` does not touch camera hardware; it only listens to `/perception/d435/*` from the QCar and runs YOLO/landmark compute in the current machine.
+
+If external mode does not see camera:
+
+```bash
+# QCar terminal: must publish these.
+ros2 topic hz /perception/d435/rgb/image_raw
+ros2 topic hz /perception/d435/depth/image_rect
+
+# Laptop Docker terminal: must see the same topics.
+ros2 topic list | grep /perception/d435
+ros2 topic hz /perception/d435/rgb/image_raw
+
+# Laptop Docker terminal: landmarks need these transforms too.
+ros2 run tf2_ros tf2_echo base_link aligned_camera_optical_frame
+ros2 run tf2_ros tf2_echo map aligned_camera_optical_frame
+```
+
+If the QCar does not publish `/perception/d435/*`, start `mode:=internal source_only:=true` on the QCar first. If the QCar publishes but the laptop does not see it, that is a DDS/network/domain issue, not a perception launch issue.
 
 Manual start, terminal 1:
 
@@ -345,6 +470,8 @@ Perception meaning notes:
 - Stable landmarks are saved; candidates and confirmed landmarks are live memory/debug hypotheses.
 - YOLO dead-zone mask draws a red polygon with `NA` on `/perception/yolo/image_annotated`.
 - Stable map, live hypotheses, current observations, and residual checks are separate Foxglove layers.
+- `perception_behavior_interface` reads `/perception/semantic_landmarks` plus `/qcar2_pose_fused` and publishes advisory events only.
+- Override the semantic map save path with `QCAR2_SEMANTIC_MAP_PATH=/path/to/semantic_map.json` if needed. By default the Docker path points at `Development/ros2/src/qcar2_perception/maps/semantic_map.json`.
 
 Core Foxglove topics:
 
@@ -362,6 +489,8 @@ Core Foxglove topics:
 /perception/semantic_current_markers
 /perception/semantic_residual_markers
 /perception/semantic_localization_residual
+/perception/behavior_events
+/perception/stop_required
 /perception/health
 ```
 
@@ -382,6 +511,8 @@ ros2 topic hz /perception/d435/depth/image_rect
 ros2 topic echo /perception/d435/camera_info --once
 ros2 topic hz /perception/yolo/image_annotated
 ros2 topic echo /perception/yolo/detections_2d
+ros2 topic echo /perception/behavior_events --once
+ros2 topic echo /perception/stop_required --once
 ros2 run tf2_ros tf2_echo base_link aligned_camera_optical_frame
 ```
 
@@ -401,7 +532,7 @@ This section is only for logs and visibility. Use it after launches are running.
 Build logs:
 
 ```bash
-cd /workspaces/isaac_ros-dev/Development/ros2
+cd /workspaces/isaac_ros-dev/ros2
 ls -lt log | head
 find log/latest_build -maxdepth 3 -type f | sort
 tail -n 80 log/latest_build/*/stdout_stderr.log
@@ -768,6 +899,674 @@ So the point appears 1.183 m ahead of the body origin, on the centerline, 0.11 m
 
 If you find any extrinsic on physical that doesn't match the manual (e.g., the LiDAR was remounted), document the override here so the team knows the source-of-truth value.
 
+## Physical QCar 2 Bring-Up (SSH + rsync)
+
+This is the workflow we use to drive the **physical** QCar 2 from the laptop without paying for VSCode/Claude to run on the Jetson. The laptop is the editor; the QCar 2 is the executor. Files travel one direction: **laptop ACC_Development → QCar 2 ACC_Development_luigi → native ~/ros2**. Builds happen on the QCar 2 (Jetson aarch64, can't be cross-built from the laptop's x86_64).
+
+> **QCar 2 access** — IP `192.168.2.207`, user `nvidia`, password `nvidia`. The wired AP from Quanser does not give the laptop internet; either dual-home or accept that you're offline while connected to the car. Foxglove still works because both machines are on the same subnet.
+
+### Step 0a. One-time SSH setup on the laptop
+
+```bash
+# Aliases live in ~/.ssh/config — `Host qcar2` already added:
+#   Host qcar2
+#     HostName 192.168.2.207
+#     User nvidia
+#     ServerAliveInterval 30
+
+# Generate a key and copy it to the car (one password prompt; never again):
+ssh-keygen -t ed25519 -C "laptop -> qcar2"   # press ENTER through prompts
+ssh-copy-id qcar2
+
+# Smoke-test:
+ssh qcar2 'echo hi from $(hostname); uname -m'
+# Expect:  hi from nvidia-desktop; aarch64
+```
+
+### Step 0b. One-time setup on the QCar 2
+
+```bash
+ssh qcar2
+mkdir -p ~/Documents/ACC_Development_luigi
+mkdir -p ~/ros2
+exit
+```
+
+`~/Documents/ACC_Development_luigi/` is where the laptop mirrors this whole `ACC_Development` checkout for Luigi's branch work. The native ROS build workspace stays separate at `~/ros2`. The QCar-side sync then mirrors `~/Documents/ACC_Development_luigi/Development/ros2/` into `~/ros2/`, while protecting `build/`, `install/`, and `log/`.
+
+### Step 0c. Sync script (on laptop)
+
+**Where the script lives (on the LAPTOP, NOT on the QCar 2):**
+
+```
+/home/bp02-ubuntu/bin/sync_qcar2.sh        # absolute path
+~/bin/sync_qcar2.sh                        # same thing, $HOME-relative
+```
+
+**Where it reads FROM (laptop — the GitHub repo root):**
+
+```
+/home/bp02-ubuntu/Documents/GitHub/ACC_Development/
+```
+
+**Where it writes TO (QCar 2 — over SSH):**
+
+```
+nvidia@192.168.2.207:/home/nvidia/Documents/ACC_Development_luigi/
+```
+
+Both paths are **hard-coded inside the script** — you do NOT need to be in any particular folder when you run it. You can call it from `~`, from the repo, from `/tmp`, anywhere. It's `cd`-agnostic.
+
+**One-time: put `~/bin` on your `PATH` so you can call it by name alone:**
+
+```bash
+# Copy-paste this once on the laptop. This makes ~/bin/sync_qcar2.sh
+# accessible from every folder as just: sync_qcar2.sh
+mkdir -p ~/bin
+cp ~/Documents/GitHub/ACC_Development/Development/ros2/scripts/sync_qcar2.sh \
+   ~/bin/sync_qcar2.sh
+chmod +x ~/bin/sync_qcar2.sh
+echo 'export PATH="$HOME/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+**Verify the script is callable from anywhere:**
+
+```bash
+# Copy-paste each line on the laptop.
+cd ~                            # prove cwd doesn't matter
+which sync_qcar2.sh             # must print: /home/bp02-ubuntu/bin/sync_qcar2.sh
+ls -l ~/bin/sync_qcar2.sh       # must show -rwxr-xr-x (executable bit)
+```
+
+If `which` prints nothing, `~/bin` is not on `PATH` yet — close and reopen the terminal, or re-run `source ~/.bashrc`.
+
+**Run it (laptop, any directory):**
+
+```bash
+# One-shot:
+# 1. copies laptop clock/timezone to the QCar 2
+# 2. mirrors the full ACC_Development checkout to ACC_Development_luigi
+sync_qcar2.sh
+
+# OR: re-sync every time a file changes (needs `sudo apt install inotify-tools` once).
+sync_qcar2.sh --watch
+```
+
+In watch mode the script syncs the QCar clock once at startup, then only rsyncs
+files. Do not repeatedly set the QCar system time while Cartographer is running:
+Cartographer requires monotonically increasing sensor/odom timestamps and can
+crash if ROS time steps backward.
+
+Run `sync_qcar2.sh` from the **laptop**, not from inside `ssh qcar2`. If the
+`qcar2` SSH alias is not available in a laptop terminal, use the IP directly:
+
+```bash
+QCAR2_REMOTE=nvidia@192.168.2.207 sync_qcar2.sh
+```
+
+**If `~/bin` is NOT on PATH for some reason, you can always call by absolute path:**
+
+```bash
+~/bin/sync_qcar2.sh
+# or
+/home/bp02-ubuntu/bin/sync_qcar2.sh
+```
+
+What it does internally:
+
+1. Copies the laptop's current UTC clock and timezone onto the QCar 2. This replaces the old separate `timesync_qcar2.sh` step.
+2. Runs `rsync -avz --delete` from the laptop's full `ACC_Development/` checkout to `~/Documents/ACC_Development_luigi/` on the QCar 2.
+3. Excludes `.git/`, `build/`, `install/`, `log/`, `__pycache__/`, Python bytecode, `.venv/`, and retired RTAB-Map source/build artifacts.
+
+`--delete` keeps the remote mirror identical. Deleting a file on the laptop deletes it from `ACC_Development_luigi` on the QCar 2 on the next push.
+
+**First-run sanity check (does the QCar 2 actually receive it?):**
+
+```bash
+# On laptop:
+sync_qcar2.sh
+
+# Then on QCar 2:
+ssh qcar2 'ls ~/Documents/ACC_Development_luigi/Development/ros2/src'
+# Expect: qcar2_autonomy  qcar2_interfaces  qcar2_nodes  qcar2_perception
+```
+
+### Step 0d. Day-to-day shape of a session
+
+1. Laptop: edit code in VSCode (+ Claude). Open one terminal: `sync_qcar2.sh --watch`. Now every save is on the QCar 2 within ~1 s.
+2. Laptop: open a second terminal: `ssh qcar2`. Use this to run launches.
+3. Laptop browser: Foxglove → `ws://192.168.2.207:8765` (port forwarded over the wired QCar 2 AP, no SSH tunnel needed because both sides see each other on the subnet).
+
+If you prefer SSH inside VSCode (integrated terminal, no remote-server bloat): `Ctrl+Shift+P` → "Terminal: Create New Terminal" → `ssh qcar2`. Do **not** use Remote-SSH; that installs the heavy `vscode-server` on the Jetson.
+
+### Step 0e. Make the sync permanent (systemd user services)
+
+`sync_qcar2.sh --watch` in a terminal works but it dies when you close the terminal or reboot. Promote both halves of the pipeline to **systemd user services** and they auto-start on login, auto-restart on failure, and survive terminal closure / reboot.
+
+The two-hop chain we're making permanent:
+
+```
+LAPTOP edit
+   │
+   ▼  ① sync_qcar2.sh --watch  (systemd: sync_qcar2.service on LAPTOP)
+   │     clock sync + full ACC_Development rsync over SSH
+   ▼
+QCar 2: ~/Documents/ACC_Development_luigi/                         ← synced repo
+   │
+   ▼    Development/ros2/                                           ← synced ROS workspace tree
+   │
+   ▼  ② sync_native_from_synced.sh --watch  (systemd: sync_native_qcar2.service on QCAR 2)
+   │     local rsync, synced ros2/ → native ~/ros2/ while protecting build/install/log
+   ▼
+QCar 2: ~/ros2/                                                    ← native ROS workspace
+   │
+   ▼  ③ you: cd ~/ros2 && colcon build && ros2 launch ...
+```
+
+Unit files are versioned in [`Development/ros2/scripts/systemd/`](Development/ros2/scripts/systemd/):
+
+| File | Lives on | Runs |
+|---|---|---|
+| `sync_qcar2.service` | LAPTOP | `~/bin/sync_qcar2.sh --watch` |
+| `sync_native_qcar2.service` | QCAR 2 | `~/Documents/ACC_Development_luigi/Development/ros2/scripts/sync_native_from_synced.sh --watch` |
+
+#### ① Install on the LAPTOP — copy-paste:
+
+```bash
+# 1. Make sure inotify-tools is installed (needed for --watch).
+sudo apt install -y inotify-tools
+
+# 2. Install the repo-tracked sync script into ~/bin.
+mkdir -p ~/bin
+cp ~/Documents/GitHub/ACC_Development/Development/ros2/scripts/sync_qcar2.sh \
+   ~/bin/sync_qcar2.sh
+chmod +x ~/bin/sync_qcar2.sh
+
+# 3. Copy the unit file into the user systemd dir.
+mkdir -p ~/.config/systemd/user
+cp ~/Documents/GitHub/ACC_Development/Development/ros2/scripts/systemd/sync_qcar2.service \
+   ~/.config/systemd/user/sync_qcar2.service
+
+# 4. Tell systemd to start it now AND on every login.
+systemctl --user daemon-reload
+systemctl --user enable --now sync_qcar2.service
+
+# 5. Keep the service alive even when no terminal is open / you log out.
+sudo loginctl enable-linger $USER
+
+# 6. Verify it's running and watch what it's doing.
+systemctl --user status sync_qcar2.service
+journalctl --user -u sync_qcar2.service -f      # Ctrl+C to stop tailing
+```
+
+#### ② Install on the QCAR 2 — copy-paste:
+
+The QCar 2 needs the synced tree to exist first (so the script + unit file are there). Do **one manual sync from the laptop** before installing the service:
+
+```bash
+# (LAPTOP, once) push the new files over so they exist on the QCar 2.
+sync_qcar2.sh
+```
+
+Then on the QCar 2:
+
+```bash
+# (QCAR 2)
+ssh qcar2
+
+# 1. Install inotify-tools on the Jetson.
+sudo apt install -y inotify-tools
+
+# 2. Make the native workspace dir.
+mkdir -p ~/ros2
+
+# 3. Copy the unit file from the synced tree into systemd user dir.
+mkdir -p ~/.config/systemd/user
+cp ~/Documents/ACC_Development_luigi/Development/ros2/scripts/systemd/sync_native_qcar2.service \
+   ~/.config/systemd/user/sync_native_qcar2.service
+
+# 4. Start it now + on every login.
+systemctl --user daemon-reload
+systemctl --user enable --now sync_native_qcar2.service
+
+# 5. Survive logout / reboot.
+sudo loginctl enable-linger $USER
+
+# 6. Verify.
+systemctl --user status sync_native_qcar2.service
+journalctl --user -u sync_native_qcar2.service -f
+```
+
+#### Test the full chain
+
+From the laptop, touch a file in the repo, then check it landed on the QCar 2's **native** workspace:
+
+```bash
+# LAPTOP
+touch ~/Documents/GitHub/ACC_Development/Development/ros2/src/qcar2_autonomy/HEARTBEAT
+sleep 3
+ssh qcar2 'ls -la ~/ros2/src/qcar2_autonomy/HEARTBEAT'
+# Expect: -rw-r--r-- ... HEARTBEAT  (timestamp within last ~3 s)
+
+# Cleanup
+rm ~/Documents/GitHub/ACC_Development/Development/ros2/src/qcar2_autonomy/HEARTBEAT
+```
+
+If the file shows up in `~/Documents/ACC_Development_luigi/...` but **not** in `~/ros2/src/...`, the laptop service is working but the QCar 2 service isn't — check `journalctl --user -u sync_native_qcar2.service -n 50` on the QCar 2.
+
+#### Useful management commands
+
+```bash
+# Stop / start manually
+systemctl --user stop sync_qcar2.service        # laptop
+systemctl --user start sync_qcar2.service
+
+# Disable autostart (won't run on next login)
+systemctl --user disable sync_qcar2.service
+
+# Edit unit file then reload
+systemctl --user daemon-reload && systemctl --user restart sync_qcar2.service
+
+# Live log tail
+journalctl --user -u sync_qcar2.service -f
+journalctl --user -u sync_native_qcar2.service -f    # on QCar 2
+```
+
+> **Caveat about `--delete`**: both watchers use `rsync --delete`. If you delete a file on the laptop, within ~1 s it disappears from the QCar 2's synced `ACC_Development_luigi` tree, and within another ~1 s it disappears from native `~/ros2/`. Native `~/ros2/build/`, `~/ros2/install/`, and `~/ros2/log/` are protected by exclude rules, so the laptop will not wipe build artifacts.
+
+### Step 0f. Clock check
+
+`sync_qcar2.sh` copies the laptop clock/timezone to the QCar 2 before every one-shot or watched sync. That is the intended way to fix the Quanser Jetson clock after reboot.
+
+**Verify drift any time:**
+
+```bash
+echo "laptop: $(date -u)";  ssh qcar2 'echo qcar2:  $(date -u)'
+```
+
+The two timestamps should match within 1–2 s.
+
+**When to re-run:**
+
+- After every cold boot of the QCar 2: run `sync_qcar2.sh` once from the laptop.
+- If Foxglove timeline shows messages "in the future" or "from yesterday".
+- Before recording any rosbag you'll want to merge with laptop-side data.
+
+(There's no permanent fix while we're on the stock Quanser image. If we ever build our own L4T image, just enable `systemd-timesyncd` with the lab NTP server and delete this script.)
+
+---
+
+### Step 1. (On QCar 2) Build ROS nodes natively
+
+The Jetson Quanser image follows their "native ROS + Isaac container side-by-side" model. The native ROS install handles the **hardware bringup** (`qcar2_launch.py` talks to the actual sensors over QUARC); the Isaac container handles **GPU-heavy autonomy & perception** (Cartographer, AMCL, YOLO, semantic mapper). Both layers see each other over DDS because they share `ROS_DOMAIN_ID=69`.
+
+We build the native ROS layer in a scratch workspace **outside** the synced tree, so the laptop's rsync `--delete` never wipes the Jetson's build artifacts.
+
+```bash
+ssh qcar2
+
+# Pull a fresh ROS workspace snapshot from ACC_Development_luigi into native ~/ros2.
+# If sync_native_qcar2.service is running, it already does this automatically.
+mkdir -p ~/ros2
+rsync -av --delete \
+  --exclude build/ \
+  --exclude install/ \
+  --exclude log/ \
+  ~/Documents/ACC_Development_luigi/Development/ros2/ \
+  ~/ros2/
+
+cd ~/ros2
+source /opt/ros/humble/setup.bash
+colcon build --symlink-install \
+  --packages-select qcar2_interfaces qcar2_nodes qcar2_autonomy
+# qcar2_autonomy is included because physical Cartographer starts
+# pose_estimator, ekf_fusor, and manual_drive from that package.
+# qcar2_perception can stay container-side unless you intentionally run it natively.
+
+source install/setup.bash
+export ROS_DOMAIN_ID=69
+```
+
+> **Re-run this step every time you change `qcar2_nodes`, `qcar2_interfaces`, or native-side `qcar2_autonomy` entry points**. The package is installed with `--symlink-install`, but re-running a focused build keeps console scripts and package metadata honest.
+
+### Step 2. (On QCar 2, native terminal) Start physical QCar hardware only
+
+```bash
+ssh qcar2
+cd ~/ros2
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+export ROS_DOMAIN_ID=69
+
+ros2 launch qcar2_nodes qcar2_launch.py
+```
+
+If you get:
+
+```text
+Package 'qcar2_nodes' not found
+```
+
+your terminal has not sourced an install space that contains `qcar2_nodes`, or
+the native build failed before installing it. Recover like this:
+
+```bash
+ssh qcar2
+
+# Make sure the QCar's native src/ has what the laptop synced.
+~/Documents/ACC_Development_luigi/Development/ros2/scripts/sync_native_from_synced.sh
+
+cd ~/ros2
+source /opt/ros/humble/setup.bash
+colcon build --symlink-install \
+  --packages-select qcar2_interfaces qcar2_nodes qcar2_autonomy
+
+source install/setup.bash
+export ROS_DOMAIN_ID=69
+ros2 pkg prefix qcar2_nodes
+
+# Launch files include the .py suffix.
+ros2 launch qcar2_nodes foxglove_bridge_launch.py
+```
+
+If `ros2 pkg prefix qcar2_nodes` still fails, inspect the native build log:
+
+```bash
+tail -n 80 ~/ros2/log/latest_build/qcar2_nodes/stdout_stderr.log
+```
+
+If `qcar2_nodes` fails with:
+
+```text
+Cannot find source file:
+  src/qcar2_odometry.cpp
+No SOURCES given to target: qcar2_odometry
+```
+
+the QCar 2 is still building an old `qcar2_nodes/CMakeLists.txt`. The laptop
+repo has the retired `qcar2_odometry` target removed, but that change has not
+landed in the QCar 2's synced tree and then `~/ros2` on the Jetson yet.
+Re-run the two sync hops, verify both files are clean, then build:
+
+```bash
+# LAPTOP
+sync_qcar2.sh
+
+# QCAR 2
+ssh qcar2
+
+# First check the synced tree. This must print nothing.
+grep -n "add_executable(qcar2_odometry\\|install(TARGETS qcar2_odometry" \
+  ~/Documents/ACC_Development_luigi/Development/ros2/src/qcar2_nodes/CMakeLists.txt
+
+# Then copy synced Development/ros2 -> native ~/ros2.
+~/Documents/ACC_Development_luigi/Development/ros2/scripts/sync_native_from_synced.sh
+
+cd ~/ros2
+
+# This must also print nothing. If it still prints qcar2_odometry,
+# the QCar-side synced tree is stale; go back to the laptop and run sync_qcar2.sh.
+grep -n "add_executable(qcar2_odometry\\|install(TARGETS qcar2_odometry" \
+  src/qcar2_nodes/CMakeLists.txt
+
+source /opt/ros/humble/setup.bash
+colcon build --symlink-install \
+  --packages-select qcar2_interfaces qcar2_nodes qcar2_autonomy
+
+source install/setup.bash
+export ROS_DOMAIN_ID=69
+ros2 pkg prefix qcar2_nodes
+```
+
+If a native build fails in `qcar2_perception` with a stale symlink error like:
+
+```text
+error: [Errno 17] File exists: ... qcar2_perception ...
+```
+
+do not let that block `qcar2_nodes`. For physical hardware/Foxglove bring-up,
+build the native packages only:
+
+```bash
+ssh qcar2
+cd ~/ros2
+source /opt/ros/humble/setup.bash
+
+colcon build --symlink-install \
+  --packages-select qcar2_interfaces qcar2_nodes qcar2_autonomy
+
+source install/setup.bash
+export ROS_DOMAIN_ID=69
+ros2 pkg prefix qcar2_nodes
+ros2 launch qcar2_nodes foxglove_bridge_launch.py
+```
+
+If you need the native perception package too, clean its stale symlink install
+first. This is the fix for the repeated `qcar2_perception` error:
+
+```bash
+cd ~/ros2
+source /opt/ros/humble/setup.bash
+rm -rf build/qcar2_perception install/qcar2_perception
+colcon build --symlink-install --packages-select qcar2_perception
+source install/setup.bash
+export ROS_DOMAIN_ID=69
+ros2 pkg prefix qcar2_perception
+```
+
+Sanity check from a second SSH terminal:
+
+```bash
+ssh qcar2
+source ~/ros2/install/setup.bash
+export ROS_DOMAIN_ID=69
+ros2 topic list | grep -E '(qcar2_imu|scan|qcar2_motor|odom)'
+ros2 topic hz /qcar2_imu       # expect ~200 Hz
+ros2 topic hz /scan            # expect ~10 Hz
+```
+
+If you don't see `/scan`, the RPLidar is unpowered or the USB enumerated to a different port — check `dmesg | tail` for `ttyUSB*`.
+
+Use this for a hardware smoke test. Stop it with `Ctrl+C` before starting the full Cartographer stack in Step 4.
+
+### Step 2b. Foxglove bridge
+
+After `qcar2_nodes` builds and `source install/setup.bash` works, start
+Foxglove like this:
+
+```bash
+ssh qcar2
+cd ~/ros2
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+export ROS_DOMAIN_ID=69
+
+ros2 launch qcar2_nodes foxglove_bridge_launch.py
+```
+
+If it says:
+
+```text
+package 'foxglove_bridge' not found
+```
+
+then `qcar2_nodes` is fine, but the QCar native ROS install is missing the
+bridge package. On the Quanser Jetson image this apt package may not exist, even
+after `sudo apt update`. Use the Isaac ROS container bridge path first:
+
+```bash
+cd ~/Documents/ACC_Development_luigi/isaac_ros_common
+./scripts/run_dev.sh ~/Documents/ACC_Development_luigi/Development
+
+# Inside container:
+cd /workspaces/isaac_ros-dev/ros2
+source /opt/ros/humble/setup.bash
+source /workspace/cartographer_ws/install/setup.bash
+source install/setup.bash
+export ROS_DOMAIN_ID=69
+ros2 launch qcar2_nodes foxglove_bridge_launch.py
+```
+
+If the container also lacks `foxglove_bridge`, keep native ROS running and use
+CLI checks (`ros2 topic list`, `ros2 topic hz`, `ros2 node list`) until the
+container image is rebuilt with the bridge. Do not keep retrying
+`sudo apt install ros-humble-foxglove-bridge` on the QCar if apt says
+`Unable to locate package`.
+
+### Step 3. (On QCar 2) Start the Isaac ROS dev container
+
+In a separate SSH terminal:
+
+```bash
+ssh qcar2
+cd ~/Documents/ACC_Development_luigi/isaac_ros_common
+./scripts/run_dev.sh ~/Documents/ACC_Development_luigi/Development
+```
+
+Once inside the container:
+
+```bash
+cd /workspaces/isaac_ros-dev/ros2
+source /opt/ros/humble/setup.bash
+source /workspace/cartographer_ws/install/setup.bash
+
+# First time on the QCar 2, or after a Python change: build inside the container.
+colcon build --symlink-install \
+  --packages-select qcar2_autonomy qcar2_perception
+source install/setup.bash
+export ROS_DOMAIN_ID=69
+```
+
+The container's `ROS_DOMAIN_ID=69` and the native side's `ROS_DOMAIN_ID=69` are how the two layers talk. Verify with `ros2 topic list` — you should see both the container-side topics **and** `/qcar2_imu`, `/scan`, etc., from the native side.
+
+### Step 4. Mapping / Driving (physical)
+
+> **Do NOT run `qcar2_launch.py` and `qcar2_cartographer_launch.py` in parallel.** The physical Cartographer launch already `IncludeLaunchDescription`-s `qcar2_launch.py` internally, plus it spawns `pose_estimator` and `ekf_fusor`. Running both means duplicated hardware nodes and a TF fight on `odom → base_link`.
+
+If Step 2's `qcar2_launch.py` is still running, **kill it first** with `Ctrl+C`.
+
+Then from a **native QCar 2 terminal**:
+
+```bash
+ssh qcar2
+cd ~/ros2
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+export ROS_DOMAIN_ID=69
+
+ros2 launch qcar2_nodes qcar2_cartographer_launch.py
+# This bundles: qcar2_launch.py + pose_estimator + ekf_fusor + cartographer
+#               + cartographer_occupancy_grid + nav2_qcar2_converter + tf nodes.
+```
+
+In a separate native QCar 2 terminal, drive manually to build the map:
+
+```bash
+ssh qcar2
+cd ~/ros2
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+export ROS_DOMAIN_ID=69
+
+ros2 run qcar2_autonomy manual_drive
+# WASD to drive, space to stop. Map builds on /map; pose fuses on /qcar2_pose_fused.
+```
+
+To freeze the map + hand off to AMCL, use `scripts/carto_to_amcl.sh` exactly as in the virtual workflow (Scripts Reference §3).
+
+### Step 5. Physical perception
+
+Do not launch `perception_core_physical.launch.py` from the laptop Docker if you need the real D435. That file starts `d435_aligned_source`, and the physical camera/Quanser target lives on the QCar 2, not on the laptop container.
+
+Mode contract:
+
+| Command args | Run location | D435 source | YOLO / landmarks |
+| --- | --- | --- | --- |
+| `mode:=internal` | QCar 2 native `~/ros2` | yes | yes |
+| `mode:=internal source_only:=true` | QCar 2 native `~/ros2` | yes | no |
+| `mode:=external` | laptop Docker `/workspaces/isaac_ros-dev/ros2` | no | yes |
+
+QCar-only mode:
+
+```bash
+ssh qcar2
+cd ~/ros2
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+export ROS_DOMAIN_ID=69
+export ROS_LOCALHOST_ONLY=0
+
+ros2 launch qcar2_perception perception_core_physical.launch.py mode:=internal
+```
+
+Laptop Docker mode, when the QCar publishes camera frames and the laptop does YOLO/landmark compute:
+
+```bash
+# QCar 2 native terminal: real D435 source only
+ssh qcar2
+cd ~/ros2
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+export ROS_DOMAIN_ID=69
+export ROS_LOCALHOST_ONLY=0
+
+ros2 launch qcar2_perception perception_core_physical.launch.py mode:=internal source_only:=true
+```
+
+```bash
+# laptop Isaac ROS Docker terminal: compute only, listening to the QCar
+cd /workspaces/isaac_ros-dev/ros2
+source /opt/ros/humble/setup.bash
+source /workspace/cartographer_ws/install/setup.bash
+source install/setup.bash
+export ROS_DOMAIN_ID=69
+export ROS_LOCALHOST_ONLY=0
+
+ros2 topic hz /perception/d435/rgb/image_raw
+ros2 launch qcar2_perception perception_core_physical.launch.py mode:=external
+```
+
+`mode:=internal` starts `d435_aligned_source`, so use it only on the QCar. `source_only:=true` publishes camera topics without also running YOLO/landmarks on the Jetson. `mode:=external` skips `d435_aligned_source` and listens to `/perception/d435/*` from the physical QCar over DDS.
+
+Why this mode exists: Cartographer works in Docker because it only consumes ROS topics already published by the QCar. The D435 aligned source is different; it talks to the QCar's local Quanser hardware target, so it must run on the QCar side. The Docker side can subscribe to `/perception/d435/*` after the QCar publishes them.
+
+External-mode debug:
+
+```bash
+# QCar terminal: these must publish first.
+ros2 topic hz /perception/d435/rgb/image_raw
+ros2 topic hz /perception/d435/depth/image_rect
+
+# Laptop Docker terminal: these must be visible from Docker.
+ros2 topic list | grep /perception/d435
+ros2 topic hz /perception/d435/rgb/image_raw
+
+# Laptop Docker terminal: semantic mapping needs static camera TF and live map TF.
+ros2 run tf2_ros tf2_echo base_link aligned_camera_optical_frame
+ros2 run tf2_ros tf2_echo map aligned_camera_optical_frame
+```
+
+If QCar has no `/perception/d435/*`, start the QCar-side `mode:=internal source_only:=true` command. If QCar has them but Docker does not, fix DDS/network/domain visibility before debugging YOLO.
+
+### Foxglove
+
+From the laptop browser, open Foxglove Studio → "Open Connection" → `ws://192.168.2.207:8765`. The `foxglove_bridge_launch.py` should be running on either the native side or in the container (either works — they share DDS).
+
+### Edit-loop cheat sheet
+
+```text
+LAPTOP                              QCar 2 (ssh qcar2)
+------                              ------------------
+(terminal 1) sync_qcar2.sh --watch  (terminal A, native)  ros2 launch qcar2_nodes ...   ← if Step 2 only
+(VSCode + Claude editing)           (terminal B, native)  ros2 launch qcar2_nodes qcar2_cartographer_launch.py
+(terminal 2) ssh qcar2 ↓            (terminal C, native)  ros2 run qcar2_autonomy manual_drive
+            └── you live in here    (terminal D) ros2 topic hz / debugging
+(browser) ws://192.168.2.207:8765
+```
+
+If a Python change in `qcar2_autonomy` doesn't take effect: the container build uses `--symlink-install`, so a re-source is enough — `source install/setup.bash` in each container terminal after the rsync lands. For C++ changes in `qcar2_nodes` you have to re-run Step 1 (native build).
+
 ## Killing Stale ROS Nodes Between Runs
 
 Ctrl-C on a `ros2 launch` does not always reap child processes. Leftover nodes
@@ -932,6 +1731,15 @@ Immediate execution order (remaining work toward competition):
 9. ⏳ Wire trip_planner's pickup/dropoff states to the reward grid.
 
 ## Change Log
+
+### 2026-05-24 EDT — physical QCar 2 SSH+rsync workflow added
+
+- Added section 12 "Physical QCar 2 Bring-Up (SSH + rsync)" to Easy_Start.md. Covers the laptop-as-editor / Jetson-as-executor split: laptop runs VSCode + Claude, QCar 2 (`192.168.2.207`, user `nvidia`) runs only ROS. Files travel laptop → QCar 2 via rsync; we deliberately avoid VSCode Remote-SSH because `vscode-server` is heavy on the Jetson.
+- Added `~/.ssh/config` alias `Host qcar2` → `192.168.2.207` with `ServerAliveInterval 30`. One-time `ssh-copy-id qcar2` removes password prompts.
+- Created repo-tracked `Development/ros2/scripts/sync_qcar2.sh` and install target `~/bin/sync_qcar2.sh`. One-shot or `--watch` mode (needs `inotify-tools`). It first copies the laptop clock/timezone to the QCar 2, then mirrors the full laptop `ACC_Development/` checkout to `nvidia@qcar2:~/Documents/ACC_Development_luigi/`. Excludes `.git`, build/install/log outputs, Python cache, virtualenvs, and the retired RTAB-Map vendored source.
+- The remote tree path on the QCar 2 is **`~/Documents/ACC_Development_luigi/Development/`**, not `~/Documents/ACC_Development/Development/`, so multiple driver branches (luigi-5, etc.) don't collide with whatever the QCar 2 originally shipped with.
+- Bring-up uses Quanser's native+container split: `qcar2_nodes` + `qcar2_interfaces` build natively in `~/ros2` on the Jetson (hardware/QUARC layer), while `qcar2_autonomy` + `qcar2_perception` build inside the Isaac dev container. Both layers see each other via `ROS_DOMAIN_ID=69`.
+- Loud warning preserved: **do not run `qcar2_launch.py` and `qcar2_cartographer_launch.py` together on the physical car** — the Cartographer launch already `IncludeLaunchDescription`-s the hardware bringup, and the duplicate hardware nodes + `odom→base_link` TF fight will silently corrupt mapping.
 
 ### 2026-05-24 EDT — ekf_fusor bundled into Cartographer launches + Scripts Reference section
 
@@ -1790,8 +2598,8 @@ ros2 topic echo /odom --once   # x should increase by ~1.0 m, not ~1.23 m
 - Fixed `semantic_yolo_detector` model path resolution.
 - The detector now searches:
   - installed `qcar2_autonomy/share/qcar2_autonomy/models`
-  - `/workspaces/isaac_ros-dev/Development/ros2/src/qcar2_autonomy/models`
-  - legacy `/workspaces/isaac_ros-dev/ros2/src/qcar2_autonomy/models`
+  - `/workspaces/isaac_ros-dev/ros2/src/qcar2_autonomy/models`
+  - legacy `/workspaces/isaac_ros-dev/Development/ros2/src/qcar2_autonomy/models`
 - `qcar2_autonomy/setup.py` now installs files from `models/` so launched
   perception nodes do not depend on stale absolute source paths.
 

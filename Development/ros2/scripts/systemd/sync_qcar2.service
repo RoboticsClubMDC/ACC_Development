@@ -1,0 +1,16 @@
+[Unit]
+Description=Laptop -> QCar 2 rsync watcher (ACC_Development tree + clock)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=%h/bin/sync_qcar2.sh --watch
+Restart=on-failure
+RestartSec=5
+# Don't spam logs if rsync briefly fails because the car is off:
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

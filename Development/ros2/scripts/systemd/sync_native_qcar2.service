@@ -1,0 +1,14 @@
+[Unit]
+Description=QCar 2 synced-tree -> native ~/ros2 rsync watcher
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=%h/Documents/ACC_Development_luigi/Development/ros2/scripts/sync_native_from_synced.sh --watch
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

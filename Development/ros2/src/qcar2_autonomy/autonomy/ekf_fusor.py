@@ -204,6 +204,9 @@ class EkfFusor(Node):
         if not msg.velocity:
             return
         ticks_per_sec = float(msg.velocity[0])
+        if not np.isfinite(ticks_per_sec):
+            self.get_logger().warn("Dropping non-finite encoder sample", throttle_duration_sec=2.0)
+            return
         self.speed = (
             ticks_per_sec
             / ENCODER_TICKS_PER_REV
@@ -213,14 +216,27 @@ class EkfFusor(Node):
         )
 
     def imu_cb(self, msg):
-        self.yaw_rate = float(msg.angular_velocity.z)
+        # NaN-guard: Quanser PIT IMU can emit bad samples. If we propagate a
+        # NaN here, pose_estimator's /odom turns NaN and Cartographer's
+        # imu_tracker.cc:67 CHECK SIGABRTs the whole cartographer_node.
+        z = float(msg.angular_velocity.z)
+        if not np.isfinite(z):
+            self.get_logger().warn("Dropping non-finite IMU sample", throttle_duration_sec=2.0)
+            return
+        self.yaw_rate = z
 
     def cmd_vel_cb(self, msg):
-        self.steering = float(np.clip(msg.angular.z, -self.steering_limit, self.steering_limit))
+        value = float(msg.angular.z)
+        if not np.isfinite(value):
+            return
+        self.steering = float(np.clip(value, -self.steering_limit, self.steering_limit))
 
     def motor_cmd_cb(self, msg):
         for name, value in zip(msg.motor_names, msg.values):
             if name == "steering_angle":
+                value = float(value)
+                if not np.isfinite(value):
+                    continue
                 self.steering = float(np.clip(value, -self.steering_limit, self.steering_limit))
 
     def amcl_pose_cb(self, msg):

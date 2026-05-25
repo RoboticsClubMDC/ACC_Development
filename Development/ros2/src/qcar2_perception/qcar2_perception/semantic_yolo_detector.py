@@ -39,7 +39,8 @@ from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 from std_msgs.msg import String
 
-os.environ["CUDA_VISIBLE_DEVICES"] = ""
+if os.environ.get("QCAR2_FORCE_CPU", "").strip() in ("1", "true", "True"):
+    os.environ["CUDA_VISIBLE_DEVICES"] = ""
 os.getlogin = lambda: os.environ.get("USER", "admin")
 
 
@@ -75,8 +76,8 @@ def find_default_model_path():
         pass
 
     candidates.extend([
-        Path("/workspaces/isaac_ros-dev/Development/ros2/src/qcar2_autonomy/models") / model_name,
         Path("/workspaces/isaac_ros-dev/ros2/src/qcar2_autonomy/models") / model_name,
+        Path("/workspaces/isaac_ros-dev/Development/ros2/src/qcar2_autonomy/models") / model_name,
         Path.cwd() / "src/qcar2_autonomy/models" / model_name,
     ])
 

@@ -25,7 +25,6 @@ setup(
     entry_points={
         'console_scripts': [
             'path_follower = autonomy.nav_to_pose:main',
-            'traffic_system_detector=autonomy.traffic_system_detector:main',
             'lane_detection=autonomy.lane_detection:main',
             'trip_planner=autonomy.trip_planner:main',
             'bev_csi_node=autonomy.bev_csi_node:main',

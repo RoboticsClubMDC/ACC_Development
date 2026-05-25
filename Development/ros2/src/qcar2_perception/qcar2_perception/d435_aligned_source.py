@@ -11,7 +11,8 @@ from rclpy.node import Node
 from sensor_msgs.msg import Image, CameraInfo
 from cv_bridge import CvBridge
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "" # this is a bout CPU use only, we have to change this on physical.
+if os.environ.get("QCAR2_FORCE_CPU", "").strip() in ("1", "true", "True"):
+    os.environ["CUDA_VISIBLE_DEVICES"] = ""
 os.getlogin = lambda: os.environ.get("USER", "admin")
 
 
@@ -19,6 +20,7 @@ def add_mdc_paths():
     candidates = [
         "/workspaces/isaac_ros-dev/MDC_libraries/python",
         str(Path.home() / "Documents/ACC_Development/Development/MDC_libraries/python"),
+        "/home/nvidia/Documents/ACC_Development_luigi/Development/MDC_libraries/python",
         "/home/nvidia/Documents/ACC_Development/Development/MDC_libraries/python",
     ]
 
