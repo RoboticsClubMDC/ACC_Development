@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 1
+names: ['Traffic Cone']
+
+roboflow:
+  workspace: turret-hcisr
+  project: turret-hcisr
+  version: dataset
+  license: Private
+  url: https://app.roboflow.com/turret-hcisr/turret-hcisr/dataset

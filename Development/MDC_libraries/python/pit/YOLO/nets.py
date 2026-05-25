@@ -48,6 +48,7 @@ class YOLOv8():
         self.modelPath = self.__check_path(modelPath)
         self.img=np.empty((self.imageHeight,self.imageWidth,3),dtype=np.uint8)
         self._calc_distence = False
+        self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
         self.net=YOLO(self.modelPath,task='segment')
         print('YOLOv8 model loaded')   
 
@@ -156,7 +157,7 @@ class YOLOv8():
             bgRemoved = np.where((depth3D > clippingDistance)| 
                                  (depth3D <= 0), 0, depth3D)
             self._calc_distence = True
-            self.depthTensor=torch.as_tensor(bgRemoved,device="cuda:0")
+            self.depthTensor=torch.as_tensor(bgRemoved,device=self.device)
         for i in range(len(self.objectsDetected)):
             if self.objectsDetected[i]==9:
                 trafficBox = self.bounding[i]
@@ -167,7 +168,7 @@ class YOLOv8():
                 name=self.predictions[0].names[self.objectsDetected[i]]
                 result=Obstacle(name=name)
             if alignedDepth is not None:
-                mask=self.predictions[0].masks.data.cuda()[i]
+                mask=self.predictions[0].masks.data.to(self.device)[i]
                 distance=self.check_distance(mask,self.depthTensor[:,:,:1])
                 result.distance=distance.cpu().numpy().round(3)
             points=self.predictions[0].boxes.xyxy.cpu()[i]
@@ -200,11 +201,11 @@ class YOLOv8():
             else: out=self.img
             return out
         colors=[]
-        masks = self.predictions[0].masks.data.cuda()
+        masks = self.predictions[0].masks.data.to(self.device)
         boxes = self.predictions[0].boxes.xyxy.cpu().numpy().astype(int)
         imgClone=self.img.copy()
         for i in range(len(self.objectsDetected)):
-            colors.append(MASK_COLORS_RGB[self.objectsDetected[i].astype(int)])
+            colors.append(self._get_mask_color(self.objectsDetected[i]))
             name=self.processedResults[i].name
             x=self.processedResults[i].x
             y=self.processedResults[i].y
@@ -221,7 +222,7 @@ class YOLOv8():
             cv2.putText(imgClone, 'Inference FPS: '+str(round(self.FPS)), 
                         (495,15), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
                         (255,255,255), 2)
-        imgTensor=torch.from_numpy(imgClone).to("cuda:0")
+        imgTensor=torch.from_numpy(imgClone).to(self.device)
         imgMask=self.mask_color(masks, imgTensor,colors)
         if imgMask.shape[:2] != self.inputShape:
             imgMask=cv2.resize(imgMask,
@@ -277,7 +278,7 @@ class YOLOv8():
             ndarray: Input image overlaid with colored object masks.
 
         '''
-        colors = torch.tensor(colors, device="cuda:0", dtype=torch.float32) / 255.0 
+        colors = torch.tensor(colors, device=im_gpu.device, dtype=torch.float32) / 255.0 
         colors = colors[:, None, None]
         masks = masks.unsqueeze(3)
         masks_color = masks * (colors * alpha)
@@ -338,11 +339,11 @@ class YOLOv8():
         maskR=cv2.circle(copy.deepcopy(mask),R_center,int(d/2),1,-1)
         maskY=cv2.circle(copy.deepcopy(mask),Y_center,int(d/2),1,-1)
         maskG=cv2.circle(copy.deepcopy(mask),G_center,int(d/2),1,-1)
-        maskR_gpu=torch.tensor(maskR,device="cuda:0").unsqueeze(2)
-        maskY_gpu=torch.tensor(maskY,device="cuda:0").unsqueeze(2)
-        maskG_gpu=torch.tensor(maskG,device="cuda:0").unsqueeze(2)
+        maskR_gpu=torch.tensor(maskR,device=self.device).unsqueeze(2)
+        maskY_gpu=torch.tensor(maskY,device=self.device).unsqueeze(2)
+        maskG_gpu=torch.tensor(maskG,device=self.device).unsqueeze(2)
         im_hsv=cv2.cvtColor(im_cpu, cv2.COLOR_RGB2HSV)
-        im_hsv_gpu = torch.tensor(im_hsv,device="cuda:0")
+        im_hsv_gpu = torch.tensor(im_hsv,device=self.device)
         masked_red = im_hsv_gpu*maskR_gpu
         masked_yellow = im_hsv_gpu*maskY_gpu
         masked_green = im_hsv_gpu*maskG_gpu
@@ -351,11 +352,12 @@ class YOLOv8():
         value_G=torch.sum(masked_green[:,:,2])/torch.count_nonzero(masked_green[:,:,2])
         mean = (value_R+value_Y+value_G)/3
         threshold_perc=0.25
-        min= torch.min(torch.tensor([value_R,value_Y,value_G]))
-        max= torch.max(torch.tensor([value_R,value_Y,value_G]))
-        if (max-min)<30:
+        values = torch.stack((value_R, value_Y, value_G))
+        min_value = values.min()
+        max_value = values.max()
+        if (max_value-min_value)<30:
             return 'idle'
-        threshold=(max-min)*threshold_perc
+        threshold=(max_value-min_value)*threshold_perc
         # print('red',value_R,'yellow',value_Y,'green',value_G,mean,threshold)
         redOn=(value_R>mean) and (value_R-mean)>threshold
         yellowOn=(value_Y>mean) and (value_Y-mean)>threshold
@@ -368,6 +370,20 @@ class YOLOv8():
                 traffic_light_color+=colors[i]
                 traffic_light_color+=' '
         return traffic_light_color
+
+    @staticmethod
+    def _get_mask_color(class_index):
+        '''Return a stable mask color for the requested class index.'''
+        class_index = int(class_index)
+        if class_index == 80:
+            return [255, 120, 0]
+        if 0 <= class_index < len(MASK_COLORS_RGB):
+            return MASK_COLORS_RGB[class_index]
+        return [
+            (37 * class_index + 17) % 256,
+            (67 * class_index + 29) % 256,
+            (97 * class_index + 43) % 256,
+        ]
 
     @staticmethod
     def check_distance(mask,depth_gpu):
