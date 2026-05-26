@@ -90,10 +90,10 @@ class PathFollower(Node):
 
         self.scale = 1.0
 
-        self.declare_parameter('rotation_offset', [83.0])
+        self.declare_parameter('rotation_offset', [0.0])
         self.rotation_offset = list(self.get_parameter('rotation_offset').get_parameter_value().double_array_value)
 
-        self.declare_parameter('translation_offset', [0.0, 0.0])
+        self.declare_parameter('translation_offset', [0.100640468153, -0.064883315798])
         self.translation_offset = list(self.get_parameter('translation_offset').get_parameter_value().double_array_value)
 
         # Unified control mode — ONE node owns /cmd_vel_nav, no double-publish.
@@ -148,7 +148,7 @@ class PathFollower(Node):
 
         # Stanley blend is kept at 0 — pure pursuit only
         self.stanley_blend     = 0.3
-        self.stanley_trust_min = 999.0
+        self.stanley_trust_min = 0.0
 
         self.add_on_set_parameters_callback(self.parameter_update_callback)
 
@@ -183,8 +183,8 @@ class PathFollower(Node):
         self.rotation = [0, 0, 0]
         self.wp = SDCSRoadMap().generate_path(self.waypoints) * self.scale
         # -------------ADDED N_1
-        self.auto_align_start = True
-        self.auto_aligned = False
+        self.auto_align_start = False
+        self.auto_aligned = True
         #----------
         self.N = len(self.wp[0, :])
         self.wpi = 0
@@ -192,8 +192,8 @@ class PathFollower(Node):
         self.current_steering = 0
         self._wp_in_ros_frame = False
 
-        self.stanley_delta = 0.0
-        self.stanley_trust = 0.0
+        self.stanley_delta = 1.100
+        self.stanley_trust = 1.0
         self.pp_delta_raw  = 0.0
 
         self.publisher = self.create_publisher(Twist, '/cmd_vel_nav', 1)
