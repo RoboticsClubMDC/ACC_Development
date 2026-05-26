@@ -6896,3 +6896,729 @@ No mat run this turn (additive/default-off; validated next mat).
 - This changelog entry.
 - VO_Conversation_Log.txt Turn 117.
 - /tmp/analyze_grid.py (out-of-tree analyzer; not committed).
+
+## 2026-05-26 (YOLO detector — port Erick's rich semantic logic onto the subscriber-only camera path)
+
+**Motivation.** User compared Gabriel's `yolo_detector.py` (subscriber-only — camera owned by `qcar2_camera_bridge`, single-owner invariant the VO work relies on) against Erick's branch `yolo_detector.py`, which has the *richer* per-class semantic logic (traffic-light color via PIT's `lightColor`, yield-sign handling, per-class distance gating, `/qcar_camera/rgb_yolo` annotated overlay) but obtains its frames by instantiating `QCar2DepthAligned` directly — a second PIT camera owner that would break the single-owner architecture used by VO + cartographer. Goal: keep Gabriel's subscriber path, adopt Erick's semantics.
+
+Also addresses two physical-run observations the user reported from Erick's branch:
+  * **Stop sign trips brake too early** — car stops well before the sign. PIT computes object distance as `torch.median(mask × depth)` over the segmentation mask ([pit/YOLO/nets.py:373](Development/MDC_libraries/python/pit/YOLO/nets.py#L373)). On a small/distant stop sign the mask is jitter-noisy and biases the median *shorter* than truth.
+  * **Traffic-light trips brake too late** — car nearly clips the light. The TL seg mask leaks onto the sky and the pole behind the light, biasing the median *deeper* than the actual light face, so Erick's 2.5 m gate is effectively never crossed until the car is on top of it.
+
+**Changes in `Development/ros2/src/qcar2_autonomy/autonomy/yolo_detector.py`.**
+
+- Subscriber pattern (`/camera/color_image`, `/camera/depth_image`) and camera-bridge single-owner invariant preserved — `QCar2DepthAligned` is NOT reintroduced. Comments around the subscriber callbacks left intact (they explain the 2026-05-14 ownership migration).
+- Adopted from Erick's branch:
+  - Traffic-light state-aware stopping using PIT's `TrafficLight.lightColor` (red/yellow → stop, green/idle → drive).
+  - Yield-sign handling (PIT class 33).
+  - `/qcar_camera/rgb_yolo` annotated overlay publish (so user can inspect the detections live in `rqt_image_view`).
+  - Detection cooldown semantics (TL refreshes every frame while red/yellow; stop/yield use the full cooldown).
+- New (not in either branch):
+  - **Full-TL-visibility gate.** TL stop fires only when the bbox is at least `tl_edge_margin_px` (default 8) inside the image border on all four sides. Justification (user, 2026-05-26): "we don't want to stop in the middle of the street" when only the bottom half of a TL has entered the frame. Behavior on a half-visible red TL is to log a one-line "not stopping (bbox not fully visible)" message and keep driving.
+  - **Per-class thresholds promoted to `declare_parameter()`** (`stop_sign_conf`, `stop_sign_dist_m`, `stop_sign_hold_s`, `yield_sign_*`, `tl_conf`, `tl_min_dist_m`, `tl_stop_dist_m`, `tl_hold_s`, `tl_edge_margin_px`, `detection_cooldown_s`). Tunable at launch without a rebuild.
+  - **Diagnostic dual-distance log.** Every detection logs both PIT's mask-median distance AND a center-patch median distance (`_center_patch_depth_m`, median of valid depths in the central 20 % of the bbox). This is the data we need on the next physical run to confirm the bias direction on stop signs and TLs and finalize the thresholds; helper deliberately lightweight (a few hundred pixels per detection).
+- **Defaults vs Erick's branch:**
+  - `stop_sign_dist_m`: **0.55 m** (Erick: 1.0 m) — pulled in to match "right in front of the sign" on the physical car.
+  - `tl_stop_dist_m`: **3.5 m** (Erick: 2.5 m) — pushed out to compensate for the seg-mask-on-sky bias and to give a real braking distance.
+  - All other thresholds preserved at Erick's values.
+- `_bbox_fully_in_frame()` helper: image-edge margin check used by the TL visibility gate.
+
+**Not addressed (flagged for follow-up).** User asked about detecting yield + roundabout signs + crosswalks. The Quanser model `quanser_yolov8s-seg.pt` already includes **yield** (class 33, now wired). **Roundabout** signs and **crosswalks** are NOT in COCO and NOT in the Quanser model; adding them needs a custom-trained YOLO head (LISA + Mapillary datasets would be plausible source data) or a second stacked model. No pretrained weights I'd recommend grabbing off the internet — flagging as a separate future task rather than inventing detection code that pretends to work.
+
+**Verification expected on next physical run.** With `vo_node` + `qcar2_camera_bridge` + `yolo_detector` co-running:
+1. `ros2 topic echo /qcar_camera/rgb_yolo` (or `rqt_image_view`) shows annotated frames — boxes + class names + distances.
+2. Log lines `[YOLO] <name> conf=X PITdist=Y centerD=Z bbox=(...)` appear in the `yolo_detector` console — `Y` vs `Z` mismatch quantifies the seg-mask bias.
+3. Approaching a red TL: car should not stop until bbox is fully in view and depth median < 3.5 m. Approaching a stop sign: car should stop when depth median < 0.55 m (re-tune if dual-distance log shows persistent bias).
+4. Half-visible red TL (bottom of frame only) → log says "bbox not fully visible — NOT stopping" and car keeps moving.
+
+**Files touched.**
+
+- `Development/ros2/src/qcar2_autonomy/autonomy/yolo_detector.py` (rewrite: subscriber pattern + Erick's semantic logic + new visibility gate + parameter declarations + diagnostic log + annotated overlay publisher).
+- This changelog entry.
+- `VO_Conversation_Log.txt` Turn 138.
+
+## 2026-05-26 (Virtual camera owner + nav_to_pose map-frame switch — parity with physical)
+
+**Context.** User went to run the new yolo_detector against QLabs and caught a stack mismatch: `qcar2_cartographer_virtual_launch.py` only started legacy `rgbd` (MONO16, *not* aligned to the color grid), but the new yolo_detector relies on depth being aligned to the RGB pixel grid (YOLO seg masks live in RGB pixel coordinates; PIT's `mask × depth` median is the *wrong* pixels if depth isn't aligned). Physical mode already handled this via the `camera_source` selector in `qcar2_launch.py` (default `depth_aligned` → `qcar2_autonomy/camera_bridge`). Virtual mode lacked the same selector entirely.
+
+**Changes.**
+
+### `Development/ros2/src/qcar2_nodes/launch/qcar2_virtual_launch.py`
+Mirrored physical's `camera_source` selector pattern (copied directly from `qcar2_launch.py`). Now exposes:
+  - `camera_source:=depth_aligned` (**new default**) — runs `qcar2_autonomy/camera_bridge` with `device_type:=virtual`. The bridge uses `pit.YOLO.utils.QCar2DepthAligned`'s virtual branch ([pit/YOLO/utils.py:148-165](Development/MDC_libraries/python/pit/YOLO/utils.py#L148-L165)): QLabs Camera3D on `tcpip://localhost:18965`, `depth_scale=5.5`, `warpPerspective` M-matrix alignment. Republishes `/camera/color_image` (bgr8), `/camera/depth_image` (32FC1 meters, **aligned to color grid**), and `/camera/camera_info` (intrinsics from the VIRTUAL DepthProjector table; never cross-pollinated with physical).
+  - `camera_source:=rgbd` — legacy fallback (`qcar2_nodes/rgbd` `device_type:=virtual`, MONO16 unaligned), preserved for parity with physical's fallback.
+Same `IfCondition(PythonExpression(...))` gate the physical launch uses, identical topic names (drop-in for any subscriber). Lidar / csi / qcar2_hardware nodes unchanged.
+
+### `Development/ros2/src/qcar2_autonomy/autonomy/nav_to_pose.py`
+Switched `map_rotated` → `map` at three locations (lines 451-452, 467-468, 620-621). User confirmation: virtual cartographer's `map` frame is already correctly oriented (matches QLabs world), so the 180° static TF `map_rotated → map` that physical's `qcar2_cartographer_launch.py` injects is not needed in virtual mode. Nav2 path publish + tf lookup now happen in the `map` frame directly. Toggle is *commented-out lines preserved on the other side* so flipping back for physical mode is a one-line swap each.
+
+**No edits to `qcar2_cartographer_virtual_launch.py`.** It already `IncludeLaunchDescription(...qcar2_virtual_launch.py)`, so the new `camera_source` arg propagates without further plumbing. The launch deliberately does NOT add a `map_rotated → map` static_transform_publisher (which is what physical's cartographer launch adds at line 35-39) — virtual doesn't need the rotation.
+
+**Run recipe (updated).** Inside dev container:
+```
+ros2 launch qcar2_nodes qcar2_cartographer_virtual_launch.py        # defaults to camera_source:=depth_aligned -> camera_bridge
+ros2 launch qcar2_autonomy autonomy_planner_launch.py               # yolo_detector + trip_planner + path_follower + Planner_server
+rqt_image_view /qcar_camera/rgb_yolo                                # visual confirmation
+```
+To explicitly opt back to the legacy raw path for an A/B:
+```
+ros2 launch qcar2_nodes qcar2_cartographer_virtual_launch.py camera_source:=rgbd
+```
+
+**Files touched.**
+
+- `Development/ros2/src/qcar2_nodes/launch/qcar2_virtual_launch.py` (camera_source selector added; default depth_aligned).
+- `Development/ros2/src/qcar2_autonomy/autonomy/nav_to_pose.py` (map_rotated -> map at lines 451-452, 467-468, 620-621).
+- This changelog entry.
+- `VO_Conversation_Log.txt` Turn 139.
+
+## 2026-05-26 (YOLO detector v2 — kill TL stop-go-stop flicker + center-patch gating for stop sign)
+
+**Symptoms from user's first virtual run with the v1 (earlier today) detector.**
+1. **Traffic light: stop-go-stop chatter.** Car correctly brakes on red, then briefly creeps forward, then brakes again. Cycle visibly repeats. User correctly intuited that "yolo is looking at too many things" / inference is reacting too noisily.
+2. **Stop sign: still brakes too far away** — improved vs Erick's branch but still wrong. User suggested Luigi's idea: "focus on 50% of the stop sign, just the center, so depth is read from the center only."
+
+**Root cause v1 (TL flicker).** `on_timer` was a latch: while `sign_detected==True`, YOLO was NOT re-run; we just waited for `disable_until` to expire. With `tl_hold_s=0.25` and `detection_cooldown_s=0`, every 0.25 s the latch released, `flag_value` flipped True for one tick, the timer re-ran YOLO, the still-red TL re-engaged the latch. That one-tick gap every 250 ms is the visible creep. Stop-go-stop is a *bookkeeping* bug, not a perception bug.
+
+**Root cause v1 (stop-sign distance).** PIT's distance is `torch.median(mask × depth)` over the FULL seg mask ([pit/YOLO/nets.py:373](Development/MDC_libraries/python/pit/YOLO/nets.py#L373)). On small/distant signs the mask leaks onto the pole / background / shadow, biasing median *shorter* than the actual front face. Center-patch median (small ROI around bbox center) reads the face directly. The v1 diagnostic log already proved this — center patch was consistently closer to ground truth.
+
+**Fixes in `Development/ros2/src/qcar2_autonomy/autonomy/yolo_detector.py`.**
+
+1. **Always-evaluate, refresh-each-frame.** Rewrote `on_timer` to call `yolo_detect()` every tick unconditionally. `yolo_detect()` no longer returns `(delay, detected)` — it now mutates two absolute-time fields directly:
+   - `brake_until_abs` — `time.time()` when the brake releases. TL refreshes it every frame it's red/yellow; stop/yield set it once per latch.
+   - `sign_cooldown_until_abs` — earliest time a stop or yield sign can re-trigger. TL is exempt (always evaluates, no cooldown).
+   `flag_value = (now >= brake_until_abs)`. No more state latch, no more one-tick brake-release gap.
+
+2. **Center-patch median is the new gating distance** (Luigi's idea). New param `distance_source ∈ {center_patch, pit_median}`, **default `center_patch`**. The other measurement is still logged as a second opinion (`PITdist` / `centerD`). NaN-safe fallback: if center patch has no valid depth, gating falls back to PIT's median so we never silently fail to detect.
+
+3. **`tl_hold_s` default bumped to 0.6 s** (from 0.25 s). Must exceed one inference period (~33 ms @ 30 Hz) by a comfortable margin to bridge any single-frame miss. With refresh-each-frame logic this just means "if we lose the TL for up to 600 ms, hold the brake."
+
+4. **Removed obsolete state.** `sign_detected`, `disable_until`, `detection_cooldown`, `t0` deleted from the class state. They were the latch that caused the v1 flicker. Replaced entirely by the two `*_abs` timestamps above.
+
+5. **Stop-override (`/trip_planner/qcar_state=1`) uses `max(...)` accumulation** instead of unconditional overwrite, so the override expiry honors the longest currently-active stop reason.
+
+**What stays the same.** Subscriber pattern (camera_bridge owns the RealSense), full-TL-visibility gate, `/qcar_camera/rgb_yolo` annotated overlay, traffic-light color via PIT `lightColor`, declare_parameter for all thresholds, dual-distance log per detection.
+
+**Behavior matrix the user described, implemented:**
+- TL red/yellow + full bbox + valid distance: brake refreshed each frame -> continuous stop.
+- TL green / idle: no refresh -> brake_until_abs decays -> car drives. User's exact words: "if green we just keep moving."
+- TL bbox half out of frame: visibility gate blocks the stop -> log "NOT stopping" -> drive.
+- Stop sign closer than `stop_sign_dist_m` (default 0.55): one-shot 3 s brake + 10 s cooldown before the same sign can re-fire.
+
+**Verification on next virtual run.**
+1. Approach a red TL: brake should engage smoothly and STAY engaged with no creep until TL turns green or you pass it.
+2. Approach a green TL: car drives through (still gets logged, no brake).
+3. Approach a stop sign: distance from `used=` field in the log should match where the car actually stops. If it's still biased, swap `distance_source:=pit_median` at launch to A/B; the `PITdist` line is in every log so you can see the bias direction.
+
+**Files touched.**
+- `Development/ros2/src/qcar2_autonomy/autonomy/yolo_detector.py` (rewrite of on_timer / yolo_detect; new `distance_source` param; bumped `tl_hold_s` default; removed obsolete latch state).
+- This changelog entry.
+- `VO_Conversation_Log.txt` Turn 140.
+
+## 2026-05-26 (Overnight YOLOv8s finetune — kicked off in dev container)
+
+**Goal.** User wants a YOLO detector trained from scratch (well — finetuned from COCO) on classes that matter for ACC: stop, yield, traffic light, crosswalk, roundabout, speed limit (drop car — RealSense was picking up the front CSI bumper as a car).
+
+**What's running.**
+- **Model**: YOLOv8s detection (11.1 M params, 28.7 GFLOPs), pretrained `yolov8s.pt` (COCO) as starting weights.
+- **Dataset**: Andrew Mvd "Road Sign Detection" (875 imgs: 612 train / 175 val / 88 test) — 4 classes: `crosswalk`, `speedlimit`, `stop`, `trafficlight`. Source: https://www.kaggle.com/datasets/andrewmvd/road-sign-detection. Downloaded as Roboflow-formatted ZIP from https://github.com/fredotran/traffic-signs-detection — no Kaggle / Roboflow auth needed.
+- **Coverage vs target classes**: 4 of 6 (stop, TL, crosswalk, speedlimit). YIELD and ROUNDABOUT not in this dataset — explicitly deferred to a v2 run (need to source a supplementary set; LISA covers yield, GTSDB covers roundabout).
+- **Hyperparams**: epochs=500, patience=100, batch=16, imgsz=640, AMP=on, workers=0 (Docker `/dev/shm` is 64 MB which OOMs the multi-process DataLoader — workers=0 is the easy fix without restarting the container).
+- **Throughput**: ~17 s/epoch (14 s train + ~3 s val). 500 epochs cap = ~2.4 h; will probably converge much earlier (1-epoch smoke test already hit mAP50=0.71 on COCO-pretrained weights).
+- **Container**: `isaac_ros_dev-x86_64-container` (torch 2.1.0+cu121, ultralytics 8.4.14, GPU passthrough RTX 3060 Mobile 6 GB verified).
+- **Process**: pid 13755 inside the container (detached `docker exec -d`, `nohup`'d).
+- **Logs / outputs (host paths)**:
+  - `Development/yolo_training/logs/train.log` — live stdout
+  - `Development/yolo_training/runs/detect/road_signs_4class_v1/results.csv` — per-epoch metrics
+  - `Development/yolo_training/runs/detect/road_signs_4class_v1/weights/{best,last,epoch{N}}.pt` — checkpoints (every 25 epochs + best/last continuously)
+
+**Why this is "as autonomous as I can do."** I'm not a daemon — I only execute when the user sends a message. But the launched process is detached and doesn't depend on me being alive. Training will run to completion (or early-stop on patience=100) regardless of whether anyone talks to me. When the user wakes up and pings, I just `cat results.csv` and report status.
+
+**User commands.**
+```
+bash Development/yolo_training/scripts/check_training.sh        # one-shot status
+bash Development/yolo_training/scripts/check_training.sh tail   # status + live tail of log
+bash Development/yolo_training/scripts/stop_training.sh         # SIGTERM (graceful, then SIGKILL after 10s)
+```
+
+**Smoke test result (epoch 1, pre-launch verification).**
+```
+all          175 images / 255 instances    P=0.876 R=0.649  mAP50=0.709  mAP50-95=0.516
+crosswalk    36/40    mAP50=0.781
+speedlimit  132/152   mAP50=0.946
+stop         18/18    mAP50=0.831
+trafficlight 24/45    mAP50=0.277   <- weakest, expected to improve most over training
+```
+
+**Integration with `yolo_detector.py` (NOT done yet — for the user's morning testing).**
+The trained model will be a YOLOv8 DETECTION model (no segmentation masks). That means `pit.YOLO.nets.YOLOv8.post_processing()`'s mask-median distance is unavailable — we'd switch to the bbox center-patch depth (the path already implemented as `_center_patch_depth_m` and now the default for `distance_source`). Class IDs differ too:
+  - Current Quanser model: 2=car, 9=traffic light, 11=stop, 33=yield
+  - New model: 0=crosswalk, 1=speedlimit, 2=stop, 3=trafficlight
+A future yolo_detector v3 will need:
+  - Load weights via plain `ultralytics.YOLO(...)` instead of PIT's wrapper
+  - Map new class names directly instead of the COCO IDs
+  - Drop PIT mask-median (use center-patch only)
+  - Reuse the existing PIT TL color check (HSV brightness over three vertical patches in bbox) — or train color awareness into the model later.
+
+**Files added / touched.**
+- `Development/yolo_training/dataset/road_signs_4class/...` (875 imgs + labels + data.yaml)
+- `Development/yolo_training/scripts/train.py` (ultralytics finetune script)
+- `Development/yolo_training/scripts/check_training.sh` (status command — works from host)
+- `Development/yolo_training/scripts/stop_training.sh` (graceful stop command)
+- `.gitignore` — added `Development/yolo_training/` (too large for git)
+- This changelog entry.
+- `VO_Conversation_Log.txt` Turn 141.
+
+## 2026-05-26 PM (YOLO detector v3 — dual-backend: Quanser-seg + custom ultralytics)
+
+**Training result first.** Overnight run finished cleanly (500/500 epochs, ~2h wall clock). Per-class val on `best.pt`:
+
+| class | P | R | mAP50 | mAP50-95 |
+|---|---|---|---|---|
+| crosswalk | 0.93 | 0.93 | **0.98** | 0.84 |
+| speedlimit | 1.00 | 0.99 | **1.00** | 0.92 |
+| stop | 0.99 | 0.94 | **0.99** | 0.94 |
+| trafficlight | 0.98 | **0.51** | 0.67 | 0.48 |
+
+Three of four classes excellent. Trafficlight has high precision but **low recall (0.51)** — model misses half the TLs in the val set, expected given that class had the fewest training instances and the dataset is real-world (model may behave differently on QLabs's stylized sim TLs — test will tell). `best.pt` copied into `Development/ros2/src/qcar2_autonomy/models/road_signs_4class_yolov8s.pt` (gitignored) for a stable reference path.
+
+**Integration.** Restructured `yolo_detector.py` into a dual-backend dispatcher. Backend is chosen via two new ROS params:
+  - `model_path` (default `""`) — path to a `.pt` file. Empty = Quanser default.
+  - `model_type` (default `"auto"`) — `auto | quanser_seg | ultralytics`.
+    `auto` picks `ultralytics` when `model_path` is set, else `quanser_seg`.
+
+Architecture: `yolo_detect()` is now a thin orchestrator that dispatches to `_run_quanser_seg()` (PIT path, preserves v2 behavior bit-for-bit) or `_run_ultralytics()` (new). Both backends return a uniform `(processedResults, xyxy)` shape so the per-detection gating loop is backend-agnostic.
+
+New helpers:
+- `_load_model(image_width, image_height)` — backend setup at __init__, deferred PIT import so the ultralytics path can run on machines without the PIT package on the path.
+- `_check_traffic_light_color(bgr, x1, y1, x2, y2)` — pure-numpy port of [pit/YOLO/nets.py:320-370](Development/MDC_libraries/python/pit/YOLO/nets.py#L320-L370). Custom YOLO detects "trafficlight" as a single class with no color awareness, so we replicate PIT's three-vertical-patch HSV brightness check in-process. Output strings (`"red"`, `"yellow"`, `"green"`, `"idle"`) match PIT's so the existing red/yellow stop logic is unchanged.
+- `_Detection` nested class — backend-agnostic detection record (`.name`, `.conf`, `.x`, `.y`, `.distance`, `.lightColor`) that mirrors PIT's `Obstacle`/`TrafficLight` shape via `__dict__` so the existing per-detection loop consumes either backend's output unchanged.
+- `_ULT_NAME_MAP` — normalizes new-model class names (`"stop"` → `"stop sign"`, `"trafficlight"` → `"traffic light"`) so the existing gating branches still match. `crosswalk` and `speedlimit` pass through as-is and are handled by two new `elif` branches.
+
+**Class behavior with the v3 model:**
+- `stop` → "stop sign" → existing one-shot brake at `stop_sign_dist_m`.
+- `trafficlight` → "traffic light (color)" → existing red/yellow refresh-each-frame brake with full-visibility gate, color from the in-process HSV check.
+- `crosswalk` → log-only for now (auto-stop not wired; flagged in the changelog for the "stop before crosswalk if TL red" enhancement the user described in Turn 138).
+- `speedlimit` → log-only (user explicit: classify only, no speed change).
+- `yield` and `roundabout`: not in v3 model — deferred to a v4 training that adds those classes.
+
+**Verification on next QLabs run.** With:
+```
+ros2 launch qcar2_nodes qcar2_cartographer_virtual_launch.py
+ros2 launch qcar2_autonomy autonomy_planner_launch.py
+```
+yolo_detector starts on the Quanser-seg backend (no behavior change). To use the v3 ultralytics model instead, override via env or a separate `ros2 run`:
+```
+ros2 run qcar2_autonomy yolo_detector --ros-args \
+    -p model_path:=/workspaces/isaac_ros-dev/ros2/src/qcar2_autonomy/models/road_signs_4class_yolov8s.pt
+```
+Inspect via `rqt_image_view /qcar_camera/rgb_yolo` and watch the `[YOLO]` log lines for `used=` (center-patch depth) on each detection.
+
+**Files touched.**
+- `Development/ros2/src/qcar2_autonomy/autonomy/yolo_detector.py` (dual-backend dispatcher, new helpers, crosswalk/speedlimit elif branches).
+- `Development/ros2/src/qcar2_autonomy/models/road_signs_4class_yolov8s.pt` (copied from training run, gitignored).
+- `.gitignore` (added the new weights file).
+- This changelog entry.
+- `VO_Conversation_Log.txt` Turn 142.
+
+## 2026-05-26 PM-2 (YOLO detector v3.1 — predictive "stop beside the sign" approach)
+
+**Test observations from user's first QLabs run with v3 weights (Turn 142 follow-up):**
+- TL red->brake, green->go: ✅ working
+- Stop sign: detected (bbox in rqt) but car never braked — blew past
+- Yield sign: not detected → v3 model has no yield class (deferred to v4 retrain with supplementary dataset)
+- Crosswalk: not detected in the run — unclear whether scene lacked them or sim-vs-real domain gap
+
+**Root cause of stop-sign-detected-but-no-brake.** The v2 gating logic was `brake when used_d < stop_sign_dist_m (0.55m)`. With the car cruising at ~0.3 m/s, the in-frame window where depth crosses 0.55 m is short (~1.8 s before reaching the sign), and motion-command-propagation latency (yolo_detector → /motion_enable → path_follower → wheel cmd → motor) eats most of it. Result: car is already past the sign before brake takes effect.
+
+**Fix: predictive "stop beside the sign" approach (user request).** New `_SignApproachTracker` class:
+
+1. Each consecutive stop-sign detection feeds `(t_abs, depth_m)` into per-sign-type history (max 8 samples).
+2. Once `min_samples` (default 3) accumulated, linear-fit depth vs time: `d(t) = slope·t + intercept`. `approach_speed = -slope` (m/s, positive when closing).
+3. When `depth < commit_at_m` (default 3.0 m) AND `approach_speed > min_speed` (0.05 m/s), commit to the predicted arrival: `t_arrival = (intercept - target_offset_m) / approach_speed`.
+4. After commit: tracker is frozen — never recomputes, never updates from fresh detections. Brake fires at `t >= t_arrival` even if the sign drops out of the FOV in the last 1-2 m (which it always will on a ~70° HFOV D435 — the sign exits the frame before the car reaches it).
+5. After brake fires, `on_brake_fired()` clears state so the next sign can be tracked fresh.
+
+This sidesteps both the "depth gate window too narrow" and the "sign leaves FOV before brake fires" problems. **No wheel-encoder dependency** — approach speed is derived from depth-vs-time slope directly.
+
+**New params (all tunable at launch):**
+| param | default | meaning |
+|---|---|---|
+| `stop_target_offset_m` | 0.30 | stop this far before the sign face ("right beside the sign") |
+| `stop_predict_min_samples` | 3 | history depth required before fitting |
+| `stop_predict_max_depth_m` | 5.0 | ignore detections beyond this — too noisy / out of frame next |
+| `stop_predict_commit_at_m` | 3.0 | commit prediction only once depth crosses this |
+| `stop_predict_min_speed` | 0.05 | only commit if we're actually approaching (m/s) |
+
+**Diagnostic logging.** Every stop-sign detection that does NOT engage the brake now logs WHY:
+- `stop sign conf=0.85 < 0.90 -- not gating`
+- `stop sign depth=6.20m out of [0, 5.0] -- not gating`
+- `stop sign within cooldown 8.2s remaining -- not gating`
+- `stop sign @ 2.30m -- tracking (no commit yet, 2 samples)`
+- `stop sign @ 1.80m committed, brake in 4.20s`
+- `Stop Sign -> BRAKE NOW (predicted arrival, depth=0.55m, hold 3.0s, cooldown 10s)`
+
+Use these to tune defaults to QLabs' actual approach speeds.
+
+**Yield sign path identical** (uses `_yield_tracker`). Will only fire on the Quanser-seg backend until v4 model adds yield class.
+
+**Removed.** The old simple-distance gates (`stop_dist`, `yield_dist`) — predictive subsumes them. The `stop_sign_dist_m` and `yield_sign_dist_m` params still exist for backwards-compat but no longer drive behavior.
+
+**Not addressed (flagged for follow-up):**
+- **Crosswalk** detection in QLabs: need to confirm sim scene has crosswalks at all; if yes and model still misses them, may need sim-domain augmentation.
+- **Yield sign** detection: needs v4 training with yield + roundabout supplementary dataset (LISA + GTSDB).
+- **Traffic-light "stop right beside it"**: TL behavior stays as-is (refresh-each-frame brake while red/yellow). User's observation that the car ran a quick yellow is more about TL cycle timing than gating logic — would need a different fix (predict arrival like for stop sign, plus committed-stop on red regardless of color change mid-approach).
+
+**Files touched.**
+- `Development/ros2/src/qcar2_autonomy/autonomy/yolo_detector.py` (added `_SignApproachTracker`, two new params, replaced stop / yield branches with predictive + diagnostic logging).
+- This changelog entry.
+- `VO_Conversation_Log.txt` Turn 143.
+
+## 2026-05-26 PM-3 (YOLO detector v3.2 — lateral-edge commit + brake-state log)
+
+**Diagnosis from VO_readings.txt run.** User pasted ~70 lines of yolo_detector output. Trace:
+
+```
+[YOLO] stop sign conf=0.95 used=5.636m(center_patch)
+  stop sign depth=5.64m out of [0, 5.0] -- not gating   <- DROPPED, max too low
+...
+  stop sign @ 4.91m -- tracking (no commit yet, 1 samples)
+  stop sign @ 4.91m -- tracking (no commit yet, 2 samples)
+...
+  stop sign @ 3.45m -- tracking (no commit yet, 8 samples)
+  stop sign @ 3.45m -- tracking (no commit yet, 8 samples)
+  (sign exits FOV)
+```
+
+History: depths went 4.91 → 4.55 → 4.73 → 4.38 → 4.18 → 4.36 → 4.00 → 3.82 → 3.64 → 3.45 over 0.7 s, while bbox center x slid 423 → 449 → 476 → 503 → 533 → 566 → 600 → 620 across a 640-wide frame. **Sign was on the side of the road; car was passing on the left.** Depth never reached `commit_at_m=3.0` because depth decreases SLOWER than driving distance when you're moving past a lateral object — you're not heading at it head-on. Tracker accumulated 8 samples then sign exited the FOV with no commit.
+
+**Verified brake plumbing is correct** by tracing [nav_to_pose.py:303 → :438 → :600-611](Development/ros2/src/qcar2_autonomy/autonomy/nav_to_pose.py#L600-L611): subscribes to `/motion_enable`, sets `motion_flag`, and in the cmd_vel path `enable=0` when `motion_flag==False` which zeroes both `linear.x` and `angular.z`. Same mechanism Erick's branch used. So the bug was never on the consumer side; yolo was just never publishing False.
+
+**Two fixes (one algorithmic, one diagnostic):**
+
+### 1. LATERAL-EDGE commit trigger (primary brake signal for side-of-road signs)
+New trigger in `_SignApproachTracker.update()`: when bbox center x crosses into the outer `lateral_edge_frac` (default 15%, = 96 px on a 640-wide frame) of the image on either side, commit immediately with `target_arrival = now`. That's the moment the sign is about to leave the FOV laterally — i.e., the car is at or just past the sign's position.
+
+Subsumes depth-rate prediction in the common (side-of-road) case. Depth-rate kept as fallback for head-on / occluded signs.
+
+Tracker `update()` signature now takes `bbox_center_x` and `img_w` in addition to depth.
+
+### 2. Bumped depth thresholds so depth-rate fallback also has room to fire
+- `stop_predict_max_depth_m`: 5.0 → **8.0**. The run dropped first 14 detections at depth 5.0-5.6 m because of the 5 m cap — wasted samples we could have been using.
+- `stop_predict_commit_at_m`: 3.0 → **4.5**. The run's minimum recorded depth before sign exit was 3.45 m; commit_at=3.0 was unreachable. 4.5 m commits even on lateral approaches.
+
+### 3. Brake-state-change log line in `on_timer()`
+Logs whenever `flag_value` flips between True/False:
+```
+>>> BRAKE ENGAGED  (motion_enable -> False) at t=1779804204.32, hold for 3.00s
+>>> BRAKE RELEASED (motion_enable -> True)  at t=1779804207.33
+```
+Two new lines per stop event — minimal noise — but they tell us **whether yolo's intent reached the publisher**, independent of whether path_follower obeyed. If you see BRAKE ENGAGED here and the car keeps moving, the bug is downstream (motor topic, QoS mismatch, ROS_DOMAIN_ID drift, etc.) — not in yolo.
+
+**Tunable knobs (all `-p name:=value` at launch):**
+| param | default | meaning |
+|---|---|---|
+| `stop_target_offset_m` | 0.30 | stop this far before sign face (depth-rate fallback only) |
+| `stop_predict_min_samples` | 3 | history samples before depth-rate fit |
+| `stop_predict_max_depth_m` | 8.0 | reject detections beyond this |
+| `stop_predict_commit_at_m` | 4.5 | depth-rate commit threshold |
+| `stop_predict_min_speed` | 0.05 | min approach speed (m/s) to commit |
+| `lateral_edge_frac` | 0.15 | outer N% of frame triggers immediate commit |
+
+**Files touched.**
+- `Development/ros2/src/qcar2_autonomy/autonomy/yolo_detector.py` (lateral-edge commit, bumped defaults, brake-state log).
+- This changelog entry.
+- `VO_Conversation_Log.txt` Turn 144.
+
+## 2026-05-26 PM-4 (YOLO detector v3.3 — TL visibility for overhead lights + bbox-height proximity gate + diagnosis from user's v3.1 run)
+
+**Two big diagnoses from VO_readings.txt (user's latest run).**
+
+### Diagnosis 1: stop sign actually DID commit and the brake intent WAS sent
+Line 39076:
+```
+[predict] stop sign COMMIT (depth-rate): depth=4.36m approach=3.24m/s brake_in=1.26s
+```
+That's yolo_detector telling `/motion_enable` to flip False. But user reported the car didn't visibly stop. Three possibilities, in order of likelihood:
+1. **User ran v3.1, never built v3.2.** The log has no `BRAKE ENGAGED` lines (which v3.2 added in `on_timer`). `colcon build --packages-select qcar2_autonomy` is mandatory between code edits or the changes don't load. **This is the most likely explanation** because everything else in the log is consistent with v3.1 code paths.
+2. Brake fired but car coasted past in the 1.26 s warning + motor inertia.
+3. Brake fired but a downstream node overrode `/cmd_vel_nav`.
+
+Forward path is correct: yolo → `/motion_enable` (Bool) → nav_to_pose.py:303 (sub) → :438 (cb sets `motion_flag`) → :600-611 (`enable=0` zeroes `linear.x` and `angular.z` in Twist) → `/cmd_vel_nav` → nav2_qcar_command_convert.cpp:36 (sub) → `qcar2_motor_speed_cmd`. Verified mechanically; no broken link.
+
+**Action**: rebuild and rerun. Look for `>>> BRAKE ENGAGED (motion_enable -> False)` in yolo console. If present, brake reached the publisher; bug is downstream. If absent, tracker didn't commit, paste log and we tune.
+
+### Diagnosis 2: TL never engaged because visibility gate was wrong for overhead TLs
+User log:
+```
+TL RED @ 8.40m: bbox not fully visible (margin=8px) -- NOT stopping  (x bunch)
+```
+Walking the bboxes for the same TL:
+```
+(259, 35, 32x62)  top=35, depth=9.8m   <- depth too far (>3.5m), but visible
+(252, 20, 34x79)  top=20, depth=9.0m   <- still too far, still visible
+(250, 0, 42x81)   top=0,  depth=8.2m   <- bbox at top of frame, depth still > 3.5m
+```
+**Two root causes stacked:**
+1. **Camera depth never drops** for an overhead TL. The camera looks UP at the TL; depth along the camera ray stays ~7-9 m all the way to the stop line. `tl_stop_dist_m=3.5` was literally unreachable.
+2. **Visibility gate rejects top-clipping.** Overhead TLs naturally clip the top of the frame as the car approaches (camera tilts up, TL bracket exits above). The old "8 px margin on every edge" rule was designed against TLs entering laterally from the side. Top-clipping doesn't carry the same risk and should be allowed.
+
+**Fix:**
+- `tl_stop_dist_m`: 3.5 → **10.0** m (covers realistic overhead-TL camera depths)
+- New param `tl_min_height_px = 50`: bbox-height proximity fallback. A TL bbox ≥ 50 px tall in a 480-tall frame means we're visually close enough to act, regardless of depth. Logical OR with the depth gate.
+- New param `tl_allow_top_clip = True`: skip the top-edge check in `_bbox_fully_in_frame()` for TLs. Still reject left/right/bottom clipping.
+- Per-edge diagnostic in the "NOT stopping" log line — spells out WHICH edge tripped (`left x=`, `right x+w=`, `top y=`, `bottom y+h=`) so future tuning has a fact to act on.
+- New `[YOLO] TL ... too far (depth<10.0 or h>=50) -- NOT stopping` log when depth-and-height both fail.
+
+### On user's VO question ("can VO / KLT / PnP help with distance?")
+Honest answer: **VO can tell us our forward velocity**, but for the "stop right beside the sign" problem, **velocity isn't the missing piece**. The missing piece is **the sign's lateral position relative to the car**, which is encoded directly in the bbox x-coordinate in the camera frame. That's what v3.2's lateral-edge commit uses. VO/KLT/PnP would give a redundant estimate of forward velocity that the wheel encoder (`/qcar2_joint`) already provides. Not worth wiring in.
+
+**Files touched.**
+- `Development/ros2/src/qcar2_autonomy/autonomy/yolo_detector.py` (`_bbox_fully_in_frame` per-edge with `allow_top_clip`; TL gate uses `depth_ok OR height_ok`; per-edge clipping diagnostic).
+- This changelog entry.
+- `VO_Conversation_Log.txt` Turn 145.
+
+## 2026-05-26 PM-5 (YOLO detector v3.4 — fix the actual stop-sign brake bug + Luigi encoder check)
+
+**Critical bug found in user's v3.3 run** (line 40138 of VO_readings.txt):
+```
+[predict] stop sign COMMIT (depth-rate): depth=4.36m approach=0.77m/s brake_in=5.50s
+... stop sign continues being tracked, bbox cx slides 464 -> 555 -> 588 -> 620 ...
+... sign exits FOV around t=...848.764 ...
+... 5.50 seconds later (target_arrival), NO brake fires ...
+```
+All subsequent `>>> BRAKE ENGAGED` lines in the log are `hold for 0.60s` → TL only, never stop-sign (which would be `hold for 3.00s`). User confirmed via `ros2 topic echo /motion_enable` that for stop signs the topic stays True the entire run.
+
+**Two compounding bugs:**
+
+### Bug A: lateral-edge trigger was blocked by an earlier depth-rate commit
+The tracker's "already committed → return early" check ran BEFORE the lateral-edge check. So if depth-rate committed first (sample 3 of the 8-sample history, around depth 4.36m), the tracker froze and the lateral-edge trigger never ran — even when bbox cx kept growing past the lateral edge threshold (544). For side-of-road signs, depth-rate commits almost always land **in the future** (small depth_rate × large remaining_offset = several seconds away), so this freeze is catastrophic.
+
+**Fix:** Lateral edge now runs **before** the early-return and OVERRIDES any prior commit whose target time is in the future. Logged with `COMMIT (lateral edge) OVERRIDES prior commit (was brake_in=…s)`.
+
+### Bug B: `should_brake()` was only polled inside the per-detection elif
+That elif only runs when a stop-sign detection is in the current frame. The depth-rate path sets a target like 5 s in the future. The sign exits the FOV within ~1 s. For the next ~4 s no detection → no elif → no `should_brake()` poll → brake never engages even though the tracker is armed.
+
+**Fix:** Added an end-of-tick poll in `yolo_detect()` after the per-detection loop:
+```python
+for tracker, hold, label in [(self._stop_tracker, stop_hold, "Stop Sign"),
+                              (self._yield_tracker, yield_hold, "Yield Sign")]:
+    if tracker.should_brake(poll_now) and poll_now >= self.sign_cooldown_until_abs:
+        self.brake_until_abs = max(self.brake_until_abs, poll_now + hold)
+        ...
+        tracker.on_brake_fired()
+```
+Runs every tick. If a tracker is armed and its target time has arrived, brake fires regardless of whether the sign is still visible.
+
+**Combined effect of A + B:** With v3.4, the user's exact same run trace would have:
+- t=848.198 → depth-rate commit (brake_in=5.50s, target=853.70)
+- t=848.598 → bbox cx=594, hits lateral edge (>544), commit OVERRIDDEN to target=now
+- Same tick: end-of-tick poll sees armed tracker, fires brake_until_abs = now + 3.00s
+- `>>> BRAKE ENGAGED (motion_enable -> False) at t=848.598, hold for 3.00s`
+- Car stops next to the sign. ✅
+
+### Luigi encoder check (user asked: "use Luigi's encoder reading?")
+Checked `git diff origin/main..origin/luigi-5 -- nav_to_pose.py` for `joint_state_callback`. **The encoder reading formula is byte-identical between main and luigi-5:**
+```python
+self.qcar2_measurred_speed = (msg.velocity[0]/(720.0*4.0)) * ((13.0*19.0)/(70.0*30.0)) * (2.0*np.pi) * 0.033
+```
+Luigi did NOT change how the encoder is read. What Luigi DID add: extensive controller-side instrumentation (`/nav/speed_cmd`, `/nav/yaw_rate_imu`, `/nav/progress_rate`, `/nav/controller_mode` debug publishers), EKF integration with chi² Mahalanobis landmarking, mode switching, IIR filtering on the gyro signal (`apply_filter('gyro', ...)`). The encoder noise itself is not addressed at the source on his branch.
+
+**Practical takeaway for our problem:** The brake decision in yolo_detector doesn't depend on encoder speed at all (it depends on bbox lateral position + depth-rate). So encoder noise is not the cause of the stop-sign-not-stopping bug fixed above. If encoder noise becomes a problem later (e.g., for the predictive-stop logic in nav_to_pose's path-planner), the right fix would be a complementary filter using IMU yaw rate alongside the encoder — but that's a nav_to_pose change, not a yolo_detector change, and out of scope here.
+
+**Files touched.**
+- `Development/ros2/src/qcar2_autonomy/autonomy/yolo_detector.py` (lateral-edge always wins; armed-tracker end-of-tick poll).
+- This changelog entry.
+- `VO_Conversation_Log.txt` Turn 146.
+
+## 2026-05-26 PM-6 (YOLO detector v3.5 — TL color stabilization, pass-line rule, stricter HSV, bottom crop)
+
+**v3.4 result:** stop-sign brake fires correctly — user confirmed car stopped "right beside the stop sign, exactly what I wanted." 🎉
+
+**v3.5 addresses TL behavior + the CSI-bumper false positive.** Four independent fixes:
+
+### 1. Temporal color stabilization (the "uh nvm" fix)
+The TL HSV check produces a per-frame color reading. User reported the car decides red→stops→"nvm"→green→moves→"actually red"→stops again. That's per-frame color flicker. Fix: maintain a rolling window of the last N color readings (default `tl_color_history_size=5` = ~165 ms at 30 Hz), bucket into red/yellow/green/idle, take the majority. Tie-break order favors STOP signals (red > yellow > green > idle) so a borderline frame never accidentally runs a red light. The effective color drives the gate; the instantaneous color is still logged for debugging.
+
+### 2. Pass-the-line rule
+New param `tl_pass_line_height_px=100`. If the TL bbox is taller than this when we FIRST consider engaging a brake, we're already at the intersection and a fresh brake would stop in the middle of the road. The rule blocks NEW activations only — if `_tl_stop_active=True` (we already committed earlier on the approach), refresh-each-frame keeps the brake engaged through the line. Behavior matches what a human driver does: "if it turned yellow when I was already at the line, I keep going."
+
+New `_tl_stop_active` latch + a release condition: when the effective color is non-stop AND we had been stopping, log "release: TL no longer red/yellow" and clear the latch.
+
+### 3. Stricter HSV color check (saturation gate)
+`_check_traffic_light_color` previously required just brightness (V) above a relative threshold. Reflections on the TL housing have high V but **low saturation** — they were tripping the gate. Added absolute floors:
+  - `tl_color_min_v=90` (0-255 brightness)
+  - `tl_color_min_s=70` (0-255 saturation — the key one)
+A patch must satisfy `V >= 90 AND S >= 70 AND V > mean_v AND (V - mean_v) > 0.25*(max - min)` to count as lit. The S floor is what rejects gray reflections and white sky.
+
+### 4. Bottom crop to hide the CSI bumper
+New param `crop_bottom_px=24` (~5% of 480). Applied in `on_timer` BEFORE yolo inference — the model never sees the bottom rows. The published `/qcar_camera/rgb_yolo` overlay is also cropped, so rqt shows what the model actually sees. `self._img_h` is refreshed each tick to the cropped height so the visibility gate uses the correct frame dimensions. The CSI bumper, which has been misclassified as "car" and "traffic light", is now physically excluded from the input.
+
+Tune by watching rqt: if the bumper still shows, increase `crop_bottom_px` in steps of 4-8.
+
+### Lighting techniques people use for TL color detection (user asked)
+Quick literature note for future reference:
+1. **HSV + saturation gate** — what v3.5 now does. Filters reflections.
+2. **HSV H ranges** — check the hue value to confirm color identity (red H≈0 or 180, yellow H≈30, green H≈60). We're brightness-only; adding H checks is a follow-up.
+3. **LAB color space** — A channel (green↔red), B channel (blue↔yellow) are more robust to illumination than RGB.
+4. **Adaptive thresholding (Otsu)** — auto-tune per frame.
+5. **CNN color classifier** — train a small network on TL bbox crops. Most robust. Your friend's video of a TL switching colors would be perfect training data for this.
+6. **Temporal voting** — what v3.5 now does, majority over N frames.
+7. **White-balance normalization** — pre-process image to neutral white before checking color.
+
+For now (1) + (6) should make a significant dent. (3) is the next thing to try if the HSV approach still has issues in tricky lighting. (5) is the long-term right answer once we have enough labeled TL crops.
+
+### What the new log lines look like
+Successful gate:
+```
+Traffic Light RED (inst=red, buckets r4/y0/g0/i1) @ depth=8.40m h=81px (height) -> STOP (brake refreshed +0.60s)
+```
+The bucket counts show the majority-vote breakdown. If buckets look chaotic (e.g. r2/y0/g2/i1), the color check is still noisy and we need to tune `tl_color_min_v` / `tl_color_min_s` further.
+
+Pass-line block:
+```
+TL RED (inst=red) h=125px > pass-line 100px: already past the line -- NOT starting new brake
+```
+
+Release:
+```
+TL GREEN (inst=green) -- release: TL no longer red/yellow
+```
+
+### Files touched
+- `Development/ros2/src/qcar2_autonomy/autonomy/yolo_detector.py` (bottom crop in on_timer; stricter HSV with V+S floors; temporal majority-vote color; pass-line rule with `_tl_stop_active` latch; new diagnostic logs).
+- This changelog entry.
+- `VO_Conversation_Log.txt` Turn 147.
+
+## 2026-05-26 PM-8 (YOLO detector v3.6 — TL approach state machine: commit-and-hold semantics)
+
+**User feedback after v3.5:**
+- `tl_color_history_size=8` was the best preset; flicker mostly gone.
+- New requirement: don't stop in the middle of an intersection on a late yellow. Concretely:
+  - If we were stopped at red and it goes green, we GO — and if it briefly turns yellow as we cross, we KEEP GOING (don't re-brake).
+  - If we first see the TL green when still far away, we GO — and any later color change during the pass-through is ignored.
+- Asked whether depth camera would help. Honest answer: **no, not for overhead TLs.** Camera-depth stays ~7-10 m even at the stop line because the camera looks UP along the ray; depth often falls back to NaN (=-1.0 m) at close range when the TL exits the depth FOV at the top. **bbox_h is the right proximity proxy for overhead TLs** — grows monotonically as we approach. v3.6 makes this explicit.
+
+### Design: `_TLStateMachine` (new nested class)
+
+Three states + one reset:
+
+```
+IDLE
+  +-- first sighting + bbox_h > pass_line          -> COMMIT_GO
+  +-- first sighting + effective color red/yellow  -> COMMIT_STOP (brake)
+  +-- first sighting + effective color green/idle  -> COMMIT_GO
+
+COMMIT_STOP  (brake refreshed every tick)
+  +-- effective color = green for K consecutive frames -> COMMIT_GO (release)
+  +-- otherwise                                        -> stay
+
+COMMIT_GO  (NO brake, color-change-IMMUNE)
+  +-- anything                                     -> stay
+
+any non-IDLE + TL not seen for M frames           -> IDLE (reset for next TL)
+```
+
+The critical invariant: **once in `COMMIT_GO`, no color change can engage a brake.** That eliminates the "stopped mid-intersection on a flash yellow" failure mode by construction.
+
+State transitions emit log lines like:
+```
+[TL-FSM] IDLE -> COMMIT_STOP: first sight red/yellow at bh=72 -> STOP
+[TL-FSM] COMMIT_STOP -> COMMIT_GO: sustained green (3 frames) -> GO (release)
+[TL-FSM] COMMIT_GO -> IDLE: lost for 15 frames -> reset
+```
+
+### How it integrates (architecture)
+
+- Per-detection loop now COLLECTS instead of DECIDING for TLs:
+  - For each TL detection: compute instantaneous color via `_check_traffic_light_color`, push into the temporal-vote history, derive effective color, gate on confidence + visibility + close-enough (`depth_ok OR height_ok`).
+  - Of all usable TL detections this tick, remember the most prominent (largest `bbox_h`) as the FSM input.
+  - If no usable TL passed the gates, the FSM gets `present=False` and counts toward the lost-frames reset threshold.
+- After the loop, call `_tl_fsm.update(...)` exactly once with the chosen TL or `present=False`.
+- FSM returns `'brake'` / `'release'` / `None`. The driver acts:
+  - `'brake'`: refresh `brake_until_abs += tl_hold`, publish `qcar_state=1`, log STOP line including state.
+  - `'release'`: hard-pull `brake_until_abs` back to `now` so the outer `on_timer` flips `motion_enable` to True next tick.
+  - `None`: no-op (covers IDLE-with-no-TL, COMMIT_GO-with-anything, and COMMIT_STOP-while-counting-green).
+
+### Removed
+- `self._tl_stop_active` boolean from v3.5 — FSM state is now the authority.
+- The inline pass-the-line block (`gate_ok and past_pass_line and not _tl_stop_active`) — the FSM's first-sighting + `past_line` check subsumes it.
+
+### New params (all overridable at launch)
+| param | default | meaning |
+|---|---|---|
+| `tl_fsm_lost_frames_to_reset` | 15 (~0.5 s @ 30 fps) | Frames without TL detection before FSM returns to IDLE |
+| `tl_fsm_green_frames_to_release` | 3 (~0.1 s) | Sustained green frames required to release a `COMMIT_STOP` |
+
+### Launch additions
+Both new params are forwarded by `autonomy_planner_launch.py` so the user can override at launch:
+```
+ros2 launch qcar2_autonomy autonomy_planner_launch.py \
+  yolo_model_path:=... tl_fsm_green_frames_to_release:=5
+```
+
+### Why depth was rejected as the primary TL proximity signal
+The user proposed using depth for "distancing to the TL." From v3.5 log analysis (lines 38614+ in VO_readings.txt):
+- Camera depth for the same overhead TL: stayed in `[7.0, 10.0] m` across the entire approach. Never crossed `tl_stop_dist_m=10` from above OR below in a useful way.
+- 70% of the depth readings were `-1.000 m` (center-patch NaN — TL bbox at the top of frame, center patch outside the valid depth area).
+- bbox_h same approach: monotonically grew `24 -> 52 -> 75 -> 81 -> 110 -> exit-frame-at-top`. Clean signal.
+
+`tl_pass_line_height_px=100` (the FSM input) is on `bbox_h`. Depth stays in the proximity check as the `depth_ok OR height_ok` OR-gate so it can help on the rare cases where it produces a valid reading, but it's no longer the primary signal.
+
+### Lighting techniques (continued from PM-6 writeup)
+HSV V+S floors and temporal voting are now both in. Next-best improvements if TL color still has issues:
+- LAB color space color check (A channel for green↔red, B for blue↔yellow — more illumination-robust than HSV).
+- HSV H ranges (verify hue numerically: red H≈0/180, yellow≈30, green≈60).
+- A small CNN trained on TL bbox crops (most robust; the user's friend's TL color-change video would be perfect input data).
+
+### Files touched
+- `Development/ros2/src/qcar2_autonomy/autonomy/yolo_detector.py` (new `_TLStateMachine` class; new FSM params; per-detection loop collects TL info; FSM driver after loop; `_tl_stop_active` removed; release path; rich state-transition logs).
+- `Development/ros2/src/qcar2_autonomy/launch/autonomy_planner_launch.py` (added `tl_fsm_lost_frames_to_reset` and `tl_fsm_green_frames_to_release` launch args).
+- This changelog entry.
+- `VO_Conversation_Log.txt` Turn 148.
+
+## 2026-05-26 PM-9 (YOLO detector v3.7 — TL FSM corrected: reactive while far, locked only past line)
+
+**Misread fixed.** v3.6 implemented "first-sight commitment" — if first frame was green, COMMIT_GO locked us in, color-immune for the whole approach. User (Turn 149) clarified that's WRONG: a green-then-yellow flip **while still far** should obey the yellow (stop). The "locked GO" should only kick in **once at the line**, not from first sighting.
+
+**New FSM design (v3.7):**
+
+```
+IDLE
+  +-- first sight + bbox_h > pass_line     -> PASSING (locked GO)
+  +-- first sight otherwise                -> WATCHING
+
+WATCHING                                    (reactive while far)
+  +-- bbox_h > pass_line                   -> PASSING
+  +-- effective color in {red, yellow}     -> brake (refresh)
+  +-- effective color in {green, idle}     -> release (drive)
+
+PASSING                                     (locked, color-IMMUNE)
+  +-- anything                             -> stay (NO brake ever)
+
+any non-IDLE + TL not seen for M frames    -> IDLE (reset)
+```
+
+The two scenarios the user wants:
+
+1. **"Far + green → suddenly yellow while still far → obey, wait for red→green, then go"**
+   - WATCHING + green: release (drive)
+   - WATCHING + yellow: brake
+   - WATCHING + red: brake (refresh)
+   - WATCHING + green: release (drive)
+   - We approach, bbox grows past pass_line → PASSING (locked)
+   - Yellow during cross: ignored ✓
+
+2. **"At the line / in the intersection, no matter what color: GO"**
+   - First sight already past_line OR transitioned WATCHING→PASSING from approaching: PASSING
+   - All color changes ignored ✓
+
+### What was removed
+- The `COMMIT_STOP` / `COMMIT_GO` states from v3.6. WATCHING subsumes COMMIT_STOP (it's just WATCHING + red/yellow); PASSING is the only "locked" state and only applies past the line.
+- The `_green_count` field and the K-consecutive-green-to-release logic. WATCHING mirrors live color directly. Brief flickers are absorbed by `tl_color_history_size` upstream (the effective color stays stable via majority vote — that's already where flicker is killed).
+- The `green_frames_to_release` parameter is still **declared** for API compatibility but is no longer used by the FSM.
+
+### What was kept
+- The "collect the most prominent TL per tick, feed FSM once" architecture.
+- `tl_color_history_size` majority vote for effective color.
+- `tl_pass_line_height_px` as the WATCHING→PASSING trigger.
+- `tl_fsm_lost_frames_to_reset` for IDLE reset.
+- `_last_action` field used to detect brake→release transitions (so we emit `release` exactly at the transition instant, not every green tick).
+
+### User's note about crosswalk-aware logic
+User asked whether to add: "if I saw the TL green when last frame had a crosswalk visible, but now light's yellow and I no longer see the crosswalk → keep going OR stop based on whether car is past it." Plausible enhancement. Deferred — user wants to check competition staff's preference first ("most of our car is still ON the crosswalk so I would say stop but I will make sure with the competition staff").
+
+### Files touched
+- `Development/ros2/src/qcar2_autonomy/autonomy/yolo_detector.py` (`_TLStateMachine` rewrite: states + transitions + action semantics; brief comment updates referencing old state names; `green_frames_to_release` param marked unused).
+- This changelog entry.
+- `VO_Conversation_Log.txt` Turn 149.
+
+## 2026-05-26 PM-10 (YOLO detector — revert v3.7 -> v3.6 FSM, user trade-off decision)
+
+**User decision (Turn 150).** v3.7's reactive-while-far semantic was technically more "correct" per traffic law (obey yellow even when far) but in practice produced a worse failure mode: when a green-then-yellow flip happens *as the car is approaching the line at speed*, propagation latency means the brake engages around the moment the bbox crosses pass_line — i.e., car stops with its front in the intersection. That's worse than just driving through.
+
+Reverted `_TLStateMachine` back to v3.6 (commit-and-hold):
+- IDLE → first sight + bbox_h > pass_line OR color in {green, idle} → COMMIT_GO (locked, color-immune)
+- IDLE → first sight + color in {red, yellow} → COMMIT_STOP (brake until sustained green)
+- COMMIT_STOP → sustained green for K frames → COMMIT_GO (release)
+- COMMIT_GO → ignore all subsequent color changes
+
+User's explicit reasoning, quoted: **"going on a red is better than staying in the middle of the intersection"**. Documented in the class docstring + the init comment so future readers know the trade-off was deliberate.
+
+The `tl_fsm_green_frames_to_release` param is back in active use (controls the K in "sustained green for K frames → release"). Default 3 = ~0.1 s @ 30 fps.
+
+### What stays from v3.7
+Nothing structural — full revert. The COLLECT-then-FSM-drive architecture, the temporal majority vote, the per-detection log changes, the launch args — all kept (those weren't part of the FSM-spec change).
+
+### Why bring v3.6 back specifically
+Tested by user (their actual run, not the cleaned-up scenario) where:
+1. v3.5 (no FSM, refresh-each-frame) — worked OK most of the time but flickered between brake/release.
+2. v3.6 (first-sight commit, this revert) — user described as "actually good" with the caveat about the edge case where front is just past the crosswalk on a flash yellow.
+3. v3.7 (reactive-while-far) — failure mode that's strictly worse than v3.6.
+
+User accepts the v3.6 edge case (running a red the model only learned about after committing to GO) as the lesser evil.
+
+### Files touched
+- `Development/ros2/src/qcar2_autonomy/autonomy/yolo_detector.py` (`_TLStateMachine` reverted; param comment restored; init comment updated).
+- This changelog entry.
+- `VO_Conversation_Log.txt` Turn 150.
+
+## 2026-05-26 PM-11 (v2 model training kicked off — 6 classes incl. yield + roundabout, started from v1 weights)
+
+**Goal.** Add yield + roundabout-warning detection to the v1 4-class model so the QCar can react to those signs in QLabs (and eventually on the physical car). User-requested behavior:
+- yield = treat like stop (predictive brake, stop-beside-the-sign)
+- roundabout = slow down (brief deceleration cue, no full stop)
+
+### Dataset strategy: 875 real-world + 22 QLabs sim, auto-labeled
+
+Searched for a public dataset that has both yield AND the US-style "roundabout ahead" yellow-diamond warning sign — no good match. GTSDB has yield + European blue roundabout (wrong visual style). LISA has yield but not roundabout. The QLabs roundabout sign is unique enough (yellow diamond with circle-of-arrows icon) that real-world transfer would be unreliable.
+
+Pivoted to **auto-labeling 22 user-provided QLabs screenshots**. The sim has clean, consistent colors (no lighting variation), which makes HSV thresholding + shape filtering reliable. Wrote `autolabel_qlabs_signs.py`:
+
+- **Yield**: red mask (HSV H∈[0,10]∪[170,180]) → morphological close → contours → `approxPolyDP` 3-6 vertices → bbox AR ~1:1 → pole-mounted (upper 65% of frame) → MIN_AREA 200, MAX_AREA 6% of img.
+- **Roundabout**: yellow mask (HSV H∈[15,35]) → same shape filtering with 4-8 vertices → solidity ≥ 0.30 (contour_area / bbox_area; rejects thin road centerlines that initially tripped the filter).
+
+Two rounds of tuning:
+- v1 of the autolabeler: false-positive — yellow road centerline as a "huge diamond" (bbox 350x430 covering pavement + line).
+- Added max-area + center-y filters → killed obvious false positives but lost ~9 valid roundabouts.
+- Switched the inside-darkness check for a **solidity** check. Road line solidity ≈ 0.10 (thin yellow snake in square bbox); sign solidity ≈ 0.50 (diamond inscribed in rect). Clean discriminator. Final: 25 yield + 9 roundabout boxes across 22 imgs, no false positives.
+
+Build script `build_v2_dataset.py` then:
+- Copied the 4-class dataset (875 imgs) wholesale (label files still valid; class IDs 0-3 unchanged).
+- Split the 22 qlabs imgs 18/2/2 train/valid/test.
+- Wrote 6-class data.yaml: `0: crosswalk, 1: speedlimit, 2: stop, 3: trafficlight, 4: yield, 5: roundabout`.
+- Final layout: 630 train / 177 valid / 90 test (897 total).
+
+### Training: started from v1 best.pt
+Using `train_v2.py` which is `train.py` with `WEIGHTS=…/road_signs_4class_v1/weights/best.pt`. Ultralytics auto-handles the head expansion (logged `Overriding model.yaml nc=4 with nc=6`). Same hyperparams as v1: 500 epochs cap, patience 100, batch 16, workers=0, AMP, imgsz 640.
+
+**Why warm-start from v1?** Training from plain COCO yolov8s.pt would force the model to relearn crosswalk/speedlimit/stop/trafficlight from scratch (~50 epochs). Warm-start: those classes are already at 95+% mAP50 in v1, and the new yield/roundabout heads can train on top in a small fraction of the time.
+
+Verified at ~3 epochs in: mAP50 0.71 → 0.96 → 0.59 → 0.77 (the dip-and-recover is the new class heads being added; existing classes are recovering fast). Wall-clock ~17s/epoch, GPU 54°C / 39W / 67% util, 5.6 GB VRAM. Will run to completion (or patience early-stop) overnight.
+
+**Process**: pid 33505 inside `isaac_ros_dev-x86_64-container`, detached `docker exec -d`, nohup'd, log at `Development/yolo_training/logs/train_v2.log`.
+
+### Files added
+- `Development/yolo_training/scripts/autolabel_qlabs_signs.py` — HSV/shape auto-labeler for QLabs sim signs
+- `Development/yolo_training/scripts/build_v2_dataset.py` — merge 4-class + qlabs into 6-class dataset
+- `Development/yolo_training/scripts/train_v2.py` — finetune from v1 weights
+- `Development/yolo_training/scripts/check_training_v2.sh` — status command (twin of `check_training.sh`)
+- `Development/yolo_training/dataset/qlabs_signs/{source,images,labels,raw}/` — QLabs source + labels + viz overlays
+- `Development/yolo_training/dataset/road_signs_6class_v2/{train,valid,test}/{images,labels}/` + `data.yaml`
+
+### Status check
+```bash
+bash Development/yolo_training/scripts/check_training_v2.sh
+bash Development/yolo_training/scripts/check_training_v2.sh tail   # also follow log
+```
+
+### Pending after training completes (next session's work)
+1. Per-class val on best.pt — check yield/roundabout accuracy.
+2. Integrate into `yolo_detector.py`:
+   - **yield** → reuse `_SignApproachTracker` (same as stop sign), but tighter `yield_hold` (1.5 s, not 3.0 s) and the action is "slow" not "full stop" — actually with current binary brake the difference is just the hold duration.
+   - **roundabout** → new sign-type branch. Behavior: once detected + close enough, fire a SHORT brake (~0.6 s) as a deceleration cue, ONCE per roundabout (cooldown). Don't engage the predictive tracker because we don't want to stop AT the sign — we want to brake briefly to slow before entering the circle.
+3. Add `model_path` override to the launch file pointing at the v2 weights when ready.
+
+### Files touched
+- This changelog entry.
+- `VO_Conversation_Log.txt` Turn 151.
