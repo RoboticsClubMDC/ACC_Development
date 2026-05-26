@@ -27,6 +27,7 @@ setup(
         'manual_drive = autonomy.manual_drive:main',
         'traffic_system_detector=autonomy.traffic_system_detector:main',
         'lane_detector=autonomy.lane_detector:main',
+        'lane_stanley_controller=autonomy.lane_stanley_controller:main',
         'yolo_detector=autonomy.yolo_detector:main',
         'trip_planner=autonomy.trip_planner:main',
         'dataset_collector=autonomy.dataset_collector:main',

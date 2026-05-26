@@ -11,14 +11,15 @@ from rclpy.parameter import ParameterType
 
 class PlannerServer(Node):
     """
-    Subscribes to /trip_planner/qcar_state (UInt8: 1..4)
+    Subscribes to /trip_planner/qcar_state (UInt8: 1..5)
     and sets /qcar2_hardware led_color_id accordingly.
 
     Mapping:
       qcar_state 1 -> led_color_id 0 (red)
       qcar_state 2 -> led_color_id 2 (blue)
-      qcar_state 3 -> led_color_id 3 (yellow)
+      qcar_state 3 -> led_color_id 6 (orange)
       qcar_state 4 -> led_color_id 1 (green)
+      qcar_state 5 -> led_color_id 5 (magenta)
     """
 
     def __init__(self):
@@ -51,9 +52,11 @@ class PlannerServer(Node):
         elif qcar_state == 2:
             led_color_id = 2  # blue
         elif qcar_state == 3:
-            led_color_id = 3  # yellow
+            led_color_id = 6  # orange
         elif qcar_state == 4:
             led_color_id = 1  # green
+        elif qcar_state == 5:
+            led_color_id = 5  # magenta
         else:
             self.get_logger().warn(f'Unknown qcar_state={qcar_state}, defaulting to green')
             led_color_id = 1

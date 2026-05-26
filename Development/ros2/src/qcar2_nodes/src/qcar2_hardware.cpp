@@ -311,6 +311,8 @@ private:
             {color_value = { 0, 255, 255 };}
         if (led_color_id == 5)
             {color_value = { 255, 0, 255 };}
+        if (led_color_id == 6)
+            {color_value = { 255, 128, 0 };}
 
         // { 255, 0, 0 };        /* LED #0: red     */
         // { 0, 255, 0 },        /* LED #1: green   */
@@ -318,6 +320,7 @@ private:
         // { 255, 255, 0 },      /* LED #3: yellow  */
         // { 0, 255, 255 },      /* LED #4: cyan    */
         // { 255, 0, 255 },      /* LED #5: magenta */
+        // { 255, 128, 0 },      /* LED #6: orange  */
 
         for(int i = 0; i < LED_STRIP_SIZE; i++)
         {

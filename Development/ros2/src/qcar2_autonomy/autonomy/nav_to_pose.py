@@ -199,7 +199,7 @@ class PathFollower(Node):
       self.declare_parameter('node_values', [0,8,10])
       self.waypoints = list(self.get_parameter("node_values").get_parameter_value().integer_array_value)
 
-      self.declare_parameter('desired_speed', [0.2])
+      self.declare_parameter('desired_speed', [0.8])
       self.desired_speed = list(self.get_parameter("desired_speed").get_parameter_value().double_array_value)
 
 
@@ -448,7 +448,7 @@ class PathFollower(Node):
     def path_publisher(self):
         path_msg = Path()
         path_msg.header.stamp = self.get_clock().now().to_msg()
-        path_msg.header.frame_id = "map_rotated"
+        path_msg.header.frame_id = "map"
         # path_msg.header.frame_id = "map"
 
         for i in range(self.wpi):
@@ -464,7 +464,7 @@ class PathFollower(Node):
           t = np.array([self.translation_offset[0],self.translation_offset[1]])
           wp_1_mod = ([self.wp[0,i],self.wp[1,i]]+t)@R_QLabs_ROS
           pose.header.stamp = self.get_clock().now().to_msg()
-          pose.header.frame_id = "map_rotated"
+          pose.header.frame_id = "map"
           # pose.header.frame_id = "map"
           pose.pose.position.x =wp_1_mod[0]
           pose.pose.position.y =wp_1_mod[1]
@@ -617,7 +617,7 @@ class PathFollower(Node):
       self.path_status_publisher.publish(msg)
 
     def tf_timer(self):
-      from_frame_rel= "map_rotated"
+      from_frame_rel= "map"
       # from_frame_rel= "map"
       to_frame_rel = self.target_frame
 
@@ -705,8 +705,15 @@ def main():
       rclpy.spin(node)
   except KeyboardInterrupt:
       pass
-
-  rclpy.shutdown()
+  finally:
+      try:
+          node.destroy_node()
+      except Exception:
+          pass
+      try:
+          rclpy.shutdown()
+      except Exception:
+          pass
 
 if __name__ == '__main__':
   main()

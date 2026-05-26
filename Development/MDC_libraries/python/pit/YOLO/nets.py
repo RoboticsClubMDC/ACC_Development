@@ -29,6 +29,7 @@ class YOLOv8():
         imageHeight = 480,
         modelPath = None,
         convert_tensorrt = True,
+        device = None,
         ):
         """Creates a LaneNet Instance. Find the path to the LaneNet model, load the 
            Tensor RT engine, and prepare for executing inference.
@@ -48,6 +49,7 @@ class YOLOv8():
         self.modelPath = self.__check_path(modelPath)
         self.img=np.empty((self.imageHeight,self.imageWidth,3),dtype=np.uint8)
         self._calc_distence = False
+        self.device = device or ("cuda:0" if torch.cuda.is_available() else "cpu")
         self.net=YOLO(self.modelPath,task='segment')
         print('YOLOv8 model loaded')   
 
@@ -98,7 +100,8 @@ class YOLOv8():
                                                      self.imageWidth),
                                             classes = classes,
                                             conf = confidence,
-                                            half = half
+                                            half = half and self.device != "cpu",
+                                            device = self.device
                                             )
         self.objectsDetected=self.predictions[0].boxes.cls.cpu().numpy()
         self.FPS=1000/self.predictions[0].speed['inference']
@@ -156,7 +159,7 @@ class YOLOv8():
             bgRemoved = np.where((depth3D > clippingDistance)| 
                                  (depth3D <= 0), 0, depth3D)
             self._calc_distence = True
-            self.depthTensor=torch.as_tensor(bgRemoved,device="cuda:0")
+            self.depthTensor=torch.as_tensor(bgRemoved,device=self.device)
         for i in range(len(self.objectsDetected)):
             if self.objectsDetected[i]==9:
                 trafficBox = self.bounding[i]
@@ -167,7 +170,7 @@ class YOLOv8():
                 name=self.predictions[0].names[self.objectsDetected[i]]
                 result=Obstacle(name=name)
             if alignedDepth is not None:
-                mask=self.predictions[0].masks.data.cuda()[i]
+                mask=self.predictions[0].masks.data.to(self.device)[i]
                 distance=self.check_distance(mask,self.depthTensor[:,:,:1])
                 result.distance=distance.cpu().numpy().round(3)
             points=self.predictions[0].boxes.xyxy.cpu()[i]
@@ -338,11 +341,11 @@ class YOLOv8():
         maskR=cv2.circle(copy.deepcopy(mask),R_center,int(d/2),1,-1)
         maskY=cv2.circle(copy.deepcopy(mask),Y_center,int(d/2),1,-1)
         maskG=cv2.circle(copy.deepcopy(mask),G_center,int(d/2),1,-1)
-        maskR_gpu=torch.tensor(maskR,device="cuda:0").unsqueeze(2)
-        maskY_gpu=torch.tensor(maskY,device="cuda:0").unsqueeze(2)
-        maskG_gpu=torch.tensor(maskG,device="cuda:0").unsqueeze(2)
+        maskR_gpu=torch.tensor(maskR,device=self.device).unsqueeze(2)
+        maskY_gpu=torch.tensor(maskY,device=self.device).unsqueeze(2)
+        maskG_gpu=torch.tensor(maskG,device=self.device).unsqueeze(2)
         im_hsv=cv2.cvtColor(im_cpu, cv2.COLOR_RGB2HSV)
-        im_hsv_gpu = torch.tensor(im_hsv,device="cuda:0")
+        im_hsv_gpu = torch.tensor(im_hsv,device=self.device)
         masked_red = im_hsv_gpu*maskR_gpu
         masked_yellow = im_hsv_gpu*maskY_gpu
         masked_green = im_hsv_gpu*maskG_gpu

@@ -64,7 +64,8 @@ def generate_launch_description():
     csi_camera_node = Node(
             package='qcar2_nodes',
             executable='csi',
-            name='csi_camera'
+            name='csi_camera',
+            parameters=[{'camera_num': 3}]
         )
 
     qcar2_hardware = Node(

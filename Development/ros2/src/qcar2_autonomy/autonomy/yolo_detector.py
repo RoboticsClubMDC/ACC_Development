@@ -65,6 +65,7 @@ class ObjectDetector(Node):
                     imageHeight= imageHeight,
                     imageWidth = imageWidth,
                     convert_tensorrt = False,
+                    device = "cpu",
                 )
 
         # Call on_timer function every second to receive pose info
@@ -228,7 +229,7 @@ class ObjectDetector(Node):
         predecion = self.myYolo.predict(inputImg = rgbProcessed,
                                     classes = [2,9,11,33],
                                     confidence = 0.3,
-                                    half = True,
+                                    half = False,
                                     verbose = False
                                     )
 
@@ -292,7 +293,15 @@ def main():
   except KeyboardInterrupt:
       node.terminate()
       pass
-  rclpy.shutdown()
+  finally:
+      try:
+          node.destroy_node()
+      except Exception:
+          pass
+      try:
+          rclpy.shutdown()
+      except Exception:
+          pass
 
 if __name__ == '__main__':
   main()

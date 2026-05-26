@@ -43,8 +43,8 @@ class tripPlanner(Node):
         self.declare_parameter('taxi_node', [10])
         self.taxi_node = list(self.get_parameter("taxi_node").get_parameter_value().integer_array_value)[0]
 
-        # define new parameters for node to use
-        self.declare_parameter('trip_nodes', [2, 8])
+        # Full ride route: [current/start, pickup, dropoff, taxi_hub].
+        self.declare_parameter('trip_nodes', [10, 2, 8, 10])
         self.trip_nodes = list(self.get_parameter("trip_nodes").get_parameter_value().integer_array_value)
 
         # parameter callback for new rides/update to taxi node
@@ -52,25 +52,21 @@ class tripPlanner(Node):
 
         """
         State definition for trip planner logic
-        trip super states
-        1 - going to taxi hub
-        2 - ready for rides
-
         trip states (qcar_state published)
         1 - waiting red
         2 - pickup blue
-        3 - dropoff yellow
+        3 - dropoff orange
         4 - driving green
+        5 - taxi hub magenta
         """
 
-        self.trip_super_state = 1.0
+        self.trip_super_state = 2.0
         self.current_trip_state = 1.0
         self.path_nodes = []
         self.super_state_1_flags = [False, False]
-        self.taxi_node = 10
         self.new_ride_requested = False
         self.trip_length = 0
-        self.current_trip_status = False
+        self.current_trip_status = True
         self.current_stop = 0
         self.goal_stop = 0
         self.stop_index = 0
@@ -86,7 +82,7 @@ class tripPlanner(Node):
         )
 
         # --- STATE + PUBLISHER (THIS WAS THE MISSING PART) ---
-        self.qcar_state = 4  # use int for publishing
+        self.qcar_state = 5  # start ready at the taxi hub (magenta)
         self.previous_led_state = 0
         self.current_path_status = False
 
@@ -109,45 +105,50 @@ class tripPlanner(Node):
         for param in params:
             if param.name == 'taxi_node' and param.type_ == param.Type.INTEGER_ARRAY:
                 self.taxi_node = list(param.value)
-                if len(self.taxi_node > 1):
+                if len(self.taxi_node) > 1:
                     self.get_logger().info('Incorrect number of nodes given... setting default')
                     self.taxi_node = 10
+                else:
+                    self.taxi_node = self.taxi_node[0]
 
             elif param.name == 'trip_nodes' and param.type_ == param.Type.INTEGER_ARRAY:
-                if self.trip_super_state == 1:
-                    self.get_logger().info('Cant assign trip, not at the taxi hub!')
-
                 # The QCar2 has to reach the taxi hub before a new trip can be requested
                 if self.current_trip_status is True and self.trip_super_state == 2:
                     self.trip_nodes = list(param.value)
-                    self.path_nodes = []
+                    self.path_nodes = list(self.trip_nodes)
                     self.trip_length = len(self.trip_nodes)
 
-                    if self.trip_length < 2:
-                        self.get_logger().info('Invalid trip scenario... minimum 2 point required for trip')
+                    if self.trip_length < 4:
+                        self.get_logger().info(
+                            'Invalid trip scenario... expected [current, pickup, dropoff, taxi_hub]'
+                        )
                     else:
-                        for i in range(2 + self.trip_length):
-                            if i == 0 or i == len(self.trip_nodes) + 1:
-                                self.path_nodes.append(10)
-                            else:
-                                self.path_nodes.append(self.trip_nodes[i - 1])
-
                         print("New trip requested!")
                         print(self.path_nodes)
 
                         self.new_ride_requested = True
+                        self.current_trip_status = False
                         self.stop_index = 0
+                        self.nodes_sent = False
+                        self.led_timer_reset = False
+                        self.current_path_status = False
+                        self.qcar_state = 4
                         self.trip_time = time.time()
 
-                        # We travel slowly to pickup station and speed up during actual rides
                         self.send_request(
                             param_name="desired_speed",
                             param_value=[1.0],
                             param_type=ParameterType.PARAMETER_DOUBLE_ARRAY,
                             client=self.path_follower_client
                         )
+                        self.send_request(
+                            param_name="start_path",
+                            param_value=[True],
+                            param_type=ParameterType.PARAMETER_BOOL_ARRAY,
+                            client=self.path_follower_client
+                        )
 
-                if self.current_trip_status is False and self.trip_super_state == 2:
+                elif self.current_trip_status is False and self.trip_super_state == 2:
                     self.get_logger().info('Cant assign trip, current trip in progress!')
 
         return SetParametersResult(successful=True)
@@ -158,48 +159,8 @@ class tripPlanner(Node):
 
         t_current = time.time() - self.trip_time
 
-        # Super state 1: drive to taxi hub
-        if self.trip_super_state == 1:
-            if 5 < t_current < 15 and len(self.path_nodes) == 0 and self.current_path_status is False:
-                self.path_nodes.append(0)
-                for node in self.trip_nodes:
-                    self.path_nodes.append(node)
-                self.path_nodes.append(self.taxi_node)
-
-                if self.super_state_1_flags[0] is False:
-                    self.super_state_1_flags[0] = self.send_request(
-                        param_name="node_values",
-                        param_value=self.path_nodes,
-                        param_type=ParameterType.PARAMETER_INTEGER_ARRAY,
-                        client=self.path_follower_client
-                    )
-
-                if self.super_state_1_flags[1] is False:
-                    self.super_state_1_flags[1] = self.send_request(
-                        param_name="start_path",
-                        param_value=[True],
-                        param_type=ParameterType.PARAMETER_BOOL_ARRAY,
-                        client=self.path_follower_client
-                    )
-
-            if self.current_path_status is True and t_current > 10:
-                if not self.led_timer_reset:
-                    self.led_time_t0 = time.time()
-                    self.led_timer_reset = True
-
-                if time.time() - self.led_time_t0 < self.led_time:
-                    self.qcar_state = 1  # red
-                elif time.time() - self.led_time_t0 > self.led_time:
-                    self.qcar_state = 4  # green driving/ready
-
-                    self.path_nodes = []
-                    self.trip_super_state = 2
-                    self.current_trip_status = True
-                    self.led_timer_reset = False
-
-        # Super state 2: at taxi hub, run ride segments
+        # Super state 2: run ride segments from the explicit trip_nodes route.
         if self.trip_super_state == 2:
-            self.qcar_state = 4
             if self.new_ride_requested:
                 if self.stop_index + 1 <= len(self.path_nodes) - 1:
                     if self.nodes_sent is False:
@@ -214,43 +175,51 @@ class tripPlanner(Node):
                                 param_type=ParameterType.PARAMETER_INTEGER_ARRAY,
                                 client=self.path_follower_client
                             )
+                            self.current_path_status = False
+                            self.qcar_state = 4
 
-                    if self.current_path_status is True and t_current > 2:
+                    if self.current_path_status is True:
                         if not self.led_timer_reset:
                             self.led_time_t0 = time.time()
                             self.led_timer_reset = True
+                            self.qcar_state = self.state_for_arrival(self.stop_index + 1)
 
                         if time.time() - self.led_time_t0 < self.led_time:
-                            if len(self.path_nodes) > 4:
-                                if self.stop_index + 1 == 1:
-                                    self.qcar_state = 2  # pickup blue
-
-                                if (self.stop_index + 1 > 1 or self.stop_index + 1 == len(self.path_nodes) - 1 and
-                                        self.stop_index + 1 != len(self.path_nodes) - 2):
-                                    self.qcar_state = 1  # red stop
-
-                                if self.stop_index + 1 == len(self.path_nodes) - 2:
-                                    self.qcar_state = 3  # dropoff yellow
-
-                            elif len(self.path_nodes) == 4:
-                                if self.stop_index + 1 == 1:
-                                    self.qcar_state = 2
-                                elif self.stop_index + 1 == 2:
-                                    self.qcar_state = 3
-                                elif self.stop_index + 1 == 3:
-                                    self.qcar_state = 1
+                            self.qcar_state = self.state_for_arrival(self.stop_index + 1)
 
                         elif time.time() - self.led_time_t0 > self.led_time:
+                            arrived_index = self.stop_index + 1
                             self.led_timer_reset = False
                             self.nodes_sent = False
-                            self.qcar_state = 4
                             self.stop_index += 1
+                            self.current_path_status = False
                             self.trip_time = time.time()
+                            if arrived_index == len(self.path_nodes) - 1:
+                                self.new_ride_requested = False
+                                self.current_trip_status = True
+                                self.qcar_state = 5
+                            else:
+                                self.qcar_state = 4
+                else:
+                    self.new_ride_requested = False
+                    self.current_trip_status = True
+                    self.qcar_state = 5
+            elif self.current_trip_status is True:
+                self.qcar_state = 5
 
         if self.previous_led_state != self.qcar_state:
             self.previous_led_state = self.qcar_state
             self.publish_qcar_state()  # publish immediately on change
             self.led_set_logic()
+
+    def state_for_arrival(self, arrived_index):
+        if arrived_index == 1:
+            return 2  # pickup blue
+        if arrived_index == len(self.path_nodes) - 2:
+            return 3  # dropoff orange
+        if arrived_index == len(self.path_nodes) - 1:
+            return 5  # taxi hub magenta
+        return 1  # intermediate stop red
 
     def led_set_logic(self):
         # LED Red
@@ -271,11 +240,11 @@ class tripPlanner(Node):
                 client=self.qcar_hardware_client
             )
 
-        # Drop off (yellow)
+        # Drop off (orange)
         elif self.qcar_state == 3:
             self.send_request(
                 param_name="led_color_id",
-                param_value=3,
+                param_value=6,
                 param_type=ParameterType.PARAMETER_INTEGER,
                 client=self.qcar_hardware_client
             )
@@ -285,6 +254,15 @@ class tripPlanner(Node):
             self.send_request(
                 param_name="led_color_id",
                 param_value=1,
+                param_type=ParameterType.PARAMETER_INTEGER,
+                client=self.qcar_hardware_client
+            )
+
+        # Taxi hub (magenta)
+        elif self.qcar_state == 5:
+            self.send_request(
+                param_name="led_color_id",
+                param_value=5,
                 param_type=ParameterType.PARAMETER_INTEGER,
                 client=self.qcar_hardware_client
             )
@@ -319,7 +297,15 @@ def main():
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass
-    rclpy.shutdown()
+    finally:
+        try:
+            node.destroy_node()
+        except Exception:
+            pass
+        try:
+            rclpy.shutdown()
+        except Exception:
+            pass
 
 
 if __name__ == '__main__':
