@@ -1,0 +1,273 @@
+[0.067s] Invoking command in '/workspaces/isaac_ros-dev/build/isaac_ros_nova_interfaces': AMENT_PREFIX_PATH=/workspaces/isaac_ros-dev/install/isaac_ros_common:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/workspaces/isaac_ros-dev/install/isaac_ros_common:/workspace/cartographer_ws/install/perception_pcl:/workspace/cartographer_ws/install/pcl_ros:/workspace/cartographer_ws/install/cartographer_rviz:/workspace/cartographer_ws/install/cartographer_ros:/workspace/cartographer_ws/install/pcl_conversions:/workspace/cartographer_ws/install/pcl_msgs:/workspace/cartographer_ws/install/isaac_ros_tensor_list_interfaces:/workspace/cartographer_ws/install/isaac_ros_pointcloud_interfaces:/workspace/cartographer_ws/install/isaac_ros_nova_interfaces:/workspace/cartographer_ws/install/isaac_ros_nitros_bridge_interfaces:/workspace/cartographer_ws/install/isaac_ros_common:/workspace/cartographer_ws/install/isaac_ros_bi3d_interfaces:/workspace/cartographer_ws/install/isaac_ros_apriltag_interfaces:/workspace/cartographer_ws/install/control_msgs:/workspace/cartographer_ws/install/cartographer_ros_msgs:/workspace/cartographer_ws/install/cartographer:/workspace/cartographer_ws/install/absl:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble LD_LIBRARY_PATH=/workspaces/isaac_ros-dev/install/isaac_ros_common/lib:${LD_LIBRARY_PATH} _=/usr/bin/env /usr/bin/cmake /workspaces/isaac_ros-dev/isaac_ros_nova_interfaces -DCMAKE_INSTALL_PREFIX=/workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces
+[0.112s] -- The C compiler identification is GNU 9.4.0
+[0.145s] -- The CXX compiler identification is GNU 9.4.0
+[0.150s] -- Detecting C compiler ABI info
+[0.198s] -- Detecting C compiler ABI info - done
+[0.203s] -- Check for working C compiler: /usr/bin/cc - skipped
+[0.203s] -- Detecting C compile features
+[0.203s] -- Detecting C compile features - done
+[0.205s] -- Detecting CXX compiler ABI info
+[0.263s] -- Detecting CXX compiler ABI info - done
+[0.269s] -- Check for working CXX compiler: /usr/bin/c++ - skipped
+[0.269s] -- Detecting CXX compile features
+[0.270s] -- Detecting CXX compile features - done
+[0.272s] -- Found ament_cmake_auto: 1.3.5 (/opt/ros/humble/share/ament_cmake_auto/cmake)
+[0.773s] -- Found Python3: /usr/bin/python3.8 (found version "3.8.10") found components: Interpreter 
+[0.895s] -- Loading isaac_ros_common extras
+[0.896s] -- CMAKE_BUILD_TYPE: Release
+[0.908s] -- Looking for pthread.h
+[0.962s] -- Looking for pthread.h - found
+[0.962s] -- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+[1.020s] -- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Failed
+[1.020s] -- Looking for pthread_create in pthreads
+[1.064s] -- Looking for pthread_create in pthreads - not found
+[1.064s] -- Looking for pthread_create in pthread
+[1.117s] -- Looking for pthread_create in pthread - found
+[1.118s] -- Found Threads: TRUE  
+[1.138s] -- Found CUDA: /usr/local/cuda (found version "11.8") 
+[1.139s] -- Loading isaac_ros_common extras (modules)
+[1.180s] -- Found rosidl_generator_c: 3.1.5 (/opt/ros/humble/share/rosidl_generator_c/cmake)
+[1.186s] -- Found rosidl_adapter: 3.1.5 (/opt/ros/humble/share/rosidl_adapter/cmake)
+[1.194s] -- Found rosidl_generator_cpp: 3.1.5 (/opt/ros/humble/share/rosidl_generator_cpp/cmake)
+[1.207s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[1.226s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[1.283s] -- Found rmw_implementation_cmake: 6.1.1 (/opt/ros/humble/share/rmw_implementation_cmake/cmake)
+[1.285s] -- Found rmw_fastrtps_cpp: 6.2.4 (/opt/ros/humble/share/rmw_fastrtps_cpp/cmake)
+[1.391s] -- Found OpenSSL: /usr/lib/x86_64-linux-gnu/libcrypto.so (found version "1.1.1f")  
+[1.419s] -- Found FastRTPS: /opt/ros/humble/include  
+[1.477s] -- Using RMW implementation 'rmw_fastrtps_cpp' as default
+[1.726s] -- Found ament_cmake_ros: 0.10.0 (/opt/ros/humble/share/ament_cmake_ros/cmake)
+[1.881s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[1.946s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[1.970s] -- Found PythonInterp: /usr/bin/python3 (found suitable version "3.8.10", minimum required is "3.6") 
+[1.975s] -- Found python_cmake_module: 0.10.0 (/opt/ros/humble/share/python_cmake_module/cmake)
+[1.999s] -- Found PythonLibs: /usr/lib/x86_64-linux-gnu/libpython3.8.so (found suitable version "3.8.10", minimum required is "3.5") 
+[1.999s] -- Using PYTHON_EXECUTABLE: /usr/bin/python3
+[1.999s] -- Using PYTHON_INCLUDE_DIRS: /usr/include/python3.8
+[1.999s] -- Using PYTHON_LIBRARIES: /usr/lib/x86_64-linux-gnu/libpython3.8.so
+[2.018s] -- Found PythonExtra: .so  
+[2.082s] -- Found ament_lint_auto: 0.12.8 (/opt/ros/humble/share/ament_lint_auto/cmake)
+[2.114s] -- Added test 'copyright' to check source files copyright and LICENSE
+[2.116s] -- Added test 'lint_cmake' to check CMake code style
+[2.117s] -- Added test 'xmllint' to check XML markup files
+[2.120s] -- Configuring done
+[2.164s] -- Generating done
+[2.169s] -- Build files have been written to: /workspaces/isaac_ros-dev/build/isaac_ros_nova_interfaces
+[2.190s] Invoked command in '/workspaces/isaac_ros-dev/build/isaac_ros_nova_interfaces' returned '0': AMENT_PREFIX_PATH=/workspaces/isaac_ros-dev/install/isaac_ros_common:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/workspaces/isaac_ros-dev/install/isaac_ros_common:/workspace/cartographer_ws/install/perception_pcl:/workspace/cartographer_ws/install/pcl_ros:/workspace/cartographer_ws/install/cartographer_rviz:/workspace/cartographer_ws/install/cartographer_ros:/workspace/cartographer_ws/install/pcl_conversions:/workspace/cartographer_ws/install/pcl_msgs:/workspace/cartographer_ws/install/isaac_ros_tensor_list_interfaces:/workspace/cartographer_ws/install/isaac_ros_pointcloud_interfaces:/workspace/cartographer_ws/install/isaac_ros_nova_interfaces:/workspace/cartographer_ws/install/isaac_ros_nitros_bridge_interfaces:/workspace/cartographer_ws/install/isaac_ros_common:/workspace/cartographer_ws/install/isaac_ros_bi3d_interfaces:/workspace/cartographer_ws/install/isaac_ros_apriltag_interfaces:/workspace/cartographer_ws/install/control_msgs:/workspace/cartographer_ws/install/cartographer_ros_msgs:/workspace/cartographer_ws/install/cartographer:/workspace/cartographer_ws/install/absl:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble LD_LIBRARY_PATH=/workspaces/isaac_ros-dev/install/isaac_ros_common/lib:${LD_LIBRARY_PATH} _=/usr/bin/env /usr/bin/cmake /workspaces/isaac_ros-dev/isaac_ros_nova_interfaces -DCMAKE_INSTALL_PREFIX=/workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces
+[2.193s] Invoking command in '/workspaces/isaac_ros-dev/build/isaac_ros_nova_interfaces': AMENT_PREFIX_PATH=/workspaces/isaac_ros-dev/install/isaac_ros_common:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/workspaces/isaac_ros-dev/install/isaac_ros_common:/workspace/cartographer_ws/install/perception_pcl:/workspace/cartographer_ws/install/pcl_ros:/workspace/cartographer_ws/install/cartographer_rviz:/workspace/cartographer_ws/install/cartographer_ros:/workspace/cartographer_ws/install/pcl_conversions:/workspace/cartographer_ws/install/pcl_msgs:/workspace/cartographer_ws/install/isaac_ros_tensor_list_interfaces:/workspace/cartographer_ws/install/isaac_ros_pointcloud_interfaces:/workspace/cartographer_ws/install/isaac_ros_nova_interfaces:/workspace/cartographer_ws/install/isaac_ros_nitros_bridge_interfaces:/workspace/cartographer_ws/install/isaac_ros_common:/workspace/cartographer_ws/install/isaac_ros_bi3d_interfaces:/workspace/cartographer_ws/install/isaac_ros_apriltag_interfaces:/workspace/cartographer_ws/install/control_msgs:/workspace/cartographer_ws/install/cartographer_ros_msgs:/workspace/cartographer_ws/install/cartographer:/workspace/cartographer_ws/install/absl:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble LD_LIBRARY_PATH=/workspaces/isaac_ros-dev/install/isaac_ros_common/lib:${LD_LIBRARY_PATH} _=/usr/bin/env /usr/bin/cmake --build /workspaces/isaac_ros-dev/build/isaac_ros_nova_interfaces -- -j20 -l20
+[2.229s] [  2%] [34m[1mGenerating C code for ROS interfaces[0m
+[2.257s] [  2%] Built target ament_cmake_python_copy_isaac_ros_nova_interfaces
+[2.260s] [  5%] [34m[1mGenerating C++ code for ROS interfaces[0m
+[2.706s] running egg_info
+[2.706s] creating isaac_ros_nova_interfaces.egg-info
+[2.723s] writing isaac_ros_nova_interfaces.egg-info/PKG-INFO
+[2.726s] writing dependency_links to isaac_ros_nova_interfaces.egg-info/dependency_links.txt
+[2.727s] writing top-level names to isaac_ros_nova_interfaces.egg-info/top_level.txt
+[2.728s] writing manifest file 'isaac_ros_nova_interfaces.egg-info/SOURCES.txt'
+[2.826s] reading manifest file 'isaac_ros_nova_interfaces.egg-info/SOURCES.txt'
+[2.826s] writing manifest file 'isaac_ros_nova_interfaces.egg-info/SOURCES.txt'
+[2.846s] [  7%] [32mBuilding C object CMakeFiles/isaac_ros_nova_interfaces__rosidl_generator_c.dir/rosidl_generator_c/isaac_ros_nova_interfaces/msg/detail/encoder_ticks__functions.c.o[0m
+[2.856s] [ 10%] [32mBuilding C object CMakeFiles/isaac_ros_nova_interfaces__rosidl_generator_c.dir/rosidl_generator_c/isaac_ros_nova_interfaces/msg/detail/correlated_timestamp__functions.c.o[0m
+[2.866s] [ 10%] Built target isaac_ros_nova_interfaces__cpp
+[2.904s] [ 15%] [34m[1mGenerating C++ type support dispatch for ROS interfaces[0m
+[2.907s] [ 15%] [34m[1mGenerating C++ type support for eProsima Fast-RTPS[0m
+[2.911s] [ 17%] [34m[1mGenerating C++ introspection for ROS interfaces[0m
+[3.087s] [ 17%] Built target ament_cmake_python_build_isaac_ros_nova_interfaces_egg
+[3.161s] [ 20%] [32m[1mLinking C shared library libisaac_ros_nova_interfaces__rosidl_generator_c.so[0m
+[3.255s] [ 20%] Built target isaac_ros_nova_interfaces__rosidl_generator_c
+[3.296s] [ 25%] [34m[1mGenerating C type support dispatch for ROS interfaces[0m
+[3.300s] [ 28%] [34m[1mGenerating C type support for eProsima Fast-RTPS[0m
+[3.301s] [ 28%] [34m[1mGenerating C introspection for ROS interfaces[0m
+[3.507s] [ 30%] [32mBuilding CXX object CMakeFiles/isaac_ros_nova_interfaces__rosidl_typesupport_cpp.dir/rosidl_typesupport_cpp/isaac_ros_nova_interfaces/msg/correlated_timestamp__type_support.cpp.o[0m
+[3.514s] [ 33%] [32mBuilding CXX object CMakeFiles/isaac_ros_nova_interfaces__rosidl_typesupport_cpp.dir/rosidl_typesupport_cpp/isaac_ros_nova_interfaces/msg/encoder_ticks__type_support.cpp.o[0m
+[3.881s] [ 35%] [32mBuilding CXX object CMakeFiles/isaac_ros_nova_interfaces__rosidl_typesupport_introspection_cpp.dir/rosidl_typesupport_introspection_cpp/isaac_ros_nova_interfaces/msg/detail/correlated_timestamp__type_support.cpp.o[0m
+[3.887s] [ 38%] [32mBuilding CXX object CMakeFiles/isaac_ros_nova_interfaces__rosidl_typesupport_fastrtps_cpp.dir/rosidl_typesupport_fastrtps_cpp/isaac_ros_nova_interfaces/msg/detail/dds_fastrtps/correlated_timestamp__type_support.cpp.o[0m
+[3.888s] [ 41%] [32mBuilding CXX object CMakeFiles/isaac_ros_nova_interfaces__rosidl_typesupport_introspection_cpp.dir/rosidl_typesupport_introspection_cpp/isaac_ros_nova_interfaces/msg/detail/encoder_ticks__type_support.cpp.o[0m
+[3.890s] [ 43%] [32mBuilding CXX object CMakeFiles/isaac_ros_nova_interfaces__rosidl_typesupport_fastrtps_cpp.dir/rosidl_typesupport_fastrtps_cpp/isaac_ros_nova_interfaces/msg/detail/dds_fastrtps/encoder_ticks__type_support.cpp.o[0m
+[3.993s] [ 46%] [32mBuilding CXX object CMakeFiles/isaac_ros_nova_interfaces__rosidl_typesupport_fastrtps_c.dir/rosidl_typesupport_fastrtps_c/isaac_ros_nova_interfaces/msg/detail/encoder_ticks__type_support_c.cpp.o[0m
+[3.993s] [ 48%] [32mBuilding CXX object CMakeFiles/isaac_ros_nova_interfaces__rosidl_typesupport_fastrtps_c.dir/rosidl_typesupport_fastrtps_c/isaac_ros_nova_interfaces/msg/detail/correlated_timestamp__type_support_c.cpp.o[0m
+[4.015s] [ 51%] [32m[1mLinking CXX shared library libisaac_ros_nova_interfaces__rosidl_typesupport_cpp.so[0m
+[4.066s] [ 51%] Built target isaac_ros_nova_interfaces__rosidl_typesupport_cpp
+[4.070s] [ 53%] [32mBuilding C object CMakeFiles/isaac_ros_nova_interfaces__rosidl_typesupport_introspection_c.dir/rosidl_typesupport_introspection_c/isaac_ros_nova_interfaces/msg/detail/correlated_timestamp__type_support.c.o[0m
+[4.077s] [ 56%] [32mBuilding C object CMakeFiles/isaac_ros_nova_interfaces__rosidl_typesupport_introspection_c.dir/rosidl_typesupport_introspection_c/isaac_ros_nova_interfaces/msg/detail/encoder_ticks__type_support.c.o[0m
+[4.157s] [ 58%] [32m[1mLinking C shared library libisaac_ros_nova_interfaces__rosidl_typesupport_introspection_c.so[0m
+[4.157s] [ 61%] [32mBuilding CXX object CMakeFiles/isaac_ros_nova_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/isaac_ros_nova_interfaces/msg/correlated_timestamp__type_support.cpp.o[0m
+[4.164s] [ 64%] [32mBuilding CXX object CMakeFiles/isaac_ros_nova_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/isaac_ros_nova_interfaces/msg/encoder_ticks__type_support.cpp.o[0m
+[4.200s] [ 64%] Built target isaac_ros_nova_interfaces__rosidl_typesupport_introspection_c
+[4.212s] [ 66%] [32m[1mLinking CXX shared library libisaac_ros_nova_interfaces__rosidl_typesupport_c.so[0m
+[4.252s] [ 66%] Built target isaac_ros_nova_interfaces__rosidl_typesupport_c
+[4.405s] [ 69%] [32m[1mLinking CXX shared library libisaac_ros_nova_interfaces__rosidl_typesupport_fastrtps_c.so[0m
+[4.457s] [ 69%] Built target isaac_ros_nova_interfaces__rosidl_typesupport_fastrtps_c
+[4.472s] [ 71%] [32m[1mLinking CXX shared library libisaac_ros_nova_interfaces__rosidl_typesupport_fastrtps_cpp.so[0m
+[4.481s] [ 74%] [32m[1mLinking CXX shared library libisaac_ros_nova_interfaces__rosidl_typesupport_introspection_cpp.so[0m
+[4.522s] [ 74%] Built target isaac_ros_nova_interfaces__rosidl_typesupport_fastrtps_cpp
+[4.523s] [ 74%] Built target isaac_ros_nova_interfaces__rosidl_typesupport_introspection_cpp
+[4.541s] [ 74%] Built target isaac_ros_nova_interfaces
+[4.559s] [ 76%] [34m[1mGenerating Python code for ROS interfaces[0m
+[4.854s] [ 76%] Built target isaac_ros_nova_interfaces__py
+[4.873s] [ 79%] [32mBuilding C object CMakeFiles/isaac_ros_nova_interfaces__rosidl_generator_py.dir/rosidl_generator_py/isaac_ros_nova_interfaces/msg/_encoder_ticks_s.c.o[0m
+[4.874s] [ 82%] [32mBuilding C object CMakeFiles/isaac_ros_nova_interfaces__rosidl_generator_py.dir/rosidl_generator_py/isaac_ros_nova_interfaces/msg/_correlated_timestamp_s.c.o[0m
+[4.941s] [ 84%] [32m[1mLinking C shared library rosidl_generator_py/isaac_ros_nova_interfaces/libisaac_ros_nova_interfaces__rosidl_generator_py.so[0m
+[4.965s] [ 84%] Built target isaac_ros_nova_interfaces__rosidl_generator_py
+[4.984s] [ 87%] [32mBuilding C object CMakeFiles/isaac_ros_nova_interfaces__rosidl_typesupport_introspection_c__pyext.dir/rosidl_generator_py/isaac_ros_nova_interfaces/_isaac_ros_nova_interfaces_s.ep.rosidl_typesupport_introspection_c.c.o[0m
+[4.985s] [ 89%] [32mBuilding C object CMakeFiles/isaac_ros_nova_interfaces__rosidl_typesupport_c__pyext.dir/rosidl_generator_py/isaac_ros_nova_interfaces/_isaac_ros_nova_interfaces_s.ep.rosidl_typesupport_c.c.o[0m
+[4.986s] [ 92%] [32mBuilding C object CMakeFiles/isaac_ros_nova_interfaces__rosidl_typesupport_fastrtps_c__pyext.dir/rosidl_generator_py/isaac_ros_nova_interfaces/_isaac_ros_nova_interfaces_s.ep.rosidl_typesupport_fastrtps_c.c.o[0m
+[5.063s] [ 94%] [32m[1mLinking C shared library rosidl_generator_py/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces_s__rosidl_typesupport_introspection_c.cpython-38-x86_64-linux-gnu.so[0m
+[5.088s] [ 97%] [32m[1mLinking C shared library rosidl_generator_py/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces_s__rosidl_typesupport_c.cpython-38-x86_64-linux-gnu.so[0m
+[5.093s] [ 97%] Built target isaac_ros_nova_interfaces__rosidl_typesupport_introspection_c__pyext
+[5.098s] [100%] [32m[1mLinking C shared library rosidl_generator_py/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces_s__rosidl_typesupport_fastrtps_c.cpython-38-x86_64-linux-gnu.so[0m
+[5.121s] [100%] Built target isaac_ros_nova_interfaces__rosidl_typesupport_c__pyext
+[5.126s] [100%] Built target isaac_ros_nova_interfaces__rosidl_typesupport_fastrtps_c__pyext
+[5.132s] Invoked command in '/workspaces/isaac_ros-dev/build/isaac_ros_nova_interfaces' returned '0': AMENT_PREFIX_PATH=/workspaces/isaac_ros-dev/install/isaac_ros_common:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/workspaces/isaac_ros-dev/install/isaac_ros_common:/workspace/cartographer_ws/install/perception_pcl:/workspace/cartographer_ws/install/pcl_ros:/workspace/cartographer_ws/install/cartographer_rviz:/workspace/cartographer_ws/install/cartographer_ros:/workspace/cartographer_ws/install/pcl_conversions:/workspace/cartographer_ws/install/pcl_msgs:/workspace/cartographer_ws/install/isaac_ros_tensor_list_interfaces:/workspace/cartographer_ws/install/isaac_ros_pointcloud_interfaces:/workspace/cartographer_ws/install/isaac_ros_nova_interfaces:/workspace/cartographer_ws/install/isaac_ros_nitros_bridge_interfaces:/workspace/cartographer_ws/install/isaac_ros_common:/workspace/cartographer_ws/install/isaac_ros_bi3d_interfaces:/workspace/cartographer_ws/install/isaac_ros_apriltag_interfaces:/workspace/cartographer_ws/install/control_msgs:/workspace/cartographer_ws/install/cartographer_ros_msgs:/workspace/cartographer_ws/install/cartographer:/workspace/cartographer_ws/install/absl:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble LD_LIBRARY_PATH=/workspaces/isaac_ros-dev/install/isaac_ros_common/lib:${LD_LIBRARY_PATH} _=/usr/bin/env /usr/bin/cmake --build /workspaces/isaac_ros-dev/build/isaac_ros_nova_interfaces -- -j20 -l20
+[5.638s] Invoking command in '/workspaces/isaac_ros-dev/build/isaac_ros_nova_interfaces': AMENT_PREFIX_PATH=/workspaces/isaac_ros-dev/install/isaac_ros_common:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/workspaces/isaac_ros-dev/install/isaac_ros_common:/workspace/cartographer_ws/install/perception_pcl:/workspace/cartographer_ws/install/pcl_ros:/workspace/cartographer_ws/install/cartographer_rviz:/workspace/cartographer_ws/install/cartographer_ros:/workspace/cartographer_ws/install/pcl_conversions:/workspace/cartographer_ws/install/pcl_msgs:/workspace/cartographer_ws/install/isaac_ros_tensor_list_interfaces:/workspace/cartographer_ws/install/isaac_ros_pointcloud_interfaces:/workspace/cartographer_ws/install/isaac_ros_nova_interfaces:/workspace/cartographer_ws/install/isaac_ros_nitros_bridge_interfaces:/workspace/cartographer_ws/install/isaac_ros_common:/workspace/cartographer_ws/install/isaac_ros_bi3d_interfaces:/workspace/cartographer_ws/install/isaac_ros_apriltag_interfaces:/workspace/cartographer_ws/install/control_msgs:/workspace/cartographer_ws/install/cartographer_ros_msgs:/workspace/cartographer_ws/install/cartographer:/workspace/cartographer_ws/install/absl:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble LD_LIBRARY_PATH=/workspaces/isaac_ros-dev/install/isaac_ros_common/lib:${LD_LIBRARY_PATH} _=/usr/bin/env /usr/bin/cmake --install /workspaces/isaac_ros-dev/build/isaac_ros_nova_interfaces
+[5.641s] -- Install configuration: "Release"
+[5.641s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/ament_index/resource_index/rosidl_interfaces/isaac_ros_nova_interfaces
+[5.642s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces
+[5.642s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg
+[5.642s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/encoder_ticks.h
+[5.642s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/rosidl_generator_c__visibility_control.h
+[5.642s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/correlated_timestamp.h
+[5.642s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/detail
+[5.642s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/detail/encoder_ticks__functions.h
+[5.642s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/detail/correlated_timestamp__type_support.h
+[5.642s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/detail/encoder_ticks__functions.c
+[5.642s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/detail/correlated_timestamp__functions.c
+[5.642s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/detail/encoder_ticks__struct.h
+[5.642s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/detail/correlated_timestamp__struct.h
+[5.642s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/detail/encoder_ticks__type_support.h
+[5.642s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/detail/correlated_timestamp__functions.h
+[5.642s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/environment/library_path.sh
+[5.642s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/environment/library_path.dsv
+[5.642s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/libisaac_ros_nova_interfaces__rosidl_generator_c.so
+[5.642s] -- Set runtime path of "/workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/libisaac_ros_nova_interfaces__rosidl_generator_c.so" to ""
+[5.642s] -- Up-to-date: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces
+[5.642s] -- Up-to-date: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg
+[5.642s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/rosidl_typesupport_fastrtps_c__visibility_control.h
+[5.643s] -- Up-to-date: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/detail
+[5.643s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/detail/encoder_ticks__rosidl_typesupport_fastrtps_c.h
+[5.643s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/detail/correlated_timestamp__rosidl_typesupport_fastrtps_c.h
+[5.643s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/libisaac_ros_nova_interfaces__rosidl_typesupport_fastrtps_c.so
+[5.643s] -- Set runtime path of "/workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/libisaac_ros_nova_interfaces__rosidl_typesupport_fastrtps_c.so" to ""
+[5.643s] -- Up-to-date: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces
+[5.643s] -- Up-to-date: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg
+[5.643s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/correlated_timestamp.hpp
+[5.643s] -- Up-to-date: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/detail
+[5.643s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/detail/correlated_timestamp__struct.hpp
+[5.644s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/detail/correlated_timestamp__traits.hpp
+[5.644s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/detail/correlated_timestamp__builder.hpp
+[5.644s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/detail/encoder_ticks__struct.hpp
+[5.644s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/detail/encoder_ticks__builder.hpp
+[5.644s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/detail/encoder_ticks__traits.hpp
+[5.644s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/encoder_ticks.hpp
+[5.645s] -- Up-to-date: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces
+[5.645s] -- Up-to-date: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg
+[5.645s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/rosidl_typesupport_fastrtps_cpp__visibility_control.h
+[5.645s] -- Up-to-date: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/detail
+[5.645s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/detail/dds_fastrtps
+[5.645s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/detail/encoder_ticks__rosidl_typesupport_fastrtps_cpp.hpp
+[5.645s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/detail/correlated_timestamp__rosidl_typesupport_fastrtps_cpp.hpp
+[5.645s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/libisaac_ros_nova_interfaces__rosidl_typesupport_fastrtps_cpp.so
+[5.645s] -- Set runtime path of "/workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/libisaac_ros_nova_interfaces__rosidl_typesupport_fastrtps_cpp.so" to ""
+[5.645s] -- Up-to-date: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces
+[5.645s] -- Up-to-date: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg
+[5.645s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/rosidl_typesupport_introspection_c__visibility_control.h
+[5.645s] -- Up-to-date: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/detail
+[5.645s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/detail/encoder_ticks__type_support.c
+[5.645s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/detail/correlated_timestamp__type_support.c
+[5.645s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/detail/encoder_ticks__rosidl_typesupport_introspection_c.h
+[5.645s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/detail/correlated_timestamp__rosidl_typesupport_introspection_c.h
+[5.645s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/libisaac_ros_nova_interfaces__rosidl_typesupport_introspection_c.so
+[5.645s] -- Set runtime path of "/workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/libisaac_ros_nova_interfaces__rosidl_typesupport_introspection_c.so" to ""
+[5.645s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/libisaac_ros_nova_interfaces__rosidl_typesupport_c.so
+[5.645s] -- Set runtime path of "/workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/libisaac_ros_nova_interfaces__rosidl_typesupport_c.so" to ""
+[5.645s] -- Up-to-date: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces
+[5.645s] -- Up-to-date: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg
+[5.645s] -- Up-to-date: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/detail
+[5.645s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/detail/encoder_ticks__type_support.cpp
+[5.645s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/detail/correlated_timestamp__type_support.cpp
+[5.645s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/detail/encoder_ticks__rosidl_typesupport_introspection_cpp.hpp
+[5.645s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/include/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces/msg/detail/correlated_timestamp__rosidl_typesupport_introspection_cpp.hpp
+[5.645s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/libisaac_ros_nova_interfaces__rosidl_typesupport_introspection_cpp.so
+[5.645s] -- Set runtime path of "/workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/libisaac_ros_nova_interfaces__rosidl_typesupport_introspection_cpp.so" to ""
+[5.645s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/libisaac_ros_nova_interfaces__rosidl_typesupport_cpp.so
+[5.645s] -- Set runtime path of "/workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/libisaac_ros_nova_interfaces__rosidl_typesupport_cpp.so" to ""
+[5.645s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/environment/pythonpath.sh
+[5.645s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/environment/pythonpath.dsv
+[5.645s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages/isaac_ros_nova_interfaces-2.1.0-py3.8.egg-info
+[5.646s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages/isaac_ros_nova_interfaces-2.1.0-py3.8.egg-info/SOURCES.txt
+[5.646s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages/isaac_ros_nova_interfaces-2.1.0-py3.8.egg-info/PKG-INFO
+[5.646s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages/isaac_ros_nova_interfaces-2.1.0-py3.8.egg-info/top_level.txt
+[5.646s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages/isaac_ros_nova_interfaces-2.1.0-py3.8.egg-info/dependency_links.txt
+[5.646s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages/isaac_ros_nova_interfaces
+[5.646s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces_s__rosidl_typesupport_introspection_c.cpython-38-x86_64-linux-gnu.so
+[5.646s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces_s__rosidl_typesupport_c.cpython-38-x86_64-linux-gnu.so
+[5.646s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages/isaac_ros_nova_interfaces/_isaac_ros_nova_interfaces_s.ep.rosidl_typesupport_fastrtps_c.c
+[5.646s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages/isaac_ros_nova_interfaces/libisaac_ros_nova_interfaces__rosidl_generator_py.so
+[5.646s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces_s__rosidl_typesupport_fastrtps_c.cpython-38-x86_64-linux-gnu.so
+[5.646s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages/isaac_ros_nova_interfaces/msg
+[5.646s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages/isaac_ros_nova_interfaces/msg/_encoder_ticks.py
+[5.646s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages/isaac_ros_nova_interfaces/msg/_correlated_timestamp_s.c
+[5.646s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages/isaac_ros_nova_interfaces/msg/__init__.py
+[5.646s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages/isaac_ros_nova_interfaces/msg/_encoder_ticks_s.c
+[5.646s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages/isaac_ros_nova_interfaces/msg/_correlated_timestamp.py
+[5.646s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages/isaac_ros_nova_interfaces/__init__.py
+[5.646s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages/isaac_ros_nova_interfaces/_isaac_ros_nova_interfaces_s.ep.rosidl_typesupport_c.c
+[5.646s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages/isaac_ros_nova_interfaces/_isaac_ros_nova_interfaces_s.ep.rosidl_typesupport_introspection_c.c
+[5.671s] Listing '/workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages/isaac_ros_nova_interfaces'...
+[5.671s] Compiling '/workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages/isaac_ros_nova_interfaces/__init__.py'...
+[5.671s] Listing '/workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages/isaac_ros_nova_interfaces/msg'...
+[5.671s] Compiling '/workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages/isaac_ros_nova_interfaces/msg/__init__.py'...
+[5.671s] Compiling '/workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages/isaac_ros_nova_interfaces/msg/_correlated_timestamp.py'...
+[5.671s] Compiling '/workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages/isaac_ros_nova_interfaces/msg/_encoder_ticks.py'...
+[5.673s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces_s__rosidl_typesupport_fastrtps_c.cpython-38-x86_64-linux-gnu.so
+[5.674s] -- Set runtime path of "/workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces_s__rosidl_typesupport_fastrtps_c.cpython-38-x86_64-linux-gnu.so" to ""
+[5.674s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces_s__rosidl_typesupport_introspection_c.cpython-38-x86_64-linux-gnu.so
+[5.674s] -- Set runtime path of "/workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces_s__rosidl_typesupport_introspection_c.cpython-38-x86_64-linux-gnu.so" to ""
+[5.674s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces_s__rosidl_typesupport_c.cpython-38-x86_64-linux-gnu.so
+[5.674s] -- Set runtime path of "/workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/python3.8/site-packages/isaac_ros_nova_interfaces/isaac_ros_nova_interfaces_s__rosidl_typesupport_c.cpython-38-x86_64-linux-gnu.so" to ""
+[5.674s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/libisaac_ros_nova_interfaces__rosidl_generator_py.so
+[5.674s] -- Set runtime path of "/workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/lib/libisaac_ros_nova_interfaces__rosidl_generator_py.so" to ""
+[5.674s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/msg/CorrelatedTimestamp.idl
+[5.674s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/msg/EncoderTicks.idl
+[5.674s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/msg/CorrelatedTimestamp.msg
+[5.675s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/msg/EncoderTicks.msg
+[5.675s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/ament_index/resource_index/package_run_dependencies/isaac_ros_nova_interfaces
+[5.675s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/ament_index/resource_index/parent_prefix_path/isaac_ros_nova_interfaces
+[5.675s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/environment/ament_prefix_path.sh
+[5.675s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/environment/ament_prefix_path.dsv
+[5.675s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/environment/path.sh
+[5.675s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/environment/path.dsv
+[5.675s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/local_setup.bash
+[5.675s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/local_setup.sh
+[5.675s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/local_setup.zsh
+[5.676s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/local_setup.dsv
+[5.676s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/package.dsv
+[5.676s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/ament_index/resource_index/packages/isaac_ros_nova_interfaces
+[5.676s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/cmake/export_isaac_ros_nova_interfaces__rosidl_generator_cExport.cmake
+[5.676s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/cmake/export_isaac_ros_nova_interfaces__rosidl_generator_cExport-release.cmake
+[5.676s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/cmake/export_isaac_ros_nova_interfaces__rosidl_typesupport_fastrtps_cExport.cmake
+[5.676s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/cmake/export_isaac_ros_nova_interfaces__rosidl_typesupport_fastrtps_cExport-release.cmake
+[5.676s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/cmake/export_isaac_ros_nova_interfaces__rosidl_generator_cppExport.cmake
+[5.676s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/cmake/export_isaac_ros_nova_interfaces__rosidl_typesupport_fastrtps_cppExport.cmake
+[5.676s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/cmake/export_isaac_ros_nova_interfaces__rosidl_typesupport_fastrtps_cppExport-release.cmake
+[5.676s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/cmake/isaac_ros_nova_interfaces__rosidl_typesupport_introspection_cExport.cmake
+[5.676s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/cmake/isaac_ros_nova_interfaces__rosidl_typesupport_introspection_cExport-release.cmake
+[5.677s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/cmake/isaac_ros_nova_interfaces__rosidl_typesupport_cExport.cmake
+[5.677s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/cmake/isaac_ros_nova_interfaces__rosidl_typesupport_cExport-release.cmake
+[5.677s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/cmake/isaac_ros_nova_interfaces__rosidl_typesupport_introspection_cppExport.cmake
+[5.677s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/cmake/isaac_ros_nova_interfaces__rosidl_typesupport_introspection_cppExport-release.cmake
+[5.677s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/cmake/isaac_ros_nova_interfaces__rosidl_typesupport_cppExport.cmake
+[5.677s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/cmake/isaac_ros_nova_interfaces__rosidl_typesupport_cppExport-release.cmake
+[5.677s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/cmake/export_isaac_ros_nova_interfaces__rosidl_generator_pyExport.cmake
+[5.677s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/cmake/export_isaac_ros_nova_interfaces__rosidl_generator_pyExport-release.cmake
+[5.677s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/cmake/rosidl_cmake-extras.cmake
+[5.677s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/cmake/ament_cmake_export_dependencies-extras.cmake
+[5.677s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/cmake/ament_cmake_export_include_directories-extras.cmake
+[5.677s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/cmake/ament_cmake_export_libraries-extras.cmake
+[5.677s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/cmake/ament_cmake_export_targets-extras.cmake
+[5.677s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/cmake/rosidl_cmake_export_typesupport_targets-extras.cmake
+[5.677s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/cmake/rosidl_cmake_export_typesupport_libraries-extras.cmake
+[5.678s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/cmake/isaac_ros_nova_interfacesConfig.cmake
+[5.678s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/cmake/isaac_ros_nova_interfacesConfig-version.cmake
+[5.678s] -- Installing: /workspaces/isaac_ros-dev/install/isaac_ros_nova_interfaces/share/isaac_ros_nova_interfaces/package.xml
+[5.684s] Invoked command in '/workspaces/isaac_ros-dev/build/isaac_ros_nova_interfaces' returned '0': AMENT_PREFIX_PATH=/workspaces/isaac_ros-dev/install/isaac_ros_common:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/workspaces/isaac_ros-dev/install/isaac_ros_common:/workspace/cartographer_ws/install/perception_pcl:/workspace/cartographer_ws/install/pcl_ros:/workspace/cartographer_ws/install/cartographer_rviz:/workspace/cartographer_ws/install/cartographer_ros:/workspace/cartographer_ws/install/pcl_conversions:/workspace/cartographer_ws/install/pcl_msgs:/workspace/cartographer_ws/install/isaac_ros_tensor_list_interfaces:/workspace/cartographer_ws/install/isaac_ros_pointcloud_interfaces:/workspace/cartographer_ws/install/isaac_ros_nova_interfaces:/workspace/cartographer_ws/install/isaac_ros_nitros_bridge_interfaces:/workspace/cartographer_ws/install/isaac_ros_common:/workspace/cartographer_ws/install/isaac_ros_bi3d_interfaces:/workspace/cartographer_ws/install/isaac_ros_apriltag_interfaces:/workspace/cartographer_ws/install/control_msgs:/workspace/cartographer_ws/install/cartographer_ros_msgs:/workspace/cartographer_ws/install/cartographer:/workspace/cartographer_ws/install/absl:/workspace/cartographer_ws/install/isaac_ros_test:/opt/ros/humble LD_LIBRARY_PATH=/workspaces/isaac_ros-dev/install/isaac_ros_common/lib:${LD_LIBRARY_PATH} _=/usr/bin/env /usr/bin/cmake --install /workspaces/isaac_ros-dev/build/isaac_ros_nova_interfaces

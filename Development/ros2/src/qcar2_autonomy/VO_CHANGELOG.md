@@ -178,6 +178,12 @@ FALSE-YAW SERIES COMPLETE (force_cart_yaw=false, 1x, manual, rtabmap_viz):
   KLT+SVD : 131 nodes / 11.62 m / 8 LC / 0 jumps / end ~2.5 m off (most drift)
   ORB+PnP : 119 nodes / 11.14 m / 6 LC / 1 jump 1.77 m / end ~1 m (closes well)
   KLT+PnP : 122 nodes / 11.19 m / 3 LC / 1 jump 1.62 m / end ~1.06 m, BEST SHAPE
+
+## 2026-05-26 RunDev config / workspace path clarification
+ENVIRONMENT: updated local Isaac ROS development config in the repository.
+FIX: `isaac_ros_common/scripts/.isaac_ros_common-config` now uses `${HOME}` for `CONFIG_DOCKER_SEARCH_DIRS`, avoiding shell-dependent `$USER` expansion issues.
+NOTE: the workspace argument for `run_dev.sh` should be the repo dev tree, e.g. `./isaac_ros_common/scripts/run_dev.sh /home/$USER/Documents/GitHub/ACC_Development/Development` from repo root.
+
 All pose graphs exactly planar. PnP variants close the loop better than
 KLT+SVD (less yaw drift) -> map-level agreement with the odometry-2x2
 PnP>SVD finding. rtabmap_viz legend (operator asked): white line = raw
