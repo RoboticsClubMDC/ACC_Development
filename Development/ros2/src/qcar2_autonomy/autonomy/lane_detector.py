@@ -82,10 +82,13 @@ class LaneDetector(Node):
         self.declare_parameter('lanenet_dbscan_min_area', 100)
 
         # BEV source polygon
-        self.declare_parameter('src_top_left',      [190, 200])
-        self.declare_parameter('src_top_right',     [450, 200])
-        self.declare_parameter('src_bottom_right',  [620, 470])
-        self.declare_parameter('src_bottom_left',   [20,  470])
+        # Front CSI default is 820x410. These are the old 640x480
+        # homography points scaled into the CSI image so the bottom
+        # points stay inside the frame.
+        self.declare_parameter('src_top_left',      [243, 171])
+        self.declare_parameter('src_top_right',     [576, 171])
+        self.declare_parameter('src_bottom_right',  [794, 401])
+        self.declare_parameter('src_bottom_left',   [26,  401])
         self.declare_parameter('bev_width',  400)
         self.declare_parameter('bev_height', 400)
         self.declare_parameter('bev_world_width_m', 1.5)
@@ -163,6 +166,7 @@ class LaneDetector(Node):
         self._lanenet = None
         self._lanenet_disabled = False
         self._lanenet_fallback_warned = False
+        self._homography_warning_logged = False
 
         # ───────────── Homography ─────────────
         self._rebuild_homography()
@@ -263,6 +267,26 @@ class LaneDetector(Node):
         self.get_logger().info(
             f'Homography: bev={self.bev_w}x{self.bev_h} '
             f'm/pix={self.m_per_pix:.5f}')
+
+    def _warn_if_homography_outside_image(self, image_w, image_h):
+        if self._homography_warning_logged:
+            return
+        pts = [
+            self._pia('src_top_left'),
+            self._pia('src_top_right'),
+            self._pia('src_bottom_right'),
+            self._pia('src_bottom_left'),
+        ]
+        bad = [
+            p for p in pts
+            if p[0] < 0 or p[0] >= image_w or p[1] < 0 or p[1] >= image_h
+        ]
+        if bad:
+            self.get_logger().warn(
+                'Homography source point outside image frame '
+                f'{image_w}x{image_h}: {bad}. Lane CTE/heading will be wrong.'
+            )
+        self._homography_warning_logged = True
 
     def _to_bev(self, img):
         return cv2.warpPerspective(
@@ -536,6 +560,7 @@ class LaneDetector(Node):
         if not self._got_first:
             h, w = bgr.shape[:2]
             self.get_logger().info(f'First image: {w}x{h}')
+            self._warn_if_homography_outside_image(w, h)
             self._got_first = True
 
         lane_w = self._pd('lane_width_m')
