@@ -36,12 +36,15 @@ class SidewalkDetectionNode(Node):
         self.declare_parameter("image_topic", "/camera/color_image")
         self.declare_parameter("model_path",  "ros2/src/qcar2_autonomy/models/sidewalk_seg_yolo.pt")
         self.declare_parameter("imgsz",       640)
-        self.declare_parameter("device",      0)
+        # Default to CPU. Some newer laptop GPUs (e.g. RTX 50-series) are not
+        # supported by the PyTorch wheel in the ROS Docker image and crash on
+        # CUDA warmup with "no kernel image is available".
+        self.declare_parameter("device",      "cpu")
 
         image_topic      = self.get_parameter("image_topic").get_parameter_value().string_value
         model_path_param = self.get_parameter("model_path").get_parameter_value().string_value
         imgsz            = int(self.get_parameter("imgsz").get_parameter_value().integer_value)
-        device           = int(self.get_parameter("device").get_parameter_value().integer_value)
+        device           = str(self.get_parameter("device").value)
 
         model_path = self._resolve_model_path(model_path_param)
 
@@ -53,6 +56,7 @@ class SidewalkDetectionNode(Node):
 
         self.imgsz  = imgsz
         self.device = device
+        self._cuda_fallback_attempted = False
 
         k = 2 * NO_GO_MARGIN_PX + 1
         self.no_go_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k))
@@ -84,7 +88,29 @@ class SidewalkDetectionNode(Node):
 
         h, w = img_bgr.shape[:2]
 
-        res = self.model.predict(img_bgr, imgsz=self.imgsz, device=self.device, verbose=False)[0]
+        try:
+            res = self.model.predict(
+                img_bgr,
+                imgsz=self.imgsz,
+                device=self.device,
+                verbose=False,
+            )[0]
+        except RuntimeError as exc:
+            if self._should_fallback_to_cpu(exc):
+                self._cuda_fallback_attempted = True
+                self.device = "cpu"
+                self.get_logger().warn(
+                    "YOLO CUDA inference failed; falling back to CPU for sidewalk_detection. "
+                    f"Original error: {exc}"
+                )
+                res = self.model.predict(
+                    img_bgr,
+                    imgsz=self.imgsz,
+                    device=self.device,
+                    verbose=False,
+                )[0]
+            else:
+                raise
 
         union     = {NO_GO: np.zeros((h, w), dtype=bool)}
         dbg_lines = []
@@ -118,6 +144,18 @@ class SidewalkDetectionNode(Node):
         margin_msg      = self.bridge.cv2_to_imgmsg(no_go_margin_u8, encoding="mono8")
         margin_msg.header = msg.header
         self.pub_no_go_mgn.publish(margin_msg)
+
+    def _should_fallback_to_cpu(self, exc):
+        if self._cuda_fallback_attempted:
+            return False
+        if str(self.device).lower() == "cpu":
+            return False
+        text = str(exc).lower()
+        return (
+            "cuda" in text
+            or "no kernel image is available" in text
+            or "not compatible with the current pytorch installation" in text
+        )
 
 
 def main():

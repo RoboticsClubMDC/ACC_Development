@@ -76,9 +76,13 @@ def find_default_model_path():
         pass
 
     candidates.extend([
+        Path("/workspaces/isaac_ros-dev/src/qcar2_autonomy/models") / model_name,
         Path("/workspaces/isaac_ros-dev/ros2/src/qcar2_autonomy/models") / model_name,
         Path("/workspaces/isaac_ros-dev/Development/ros2/src/qcar2_autonomy/models") / model_name,
+        Path("/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/src/qcar2_autonomy/models") / model_name,
+        Path.home() / "Documents/GitHub/ACC_Development/Development/ros2/src/qcar2_autonomy/models" / model_name,
         Path.cwd() / "src/qcar2_autonomy/models" / model_name,
+        Path.cwd() / "Development/ros2/src/qcar2_autonomy/models" / model_name,
     ])
 
     for candidate in candidates:
@@ -174,6 +178,11 @@ class SemanticYoloDetector(Node):
             imageWidth=self.image_width,
             convert_tensorrt=False,
         )
+        try:
+            names = getattr(self.yolo.net, "names", {})
+            self.get_logger().info(f"YOLO class names: {names}")
+        except Exception:
+            pass
 
         self.image_sub = self.create_subscription(
             Image,

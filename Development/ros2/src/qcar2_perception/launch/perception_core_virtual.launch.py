@@ -27,6 +27,17 @@ def semantic_map_path():
     return str(candidates[0])
 
 
+def quanser_yolo_model_path():
+    override = os.environ.get("QCAR2_YOLO_MODEL_PATH", "").strip()
+    if override:
+        return override
+    return os.path.join(
+        get_package_share_directory("qcar2_autonomy"),
+        "models",
+        "quanser_yolov8s-seg.pt",
+    )
+
+
 def generate_launch_description():
     package_share = get_package_share_directory("qcar2_perception")
 
@@ -51,6 +62,11 @@ def generate_launch_description():
         package="qcar2_perception",
         executable="semantic_yolo_detector",
         name="semantic_yolo_detector",
+        parameters=[{
+            "model_path": quanser_yolo_model_path(),
+            "class_filter": "2,9,11,33",
+            "confidence": 0.30,
+        }],
         output="screen",
     )
 
@@ -102,6 +118,11 @@ def generate_launch_description():
             "active_statuses": ["confirmed", "stable"],
             "max_event_distance_m": 1.50,
             "forward_fov_deg": 100.0,
+            "enable_landmark_distance_stop": True,
+            "stop_trigger_distance_m": 0.20,
+            "stop_hold_seconds": 3.0,
+            "stop_cooldown_seconds": 10.0,
+            "stop_min_confidence": 0.30,
         }],
         output="screen",
     )

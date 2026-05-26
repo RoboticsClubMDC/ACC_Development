@@ -1,1 +1,0 @@
-cartographer_ros:control_msgs:cv_bridge:geometry_msgs:image_transport:libopencv-dev:nav2_amcl:nav2_bringup:nav2_lifecycle_manager:nav2_map_server:qcar2_autonomy:qcar2_interfaces:rclcpp:ros2launch:sensor_msgs:std_msgs:std_srvs
