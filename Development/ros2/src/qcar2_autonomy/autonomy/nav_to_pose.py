@@ -200,6 +200,10 @@ class PathFollower(Node):
         #----------
         self.N = len(self.wp[0, :])
         self.wpi = 0
+        self._path_start_initialized = False
+        self.start_gate_radius = 0.30
+        self._last_auto_align_wait_log = 0.0
+        self._last_start_wait_log = 0.0
         self.wp_prior = []
         self.current_steering = 0
         self._wp_in_ros_frame = False
@@ -287,6 +291,7 @@ class PathFollower(Node):
         self.wp              = np.array([xs, ys])
         self.N               = self.wp.shape[1]
         self.wpi             = 0
+        self._path_start_initialized = False
         self.path_complete   = False
         self._wp_in_ros_frame = True
         # Auto-switch to autonomous mode (BO/trip_planner/etc. sending a path
@@ -366,6 +371,7 @@ class PathFollower(Node):
                 self.wp = SDCSRoadMap().generate_path(self.waypoints) * 0.975
                 self.N = len(self.wp[0, :])
                 self.wpi = 0
+                self._path_start_initialized = False
                 self.previous_steering_value = 0
                 self.path_complete = False
                 self._wp_in_ros_frame = False
@@ -480,6 +486,60 @@ class PathFollower(Node):
         self.gyroscope = [msg.angular_velocity.x, msg.angular_velocity.y, msg.angular_velocity.z]
 
 
+    def _roadmap_to_map_rotation(self):
+        angle_offset = self.rotation_offset[0]
+        return np.array([
+            [np.cos(-angle_offset * np.pi / 180), -np.sin(-angle_offset * np.pi / 180)],
+            [np.sin(-angle_offset * np.pi / 180),  np.cos(-angle_offset * np.pi / 180)]
+        ])
+
+    def _waypoints_in_map_frame(self):
+        if self._wp_in_ros_frame:
+            return np.array(self.wp)
+
+        t = np.array([self.translation_offset[0], self.translation_offset[1]])
+        return ((self.wp.T + t) @ self._roadmap_to_map_rotation()).T
+
+    def _warn_once_per_second(self, attr_name, message):
+        now = time.time()
+        if now - getattr(self, attr_name, 0.0) >= 1.0:
+            self.get_logger().warn(message)
+            setattr(self, attr_name, now)
+
+    def _initialize_path_start_from_current_pose(self):
+        if self._path_start_initialized:
+            return True
+
+        if self.fused_pose_x is None or self.fused_pose_y is None:
+            self._warn_once_per_second(
+                '_last_start_wait_log',
+                'Waiting for /qcar2_pose_fused before starting path index')
+            return False
+
+        if self.N <= 0:
+            return False
+
+        current_xy = np.array([self.fused_pose_x, self.fused_pose_y])
+        wp_map = self._waypoints_in_map_frame()
+        deltas = wp_map.T - current_xy
+        dists = np.linalg.norm(deltas, axis=1)
+        nearest_i = int(np.argmin(dists))
+        nearest_dist = float(dists[nearest_i])
+
+        self.wpi = int(np.clip(nearest_i, 0, self.N - 1))
+        self._path_start_initialized = True
+
+        if nearest_dist > self.start_gate_radius:
+            self.get_logger().warn(
+                f'Starting path from nearest waypoint {self.wpi}, '
+                f'but EKF pose is {nearest_dist:.2f}m away')
+        else:
+            self.get_logger().info(
+                f'Starting path from waypoint {self.wpi} '
+                f'(EKF distance {nearest_dist:.2f}m)')
+
+        return True
+
 
 #----------------Change N2 auto_align_roadmap_to_current_pose----------------
     def auto_align_roadmap_to_current_pose(self):
@@ -488,28 +548,22 @@ class PathFollower(Node):
 
         It assumes:
         - The QCar is physically placed at the first waypoint of the current route.
-        - Cartographer map->base_link is already available.
+        - /qcar2_pose_fused is already available.
         - self.wp has shape (2, N), where row 0 = x and row 1 = y.
         """
 
         try:
-            # Current QCar pose in Cartographer map frame
-            tf_msg = self.tf_buffer.lookup_transform(
-                'map',
-                self.target_frame,   # usually base_link
-                rclpy.time.Time()
-            )
+            if self.fused_pose_x is None or self.fused_pose_y is None or self.fused_pose_yaw is None:
+                self._warn_once_per_second(
+                    '_last_auto_align_wait_log',
+                    'Roadmap auto-align waiting for /qcar2_pose_fused')
+                return False
 
             current_xy = np.array([
-                tf_msg.transform.translation.x,
-                tf_msg.transform.translation.y
+                self.fused_pose_x,
+                self.fused_pose_y
             ])
-
-            q = tf_msg.transform.rotation
-            current_yaw = np.arctan2(
-                2.0 * (q.w * q.z + q.x * q.y),
-                1.0 - 2.0 * (q.y * q.y + q.z * q.z)
-            )
+            current_yaw = self.fused_pose_yaw
 
             # First point of SDCSRoadMap path
             raw_start = np.array([
@@ -561,7 +615,7 @@ class PathFollower(Node):
             return True
 
         except Exception as e:
-            self.get_logger().warn(f"Roadmap auto-align waiting for TF map->{self.target_frame}: {e}")
+            self.get_logger().warn(f"Roadmap auto-align failed using /qcar2_pose_fused: {e}")
             return False
     #----------------End of auto_align_roadmap_to_current_pose----------------N2
 
@@ -573,11 +627,7 @@ class PathFollower(Node):
             if i >= self.N:
                 i = self.N - 1
             pose = PoseStamped()
-            angle_offset = self.rotation_offset[0]
-            R_QLabs_ROS = np.array([
-                [np.cos(-angle_offset * np.pi / 180), -np.sin(-angle_offset * np.pi / 180)],
-                [np.sin(-angle_offset * np.pi / 180),  np.cos(-angle_offset * np.pi / 180)]
-            ])
+            R_QLabs_ROS = self._roadmap_to_map_rotation()
             t = np.array([self.translation_offset[0], self.translation_offset[1]])
             if self._wp_in_ros_frame:
                 wp_1_mod = np.array([self.wp[0, i], self.wp[1, i]])
@@ -601,12 +651,15 @@ class PathFollower(Node):
         # ekf_fusor node; this node only consumes the fused pose.
 
         #----CHANGE N3--------------
-        if self.auto_align_start and not self.auto_aligned:
+        if self.auto_align_start and not self.auto_aligned and not self._wp_in_ros_frame:
             self.auto_aligned = self.auto_align_roadmap_to_current_pose()
             if not self.auto_aligned:
                 return
 
         #--END OF CHANGE N3---------------------
+
+        if not self._initialize_path_start_from_current_pose():
+            return
 
         if round(self.t_plot) % 2 == 0:
             self.path_publisher()
@@ -615,11 +668,7 @@ class PathFollower(Node):
             if not self.path_complete:
                 wp_1 = np.array(self.wp[:, self.wpi])
 
-                angle_offset = self.rotation_offset[0]
-                R_QLabs_ROS = np.array([
-                    [np.cos(-angle_offset * np.pi / 180), -np.sin(-angle_offset * np.pi / 180)],
-                    [np.sin(-angle_offset * np.pi / 180),  np.cos(-angle_offset * np.pi / 180)]
-                ])
+                R_QLabs_ROS = self._roadmap_to_map_rotation()
                 t = np.array([self.translation_offset[0], self.translation_offset[1]])
                 if self._wp_in_ros_frame:
                     wp_1_mod = wp_1
