@@ -13,8 +13,8 @@ from pit.YOLO.nets import YOLOv8
 # this node now subscribes to /camera/color_image and /camera/depth_image
 # (aligned 32FC1 meters from the bridge, or MONO16 raw from legacy rgbd
 # if camera_source:=rgbd is selected in the launch). YOLO inference,
-# /motion_enable, /trip_planner/qcar_state, and the stop-override logic
-# below are unchanged.
+# /motion_enable braking is unchanged. Trip LEDs are owned only by
+# trip_planner -> Planner_server.
 #
 # To restore direct PIT-ownership behavior (not recommended outside
 # diagnostic runs), uncomment the import + instantiation below and
@@ -31,7 +31,7 @@ import cv2
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
-from std_msgs.msg import Bool, UInt8   # <-- ADDED UInt8
+from std_msgs.msg import Bool
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 
@@ -101,12 +101,6 @@ class ObjectDetector(Node):
             Image, '/camera/depth_image', self._depth_cb, qos_profile_sensor_data)
         # ---------------------------------------------------------------
 
-        # --- ADDED: publish qcar_state override to existing topic ---
-        self.qcar_state_pub = self.create_publisher(UInt8, '/trip_planner/qcar_state', 10)
-        self.stop_override_active = False
-        self.stop_override_until = 0.0
-        # -----------------------------------------------------------
-
         # Debug window — annotated YOLO frame.
         self.debug_window_name = 'YOLO Debug'
         self.publish_debug = self.create_publisher(Image, '/qcar_camera/yolo_debug', 1)
@@ -121,16 +115,6 @@ class ObjectDetector(Node):
     def flag_publisher(self):
         # keep existing behavior
         self.publish_motion_flag(self.flag_value)
-
-        # --- ADDED: while stop override active, spam state=1 so it wins over trip_planner 10Hz ---
-        now = time.time()
-        if self.stop_override_active and now < self.stop_override_until:
-            msg = UInt8()
-            msg.data = 1
-            self.qcar_state_pub.publish(msg)
-        elif self.stop_override_active and now >= self.stop_override_until:
-            self.stop_override_active = False
-        # --------------------------------------------------------------------------------------
 
     # --- 2026-05-14: ROS subscriber callbacks (replace direct PIT read) ---
     def _valid_image(self, frame):
@@ -260,7 +244,7 @@ class ObjectDetector(Node):
                 except Exception:
                     pass
 
-        status = 'STOPPED' if self.stop_override_active else ('RUN' if self.flag_value else 'WAIT')
+        status = 'RUN' if self.flag_value else 'WAIT'
         color = (0, 0, 255) if status == 'STOPPED' else (0, 255, 0)
         cv2.putText(annotated, f'YOLO: {status}', (10, 25),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2, cv2.LINE_AA)
@@ -319,14 +303,6 @@ class ObjectDetector(Node):
                 self.t0 = time.time()
                 detected = True
                 self.detection_cooldown = 10.0
-
-                # --- ADDED: publish qcar_state=1 while we are stopped ---
-                self.stop_override_active = True
-                self.stop_override_until = time.time() + delay
-                msg = UInt8()
-                msg.data = 1
-                self.qcar_state_pub.publish(msg)
-                # -------------------------------------------------------
 
             elif labelName == "yield sign" and labelConf > 0.9 and objectDist < 0.52:
                 self.get_logger().info("Yield Sign Detected!")

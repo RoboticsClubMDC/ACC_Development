@@ -100,7 +100,10 @@ def generate_launch_description():
             package='qcar2_nodes',
             executable='qcar2_hardware',
             name='qcar2_hardware',
-            parameters=[{"device_type":"virtual"}]
+            parameters=[
+                {"device_type":"virtual"},
+                {"allow_boolean_led_cmd": False},
+            ]
 
         )
 

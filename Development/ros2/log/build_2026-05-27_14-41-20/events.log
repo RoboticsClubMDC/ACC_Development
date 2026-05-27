@@ -1,0 +1,7 @@
+[0.000000] (-) TimerEvent: {}
+[0.000109] (-) JobUnselected: {'identifier': 'qcar2_autonomy'}
+[0.000202] (-) JobUnselected: {'identifier': 'qcar2_interfaces'}
+[0.000222] (qcar2_nodes) JobQueued: {'identifier': 'qcar2_nodes', 'dependencies': OrderedDict({'qcar2_interfaces': '/home/arturo-noble/Documents/GitHub/ACC_Development/Development/ros2/install/qcar2_interfaces'})}
+[0.000381] (qcar2_nodes) JobStarted: {'identifier': 'qcar2_nodes'}
+[0.011630] (qcar2_nodes) JobEnded: {'identifier': 'qcar2_nodes', 'rc': 1}
+[0.012305] (-) EventReactorShutdown: {}

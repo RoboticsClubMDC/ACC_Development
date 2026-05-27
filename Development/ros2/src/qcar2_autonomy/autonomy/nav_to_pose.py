@@ -638,9 +638,9 @@ class PathFollower(Node):
 
             # --- Tune-friendly lookahead + waypoint advance ---
             # --- Tune-friendly lookahead + waypoint advance ---
-            v_eff = max(self.qcar2_measurred_speed, 0.05)              # measured speed (m/s), avoid 0
-            lookahead_dist = v_eff * 1.7
-            lookahead_dist = max(0.30, lookahead_dist)
+            v_eff = max(self.qcar2_measurred_speed, 0.4)              # measured speed (m/s), avoid 0
+            lookahead_dist = v_eff * 0.7
+            lookahead_dist = max(0.1, lookahead_dist)
             skip_index = 1                                             # no target jumping while tuning
 
 

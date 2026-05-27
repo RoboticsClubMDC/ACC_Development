@@ -73,6 +73,10 @@ public:
         param_desc.additional_constraints = "This parameter allows you to set the LEDs for the QCar2";
         this->declare_parameter("led_color_id", 0, param_desc);
 
+        param_desc.description = "Allow legacy BooleanLeds commands";
+        param_desc.additional_constraints = "False keeps trip_planner -> Planner_server -> led_color_id as the only LED owner.";
+        allow_boolean_led_cmd = this->declare_parameter("allow_boolean_led_cmd", allow_boolean_led_cmd, param_desc);
+
 
         // Parameters initialization
         try
@@ -513,6 +517,11 @@ private:
 
     void led_command_callback(const qcar2_interfaces::msg::BooleanLeds &led_commands)
     {
+        if (!allow_boolean_led_cmd)
+        {
+            return;
+        }
+
         size_t led_commands_size = led_commands.led_names.size();
         std::map<std::string, int> led_channel_map {{"left_outside_brake_light",    11},
                                                     {"left_inside_brake_light",     12},
@@ -673,6 +682,14 @@ private:
                 LED_Set();
                 }
             }
+            else if (parameter.get_name().compare("allow_boolean_led_cmd") == 0)
+            {
+                allow_boolean_led_cmd = parameter.as_bool();
+                RCLCPP_INFO(
+                    this->get_logger(),
+                    "allow_boolean_led_cmd is %s",
+                    allow_boolean_led_cmd ? "true" : "false");
+            }
             else
             {
                 result.successful = false;
@@ -692,6 +709,7 @@ private:
     //LED ID selector
     int led_color_id;
     int response = -1;
+    bool allow_boolean_led_cmd = true;
 
 
     // speed controller parameters
