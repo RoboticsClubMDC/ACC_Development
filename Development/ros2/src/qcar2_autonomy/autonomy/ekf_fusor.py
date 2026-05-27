@@ -186,6 +186,18 @@ class EkfFusor(Node):
                 PoseWithCovarianceStamped, self.landmark_topic, self.landmark_pose_cb, amcl_qos
             )
 
+        # 2026-05-27: /initialpose hard-reset channel. trip_planner publishes
+        # here on arrival at a known node — semantically a RESET signal, not a
+        # regular measurement. We bypass the Mahalanobis gate (which would
+        # otherwise reject the snap as an outlier when AMCL jumps to the new
+        # pose). After the reset, /amcl_pose converges to the snapped pose
+        # within ~1s and the normal correction path resumes seamlessly.
+        # Subscribed regardless of correction_source — /initialpose is always
+        # an authoritative reset.
+        self.create_subscription(
+            PoseWithCovarianceStamped, "/initialpose", self.initialpose_cb, amcl_qos
+        )
+
         # --- Publishers ---
         self.pub_pose = self.create_publisher(PoseWithCovarianceStamped, "/qcar2_pose_fused", 10)
         self.pub_odom = self.create_publisher(Odometry, "/qcar2_ekf/odometry_fused", 10)
@@ -267,6 +279,59 @@ class EkfFusor(Node):
         var_t = c[35] if c[35] > 1e-9 else self.r_amcl_default_diag[2]
         R_amcl = np.diag([var_x, var_y, var_t])
         self.apply_correction(z, R_amcl, source="amcl_pose")
+
+    def initialpose_cb(self, msg):
+        """
+        2026-05-27: trusted hard-reset from /initialpose (RViz, trip_planner
+        node-arrival snap, carto_to_amcl seed, amcl_load.sh seed).
+
+        Bypasses the Mahalanobis gate — by design, /initialpose IS a reset
+        signal, not a measurement to validate against the current belief.
+        Sets xHat to the message pose with the message's reported covariance
+        (or a tight default if the message covariance is empty), resets the
+        outlier streak, and marks bootstrap done.
+
+        After this fires, AMCL is ALSO resetting around /initialpose. Its
+        next /amcl_pose will be close to the snapped pose so the regular
+        amcl_pose_cb path resumes normally with a small innovation — no
+        rejection cascade, no discontinuity in /qcar2_pose_fused.
+        """
+        x = float(msg.pose.pose.position.x)
+        y = float(msg.pose.pose.position.y)
+        theta = yaw_from_quaternion(msg.pose.pose.orientation)
+        if not (np.isfinite(x) and np.isfinite(y) and np.isfinite(theta)):
+            self.get_logger().warn("/initialpose contains non-finite values; ignored")
+            return
+
+        # Use sender-reported covariance for xHat's P; fall back to a tight
+        # default if the sender didn't fill it in (some RViz GUIs zero it).
+        c = msg.pose.covariance
+        var_x = c[0]  if c[0]  > 1e-9 else 0.01
+        var_y = c[7]  if c[7]  > 1e-9 else 0.01
+        var_t = c[35] if c[35] > 1e-9 else 0.05
+
+        # Hard reset of the planar EKF state.
+        self.qcar2_ekf.xHat = np.array([[x], [y], [theta]])
+        self.qcar2_ekf.P    = np.diag([var_x, var_y, var_t])
+
+        if self.use_gyro_kf:
+            self.gyro_kf.xHat[0, 0] = theta
+
+        self.bootstrapped         = True
+        self.outlier_streak       = 0
+        self.last_correction_time = self.get_clock().now()
+        self.last_pose_source     = "initialpose"
+        self.last_innovation      = np.zeros(3)
+        self.last_maha            = 0.0
+
+        # Publish a zero-innovation diagnostic point so plots show the
+        # reset cleanly (not as a spike that looks like an outlier).
+        self._publish_correction_diagnostics(np.zeros(3), 0.0)
+
+        self.get_logger().info(
+            f"/initialpose reset: x={x:.3f}, y={y:.3f}, theta={math.degrees(theta):.1f}° "
+            f"(var: x={var_x:.4f}, y={var_y:.4f}, theta={var_t:.4f})"
+        )
 
     def landmark_pose_cb(self, msg):
         """

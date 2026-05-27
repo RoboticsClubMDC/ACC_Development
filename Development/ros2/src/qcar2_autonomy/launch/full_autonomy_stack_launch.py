@@ -50,6 +50,15 @@ def generate_launch_description():
         output="screen",
     )
 
+    # 2026-05-27: trip_planner is now bundled. It polls services lazily so
+    # startup order within the launch group doesn't matter.
+    trip_planner = Node(
+        package="qcar2_autonomy",
+        executable="trip_planner",
+        name="trip_planner",
+        output="screen",
+    )
+
     lane_stack = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(perception_share, "launch",
@@ -61,5 +70,6 @@ def generate_launch_description():
         force_cpu,
         perception_core,
         path_follower,
+        trip_planner,
         lane_stack,
     ])

@@ -78,6 +78,15 @@ def generate_launch_description():
         output="screen",
     )
 
+    # 2026-05-27: trip_planner bundled. Polls services lazily, no startup-order
+    # dependency within the launch.
+    trip_planner = Node(
+        package="qcar2_autonomy",
+        executable="trip_planner",
+        name="trip_planner",
+        output="screen",
+    )
+
     lane_stack = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(perception_share, "launch",
