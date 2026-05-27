@@ -20,13 +20,21 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription
+from launch.actions import IncludeLaunchDescription, SetEnvironmentVariable
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
 
 
 def generate_launch_description():
     perception_share = get_package_share_directory("qcar2_perception")
+
+    # 2026-05-27: VIRTUAL stack runs on the laptop dev container which
+    # typically does NOT have CUDA passthrough. Force CPU for YOLO and
+    # the D435 source so torch doesn't waste time probing for an absent
+    # GPU and falling back. Read by semantic_yolo_detector.py:42 and
+    # d435_aligned_source.py:14. LaneNet stays on HSV backend (default
+    # in lane_lanenet_stanley_launch.py) which doesn't need CUDA.
+    force_cpu = SetEnvironmentVariable(name="QCAR2_FORCE_CPU", value="1")
 
     perception_core = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -50,6 +58,7 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
+        force_cpu,
         perception_core,
         path_follower,
         lane_stack,

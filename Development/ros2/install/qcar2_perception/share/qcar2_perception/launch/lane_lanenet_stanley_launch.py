@@ -192,6 +192,26 @@ def _launch_setup(context):
         "centerline_search_margin_px": 200,  # was 120 — bridge dash gaps
         "min_valid_rows": 8,               # was 15 — accept thinner runs
         "min_row_pixels": 2,               # was 3 — sensitive to thin lines
+        # 2026-05-27: HSV defaults tuned for WHITE lane lines (the SDCS
+        # dashed center line). The lane_detector's internal defaults are
+        # for YELLOW which leaves the mask empty when the visible lane
+        # is white — Stanley then sits silent because no centroids pass
+        # min_valid_rows. "Bright + desaturated" = white:
+        #   - any hue (white has no defined hue)
+        #   - low saturation (desaturated)
+        #   - high brightness (not the dark road)
+        # To switch back to yellow tracking at runtime:
+        #   ros2 param set /lane_detector hsv_h_low 18
+        #   ros2 param set /lane_detector hsv_h_high 40
+        #   ros2 param set /lane_detector hsv_s_low 80
+        #   ros2 param set /lane_detector hsv_s_high 255
+        #   ros2 param set /lane_detector hsv_v_low 120
+        "hsv_h_low":  0,
+        "hsv_h_high": 180,
+        "hsv_s_low":  0,
+        "hsv_s_high": 60,
+        "hsv_v_low":  180,
+        "hsv_v_high": 255,
     }
 
     lane_detector = Node(

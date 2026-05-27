@@ -1772,6 +1772,114 @@ Immediate execution order (remaining work toward competition):
 
 ## Change Log
 
+### 2026-05-27 EDT — `QCar2DepthAligned.__initDepthAlign` now searches multiple paths and accepts env override.
+
+**User prompt (verbatim):** "so amke ti that if douesnt found onlaptop route to this on the file that is trying to call it QCar 2 : ~/Documents/ACC_Development_luigi/Development/MDC_libraries/resources/applications/QCarDepthAlign/QCar2DepthAlign.rt-linux_qcar2"
+
+**Answer:** Patched [`pit/YOLO/utils.py:__initDepthAlign`](Development/MDC_libraries/python/pit/YOLO/utils.py) to try a candidate list of model paths and pick the first that exists. Original behavior (relative-to-file) is candidate #1; if it's missing, falls back to the QCar 2 sync path and other known locations.
+
+**Candidate order (highest priority first):**
+1. `$MDC_DEPTHALIGN_MODEL` (env-var override, full path)
+2. Relative to `utils.py` → `../../../resources/applications/QCarDepthAlign/…` (Quanser original)
+3. `~/Documents/ACC_Development_luigi/Development/MDC_libraries/resources/applications/QCarDepthAlign/…` (QCar 2 sync target)
+4. `~/Documents/GitHub/ACC_Development/Development/MDC_libraries/resources/applications/QCarDepthAlign/…` (laptop workspace)
+5. `/workspaces/isaac_ros-dev/MDC_libraries/resources/applications/QCarDepthAlign/…` (container mount)
+
+If found, logs `[QCar2DepthAligned] using model: <path>`. If none match, logs a list of what it tried and falls back to the original Quanser path (so the error matches pre-patch behavior — making the failure obvious rather than silently broken).
+
+**Override at runtime** (any environment):
+```bash
+export MDC_DEPTHALIGN_MODEL=/abs/path/to/QCar2DepthAlign.rt-linux_qcar2
+```
+
+**Sync push needed** for the QCar 2 to get the patched utils.py:
+```bash
+./scripts/sync_qcar2.sh
+```
+
+Combined with the model-file routing entry below, the QCar 2's `d435_aligned_source` should now find the model on first launch — assuming the rsync has run.
+
+### 2026-05-27 EDT — Routed `QCar2DepthAlign.rt-linux_qcar2` model into the sync path.
+
+**User prompt (verbatim):** "/home/nvidia/Documents/ACC_Development_luigi/Development/MDC_libraries/resources/applications/QCarDepthAlign/QCar2DepthAlign.rt-linux_qcar2. I dont found it even this where it is????? found it on the ros2 environment we have here. to se ehow we rout it and make the sync qcar2 and another things do this thing. because we need this thing"
+
+**Answer:** `d435_aligned_source.py` on physical needs this Quanser depth-alignment model file at a specific path on the QCar2:
+```
+/home/nvidia/Documents/ACC_Development_luigi/Development/MDC_libraries/resources/applications/QCarDepthAlign/QCar2DepthAlign.rt-linux_qcar2
+```
+Without it, the d435_aligned_source repeatedly logs `Server error: status check failed` and stops publishing depth, which kills YOLO + landmark detection.
+
+The file existed in 8 places on the laptop (most under `Quanser_Academic_Resources` and `docker/0_libraries/`), but NOT inside the path that `sync_qcar2.sh` mirrors to the QCar 2's `~/Documents/ACC_Development_luigi/`. Copied the canonical copy from:
+```
+ACC_Development/docker/0_libraries/resources/applications/QCarDepthAlign/QCar2DepthAlign.rt-linux_qcar2
+```
+to:
+```
+ACC_Development/Development/MDC_libraries/resources/applications/QCarDepthAlign/QCar2DepthAlign.rt-linux_qcar2
+```
+
+Now `sync_qcar2.sh` carries it across automatically (the file is 432 KB; `Development/` is not in the rsync excludes). After the next sync, the QCar 2 has it at the path d435_aligned_source expects, and the `Server error` storms stop.
+
+Verify on next sync:
+```bash
+./scripts/sync_qcar2.sh
+ssh qcar2 ls -lh /home/nvidia/Documents/ACC_Development_luigi/Development/MDC_libraries/resources/applications/QCarDepthAlign/QCar2DepthAlign.rt-linux_qcar2
+# expect: 432K
+```
+
+### 2026-05-27 EDT — CUDA discipline at the launch level: physical=GPU, virtual=CPU, baked in.
+
+**User prompt (verbatim):** "ok now change yolo, when running with physical stack work with the CUDA stack using the QCar2 Stack same with lanenet, so it doesnt fuck up everything and make them use cpu, isntead on virtual."
+
+**Answer:** Both `full_autonomy_stack_launch.py` (virtual) and `full_autonomy_stack_physical_launch.py` now explicitly set `QCAR2_FORCE_CPU` via `SetEnvironmentVariable` at launch time. The env var is honored by `semantic_yolo_detector.py:42` and `d435_aligned_source.py:14` — both nodes flip `CUDA_VISIBLE_DEVICES=""` when the var is `1/true`, otherwise let torch use whatever GPU it finds.
+
+| Launch | `QCAR2_FORCE_CPU` | Outcome |
+|---|---|---|
+| `full_autonomy_stack_launch.py` (virtual, laptop dev container) | hardcoded `1` | Forces CPU. Avoids torch wasting time probing for a GPU that isn't passed through. |
+| `full_autonomy_stack_physical_launch.py` (Jetson) | launch arg `force_cpu`, defaults `0` | CUDA on by default. YOLO + d435 source run on the Ampere GPU rather than competing with carto/AMCL/EKF on the ARM CPU. |
+
+**Override on physical (regression / debugging only):**
+```bash
+ros2 launch qcar2_autonomy full_autonomy_stack_physical_launch.py force_cpu:=1
+```
+
+**LaneNet:** the lane stack defaults to `detector_backend:=hsv`, so LaneNet isn't loaded on virtual (no CUDA → no engine). If you ever set `detector_backend:=lanenet` on physical, the TensorRT engine runs on the Jetson GPU automatically — same env-var (`QCAR2_FORCE_CPU=1` would block it). No extra change needed; the existing lane_detector code calls into PIT's LaneNet which honors CUDA visibility.
+
+**Rebuild:**
+```bash
+colcon build --symlink-install --packages-select qcar2_autonomy
+source install/setup.bash
+```
+
+### 2026-05-27 EDT — HSV defaults flipped to WHITE in `lane_lanenet_stanley_launch.py` (was the silent-Stanley cause).
+
+**User prompt (verbatim):** "its that fix it if so."
+
+**Answer:** Baked the white-line HSV thresholds directly into the launch's `common_params`, so the lane mask catches the white dashed center line on first launch — no runtime tweak required. Previously the lane_detector node's internal defaults (yellow: h=18-40, s≥80) were inherited, leaving the BEV mask empty whenever the visible lane was white → `len(centroids)=0` → `lane_detected=False` permanently → `lane_stanley_controller` correctly silent (no /cmd_vel_lane publishes) → blender path-only → "Stanley not running" symptom.
+
+**Now baked in:**
+```python
+"hsv_h_low":  0,    "hsv_h_high": 180,   # any hue
+"hsv_s_low":  0,    "hsv_s_high":  60,   # low saturation (= desaturated/white)
+"hsv_v_low":  180,  "hsv_v_high": 255,   # bright (not dark road)
+```
+
+To switch back to YELLOW at runtime (SDCS shoulder lines, for example):
+```bash
+ros2 param set /lane_detector hsv_h_low 18
+ros2 param set /lane_detector hsv_h_high 40
+ros2 param set /lane_detector hsv_s_low 80
+ros2 param set /lane_detector hsv_s_high 255
+ros2 param set /lane_detector hsv_v_low 120
+```
+
+**Rebuild + relaunch:**
+```bash
+colcon build --symlink-install --packages-select qcar2_perception
+source install/setup.bash
+# Re-run full_autonomy_stack_*_launch.py; Stanley should now publish /cmd_vel_lane at ~30 Hz on a visible lane.
+```
+
 ### 2026-05-27 EDT — `sync_native_remote.sh` — laptop-side wrapper to trigger `sync_native_from_synced.sh` over SSH.
 
 **User prompt (verbatim):** "now from the another part sync_native_from_synced.sh"

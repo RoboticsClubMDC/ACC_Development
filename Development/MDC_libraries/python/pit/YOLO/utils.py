@@ -167,14 +167,68 @@ class QCar2DepthAligned():
     
     def __initDepthAlign(self):
         self.__stopDepthAlign()
-        depthAlignPath = os.path.normpath(os.path.join(
+
+        # 2026-05-27: model-path resolution with fallbacks.
+        # The Quanser default is "relative to this utils.py" — works only
+        # when the surrounding MDC_libraries tree is intact. We add the
+        # synced QCar2 path as the next-best location, plus a few other
+        # known locations, so a missing model is recoverable as long as
+        # the file exists SOMEWHERE the QCar2 user has access to.
+        # Environment override: set MDC_DEPTHALIGN_MODEL to skip search.
+        model_name = 'QCar2DepthAlign.rt-linux_qcar2'
+        candidates = []
+
+        # 0) Explicit override (highest priority).
+        env_override = os.environ.get('MDC_DEPTHALIGN_MODEL', '').strip()
+        if env_override:
+            candidates.append(env_override)
+
+        # 1) Quanser-style: relative to this file (original behavior).
+        candidates.append(os.path.normpath(os.path.join(
             os.path.dirname(__file__),
-            '../../../resources/applications/QCarDepthAlign/'
-                + 'QCar2DepthAlign.rt-linux_qcar2 '
+            '../../../resources/applications/QCarDepthAlign/' + model_name
+        )))
+
+        # 2) QCar2-side synced location (laptop pushes here):
+        candidates.append(os.path.expanduser(
+            '~/Documents/ACC_Development_luigi/Development/MDC_libraries'
+            '/resources/applications/QCarDepthAlign/' + model_name
         ))
+
+        # 3) Laptop-side workspace location (Development/MDC_libraries):
+        candidates.append(os.path.expanduser(
+            '~/Documents/GitHub/ACC_Development/Development/MDC_libraries'
+            '/resources/applications/QCarDepthAlign/' + model_name
+        ))
+
+        # 4) Container-side mounted location.
+        candidates.append(
+            '/workspaces/isaac_ros-dev/MDC_libraries'
+            '/resources/applications/QCarDepthAlign/' + model_name
+        )
+
+        chosen = None
+        for cand in candidates:
+            if cand and os.path.isfile(cand):
+                chosen = cand
+                break
+
+        if chosen is None:
+            print(
+                '[QCar2DepthAligned] WARN: model file not found in any '
+                'known location. Tried:\n  ' + '\n  '.join(candidates)
+                + '\n  Set MDC_DEPTHALIGN_MODEL=<path> to override. '
+                'Falling back to original relative path (will likely fail).'
+            )
+            chosen = candidates[1] if env_override else candidates[0]
+        else:
+            print('[QCar2DepthAligned] using model: ' + chosen)
+
+        # The trailing SPACE before -uri is intentional — Quarc parses
+        # `quarc_run -r -t … <path> -uri tcpip://…` as separate tokens.
         os.system(
             'quarc_run -r -t tcpip://localhost:17000 '
-            + depthAlignPath + '-uri tcpip://localhost:17003'
+            + chosen + ' -uri tcpip://localhost:17003'
         )
 
         time.sleep(4)
