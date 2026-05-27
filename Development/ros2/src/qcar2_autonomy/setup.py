@@ -12,7 +12,8 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        (os.path.join('share', package_name,'launch'), glob('launch/*.py'))
+        (os.path.join('share', package_name,'launch'), glob('launch/*.py')),
+        (os.path.join('share', package_name,'rviz'), glob('rviz/*.rviz'))
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -22,18 +23,24 @@ setup(
     license='TODO: License declaration',
     tests_require=['pytest'],
     entry_points={
-        'console_scripts': [
-            'path_follower = autonomy.nav_to_pose:main',
-            'traffic_system_detector=autonomy.traffic_system_detector:main',
-            'lane_detection=autonomy.lane_detection:main',
-            'yolo_detector=autonomy.yolo_detector:main',
-            'trip_planner=autonomy.trip_planner:main',
-            'bev_csi_node=autonomy.bev_csi_node:main',
-            'stanley_live_plot=autonomy.stanley_live_plot:main',
-            'lane_stanley_node=autonomy.lane_stanley_node:main',
-            'sidewalk_detection=autonomy.sidewalk_detection:main',
-            'bev_csi_seg=autonomy.bev_csi_seg:main',
-
+    'console_scripts': [
+        'path_follower = autonomy.nav_to_pose:main',
+        'manual_drive = autonomy.manual_drive:main',
+        'traffic_system_detector=autonomy.traffic_system_detector:main',
+        'lane_detector=autonomy.lane_detector:main',
+        'cmd_vel_blender=autonomy.cmd_vel_blender:main',
+        'car_stop=autonomy.car_stop:main',
+        'sdcs_map_publisher=autonomy.sdcs_map_publisher:main',
+        'yolo_detector=autonomy.yolo_detector:main',
+        'trip_planner=autonomy.trip_planner:main',
+        'dataset_collector=autonomy.dataset_collector:main',
+        'Planner_server=autonomy.Planner_server:main',
+        'vo_node=autonomy.vo_node:main',
+        'vo_supervisor=autonomy.vo_supervisor:main',
+        'vo_dashboard=autonomy.vo_terminal_dashboard:main',
+        'vo_overlay=autonomy.vo_image_overlay:main',
+        'vo_odom_relay=autonomy.vo_odom_tf_relay:main',
+        'camera_bridge=autonomy.qcar2_camera_bridge:main',
         ],
     },
 )
