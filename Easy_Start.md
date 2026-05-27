@@ -943,14 +943,14 @@ If you find any extrinsic on physical that doesn't match the manual (e.g., the L
 
 This is the workflow we use to drive the **physical** QCar 2 from the laptop without paying for VSCode/Claude to run on the Jetson. The laptop is the editor; the QCar 2 is the executor. Files travel one direction: **laptop ACC_Development → QCar 2 ACC_Development_luigi → native ~/ros2**. Builds happen on the QCar 2 (Jetson aarch64, can't be cross-built from the laptop's x86_64).
 
-> **QCar 2 access** — IP `192.168.2.207`, user `nvidia`, password `nvidia`. The wired AP from Quanser does not give the laptop internet; either dual-home or accept that you're offline while connected to the car. Foxglove still works because both machines are on the same subnet.
+> **QCar 2 access** — IP `192.168.2.13`, user `nvidia`, password `nvidia`. The wired AP from Quanser does not give the laptop internet; either dual-home or accept that you're offline while connected to the car. Foxglove still works because both machines are on the same subnet.
 
 ### Step 0a. One-time SSH setup on the laptop
 
 ```bash
 # Aliases live in ~/.ssh/config — `Host qcar2` already added:
 #   Host qcar2
-#     HostName 192.168.2.207
+#     HostName 192.168.2.13
 #     User nvidia
 #     ServerAliveInterval 30
 
@@ -992,7 +992,7 @@ exit
 **Where it writes TO (QCar 2 — over SSH):**
 
 ```
-nvidia@192.168.2.207:/home/nvidia/Documents/ACC_Development_luigi/
+nvidia@192.168.2.13:/home/nvidia/Documents/ACC_Development_luigi/
 ```
 
 Both paths are **hard-coded inside the script** — you do NOT need to be in any particular folder when you run it. You can call it from `~`, from the repo, from `/tmp`, anywhere. It's `cd`-agnostic.
@@ -1042,7 +1042,7 @@ Run `sync_qcar2.sh` from the **laptop**, not from inside `ssh qcar2`. If the
 `qcar2` SSH alias is not available in a laptop terminal, use the IP directly:
 
 ```bash
-QCAR2_REMOTE=nvidia@192.168.2.207 sync_qcar2.sh
+QCAR2_REMOTE=nvidia@192.168.2.13 sync_qcar2.sh
 ```
 
 **If `~/bin` is NOT on PATH for some reason, you can always call by absolute path:**
@@ -1076,7 +1076,7 @@ ssh qcar2 'ls ~/Documents/ACC_Development_luigi/Development/ros2/src'
 
 1. Laptop: edit code in VSCode (+ Claude). Open one terminal: `sync_qcar2.sh --watch`. Now every save is on the QCar 2 within ~1 s.
 2. Laptop: open a second terminal: `ssh qcar2`. Use this to run launches.
-3. Laptop browser: Foxglove → `ws://192.168.2.207:8765` (port forwarded over the wired QCar 2 AP, no SSH tunnel needed because both sides see each other on the subnet).
+3. Laptop browser: Foxglove → `ws://192.168.2.13:8765` (port forwarded over the wired QCar 2 AP, no SSH tunnel needed because both sides see each other on the subnet).
 
 If you prefer SSH inside VSCode (integrated terminal, no remote-server bloat): `Ctrl+Shift+P` → "Terminal: Create New Terminal" → `ssh qcar2`. Do **not** use Remote-SSH; that installs the heavy `vscode-server` on the Jetson.
 
@@ -1591,7 +1591,7 @@ If QCar has no `/perception/d435/*`, start the QCar-side `mode:=internal source_
 
 ### Foxglove
 
-From the laptop browser, open Foxglove Studio → "Open Connection" → `ws://192.168.2.207:8765`. The `foxglove_bridge_launch.py` should be running on either the native side or in the container (either works — they share DDS).
+From the laptop browser, open Foxglove Studio → "Open Connection" → `ws://192.168.2.13:8765`. The `foxglove_bridge_launch.py` should be running on either the native side or in the container (either works — they share DDS).
 
 ### Edit-loop cheat sheet
 
@@ -1602,7 +1602,7 @@ LAPTOP                              QCar 2 (ssh qcar2)
 (VSCode + Claude editing)           (terminal B, native)  ros2 launch qcar2_nodes qcar2_cartographer_launch.py
 (terminal 2) ssh qcar2 ↓            (terminal C, native)  ros2 run qcar2_autonomy manual_drive
             └── you live in here    (terminal D) ros2 topic hz / debugging
-(browser) ws://192.168.2.207:8765
+(browser) ws://192.168.2.13:8765
 ```
 
 If a Python change in `qcar2_autonomy` doesn't take effect: the container build uses `--symlink-install`, so a re-source is enough — `source install/setup.bash` in each container terminal after the rsync lands. For C++ changes in `qcar2_nodes` you have to re-run Step 1 (native build).
@@ -1771,6 +1771,478 @@ Immediate execution order (remaining work toward competition):
 9. ⏳ Wire trip_planner's pickup/dropoff states to the reward grid.
 
 ## Change Log
+
+### 2026-05-27 EDT — `sync_native_remote.sh` — laptop-side wrapper to trigger `sync_native_from_synced.sh` over SSH.
+
+**User prompt (verbatim):** "now from the another part sync_native_from_synced.sh"
+
+**Answer:** `sync_native_from_synced.sh` runs entirely locally on the QCar 2 — no IP references in it to update. To make the native sync activatable from the laptop without a manual `ssh qcar2`, added `sync_native_remote.sh` as a thin SSH wrapper:
+
+```bash
+# Laptop side:
+./scripts/sync_native_remote.sh            # one-shot remote mirror
+./scripts/sync_native_remote.sh --watch    # remote watch loop, blocks
+```
+
+Uses the `qcar2` SSH alias (so it picks up the new IP automatically from `~/.ssh/config`). Streams the remote rsync output back to the laptop terminal via `ssh -t`.
+
+**Full chain, two laptop terminals:**
+
+```bash
+# T-1 — push laptop → qcar2 continuously:
+./scripts/sync_qcar2.sh --watch
+
+# T-2 — trigger qcar2 native mirror (synced → ~/ros2) continuously:
+./scripts/sync_native_remote.sh --watch
+```
+
+Edit on laptop → ~1 s later it's on the QCar 2's synced tree → ~1 s later it's in `~/ros2/`. Then SSH into the QCar to `colcon build` + `ros2 launch`. No manual ssh needed for the sync chain itself.
+
+### 2026-05-27 EDT — Physical-side `full_autonomy_stack_physical_launch.py` added (mirror of the virtual one).
+
+**User prompt (verbatim):** "OK NOW EDIT, I need the full stack file FOR physical, of what we have, … like you did before."
+
+**Answer:** New launch [`qcar2_autonomy/launch/full_autonomy_stack_physical_launch.py`](Development/ros2/src/qcar2_autonomy/launch/full_autonomy_stack_physical_launch.py) mirrors `full_autonomy_stack_launch.py` but includes `perception_core_physical.launch.py` instead of the virtual variant. Passes through the perception_core_physical args (`mode`, `source_only`, `enable_landmark_correction`) with sane defaults (`internal / false / false`) matching CLAUDE.md §4's "all on Jetson" recommendation.
+
+**Usage on the QCar 2 Jetson (native `~/ros2`, after sync + native build):**
+
+```bash
+ssh qcar2
+cd ~/ros2 && source /opt/ros/humble/setup.bash && source install/setup.bash
+export ROS_DOMAIN_ID=69
+
+# Fresh recording:
+./Documents/ACC_Development_luigi/Development/ros2/scripts/carto_to_amcl.sh physical
+
+# OR re-use saved map:
+./Documents/ACC_Development_luigi/Development/ros2/scripts/amcl_load.sh physical
+
+# In a second SSH session:
+ros2 launch qcar2_autonomy full_autonomy_stack_physical_launch.py
+# Optional args:
+#   mode:=external                    (paired with another box's internal source_only:=true)
+#   enable_landmark_correction:=true  (Phase-4, only after prereqs cleared)
+
+# In a third SSH session — arm:
+ros2 param set /path_follower node_values "[0, 6, 8]"
+```
+
+Three SSH sessions on the QCar2 (or three Foxglove panels with `ros2 topic` running) is the minimum for a physical drive: AMCL/script + stack launch + arm.
+
+### 2026-05-27 EDT — QCar 2 IP updated `192.168.2.207` → `192.168.2.13`.
+
+**User prompt (verbatim):** "ok change the file sync qcar2, and the another from native, so they can be ssh activated and store it as qcar2 new ip is 192.168.2.13 nvidia"
+
+**Changes:**
+- `~/.ssh/config`: `Host qcar2` HostName updated to 192.168.2.13 (backup kept at `~/.ssh/config.bak.<timestamp>`). The literal `Host 192.168.2.207` entry was rewritten the same way.
+- All IP references in `Easy_Start.md` §12 (Physical QCar 2 Bring-Up) and the Foxglove section were sed-replaced.
+- Sync scripts (`sync_qcar2.sh`, `sync_native_from_synced.sh`) **did not need changes** — they resolve via the SSH alias `qcar2`. Whatever IP `~/.ssh/config` points the alias at is what they use.
+
+**Usage unchanged** — `ssh qcar2`, `./scripts/sync_qcar2.sh`, Foxglove `ws://192.168.2.13:8765` — all just work once you're on the QCar2's wired AP.
+
+### 2026-05-27 EDT — Three usability wrappers: pose-YAML persistence, `amcl_load.sh`, and `full_autonomy_stack_launch.py` collapse 3 terminals to 1.
+
+**User prompt (verbatim):** "no, ok you cannot jus make it like that, so AMCL when uses recorde_map basically starting amcl, I need to store the initial pose when cartographer recorder started, and the recorded+ AMCL run has to be well my last pose, and well run AMCL right you understand it? ok stack everything alr on a launch file, except the script of amcl and the set parameters so stack this on a launch file."
+
+**Three additions:**
+
+**A. `carto_to_amcl.sh` now persists initial + final pose to YAML.**
+
+After carto comes up (and before `manual_drive` takes over the terminal), the script snapshots map → base_link as the "initial pose." After driving ends and the existing final-pose capture runs, both are written to `~/qcar2_maps/competition_map_pose.yaml`:
+
+```yaml
+initial_pose:
+  position:    {x: ..., y: ..., z: 0.0}
+  orientation: {x: 0.0, y: 0.0, z: ..., w: ...}
+final_pose:
+  position:    {x: ..., y: ..., z: 0.0}
+  orientation: {x: 0.0, y: 0.0, z: ..., w: ...}
+```
+
+The YAML lives alongside the `.pgm`/`.yaml` map so they travel together. Future sessions can re-seed AMCL without re-recording.
+
+**B. New script `amcl_load.sh` — launch AMCL on saved map with auto-seeded initialpose.**
+
+```bash
+# Default: virtual, seed with FINAL (last) pose:
+./scripts/amcl_load.sh
+# Seed with initial (carto-start) pose instead:
+./scripts/amcl_load.sh virtual initial
+# Physical:
+./scripts/amcl_load.sh physical
+```
+
+Flow: parses the YAML for the chosen pose → launches `qcar2_amcl_localization_*_launch.py` with `map:=...` → waits for AMCL lifecycle 'active' → publishes `/initialpose` six times at 2 Hz. AMCL stays running in the foreground (Ctrl-C to stop).
+
+**C. New launch `full_autonomy_stack_launch.py`** in `qcar2_autonomy`. Collapses old terminals B/C/D into one:
+
+```bash
+ros2 launch qcar2_autonomy full_autonomy_stack_launch.py
+```
+
+Spawns perception_core + path_follower + lane stack (detector + Stanley + blender). Excludes AMCL (separate script) and arming (separate `ros2 param set node_values`).
+
+---
+
+### Two clean session shapes
+
+**Fresh recording:**
+```bash
+# T-A (one terminal, end to end):
+./scripts/carto_to_amcl.sh
+#   carto → manual_drive → freeze → AMCL + ekf_fusor + converter
+# T-B:
+ros2 launch qcar2_autonomy full_autonomy_stack_launch.py
+# T-C (any sourced shell):
+ros2 param set /path_follower node_values "[0, 6, 8]"
+```
+
+**Re-using a saved map (no recording):**
+```bash
+# T-A:
+./scripts/amcl_load.sh
+#   AMCL + ekf_fusor + converter, seeded with last pose from competition_map_pose.yaml
+# T-B:
+ros2 launch qcar2_autonomy full_autonomy_stack_launch.py
+# T-C:
+ros2 param set /path_follower node_values "[0, 6, 8]"
+```
+
+Two terminals + one arm command. That's it.
+
+### 2026-05-27 EDT — Missing `nav2_qcar2_converter` in AMCL launches — added (was the "everything publishes, car doesn't move" cause).
+
+**User prompt (verbatim):** "parameters set but not moving … `ros2 node list | grep -iE "convert|qcar2_hardware|virtual"` → only `/qcar2_hardware` … yeah u r right fix it please"
+
+**Answer:** `/cmd_vel_nav` had 1 publisher (`cmd_vel_blender`) and 2 subscribers (`pose_estimator`, `ekf_fusor`) — but the C++ bridge `nav2_qcar2_converter` (`/cmd_vel_nav` → `/qcar2_motor_speed_cmd`) was missing entirely. That node is included in `qcar2_cartographer_*_launch.py` but was NOT in `qcar2_amcl_localization_*_launch.py`. So as soon as `carto_to_amcl.sh` killed the carto process group and handed off to AMCL, the converter died and the motor side of the bus went silent. PP + Stanley + blender kept publishing into the void.
+
+Fix: added `nav2_qcar2_converter` Node to both AMCL launches alongside the recently-added `ekf_fusor`.
+
+```python
+nav2_qcar2_converter = Node(
+    package="qcar2_nodes",
+    executable="nav2_qcar2_converter",
+    name="nav2_qcar2_converter",
+)
+```
+
+After rebuilding `qcar2_nodes` and re-running `carto_to_amcl.sh`, the converter is automatic. Until then, run it standalone in any sourced terminal: `ros2 run qcar2_nodes nav2_qcar2_converter`.
+
+**Lessons-learned bullet for next time:** any launch that produces `/cmd_vel_nav` traffic but doesn't have `nav2_qcar2_converter` somewhere in the running graph will have the same "publishes correctly, car doesn't move" symptom. Cheap sanity check: `ros2 topic info /cmd_vel_nav -v` should show the converter as one of the subscribers, alongside `ekf_fusor` and `pose_estimator`.
+
+### 2026-05-27 EDT — `carto_to_amcl.sh` now drives the car for you in the same terminal (manual_drive embedded between carto-up and ENTER-to-freeze).
+
+**User prompt (verbatim):** "YES but amcl needs that I drive it, so I need you to make it ready just activating the script activating cartographer and in that same terminal allows me to alr control if so."
+
+**Answer:** Patched `Development/ros2/scripts/carto_to_amcl.sh` so the same terminal that ran the script becomes the manual-drive console during the recording phase:
+
+```
+Phase 1: launch carto (background, logs to /tmp/carto.log)
+Phase 1.5: ros2 run qcar2_autonomy manual_drive   ← NEW, foreground in this terminal
+           User drives with WASD. Cartographer mapping in background.
+           Ctrl-C exits manual_drive — script catches SIGINT and continues.
+Phase 2-6: capture final TF, save map, kill carto, launch AMCL, seed /initialpose.
+```
+
+**Why it doesn't kill the script when you Ctrl-C:** the manual-drive section is wrapped in `trap '...' INT` plus `set +e`, so SIGINT is delivered to `manual_drive` (which exits cleanly) but the script's continuation isn't aborted. The trap is cleared immediately after.
+
+**`manual_drive` defaults to `/cmd_vel_nav`** — that's the right topic during mapping (nav2_qcar2_converter consumes it directly, no blender involved). The new `cmd_topic` default on `path_follower` doesn't affect this because path_follower isn't running during recording.
+
+**One-terminal flow now:**
+```bash
+cd /workspaces/isaac_ros-dev/ros2
+source /opt/ros/humble/setup.bash
+source /workspace/cartographer_ws/install/setup.bash
+source install/setup.bash
+export ROS_DOMAIN_ID=69
+
+./scripts/carto_to_amcl.sh
+# - carto launches (~5 s)
+# - terminal becomes manual_drive console
+# - drive WASD until map looks good
+# - Ctrl-C
+# - script auto-saves map, kills carto, brings up AMCL+ekf_fusor, seeds initialpose
+# - AMCL stays running in this terminal
+```
+
+Then in three other terminals (T-B, T-C, T-D) start `perception_core_virtual.launch.py`, `path_follower`, and `lane_lanenet_stanley_launch.py` as documented in the previous entry — no further changes needed.
+
+### 2026-05-27 EDT — PP + Stanley stack made "just-call-path_follower" ready: 4 changes + AMCL launch now includes ekf_fusor.
+
+**User prompt (verbatim):** "on secondary issue just change that behavior that I just have to call on path_follower and dont change more shit. got me? oh not growing distance its ok, OK We have to have ready the make to make Recorder, of carto, now the thing is to call AMCL to work with it, I need you to help me with that before continuing all of this and parallely, scalate it to 1s the lane_timeout_sec yeah do the skeleton centerline a little more aggresive. just make it ready to use and tell me how to use for the architecture of PP + SC i need it fast."
+
+**Changes (all baked in — no per-launch overrides needed):**
+
+1. **`path_follower` default `cmd_topic` flipped from `/cmd_vel_nav` → `/cmd_vel_path`** ([nav_to_pose.py:356](Development/ros2/src/qcar2_autonomy/autonomy/nav_to_pose.py#L356)). Now `ros2 run qcar2_autonomy path_follower` automatically feeds the blender. ⚠ Side effect: if you run path_follower WITHOUT `cmd_vel_blender` (no `lane_lanenet_stanley_launch.py`), commands go nowhere and the car won't move. Override back with `--ros-args -p cmd_topic:=/cmd_vel_nav` if you ever need single-publisher mode.
+
+2. **`lane_stanley_controller` `lane_timeout_sec` 0.35 → 1.0 s** ([lane_stanley_controller.py:26](Development/ros2/src/qcar2_perception/qcar2_perception/lane_stanley_controller.py#L26)). Survives the gap between dashed lane segments — Stanley keeps integrating CTE using the last-known value instead of going silent every dash boundary.
+
+3. **`lane_detector` skeleton more aggressive** (in `lane_lanenet_stanley_launch.py` common params):
+   - `min_lane_component_area`: 30 → 12 (keep smaller dash fragments)
+   - `centerline_search_margin_px`: 120 → 200 (bridge dash gaps in row scan)
+   - `min_valid_rows`: 15 → 8 (accept thinner runs)
+   - `min_row_pixels`: 3 → 2 (sensitive to thin painted lines)
+
+4. **AMCL launches (virtual + physical) now include `ekf_fusor` with `correction_source='amcl_pose'`** ([qcar2_amcl_localization_virtual_launch.py](Development/ros2/src/qcar2_nodes/launch/qcar2_amcl_localization_virtual_launch.py), [qcar2_amcl_localization_launch.py](Development/ros2/src/qcar2_nodes/launch/qcar2_amcl_localization_launch.py)). Previously the EKF was only in carto launch; the AMCL workflow forced path_follower to fall back to raw `map→base_link` TF. Now `/qcar2_pose_fused` is published in both modes.
+
+---
+
+### How to use — PP + Stanley + AMCL, end-to-end
+
+**One-time, per session: record a Cartographer map and freeze it to AMCL.**
+
+```bash
+# Terminal A (the carto-to-amcl pipeline driver):
+cd /workspaces/isaac_ros-dev/ros2
+source /opt/ros/humble/setup.bash
+source /workspace/cartographer_ws/install/setup.bash
+source install/setup.bash
+export ROS_DOMAIN_ID=69
+
+./scripts/carto_to_amcl.sh           # virtual (default)
+# (or: ./scripts/carto_to_amcl.sh physical)
+```
+Drive one slow clean lap in QLabs / manually. Press ENTER in Terminal A. The script:
+1. Saves `~/qcar2_maps/competition_map.{pgm,yaml}`.
+2. Kills Cartographer.
+3. Launches the AMCL stack (which now includes ekf_fusor → `/qcar2_pose_fused` keeps publishing).
+4. Seeds `/initialpose` with the final carto pose.
+5. Leaves AMCL running in the foreground.
+
+AMCL is live. Don't Ctrl-C Terminal A.
+
+**Then run the PP + Stanley stack in 3 more terminals:**
+
+```bash
+# Terminal B — perception (D435 source + YOLO + landmarks):
+ros2 launch qcar2_perception perception_core_virtual.launch.py
+
+# Terminal C — path_follower (now auto-feeds the blender):
+ros2 run qcar2_autonomy path_follower
+
+# Terminal D — lane stack (lane_detector + lane_stanley_controller + cmd_vel_blender):
+ros2 launch qcar2_perception lane_lanenet_stanley_launch.py
+```
+
+**Arm the trip:**
+
+```bash
+# Terminal E (or from any source-set shell):
+ros2 param set /path_follower node_values "[0, 6, 8]"
+```
+
+The blender log will flip from `path=missing lane=...` to `path=fresh lane=fresh` and the car drives with **0.60 lane + 0.40 path blend**. Stanley is now actually steering, not just observing.
+
+**Verify wiring in 4 commands:**
+```bash
+ros2 topic info /cmd_vel_nav -v      # 1 publisher: cmd_vel_blender. 3 subs: converter, pose_estimator, ekf_fusor.
+ros2 topic hz   /cmd_vel_path        # ~30 Hz, path_follower publishing
+ros2 topic hz   /cmd_vel_lane        # ~30 Hz when lane visible
+ros2 topic echo /qcar2_pose_fused --once   # PoseWithCovarianceStamped — confirms ekf_fusor is alive in AMCL mode
+```
+
+**Live-tunable knobs once driving:**
+```bash
+ros2 param set /cmd_vel_blender lane_weight 0.70    # crank lane authority
+ros2 param set /cmd_vel_blender path_weight 0.30
+ros2 param set /lane_stanley_controller stanley_gain 0.7    # default 0.5
+ros2 param set /lane_stanley_controller heading_gain 1.2    # default 1.0
+ros2 param set /lane_detector hsv_h_low 0      # if tracking the wrong line color
+ros2 param set /lane_detector hsv_h_high 180
+ros2 param set /lane_detector hsv_s_high 60
+ros2 param set /lane_detector hsv_v_low 180
+```
+
+**Build everything once before first use:**
+```bash
+cd /workspaces/isaac_ros-dev/ros2
+colcon build --symlink-install --packages-select qcar2_autonomy qcar2_perception qcar2_nodes
+source install/setup.bash && export ROS_DOMAIN_ID=69
+```
+
+### 2026-05-27 EDT — D435 BEV preset v4: "slash image in half, focus on bottom" — trapezoid lives in lower half only, accept perspective distortion for wider visible road.
+
+**User prompt (verbatim):** "ok but first my foxglove is so fucking heavy rn it is slow any idea why? I alr closed and open again ... hmm ok... its correct is is what is supposed to be? because im pretty sure is like the same I see with csi. not distorted but like same width of FOV, what if we do the distort method again, slash the iamge on half and focus on bottom part again but with this one"
+
+**Answer:** v3's `/lane_keeping/bev` panel showed the issue clearly: most of the upper BEV was a white/blurry smear, and only the bottom strip showed road. Root cause: v3's top row at **v=246 is just 32 px below the horizon** (cy=213.56), which at zero pitch maps to ~2.4 m ahead. At that depth in QLabs, the camera sees background walls / scene boundaries, not lane lines. Warped to fill the upper BEV → white smear.
+
+**v4 fix:** drop the trapezoid top to **v=300** (clearly road, ~0.91 m ahead of camera) and widen laterally back out. The price is that the trapezoid is **no longer a true ground rectangle** — at v=300 we capture lateral Y ∈ [-0.47, +0.49] m, at v=470 we capture Y ∈ [-0.19, +0.24] m. So the warpPerspective bends parallel ground lines slightly (the perspective inversion isn't mathematically pure). Stanley's CTE will have a small scale-bias near the bottom row that can be absorbed by tuning gains post-calibration. Same trade-off CSI made; it worked there.
+
+**Trapezoid:** lives entirely in `v ∈ [300, 470]` — the bottom 36% of the source image. Sky and far-field horizon haze are excluded.
+
+| Corner | Pixel (u,v) | World (X_body, Y_body) |
+|---|---|---|
+| top_left | [80, 300] | (1.00, +0.49) |
+| top_right | [560, 300] | (1.00, −0.47) |
+| bottom_right | [639, 470] | (0.40, −0.19) |
+| bottom_left | [0, 470] | (0.40, +0.24) |
+
+**`bev_world_width_m = 1.0`** to match the wider end of the trapezoid (~0.96 m total). Means each lane line gets more pixels in the BEV than v3.
+
+**Expected outcome on next launch:**
+- BEV upper portion now shows ROAD, not white smear.
+- HSV mask should actually catch the lane line (v3's mask was almost all black because the lane was outside the trapezoid).
+- `LOST` indicator on `/lane_keeping/debug_overlay` should flip to lane-detected on a normal straight.
+
+If after rebuild the BEV still shows white in places you don't expect, the next dial is `bev_world_width_m` (raise to 1.2 to compress more of the world into the BEV, lower to 0.8 to zoom in).
+
+### 2026-05-27 EDT — D435 BEV preset v3: switched to TRUE ground rectangle under zero-pitch assumption (user correction).
+
+**User prompt (verbatim):** "what no, is not pitched downard."
+
+**Answer:** v2 assumed the camera was pitched ~3° downward (based on me reading the horizon at v≈240 from the Foxglove panel). User clarified the camera is NOT pitched down. The Foxglove panel was scaling the image and my visual estimate of horizon position was unreliable.
+
+**Recomputed under zero pitch:**
+- Horizon = `v = cy = 213.56` (above image center).
+- Bottom row v=479 → ground at depth `fy·z/(v-cy) = 459.43·0.172/265.44 = 0.298 m` ahead of camera (= 0.39 m ahead of body origin).
+
+**Switched approach from "wide trapezoid" to "true ground rectangle"** so the BEV is geometrically correct (a real top-down view), not just visually big with perspective stretching. This means Stanley's CTE measurements are in proper meters at every BEV row, not biased by perspective.
+
+**Chosen world rectangle:** X ∈ [0.5, 2.5] m, Y ∈ ±0.26 m.
+- **0.5 m** near edge → the closest point where ±0.26 m symmetric lateral still fits inside the image.
+- **2.5 m** far edge → useful lookahead for Stanley + heading-error estimation.
+- **±0.26 m** is the **maximum symmetric width** the camera can see at X=0.5 m without one side clipping. Limited by the asymmetric 3.2 cm mount offset which eats the right side first.
+
+Projected through real intrinsics + extrinsics:
+
+| World (X, Y) | Pixel (u, v) |
+|---|---|
+| (0.5, +0.26) | ( 52, 409) bottom-left |
+| (0.5, −0.26) | (637, 409) bottom-right |
+| (2.5, +0.26) | (265, 246) top-left |
+| (2.5, −0.26) | (364, 246) top-right |
+
+**Why narrower than v2:**  v2's trapezoid was a wide non-rectangle in world coords (top corresponded to ±0.55 m, bottom to ±0.21 m). The warpPerspective stretched the far-field horizontally → distorted top-down. v3 picks a real rectangle, so the BEV is a clean 0.52 m × 2.0 m slab. Lane width 0.254 m fits with ~0.13 m of road shoulder on each side.
+
+**If you want wider lateral coverage**, two options:
+1. Move the near edge further out: e.g. `X ∈ [1.0, 3.0], Y ∈ ±0.40 m` → bottom row in image moves up to ~v=344 (loses the road right at the bumper).
+2. Accept a non-rectangle trapezoid (v2-style) — visually wider but geometrically distorted.
+
+v3 is the geometrically clean baseline. Iterate from there.
+
+### 2026-05-27 EDT — D435 BEV preset v2: real intrinsics fx=455 (not 615), wider trapezoid cross-checked against Quanser official lane-keeping reference.
+
+**User prompt (verbatim):** "well we dont to crop that much of distortion values rememebr the D435 is more wider and more mathematically correct with it, because look at this … it its too much cropping im pretty sure, you did correctly the homography it looks kind of strange this BEV … if confused try to find information here https://github.com/quanser/Quanser_Academic_Resources/tree/dev-windows/6_teaching/4_Autonomous_Systems/SDCS/skills_activities/06-lane_keeping the use D435 RGBD natively for something"
+
+**Answer:** Two compounding mistakes in the v1 preset, both fixed:
+
+**Mistake 1: wrong intrinsics.** I used Intel D435 factory defaults `fx=fy=615, cx=320, cy=240`. The actual D435 used by `d435_aligned_source.py` (lines 55-58) has:
+```
+fx = 455.20,  fy = 459.43,  cx = 308.53,  cy = 213.56
+```
+A 26 % lower focal length means the FOV is significantly **wider** than I credited. All pixel-coordinate trapezoid math based on fx=615 was therefore pinched into a narrow central band.
+
+**Mistake 2: BEV coverage too small.** Cross-referenced with Quanser's official skills activity at `Quanser_Academic_Resources/6_teaching/4_Autonomous_Systems/SDCS/skills_activities/06-lane_keeping/lane_keeping.py`:
+
+```python
+bevShape       = [800, 800]
+bevWorldDims   = [0, 20, -10, 10]      # QLabs units (×10 of real)
+                                        # → 2.0 m × 2.0 m in REAL meters
+QCarRealSense(mode='RGB', frameWidthRGB=640, frameHeightRGB=480)
+```
+
+They use a 2.0 m × 2.0 m real-world BEV; I had 1.0 m. Doubled `bev_world_width_m` from 1.0 → 1.2 (a touch tighter than Quanser for higher pixel-per-meter resolution).
+
+**Visible from the user's raw image:** the horizon sits at v≈240, which is 26 px below cy=213.56 → camera has ~3° downward pitch. So my zero-pitch assumption was approximately correct, but the precise ground projection of v=479 is ~0.40 m ahead (not the 0.44 m I computed).
+
+**v2 trapezoid:**
+| Corner | px | World (X_body, Y_body) |
+|---|---|---|
+| top_left | [200, 250] | ~(2.27, +0.55) |
+| top_right | [440, 250] | ~(2.27, −0.59) |
+| bottom_right | [639, 479] | ~(0.39, −0.18) |
+| bottom_left | [0, 479] | ~(0.39, +0.23) |
+
+Now spans **full image width at the bottom** — no more pinched 100 px band. The Quanser reference confirms it's safe to take the entire bottom edge.
+
+**Pending verification — Quanser's IPM is closed source** in the public release (`InversePerspectiveMapping` class is empty placeholder for the student lab activity — see `qcar_functions.py:738`). So we can't directly copy their src/dst point logic. The values above are derived analytically from real intrinsics + assumed 3° pitch and need empirical refinement on first run.
+
+**External references (used):**
+- [Quanser Academic Resources — lane_keeping.py](https://github.com/quanser/Quanser_Academic_Resources/blob/dev-windows/6_teaching/4_Autonomous_Systems/SDCS/skills_activities/06-lane_keeping/lane_keeping.py)
+- Local mirror at `/home/bp02-ubuntu/Documents/Quanser_Academic_Resources/6_teaching/4_Autonomous_Systems/SDCS/skills_activities/06-lane_keeping/lane_keeping.py`
+- Local intrinsics source at `Development/ros2/src/qcar2_perception/qcar2_perception/d435_aligned_source.py:55-58`
+
+### 2026-05-27 EDT — Lane stack now camera-source-switchable (CSI ↔ D435), D435 is the new default.
+
+**User prompt (verbatim):** "its the fucking csi... FOV thhat is terrible for this.... ok What do you need to wire it to D435, you have intrinsics and extrinsics alr for virtual. I want to do a test change file so it can accept device with only 1 change to select, make it defualt D435 Now, now the awarenes stanley has to be corresponding the extrinsics of the D435, but the nose is a little more further than de the D435 on x directions, and D435 its a little higher we have to adjust."
+
+**Answer:** Refactored `lane_lanenet_stanley_launch.py` so a single `camera_source` arg (`csi` or `d435`, default `d435`) selects which camera feeds the lane detector. All camera-specific parameters live in two preset dicts in the launch file — no Python code changes needed in `lane_detector` or `lane_stanley_controller`.
+
+**Geometry differences captured in the D435 preset:**
+
+| Param | CSI value | D435 value | Why |
+|---|---:|---:|---|
+| `image_topic` | `/camera/csi_image` | `/perception/d435/rgb/image_raw` | Different driver |
+| `undistort_enabled` | `True` | `False` | D435 RGB is pre-rectified by realsense |
+| `camera_matrix_fx`/`fy` | 318.86 / 312.14 | 615 / 615 | D435 640×480 factory intrinsics (refine with `ros2 topic echo /perception/d435/camera_info --once`) |
+| `camera_matrix_cx`/`cy` | 401.34 / 201.50 | 320 / 240 | 640×480 center |
+| `bev_world_width_m` | 1.5 | 1.0 | Narrower D435 HFOV → narrower lateral coverage |
+| `car_center_offset_m` | −0.40 (empirical) | +0.032 | D435 is 3.2 cm LEFT of centerline (Y_body=+0.032). CTE correction tracks the asymmetry. |
+| `front_axle_offset_m` | 0.10 | 0.05 | D435 BEV bottom is already ~0.54 m ahead of body origin (~0.41 m ahead of front axle); small lookahead so Stanley evaluates near the nose, not 0.5 m past it |
+| `src_top_left` … `src_bottom_right` | Arturo's empirical CSI trapezoid | Analytic 640×480 trapezoid for z=0.172, zero pitch | Different camera geometry |
+
+**The analytic D435 trapezoid:** assumes zero pitch / zero roll on a 640×480 image with fx=fy=615:
+- Top row v=290 → ground ~2.1 m ahead of camera, lateral ±0.5 m
+- Bot row v=479 → ground ~0.44 m ahead of camera, lateral asymmetric ±0.18 m max (camera offset eats one side)
+
+Corners:
+```python
+src_top_left     = [184, 290]
+src_top_right    = [475, 290]
+src_bottom_right = [614, 479]
+src_bottom_left  = [114, 479]
+```
+
+**Expect to empirically refine these the first time you launch with `camera_source:=d435`.** Real D435 is almost certainly mounted with some downward pitch, which will skew the trapezoid in the BEV debug overlay. Iterate top/bottom row positions exactly as we did v1→v6 for the CSI.
+
+**Usage:**
+
+```bash
+# Default (D435):
+ros2 launch qcar2_perception lane_lanenet_stanley_launch.py
+
+# Legacy CSI:
+ros2 launch qcar2_perception lane_lanenet_stanley_launch.py camera_source:=csi
+```
+
+**Pre-req for D435 mode:** the D435 source must be publishing `/perception/d435/rgb/image_raw`. In virtual: `qcar2_perception` aligned source launch must be running. In physical: see CLAUDE.md §4 perception mode contract.
+
+**Verify the camera switch is live:**
+```bash
+ros2 topic info /lane_detection/lane_selected   # should show lane_detector subscribed to /perception/d435/rgb/image_raw via /image_topic param
+ros2 param get /lane_detector image_topic       # should print /perception/d435/rgb/image_raw
+```
+
+**Pulled out for future D435 BEV calibration:** if the analytic trapezoid is off, the empirical correction loop is — open Foxglove's image panel on `/lane_detection/bev_debug` (or whatever the lane_detector publishes), eyeball where the lane center should sit, adjust src_top_left/right and src_bottom_left/right by ~20 px steps until the BEV's lane lines look parallel and the right scale.
+
+### 2026-05-27 EDT — `cmd_vel_blender` could be driven by lane alone — added `require_path` gate so path_follower is the ignition.
+
+**User prompt (verbatim):** "stanley moves a little and then stop cuz lose lane, so I cannot put at same time this and then put node values. because it will start terrible, so you cannot make just since is active that stack is idle until introducing nodes?"
+
+**Answer:** Confirmed bug in `cmd_vel_blender._timer_cb()` lines 116-117. When `/cmd_vel_path` was stale and `/cmd_vel_lane` was fresh, the blender would fall through to **lane-only** and forward Stanley's Twist as-is. That's why the car would creep when the lane stack launched before `node_values` was set: Stanley sees a lane, publishes a Twist with non-zero linear/angular, blender forwards it, hardware moves.
+
+The user's mental model is correct: **path_follower is the ignition**. Lane Stanley should only ever be a **corrector** to the planned path, never a primary driver. No path = no motion, regardless of what the lane sees.
+
+**Fix:** added `require_path` parameter (default `True`). When true and `/cmd_vel_path` is not fresh within `cmd_timeout_sec` (0.35 s), the blender publishes zero Twist regardless of lane state.
+
+```python
+if bool(self.get_parameter('require_path').value) and not path_ok:
+    self.pub.publish(cmd)   # zero Twist
+    return
+```
+
+With this in place, the lane stack + path_follower can be launched in any order — system stays idle until `node_values` is set, at which point path_follower transitions to autonomous, starts publishing `/cmd_vel_path`, and the blender begins fusing.
+
+**Override** (for bare lane-following without a planned path):
+```bash
+ros2 param set /cmd_vel_blender require_path false
+```
+
+**Status flips visible in the blender's log:**
+```
+Blend inputs: path=missing lane=fresh    ← Stanley alive, blender outputs zero
+Blend inputs: path=fresh   lane=fresh    ← armed, blender outputs 0.40·path + 0.60·lane
+```
 
 ### 2026-05-27 EDT — "Detour through node 9" was a misread: in right-hand traffic, `[0, 6, 8]` is a 7.5 m outer counter-clockwise loop, not a detour.
 
@@ -4026,8 +4498,8 @@ Do NOT subscribe to `/camera/csi_image`, `/perception/d435/rgb/image_raw`, or `/
 
 
 
-- Added section 12 "Physical QCar 2 Bring-Up (SSH + rsync)" to Easy_Start.md. Covers the laptop-as-editor / Jetson-as-executor split: laptop runs VSCode + Claude, QCar 2 (`192.168.2.207`, user `nvidia`) runs only ROS. Files travel laptop → QCar 2 via rsync; we deliberately avoid VSCode Remote-SSH because `vscode-server` is heavy on the Jetson.
-- Added `~/.ssh/config` alias `Host qcar2` → `192.168.2.207` with `ServerAliveInterval 30`. One-time `ssh-copy-id qcar2` removes password prompts.
+- Added section 12 "Physical QCar 2 Bring-Up (SSH + rsync)" to Easy_Start.md. Covers the laptop-as-editor / Jetson-as-executor split: laptop runs VSCode + Claude, QCar 2 (`192.168.2.13`, user `nvidia`) runs only ROS. Files travel laptop → QCar 2 via rsync; we deliberately avoid VSCode Remote-SSH because `vscode-server` is heavy on the Jetson.
+- Added `~/.ssh/config` alias `Host qcar2` → `192.168.2.13` with `ServerAliveInterval 30`. One-time `ssh-copy-id qcar2` removes password prompts.
 - Created repo-tracked `Development/ros2/scripts/sync_qcar2.sh` and install target `~/bin/sync_qcar2.sh`. One-shot or `--watch` mode (needs `inotify-tools`). It first copies the laptop clock/timezone to the QCar 2, then mirrors the full laptop `ACC_Development/` checkout to `nvidia@qcar2:~/Documents/ACC_Development_luigi/`. Excludes `.git`, build/install/log outputs, Python cache, virtualenvs, and the retired RTAB-Map vendored source.
 - The remote tree path on the QCar 2 is **`~/Documents/ACC_Development_luigi/Development/`**, not `~/Documents/ACC_Development/Development/`, so multiple driver branches (luigi-5, etc.) don't collide with whatever the QCar 2 originally shipped with.
 - Bring-up uses Quanser's native+container split: `qcar2_nodes` + `qcar2_interfaces` build natively in `~/ros2` on the Jetson (hardware/QUARC layer), while `qcar2_autonomy` + `qcar2_perception` build inside the Isaac dev container. Both layers see each other via `ROS_DOMAIN_ID=69`.

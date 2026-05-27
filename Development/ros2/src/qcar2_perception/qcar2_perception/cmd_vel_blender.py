@@ -19,6 +19,11 @@ class CmdVelBlender(Node):
         self.declare_parameter('control_rate_hz', 30.0)
         self.declare_parameter('linear_source', 'path')  # path, lane, blend, min
         self.declare_parameter('stop_topic', '/car_stop')
+        # 2026-05-27: when true, blender publishes zero Twist unless
+        # /cmd_vel_path is fresh. Prevents Stanley from driving the car
+        # before node_values is set (lane-only branch). Lane is a
+        # corrector, never primary.
+        self.declare_parameter('require_path', True)
 
         self.path_cmd = Twist()
         self.lane_cmd = Twist()
@@ -86,6 +91,14 @@ class CmdVelBlender(Node):
 
         cmd = Twist()
         if not path_ok and not lane_ok:
+            self.pub.publish(cmd)
+            return
+
+        # 2026-05-27: hard gate — path_follower is the ignition. No path =
+        # no motion, even if lane detector is screaming "I see a lane".
+        # Without this, Stanley drives the car the moment the lane stack
+        # comes up, which is wrong before node_values is set.
+        if bool(self.get_parameter('require_path').value) and not path_ok:
             self.pub.publish(cmd)
             return
 

@@ -23,7 +23,12 @@ class LaneStanleyController(Node):
         self.declare_parameter('steering_sign', 1.0)
         self.declare_parameter('max_steer_rad', 0.35)
         self.declare_parameter('min_speed_for_control', 0.05)
-        self.declare_parameter('lane_timeout_sec', 0.35)
+        # 2026-05-27: raised 0.35 → 1.0 to survive the gap between dashed
+        # lane segments. At competition speed (~0.5 m/s) the gap between
+        # dashes is well under 1 s, so Stanley keeps integrating CTE
+        # using the last-known value through the gap rather than going
+        # silent and handing control back to PP every dash boundary.
+        self.declare_parameter('lane_timeout_sec', 1.0)
         self.declare_parameter('publish_stop_when_lost', False)
         self.declare_parameter('control_rate_hz', 30.0)
 

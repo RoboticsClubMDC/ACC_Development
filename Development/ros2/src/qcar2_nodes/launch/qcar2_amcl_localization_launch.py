@@ -55,6 +55,26 @@ def generate_launch_description():
         ],
     )
 
+    # 2026-05-27: ekf_fusor now runs in AMCL mode too, correction_source='amcl_pose'.
+    ekf_fusor = Node(
+        package="qcar2_autonomy",
+        executable="ekf_fusor",
+        name="ekf_fusor",
+        output="screen",
+        parameters=[{
+            "use_sim_time": use_sim_time,
+            "correction_source": "amcl_pose",
+        }],
+    )
+
+    # 2026-05-27: nav2_qcar2_converter — same fix as virtual launch.
+    # /cmd_vel_nav → /qcar2_motor_speed_cmd bridge must exist in AMCL mode.
+    nav2_qcar2_converter = Node(
+        package="qcar2_nodes",
+        executable="nav2_qcar2_converter",
+        name="nav2_qcar2_converter",
+    )
+
     map_server = Node(
         package="nav2_map_server",
         executable="map_server",
@@ -189,6 +209,8 @@ def generate_launch_description():
         qcar2_physical,
         lidar_tf,
         pose_estimator,
+        ekf_fusor,
+        nav2_qcar2_converter,
         map_server,
         amcl,
         lifecycle_manager,

@@ -39,6 +39,34 @@ def generate_launch_description():
         ],
     )
 
+    # 2026-05-27: ekf_fusor now runs in AMCL mode too, with
+    # correction_source='amcl_pose'. Subscribes to /amcl_pose and applies
+    # the same Mahalanobis outlier gate as in Cartographer mode (χ²₃ at
+    # 99% = 11.345). Publishes /qcar2_pose_fused for path_follower to
+    # consume, instead of forcing path_follower to fall back to raw TF.
+    ekf_fusor = Node(
+        package="qcar2_autonomy",
+        executable="ekf_fusor",
+        name="ekf_fusor",
+        output="screen",
+        parameters=[{
+            "use_sim_time": use_sim_time,
+            "correction_source": "amcl_pose",
+        }],
+    )
+
+    # 2026-05-27: nav2_qcar2_converter — bridges /cmd_vel_nav (Twist) →
+    # /qcar2_motor_speed_cmd (qcar2_interfaces). It was already bundled
+    # in the carto launches but missing here, which meant after
+    # carto_to_amcl.sh handed off to AMCL, NOTHING was subscribed to
+    # /cmd_vel_nav from the motor side — PP + Stanley + blender published
+    # correctly into the void. Fix is to spawn it in the AMCL launch too.
+    nav2_qcar2_converter = Node(
+        package="qcar2_nodes",
+        executable="nav2_qcar2_converter",
+        name="nav2_qcar2_converter",
+    )
+
     map_server = Node(
         package="nav2_map_server",
         executable="map_server",
@@ -119,6 +147,8 @@ def generate_launch_description():
         qcar2_virtual,
         lidar_tf,
         pose_estimator,
+        ekf_fusor,
+        nav2_qcar2_converter,
         map_server,
         amcl,
         lifecycle_manager,

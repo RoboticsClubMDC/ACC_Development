@@ -349,11 +349,14 @@ class PathFollower(Node):
         self.stanley_trust = 0.0
         self.pp_delta_raw  = 0.0
 
-        # 2026-05-27: cmd_topic is now parametrizable so path_follower can
-        # publish to /cmd_vel_path when running under cmd_vel_blender (which
-        # owns /cmd_vel_nav and blends path + lane). Default keeps legacy
-        # behavior (publish directly to /cmd_vel_nav).
-        self.declare_parameter('cmd_topic', '/cmd_vel_nav')
+        # 2026-05-27 (v2): default is NOW /cmd_vel_path so the blender
+        # picks up the steering and Stanley can fuse in. If you want the
+        # old single-publisher-to-/cmd_vel_nav behavior, override with
+        #   ros2 run qcar2_autonomy path_follower --ros-args -p cmd_topic:=/cmd_vel_nav
+        # WARNING: when cmd_topic=/cmd_vel_path you MUST have cmd_vel_blender
+        # running (via lane_lanenet_stanley_launch.py) or commands go
+        # nowhere and the car won't move.
+        self.declare_parameter('cmd_topic', '/cmd_vel_path')
         cmd_topic = self.get_parameter('cmd_topic').get_parameter_value().string_value
         self.publisher = self.create_publisher(Twist, cmd_topic, 1)
         self.get_logger().info(f'path_follower publishing to {cmd_topic}')

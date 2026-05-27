@@ -1,6 +1,19 @@
 #!/usr/bin/env bash
-# carto_to_amcl.sh — record Cartographer, hit ENTER to freeze the map and
+# carto_to_amcl.sh — one-terminal pipeline: launch Cartographer, drive the
+# car with WASD keys in THIS terminal, then Ctrl-C to freeze the map and
 # transition to AMCL seeded with the final pose.
+#
+# Flow:
+#   1. Launches Cartographer in the background (logs to /tmp/carto.log).
+#   2. Waits for /map to appear.
+#   3. Hands the terminal over to `manual_drive` — drive with WASD in this
+#      same terminal. Cartographer keeps mapping in the background while
+#      you drive.
+#   4. When the map looks good, Ctrl-C to exit manual_drive (does NOT kill
+#      the script — SIGINT is trapped during this phase).
+#   5. Captures the final TF, saves the map to ~/qcar2_maps/, kills carto.
+#   6. Launches AMCL on the saved map, seeds /initialpose with the captured
+#      pose. AMCL stays running in the foreground.
 #
 # Usage (inside the Isaac ROS dev container):
 #   ./carto_to_amcl.sh           # default: virtual / QLabs
@@ -8,7 +21,8 @@
 #
 # Side effects:
 #   - Writes ~/qcar2_maps/competition_map.{pgm,yaml}
-#   - Leaves AMCL running in the foreground; Ctrl-C to stop it
+#   - Leaves AMCL (+ ekf_fusor + map_server + lifecycle_manager) running in
+#     the foreground; Ctrl-C the script ONLY when you're done with AMCL.
 #
 # Logs go to /tmp/carto.log and /tmp/amcl.log so the current terminal stays
 # clean for status output.
@@ -95,11 +109,63 @@ while ! ros2 topic info /map >/dev/null 2>&1; do
 done
 
 echo ""
-echo "      Cartographer is up. Drive the lap in QLabs / on the car."
-echo "      When you're happy with the map, press ENTER here to freeze."
+echo "[1.5/6] Capturing INITIAL pose (where carto started)..."
+# Wait a couple of seconds for map → base_link TF to settle, then snapshot.
+# This pose is what AMCL needs as a seed on a future load-without-record
+# session (where the user re-uses the saved map and wants AMCL to know
+# where the car is at startup).
+sleep 2
+INIT_OUT=$(timeout 4 ros2 run tf2_ros tf2_echo map base_link 2>/dev/null || true)
+INIT_PARSED=$(echo "$INIT_OUT" \
+  | grep -E "Translation|Quaternion" \
+  | awk -F'[][]' '{print $2}' \
+  | tr ',' ' ')
+INIT_X=$(echo "$INIT_PARSED" | sed -n '1p' | awk '{print $1}')
+INIT_Y=$(echo "$INIT_PARSED" | sed -n '1p' | awk '{print $2}')
+INIT_QZ=$(echo "$INIT_PARSED" | sed -n '2p' | awk '{print $3}')
+INIT_QW=$(echo "$INIT_PARSED" | sed -n '2p' | awk '{print $4}')
+if [[ -z "$INIT_X" || -z "$INIT_Y" ]]; then
+  echo "      WARN: could not parse initial pose. Skipping."
+  INIT_X="0.0"; INIT_Y="0.0"; INIT_QZ="0.0"; INIT_QW="1.0"
+fi
+echo "      initial:  x=$INIT_X  y=$INIT_Y  qz=$INIT_QZ  qw=$INIT_QW"
+
 echo ""
-# shellcheck disable=SC2034
-read -r _
+echo "      Cartographer is up. Now entering MANUAL DRIVE mode in this terminal."
+echo ""
+echo "      Controls (WASD-ish, see manual_drive node for exact bindings):"
+echo "        w / s     forward / back"
+echo "        a / d     steer left / right"
+echo "        space     stop"
+echo "        q         finish driving and FREEZE the map → AMCL"
+echo "        Ctrl-C    also works (script catches the signal and continues)"
+echo ""
+echo "      Drive one slow clean lap. When the map looks good, press q (or Ctrl-C)."
+echo "      Then wait a few seconds — the script will save the map, kill carto,"
+echo "      and launch AMCL automatically."
+echo ""
+sleep 1
+
+# Run manual_drive in foreground. set +e so the SIGINT exit code from
+# manual_drive doesn't abort the rest of the script. manual_drive owns
+# stdin (raw termios) during this phase — the user's keys drive the car,
+# Cartographer keeps recording in the background.
+#
+# Trap SIGINT during this phase so Ctrl-C cleanly exits manual_drive
+# WITHOUT killing the script (otherwise bash defers the SIGINT, kills
+# manual_drive's child, then exits itself before saving the map).
+#
+# IMPORTANT: manual_drive defaults to publishing /cmd_vel_nav, which the
+# nav2_qcar2_converter consumes. That's what we want during mapping.
+# (The PP/Stanley/blender stack is not running here — only carto + drive.)
+trap 'echo ""; echo "      [carto_to_amcl] SIGINT — finishing manual drive..."' INT
+set +e
+ros2 run qcar2_autonomy manual_drive
+MANUAL_RC=$?
+set -e
+trap - INT
+echo ""
+echo "      Manual drive exited (rc=$MANUAL_RC). Proceeding to freeze map..."
 
 echo "[2/6] Capturing final pose from TF (map -> base_link)..."
 # Some ROS 2 humble builds don't have tf2_echo --once, so use `timeout` and
@@ -132,6 +198,23 @@ fi
 
 echo "      pose:  x=$X  y=$Y  qz=$QZ  qw=$QW"
 echo "      saved to /tmp/final_pose.txt"
+
+# Persist BOTH the initial (carto-start) and final (carto-end) poses
+# next to the saved map. The companion script `amcl_load.sh` reads this
+# YAML when bringing AMCL back up against the saved map without recording.
+POSE_YAML="$MAP_DIR/${MAP_NAME}_pose.yaml"
+cat > "$POSE_YAML" <<EOF
+# Companion file written by carto_to_amcl.sh.
+# Used by amcl_load.sh to seed /initialpose when AMCL is launched against
+# the saved map without re-recording.
+initial_pose:
+  position:    {x: $INIT_X, y: $INIT_Y, z: 0.0}
+  orientation: {x: 0.0, y: 0.0, z: $INIT_QZ, w: $INIT_QW}
+final_pose:
+  position:    {x: $X, y: $Y, z: 0.0}
+  orientation: {x: 0.0, y: 0.0, z: $QZ, w: $QW}
+EOF
+echo "      pose YAML: $POSE_YAML"
 
 echo "[3/6] Saving map to $MAP_DIR/$MAP_NAME..."
 ros2 run nav2_map_server map_saver_cli -f "$MAP_DIR/$MAP_NAME"
