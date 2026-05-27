@@ -124,12 +124,26 @@ class ObjectDetector(Node):
         # --------------------------------------------------------------------------------------
 
     # --- 2026-05-14: ROS subscriber callbacks (replace direct PIT read) ---
+    def _valid_image(self, frame):
+        return (
+            frame is not None and
+            hasattr(frame, "shape") and
+            len(frame.shape) >= 2 and
+            frame.shape[0] > 0 and
+            frame.shape[1] > 0
+        )
+
     def _rgb_cb(self, msg):
         try:
             frame = self.bridge.imgmsg_to_cv2(msg, "bgr8")
         except Exception as exc:
             self.get_logger().warn(
                 f"yolo_detector RGB decode error: {exc}",
+                throttle_duration_sec=5.0)
+            return
+        if not self._valid_image(frame):
+            self.get_logger().warn(
+                "yolo_detector received empty RGB frame",
                 throttle_duration_sec=5.0)
             return
         with self._frame_lock:
@@ -157,6 +171,11 @@ class ObjectDetector(Node):
                 f"yolo_detector depth decode error: {exc}",
                 throttle_duration_sec=5.0)
             return
+        if not self._valid_image(depth):
+            self.get_logger().warn(
+                "yolo_detector received empty depth frame",
+                throttle_duration_sec=5.0)
+            return
         with self._frame_lock:
             self._depth_latest = depth
     # ----------------------------------------------------------------------
@@ -172,6 +191,8 @@ class ObjectDetector(Node):
             depth = None if self._depth_latest is None else self._depth_latest.copy()
         if rgb is None or depth is None:
             # Bridge / rgbd has not delivered a frame yet; skip this tick.
+            return
+        if not self._valid_image(rgb) or not self._valid_image(depth):
             return
         # Cache the latest frames for yolo_detect() which still references
         # them by name (and previously accessed self.QCarImg.rgb / .depth).

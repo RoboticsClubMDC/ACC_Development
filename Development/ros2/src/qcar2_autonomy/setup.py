@@ -28,6 +28,8 @@ setup(
         'traffic_system_detector=autonomy.traffic_system_detector:main',
         'lane_detector=autonomy.lane_detector:main',
         'lane_stanley_controller=autonomy.lane_stanley_controller:main',
+        'cmd_vel_blender=autonomy.cmd_vel_blender:main',
+        'car_stop=autonomy.car_stop:main',
         'yolo_detector=autonomy.yolo_detector:main',
         'trip_planner=autonomy.trip_planner:main',
         'dataset_collector=autonomy.dataset_collector:main',

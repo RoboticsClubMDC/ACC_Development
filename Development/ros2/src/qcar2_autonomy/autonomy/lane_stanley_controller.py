@@ -19,12 +19,12 @@ class LaneStanleyController(Node):
 
         self.declare_parameter('speed_mps', 0.20)
         self.declare_parameter('stanley_gain', 1.0)
-        self.declare_parameter('heading_gain', 2.0)
+        self.declare_parameter('heading_gain', 1.0)
         self.declare_parameter('steering_sign', 1.0)
         self.declare_parameter('max_steer_rad', 0.35)
         self.declare_parameter('min_speed_for_control', 0.05)
         self.declare_parameter('lane_timeout_sec', 0.35)
-        self.declare_parameter('publish_stop_when_lost', True)
+        self.declare_parameter('publish_stop_when_lost', False)
         self.declare_parameter('control_rate_hz', 30.0)
 
         self.cte = 0.0

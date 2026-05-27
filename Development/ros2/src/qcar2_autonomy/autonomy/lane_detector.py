@@ -27,6 +27,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import (QoSProfile, ReliabilityPolicy,
                         DurabilityPolicy, HistoryPolicy)
+from rcl_interfaces.msg import SetParametersResult
 from sensor_msgs.msg import Image
 from std_msgs.msg import Bool, Float64
 from cv_bridge import CvBridge
@@ -92,6 +93,10 @@ class LaneDetector(Node):
         self.declare_parameter('bev_width',  400)
         self.declare_parameter('bev_height', 400)
         self.declare_parameter('bev_world_width_m', 1.5)
+        self.declare_parameter('tracking_roi_top', 0)
+        self.declare_parameter('tracking_roi_bottom', 0)
+        self.declare_parameter('tracking_roi_left', 0)
+        self.declare_parameter('tracking_roi_right', 0)
 
         # Yellow HSV
         self.declare_parameter('hsv_h_low',  18)
@@ -104,7 +109,12 @@ class LaneDetector(Node):
         # Lane geometry — 10 inch lane, drive in the center
         self.declare_parameter('lane_width_m', 0.254)
         self.declare_parameter('lane_side', 1)
+        self.declare_parameter('car_center_offset_m', -0.40)
+        self.declare_parameter('front_axle_offset_m', 0.256)
 
+        self.declare_parameter('lookahead_distance_m', 0.05)
+        self.declare_parameter('heading_segment_m', 0.05)
+        self.declare_parameter('heading_offset_deg', 14.9)
         self.declare_parameter('lookahead_row', 200)
         self.declare_parameter('heading_row_gap', 80)
 
@@ -151,6 +161,11 @@ class LaneDetector(Node):
 
         # Debug
         self.declare_parameter('publish_debug_images', True)
+        self.declare_parameter('debug_crop_overlay', False)
+        self.declare_parameter('debug_crop_top', 0)
+        self.declare_parameter('debug_crop_bottom', 0)
+        self.declare_parameter('debug_crop_left', 0)
+        self.declare_parameter('debug_crop_right', 0)
 
         # ───────────── State ─────────────
         self.bridge = CvBridge()
@@ -168,6 +183,8 @@ class LaneDetector(Node):
         self._lanenet_fallback_warned = False
         self._homography_warning_logged = False
 
+        self.add_on_set_parameters_callback(self._parameter_update_cb)
+
         # ───────────── Homography ─────────────
         self._rebuild_homography()
 
@@ -180,8 +197,6 @@ class LaneDetector(Node):
             Bool, '/lane_keeping/lane_detected', 1)
         self.pub_debug_overlay = self.create_publisher(
             Image, '/lane_keeping/debug_overlay', 10)
-        self.pub_debug_bev = self.create_publisher(
-            Image, '/lane_keeping/debug_bev', 10)
 
         # ───────────── Subscriber ─────────────
         # 2026-05-15: BEST_EFFORT to match the bridge publishers.
@@ -224,6 +239,20 @@ class LaneDetector(Node):
     def _ps(self, n):
         return self.get_parameter(n).get_parameter_value().string_value
 
+    def _parameter_update_cb(self, params):
+        for param in params:
+            if param.name in (
+                'heading_offset_deg',
+                'max_heading_rad',
+                'front_axle_offset_m',
+                'lookahead_distance_m',
+                'heading_segment_m',
+                'car_center_offset_m',
+            ):
+                self.get_logger().info(
+                    f'Parameter update: {param.name}={param.value}')
+        return SetParametersResult(successful=True)
+
     # ───────────── Decode raw bgr8 (same as yolo_detector) ─────────────
     def _decode_bgr8(self, msg: Image):
         if msg.height == 0 or msg.width == 0 or msg.step == 0:
@@ -263,6 +292,7 @@ class LaneDetector(Node):
         ], dtype=np.float32)
 
         self.M = cv2.getPerspectiveTransform(src, dst)
+        self.M_inv = cv2.getPerspectiveTransform(dst, src)
         self.m_per_pix = self._pd('bev_world_width_m') / self.bev_w
         self.get_logger().info(
             f'Homography: bev={self.bev_w}x{self.bev_h} '
@@ -293,6 +323,86 @@ class LaneDetector(Node):
             img, self.M, (self.bev_w, self.bev_h),
             flags=cv2.INTER_LINEAR,
             borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0))
+
+    def _crop_rect(self, prefix, width, height):
+        left = max(0, min(width - 1, self._pi(f'{prefix}_left')))
+        top = max(0, min(height - 1, self._pi(f'{prefix}_top')))
+
+        right = self._pi(f'{prefix}_right')
+        bottom = self._pi(f'{prefix}_bottom')
+        if right <= 0 or right > width:
+            right = width
+        if bottom <= 0 or bottom > height:
+            bottom = height
+
+        if right <= left:
+            left, right = 0, width
+        if bottom <= top:
+            top, bottom = 0, height
+
+        return left, top, right, bottom
+
+    def _apply_tracking_roi(self, mask):
+        left, top, right, bottom = self._crop_rect(
+            'tracking_roi', self.bev_w, self.bev_h)
+        if left == 0 and top == 0 and right == self.bev_w and bottom == self.bev_h:
+            return mask
+
+        cropped = np.zeros_like(mask)
+        cropped[top:bottom, left:right] = mask[top:bottom, left:right]
+        return cropped
+
+    def _bev_points_to_image(self, points):
+        if not points:
+            return []
+        pts = np.asarray(points, dtype=np.float32).reshape(-1, 1, 2)
+        mapped = cv2.perspectiveTransform(pts, self.M_inv).reshape(-1, 2)
+        return [(int(round(x)), int(round(y))) for x, y in mapped]
+
+    def _lookahead_from_params(self):
+        distance_m = self._pd('lookahead_distance_m')
+        fallback_row = self._pi('lookahead_row')
+        _, top, _, bottom = self._crop_rect(
+            'tracking_roi', self.bev_w, self.bev_h)
+
+        if distance_m > 0.0:
+            row = int(round(bottom - distance_m / self.m_per_pix))
+        else:
+            row = fallback_row
+
+        row = max(top, min(bottom - 1, row))
+        actual_m = max(0.0, (bottom - row) * self.m_per_pix)
+        return row, actual_m
+
+    def _front_axle_row_from_params(self):
+        distance_m = self._pd('front_axle_offset_m')
+        lookahead_row = self._pi('lookahead_row')
+        _, top, _, bottom = self._crop_rect(
+            'tracking_roi', self.bev_w, self.bev_h)
+
+        if distance_m > 0.0:
+            row = int(round(bottom - distance_m / self.m_per_pix))
+        else:
+            row = lookahead_row
+
+        row = max(top, min(bottom - 1, row))
+        actual_m = max(0.0, (bottom - row) * self.m_per_pix)
+        return row, actual_m
+
+    def _heading_gap_from_params(self):
+        segment_m = self._pd('heading_segment_m')
+        if segment_m > 0.0:
+            gap = int(round(segment_m / self.m_per_pix))
+        else:
+            gap = self._pi('heading_row_gap')
+
+        gap = max(1, min(self.bev_h - 1, gap))
+        actual_m = gap * self.m_per_pix
+        return gap, actual_m
+
+    def _car_center_x(self):
+        offset_px = self._pd('car_center_offset_m') / self.m_per_pix
+        return np.clip(self.bev_w / 2.0 + offset_px, 0.0, self.bev_w - 1.0)
 
     # ───────────── Yellow mask ─────────────
     def _yellow_mask(self, bev_bgr):
@@ -566,16 +676,19 @@ class LaneDetector(Node):
         lane_w = self._pd('lane_width_m')
         lane_side = self._pi('lane_side')
         offset_px = (lane_w / 2.0) / self.m_per_pix * lane_side
-        reference_x = self.bev_w / 2.0 - offset_px
+        car_x = self._car_center_x()
+        reference_x = car_x - offset_px
 
         bev = self._to_bev(bgr)
         lane_mask = self._detect_lane_mask(bgr, bev)
+        lane_mask = self._apply_tracking_roi(lane_mask)
         tracking_mask = self._prepare_tracking_mask(lane_mask)
         centroids = self._scan_row_centroids(tracking_mask, reference_x)
 
         min_rows = self._pi('min_valid_rows')
-        lookahead = self._pi('lookahead_row')
-        heading_gap = self._pi('heading_row_gap')
+        lookahead, lookahead_m = self._lookahead_from_params()
+        front_axle_row, front_axle_m = self._front_axle_row_from_params()
+        heading_gap, heading_segment_m = self._heading_gap_from_params()
         ema = self._pd('ema_alpha')
         max_lost = self._pi('no_detect_max_frames')
 
@@ -585,15 +698,14 @@ class LaneDetector(Node):
         sorted_rows = sorted(centroids.keys())
 
         if detected:
-            la_cx = self._interp(centroids, sorted_rows, lookahead)
+            la_cx = self._interp(centroids, sorted_rows, front_axle_row)
 
             if la_cx is not None:
                 target_x = la_cx + offset_px
-                car_x = self.bev_w / 2.0
                 cte_raw = (car_x - target_x) * self.m_per_pix
 
-                near_row = lookahead
-                far_row = max(lookahead - heading_gap, sorted_rows[0])
+                near_row = front_axle_row
+                far_row = max(front_axle_row - heading_gap, sorted_rows[0])
                 near_cx = self._interp(centroids, sorted_rows, near_row)
                 far_cx = self._interp(centroids, sorted_rows, far_row)
 
@@ -604,6 +716,8 @@ class LaneDetector(Node):
                     dy = float(far_row - near_row)
                     if abs(dy) > 1e-3:
                         heading_raw = math.atan2(-dx, -dy)
+                        heading_raw += math.radians(
+                            self._pd('heading_offset_deg'))
                 else:
                     detected = False
             else:
@@ -644,67 +758,120 @@ class LaneDetector(Node):
         self.pub_detected.publish(m)
 
         if self._pb('publish_debug_images'):
-            self._debug(bev, tracking_mask, centroids, sorted_rows,
-                        offset_px, lookahead, heading_gap,
-                        detected, cte_out, hdg_out)
+            self._debug(bgr, tracking_mask, centroids, sorted_rows,
+                        offset_px, car_x, lookahead, front_axle_row,
+                        heading_gap, lookahead_m, front_axle_m,
+                        heading_segment_m,
+                        detected, cte_out, hdg_out, heading_raw)
 
     # ───────────── Debug ─────────────
-    def _debug(self, bev, yellow, centroids, sorted_rows,
-               offset_px, lookahead, heading_gap,
-               detected, cte_out, hdg_out):
-        try:
-            self.pub_debug_bev.publish(
-                self.bridge.cv2_to_imgmsg(yellow, encoding='mono8'))
-        except Exception:
-            pass
+    def _debug(self, bgr, yellow, centroids, sorted_rows,
+               offset_px, car_x, lookahead, front_axle_row, heading_gap,
+               lookahead_m, front_axle_m, heading_segment_m,
+               detected, cte_out, hdg_out, heading_raw):
+        ov = bgr.copy()
+        h, w = ov.shape[:2]
 
-        ov = bev.copy()
-        ov[yellow > 0] = (0, 255, 0)
+        camera_mask = cv2.warpPerspective(
+            yellow, self.M_inv, (w, h),
+            flags=cv2.INTER_NEAREST,
+            borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+        idx = camera_mask > 0
+        if np.any(idx):
+            green = np.array([0, 255, 0], dtype=np.uint8)
+            ov[idx] = (0.45 * ov[idx] + 0.55 * green).astype(np.uint8)
 
         for row, cx in centroids.items():
-            cv2.circle(ov, (int(cx), row), 2, (255, 0, 0), -1)
-            cv2.circle(ov, (int(cx + offset_px), row), 2,
-                       (255, 0, 255), -1)
+            points = self._bev_points_to_image([
+                (cx, row),
+                (cx + offset_px, row),
+            ])
+            if len(points) == 2:
+                cv2.circle(ov, points[0], 2, (255, 0, 0), -1)
+                cv2.circle(ov, points[1], 2, (255, 0, 255), -1)
 
-        cv2.line(ov, (0, lookahead), (self.bev_w, lookahead),
-                 (0, 255, 255), 1)
-        far = max(lookahead - heading_gap,
+        points = self._bev_points_to_image([
+            (0, lookahead),
+            (self.bev_w, lookahead),
+        ])
+        if len(points) == 2:
+            cv2.line(ov, points[0], points[1], (0, 255, 255), 1)
+        points = self._bev_points_to_image([
+            (0, front_axle_row),
+            (self.bev_w, front_axle_row),
+        ])
+        if len(points) == 2:
+            cv2.line(ov, points[0], points[1], (0, 165, 255), 1)
+        far = max(front_axle_row - heading_gap,
                   sorted_rows[0] if sorted_rows else 0)
-        cv2.line(ov, (0, far), (self.bev_w, far), (255, 255, 0), 1)
+        points = self._bev_points_to_image([
+            (0, far),
+            (self.bev_w, far),
+        ])
+        if len(points) == 2:
+            cv2.line(ov, points[0], points[1], (255, 255, 0), 1)
 
-        car_cx = self.bev_w // 2
-        cv2.line(ov, (car_cx, 0), (car_cx, self.bev_h),
-                 (128, 128, 128), 1)
+        points = self._bev_points_to_image([
+            (car_x, 0),
+            (car_x, self.bev_h),
+        ])
+        if len(points) == 2:
+            cv2.line(ov, points[0], points[1], (128, 128, 128), 1)
 
-        la_cx = self._interp(centroids, sorted_rows, lookahead)
+        la_cx = self._interp(centroids, sorted_rows, front_axle_row)
         if la_cx is not None:
-            tx = int(la_cx + offset_px)
-            cv2.circle(ov, (tx, lookahead), 8, (255, 0, 255), 2)
-            cv2.line(ov, (car_cx, self.bev_h),
-                     (tx, lookahead), (0, 200, 200), 1)
-
-        # Show CLAMPED values so you see what actually gets published
-        s = 'DETECTED' if detected else 'LOST'
-        c = (0, 255, 0) if detected else (0, 0, 255)
-        cv2.putText(ov, f'CTE: {cte_out:.3f} m',
-                    (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.45,
-                    (255, 255, 255), 1)
-        cv2.putText(ov,
-                    f'Hdg: {math.degrees(hdg_out):.1f} deg',
-                    (10, 38), cv2.FONT_HERSHEY_SIMPLEX, 0.45,
-                    (255, 255, 255), 1)
-        cv2.putText(ov, s, (10, 56),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, c, 1)
-        cv2.putText(ov, f'Rows: {len(centroids)}',
-                    (10, 74), cv2.FONT_HERSHEY_SIMPLEX, 0.45,
-                    (255, 255, 255), 1)
+            points = self._bev_points_to_image([
+                (la_cx + offset_px, front_axle_row),
+                (car_x, self.bev_h),
+            ])
+            if len(points) == 2:
+                cv2.circle(ov, points[0], 8, (255, 0, 255), 2)
+                cv2.line(ov, points[1], points[0], (0, 200, 200), 1)
 
         # Visualize clamp limits as vertical red lines
         max_cte_px = int(self._pd('max_cte_m') / self.m_per_pix)
-        cv2.line(ov, (car_cx - max_cte_px, 0),
-                 (car_cx - max_cte_px, self.bev_h), (0, 0, 255), 1)
-        cv2.line(ov, (car_cx + max_cte_px, 0),
-                 (car_cx + max_cte_px, self.bev_h), (0, 0, 255), 1)
+        for clamp_x in (car_x - max_cte_px, car_x + max_cte_px):
+            points = self._bev_points_to_image([
+                (clamp_x, 0),
+                (clamp_x, self.bev_h),
+            ])
+            if len(points) == 2:
+                cv2.line(ov, points[0], points[1], (0, 0, 255), 1)
+
+        if self._pb('debug_crop_overlay'):
+            h, w = ov.shape[:2]
+            left, top, right, bottom = self._crop_rect(
+                'debug_crop', w, h)
+            ov = np.ascontiguousarray(ov[top:bottom, left:right])
+
+        # Show CLAMPED values so you see what actually gets published.
+        s = 'DETECTED' if detected else 'LOST'
+        c = (0, 255, 0) if detected else (0, 0, 255)
+        text_color = (0, 0, 0)
+        cv2.putText(ov, f'CTE: {cte_out:.3f} m',
+                    (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.45,
+                    text_color, 1)
+        cv2.putText(ov,
+                    f'Hdg cmd/raw: {math.degrees(hdg_out):.1f}/{math.degrees(heading_raw):.1f} deg',
+                    (10, 38), cv2.FONT_HERSHEY_SIMPLEX, 0.45,
+                    text_color, 1)
+        cv2.putText(ov, s, (10, 56),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, c, 1)
+        cv2.putText(ov,
+                    f'Look: {lookahead_m:.2f}m Nose: {front_axle_m:.2f}m',
+                    (10, 74), cv2.FONT_HERSHEY_SIMPLEX, 0.45,
+                    text_color, 1)
+        cv2.putText(ov,
+                    f'Seg: {heading_segment_m:.2f}m Center: {self._pd("car_center_offset_m"):+.3f}m',
+                    (10, 92), cv2.FONT_HERSHEY_SIMPLEX, 0.45,
+                    text_color, 1)
+        cv2.putText(ov, f'Rows: {len(centroids)}',
+                    (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.45,
+                    text_color, 1)
+        cv2.putText(ov,
+                    f'HdgOff: {self._pd("heading_offset_deg"):+.1f} deg',
+                    (10, 128), cv2.FONT_HERSHEY_SIMPLEX, 0.45,
+                    text_color, 1)
 
         try:
             self.pub_debug_overlay.publish(

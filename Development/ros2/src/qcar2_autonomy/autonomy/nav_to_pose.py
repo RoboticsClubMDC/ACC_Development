@@ -199,7 +199,7 @@ class PathFollower(Node):
       self.declare_parameter('node_values', [0,8,10])
       self.waypoints = list(self.get_parameter("node_values").get_parameter_value().integer_array_value)
 
-      self.declare_parameter('desired_speed', [0.8])
+      self.declare_parameter('desired_speed', [0.1])
       self.desired_speed = list(self.get_parameter("desired_speed").get_parameter_value().double_array_value)
 
 
@@ -235,7 +235,7 @@ class PathFollower(Node):
       self.translation_offset = list(self.get_parameter("translation_offset").get_parameter_value().double_array_value)
 
 
-      self.declare_parameter('start_path', [False])
+      self.declare_parameter('start_path', [True])
       self.path_execute_flag = list(self.get_parameter("start_path").get_parameter_value().bool_array_value)[0]
 
       self.add_on_set_parameters_callback(self.parameter_update_callback)
@@ -293,7 +293,11 @@ class PathFollower(Node):
       self.wp_prior = []
       self.current_steering =0
 
-      self.publisher = self.create_publisher(Twist,'/cmd_vel_nav', 1)
+      self.declare_parameter('cmd_topic', '/cmd_vel_nav')
+      self.publisher = self.create_publisher(
+        Twist,
+        self.get_parameter('cmd_topic').get_parameter_value().string_value,
+        1)
       self.cyclic = False
       self.max_steering_angle = 0.6
 

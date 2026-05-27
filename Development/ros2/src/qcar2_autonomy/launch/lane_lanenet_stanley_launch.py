@@ -27,6 +27,16 @@ def generate_launch_description():
             'detector_backend': 'lanenet',
             'use_centerline_skeleton': True,
             'intersection_branch': 'straight',
+            'car_center_offset_m': 0.0,
+            'front_axle_offset_m': 0.256,
+            'tracking_roi_top': 200,
+            'tracking_roi_bottom': 400,
+            'debug_crop_overlay': True,
+            'debug_crop_top': 200,
+            'debug_crop_bottom': 400,
+            'lookahead_distance_m': 0.1,
+            'heading_segment_m': 0.30,
+            'heading_offset_deg': 0.0,
         }],
     )
 
@@ -38,6 +48,7 @@ def generate_launch_description():
             'speed_mps': 0.20,
             'stanley_gain': 1.0,
             'max_steer_rad': 0.35,
+            'publish_stop_when_lost': False,
         }],
     )
 
