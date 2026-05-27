@@ -12,8 +12,11 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        ('share/' + package_name, ['package.dsv']),
+        (os.path.join('share', package_name, 'hook'), glob('hook/*.sh')),
         (os.path.join('share', package_name,'launch'), glob('launch/*.py')),
-        (os.path.join('share', package_name,'rviz'), glob('rviz/*.rviz'))
+        (os.path.join('share', package_name,'rviz'), glob('rviz/*.rviz')),
+        (os.path.join('share', package_name,'maps'), glob('maps/*.png')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,

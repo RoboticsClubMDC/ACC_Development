@@ -58,12 +58,12 @@ Visualization Manager:
         {}
       Update Interval: 0
       Value: true
-    - Alpha: 0.7
+    - Alpha: 0.3
       Class: rviz_default_plugins/Map
       Color Scheme: map
       Draw Behind: true
       Enabled: true
-      Name: Map
+      Name: Map (Cartographer)
       Topic:
         Depth: 5
         Durability Policy: Transient Local
@@ -104,6 +104,18 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /planned_path
+      Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: Lane Target
+      Namespaces:
+        lane_keeping: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /lane_keeping/target_marker
       Value: true
     - Alpha: 1
       Autocompute Intensity Bounds: true
@@ -181,19 +193,25 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /lane/debug_overlay
       Value: true
-    - Class: rviz_default_plugins/Image
+    - Alpha: 0.6
+      Class: rviz_default_plugins/Map
+      Color Scheme: raw
+      Draw Behind: false
       Enabled: true
-      Max Value: 1
-      Median window: 5
-      Min Value: 0
       Name: SDCS Course Map
-      Normalize Range: true
       Topic:
         Depth: 1
         Durability Policy: Transient Local
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /sdcs_map_image
+        Value: /sdcs_map_grid
+      Update Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /sdcs_map_grid_updates
+      Use Timestamp: false
       Value: true
   Enabled: true
   Global Options:

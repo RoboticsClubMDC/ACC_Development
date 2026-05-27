@@ -11,5 +11,7 @@ RUN apt-get update && apt-get install -y \
 # Install all the necessary python modules via pip for students
 # The example here installs "pyqtgraph", which is a scientific
 # graphics and GUI Python library.
+# tqdm is required by pit.YOLO.nets (imported by autonomy.yolo_detector).
 RUN python3 -m pip install -U \
-    pyqtgraph
+    pyqtgraph \
+    tqdm

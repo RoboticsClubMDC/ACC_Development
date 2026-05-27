@@ -25,7 +25,9 @@ from rclpy.qos import (QoSProfile, ReliabilityPolicy,
                         DurabilityPolicy, HistoryPolicy)
 from sensor_msgs.msg import Image
 from std_msgs.msg import Bool, Float64
+from geometry_msgs.msg import Point
 from cv_bridge import CvBridge
+from visualization_msgs.msg import Marker, MarkerArray
 
 
 class LaneDetector(Node):
@@ -121,6 +123,8 @@ class LaneDetector(Node):
             Image, '/lane_keeping/debug_overlay', 10)
         self.pub_debug_bev = self.create_publisher(
             Image, '/lane_keeping/debug_bev', 10)
+        self.pub_target_marker = self.create_publisher(
+            MarkerArray, '/lane_keeping/target_marker', 10)
 
         # ───────────── Subscriber ─────────────
         # 2026-05-15: BEST_EFFORT to match the bridge publishers.
@@ -385,11 +389,54 @@ class LaneDetector(Node):
         m = Bool()
         m.data = detected or (self._frames_without_lane <= max_lost)
         self.pub_detected.publish(m)
+        self._publish_target_marker(cte_out, hdg_out, m.data)
 
         if self._pb('publish_debug_images'):
             self._debug(bev, yellow, centroids, sorted_rows,
                         offset_px, lookahead, heading_gap,
                         detected, cte_out, hdg_out)
+
+    def _publish_target_marker(self, cte, heading, lane_valid):
+        lookahead = self._pi('lookahead_row')
+        forward_m = max((self.bev_h - lookahead) * self.m_per_pix, 0.05)
+
+        target_x = forward_m * math.cos(heading)
+        target_y = cte + forward_m * math.sin(heading)
+
+        color = (0.9, 0.1, 1.0, 0.95) if lane_valid else (1.0, 0.1, 0.1, 0.45)
+        now = self.get_clock().now().to_msg()
+
+        line = Marker()
+        line.header.frame_id = 'base_link'
+        line.header.stamp = now
+        line.ns = 'lane_keeping'
+        line.id = 0
+        line.type = Marker.LINE_STRIP
+        line.action = Marker.ADD
+        line.scale.x = 0.035
+        line.color.r, line.color.g, line.color.b, line.color.a = color
+        line.points = [
+            Point(x=0.0, y=0.0, z=0.06),
+            Point(x=float(target_x), y=float(target_y), z=0.06),
+        ]
+
+        target = Marker()
+        target.header.frame_id = 'base_link'
+        target.header.stamp = now
+        target.ns = 'lane_keeping'
+        target.id = 1
+        target.type = Marker.SPHERE
+        target.action = Marker.ADD
+        target.pose.position.x = float(target_x)
+        target.pose.position.y = float(target_y)
+        target.pose.position.z = 0.06
+        target.pose.orientation.w = 1.0
+        target.scale.x = 0.12
+        target.scale.y = 0.12
+        target.scale.z = 0.04
+        target.color.r, target.color.g, target.color.b, target.color.a = color
+
+        self.pub_target_marker.publish(MarkerArray(markers=[line, target]))
 
     # ───────────── Debug ─────────────
     def _debug(self, bev, yellow, centroids, sorted_rows,

@@ -2,9 +2,10 @@ import subprocess
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
+from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
@@ -69,15 +70,44 @@ def generate_launch_description():
                      "'map' (cartographer). Set to 'odom' to run without SLAM."))
     from_frame = LaunchConfiguration('from_frame')
 
+    default_sdcs_map_image = PathJoinSubstitution([
+        FindPackageShare('qcar2_autonomy'),
+        'maps',
+        'cityscape_flat.png',
+    ])
     sdcs_map_image_arg = DeclareLaunchArgument(
         'sdcs_map_image',
-        default_value=('/workspaces/isaac_ros-dev/backup/Quanser_Academic_Resources/'
-                       '6_teaching/4_Autonomous_Systems/SDCS/skills_activities/'
-                       '04-vehicle_control/cityscape.png'),
+        default_value=default_sdcs_map_image,
         description=('Path inside the container to the SDCS course PNG that '
-                     'will be republished on /sdcs_map_image for RViz. '
+                     'will be republished as /sdcs_map_grid for RViz. '
                      'Override with sdcs_map_image:=/abs/path/to/file.png.'))
     sdcs_map_image_path = LaunchConfiguration('sdcs_map_image')
+    sdcs_map_origin_x_arg = DeclareLaunchArgument(
+        'sdcs_map_origin_x',
+        default_value='-2.308',
+        description='SDCS map bottom-left origin x in the fixed frame.')
+    sdcs_map_origin_y_arg = DeclareLaunchArgument(
+        'sdcs_map_origin_y',
+        default_value='-2.500',
+        description='SDCS map bottom-left origin y in the fixed frame.')
+    sdcs_map_origin_yaw_arg = DeclareLaunchArgument(
+        'sdcs_map_origin_yaw',
+        default_value='0.0',
+        description='SDCS map yaw rotation in radians.')
+    sdcs_map_resolution_arg = DeclareLaunchArgument(
+        'sdcs_map_resolution',
+        default_value='0.0',
+        description='SDCS map meters per pixel. 0.0 auto-scales from roadmap source image.')
+    sdcs_map_origin_x = LaunchConfiguration('sdcs_map_origin_x')
+    sdcs_map_origin_y = LaunchConfiguration('sdcs_map_origin_y')
+    sdcs_map_origin_yaw = LaunchConfiguration('sdcs_map_origin_yaw')
+    sdcs_map_resolution = LaunchConfiguration('sdcs_map_resolution')
+
+    node_pause_s_arg = DeclareLaunchArgument(
+        'node_pause_s',
+        default_value='3.0',
+        description='Seconds path_follower holds zero speed at each requested node.')
+    node_pause_s = LaunchConfiguration('node_pause_s')
 
     path_follower = Node(
         package='qcar2_autonomy',
@@ -86,6 +116,9 @@ def generate_launch_description():
         parameters=[{
             'cmd_topic': '/cmd_vel_path',
             'from_frame': from_frame,
+            'node_values': [0, 8, 10],
+            'start_path': [False],
+            'node_pause_s': ParameterValue(node_pause_s, value_type=float),
         }],
     )
 
@@ -130,7 +163,7 @@ def generate_launch_description():
         name='trip_planner',
          parameters=[{
             'taxi_node': [10],
-        #     'trip_nodes': [2, 4, 14, 20, 22, 10],
+        #     'trip_nodes': [2, 4, 14, 20, 22],
          }]
     )
 
@@ -152,6 +185,10 @@ def generate_launch_description():
         name='sdcs_map_publisher',
         parameters=[{
             'image_path': sdcs_map_image_path,
+            'origin_x': ParameterValue(sdcs_map_origin_x, value_type=float),
+            'origin_y': ParameterValue(sdcs_map_origin_y, value_type=float),
+            'origin_yaw': ParameterValue(sdcs_map_origin_yaw, value_type=float),
+            'resolution': ParameterValue(sdcs_map_resolution, value_type=float),
         }],
         output='screen',
     )
@@ -159,6 +196,11 @@ def generate_launch_description():
     return LaunchDescription([
         from_frame_arg,
         sdcs_map_image_arg,
+        sdcs_map_origin_x_arg,
+        sdcs_map_origin_y_arg,
+        sdcs_map_origin_yaw_arg,
+        sdcs_map_resolution_arg,
+        node_pause_s_arg,
         yolo_model_path_arg,
         crop_bottom_px_arg,
         tl_color_history_size_arg,

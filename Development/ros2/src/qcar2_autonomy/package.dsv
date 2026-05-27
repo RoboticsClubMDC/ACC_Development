@@ -1,0 +1,7 @@
+source;share/qcar2_autonomy/hook/pythonpath.ps1
+source;share/qcar2_autonomy/hook/pythonpath.dsv
+source;share/qcar2_autonomy/hook/pythonpath.sh
+source;share/qcar2_autonomy/hook/ament_prefix_path.ps1
+source;share/qcar2_autonomy/hook/ament_prefix_path.dsv
+source;share/qcar2_autonomy/hook/ament_prefix_path.sh
+source;share/qcar2_autonomy/hook/qcar2_runtime_deps.sh

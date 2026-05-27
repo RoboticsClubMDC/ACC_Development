@@ -66,14 +66,15 @@ class tripPlanner(Node):
 
         # Start in super_state 2 (idle at hub, ready for rides) so the user
         # can request a ride immediately by setting trip_nodes. Trip format:
-        #   [current_position, pickup, dropoff]
-        #   [current_position, pickup, stop, ..., dropoff]
-        # The planner auto-appends taxi_node so the car returns home.
+        #   [pickup, dropoff]
+        #   [pickup, stop, ..., dropoff]
+        # The planner wraps the ride with taxi_node on both ends:
+        # taxi hub -> pickup -> optional stops -> dropoff -> taxi hub.
         self.trip_super_state = 2.0
         self.current_trip_state = 1.0
         self.path_nodes = []
         self.super_state_1_flags = [False, False]
-        self.taxi_node = 10
+        self.current_position_node = self.taxi_node
         self.new_ride_requested = False
         self.trip_length = 0
         self.current_trip_status = True
@@ -97,6 +98,8 @@ class tripPlanner(Node):
         self.previous_led_state = 0
         self.current_path_status = False
         self.ride_complete = False
+        self.previous_path_status = False
+        self.arrival_active = False
 
         self.qcar_state_pub = self.create_publisher(UInt8, '/trip_planner/qcar_state', 10)
         self.publish_qcar_state()  # publish initial state
@@ -105,6 +108,61 @@ class tripPlanner(Node):
         self.dt = 1 / 10
         self.trip_time = time.time()
         self.timer1 = self.create_timer(self.dt, self.trip_planner_controller)
+
+        # Park the car at boot. Without this, path_follower would auto-drive
+        # its compiled-in default node_values ([0, 8, 10]) if anything enables
+        # motion early. We sit idle until a trip_nodes param arrives.
+        self._set_path_execute(False)
+        self.get_logger().info(
+            "trip_planner idle at hub (magenta). Set trip_nodes to start a ride: "
+            "ros2 param set /trip_planner trip_nodes \"[PICKUP, ..., DROPOFF]\""
+        )
+
+    def _set_path_execute(self, run: bool):
+        """Pause / resume path_follower's motion command output."""
+        self.send_request(
+            param_name='start_path',
+            param_value=[bool(run)],
+            param_type=ParameterType.PARAMETER_BOOL_ARRAY,
+            client=self.path_follower_client,
+        )
+
+    def _send_full_path(self):
+        """Send the full ride once; path_follower pauses at internal boundaries."""
+        self.current_path_status = False
+        self.previous_path_status = False
+        self.arrival_active = False
+        self.send_request(
+            param_name='node_values',
+            param_value=[int(node) for node in self.path_nodes],
+            param_type=ParameterType.PARAMETER_INTEGER_ARRAY,
+            client=self.path_follower_client,
+        )
+        self._set_path_execute(True)
+
+    def _build_path_nodes(self, ride_nodes):
+        trip = [int(node) for node in ride_nodes]
+        if trip[0] == self.taxi_node:
+            trip.pop(0)
+        if trip and trip[-1] == self.taxi_node:
+            trip.pop()
+        start_node = int(self.current_position_node)
+        if start_node != self.taxi_node:
+            self.get_logger().warn(
+                f'current_position_node={start_node}, forcing next ride start '
+                f'to taxi hub node {self.taxi_node}'
+            )
+            start_node = int(self.taxi_node)
+        return [start_node] + trip + [int(self.taxi_node)]
+
+    def _arrival_state_for_path_index(self, arrived_at, last):
+        if arrived_at == last:
+            return 5  # taxi hub -> magenta
+        if arrived_at == 1:
+            return 2  # first ride coordinate / pickup -> blue
+        if arrived_at == last - 1:
+            return 3  # last ride coordinate / drop-off -> orange
+        return 1      # any middle ride coordinate / stop -> red
 
     def publish_qcar_state(self):
         msg = UInt8()
@@ -131,18 +189,21 @@ class tripPlanner(Node):
                 self.trip_length = len(self.trip_nodes)
                 if self.trip_length < 2:
                     self.get_logger().info(
-                        'Invalid trip: need at least [current_position, pickup, dropoff].'
+                        'Invalid trip: need at least [pickup, dropoff].'
                     )
                     continue
 
-                # trip_nodes already starts at the car's current node and ends
-                # at the drop-off. Append the taxi hub so the car drives home
-                # after the drop-off. Strip any user-supplied trailing hub to
-                # avoid a duplicate node.
-                trip = list(self.trip_nodes)
-                if trip[-1] == self.taxi_node:
-                    trip.pop()
-                self.path_nodes = trip + [self.taxi_node]
+                # Rules: first ride coordinate is pickup, last ride coordinate
+                # is drop-off, middle coordinates are stops. The taxi hub is
+                # not part of the ride list; we wrap it automatically.
+                path_nodes = self._build_path_nodes(self.trip_nodes)
+                if len(path_nodes) < 4:
+                    self.get_logger().info(
+                        'Invalid trip after removing taxi hub duplicates: '
+                        'need pickup and dropoff ride coordinates.'
+                    )
+                    continue
+                self.path_nodes = path_nodes
 
                 self.get_logger().info(f'New trip requested: {self.path_nodes}')
 
@@ -153,6 +214,9 @@ class tripPlanner(Node):
                 self.nodes_sent = False
                 self.led_timer_reset = False
                 self.trip_time = time.time()
+                self.current_path_status = False
+                self.previous_path_status = False
+                self.arrival_active = False
 
                 # We travel slowly to pickup station and speed up during actual rides
                 self.send_request(
@@ -173,10 +237,7 @@ class tripPlanner(Node):
         # Super state 1: drive to taxi hub
         if self.trip_super_state == 1:
             if 5 < t_current < 15 and len(self.path_nodes) == 0 and self.current_path_status is False:
-                self.path_nodes.append(0)
-                for node in self.trip_nodes:
-                    self.path_nodes.append(node)
-                self.path_nodes.append(self.taxi_node)
+                self.path_nodes = self._build_path_nodes(self.trip_nodes)
 
                 if self.super_state_1_flags[0] is False:
                     self.super_state_1_flags[0] = self.send_request(
@@ -227,51 +288,62 @@ class tripPlanner(Node):
                     if self.nodes_sent is False:
                         self.current_stop = self.path_nodes[self.stop_index]
                         self.goal_stop = self.path_nodes[self.stop_index + 1]
-                        trip = [self.current_stop, self.goal_stop]
-                        self.nodes_sent = self.send_request(
-                            param_name="node_values",
-                            param_value=trip,
-                            param_type=ParameterType.PARAMETER_INTEGER_ARRAY,
-                            client=self.path_follower_client
+                        self._send_full_path()
+                        self.get_logger().info(
+                            f'Full ride path sent once: {self.path_nodes}. '
+                            f'Driving segment {self.stop_index+1}/{last}: '
+                            f'{self.current_stop} -> {self.goal_stop}.'
                         )
+                        self.nodes_sent = True
 
-                    # Once the segment is complete and a small grace
-                    # window has elapsed, dwell 3 s at the arrived node
-                    # with the LED color appropriate for that node.
-                    if self.current_path_status is True and t_current > 2:
+                    # nav_to_pose owns the actual 3 s zero-speed pause.
+                    # This node only changes LEDs during that arrival window.
+                    if self.arrival_active:
                         if not self.led_timer_reset:
                             self.led_time_t0 = time.time()
                             self.led_timer_reset = True
 
                         arrived_at = self.stop_index + 1
-                        if arrived_at == 1:
-                            arrived_state = 2          # pickup → blue
-                        elif arrived_at == last:
-                            arrived_state = 5          # back at taxi hub → magenta
-                        elif arrived_at == last - 1:
-                            arrived_state = 3          # drop-off → orange
-                        else:
-                            arrived_state = 1          # intermediate stop → red
+                        arrived_state = self._arrival_state_for_path_index(
+                            arrived_at, last
+                        )
 
                         elapsed = time.time() - self.led_time_t0
                         if elapsed < self.led_time:
                             self.qcar_state = arrived_state
                         else:
                             # 3 s dwell finished → advance to the next segment.
+                            self.arrival_active = False
                             self.led_timer_reset = False
-                            self.nodes_sent = False
+                            self.current_position_node = self.path_nodes[arrived_at]
                             self.stop_index += 1
                             self.trip_time = time.time()
                             if arrived_at >= last:
                                 # We just dwelled at the taxi hub — ride is over.
+                                self.current_position_node = self.taxi_node
                                 self.ride_complete = True
                                 self.new_ride_requested = False
                                 self.current_trip_status = True  # re-arm for next ride
                                 self.qcar_state = 5
                                 self.stop_index = 0
+                                self.nodes_sent = False
                                 self.path_nodes = []
+                                self.current_path_status = False
+                                self.previous_path_status = False
+                                # Park the car until the next trip request.
+                                self._set_path_execute(False)
                                 self.get_logger().info(
-                                    'Ride complete. Magenta @ taxi hub. Awaiting next trip_nodes.'
+                                    f'Ride complete. Current position set to '
+                                    f'taxi hub node {self.current_position_node}. '
+                                    f'Magenta @ taxi hub. Awaiting next trip_nodes.'
+                                )
+                            else:
+                                self.current_stop = self.path_nodes[self.stop_index]
+                                self.goal_stop = self.path_nodes[self.stop_index + 1]
+                                self.get_logger().info(
+                                    f'Continuing existing path for segment '
+                                    f'{self.stop_index+1}/{last}: '
+                                    f'{self.current_stop} -> {self.goal_stop}.'
                                 )
 
         if self.previous_led_state != self.qcar_state:
@@ -279,7 +351,12 @@ class tripPlanner(Node):
             self.publish_qcar_state()  # publish immediately on change
 
     def path_status_callback(self, msg):
-        self.current_path_status = msg.data
+        new_status = bool(msg.data)
+        if self.nodes_sent and new_status and not self.previous_path_status:
+            self.arrival_active = True
+            self.led_timer_reset = False
+        self.current_path_status = new_status
+        self.previous_path_status = new_status
 
     def send_request(self, param_name, param_value, param_type, client):
         param = Parameter()

@@ -235,8 +235,12 @@ class PathFollower(Node):
       self.translation_offset = list(self.get_parameter("translation_offset").get_parameter_value().double_array_value)
 
 
-      self.declare_parameter('start_path', [True])
+      # Default to PARKED. trip_planner flips this to True once per full ride.
+      self.declare_parameter('start_path', [False])
       self.path_execute_flag = list(self.get_parameter("start_path").get_parameter_value().bool_array_value)[0]
+
+      self.declare_parameter('node_pause_s', 3.0)
+      self.node_pause_s = float(self.get_parameter("node_pause_s").get_parameter_value().double_value)
 
       self.add_on_set_parameters_callback(self.parameter_update_callback)
 
@@ -294,6 +298,10 @@ class PathFollower(Node):
       self.wp  = SDCSRoadMap().generate_path(self.waypoints)*self.scale
       self.N = len(self.wp[0, :])
       self.wpi = 0
+      self.segment_boundary_indices = self._compute_segment_boundary_indices(self.waypoints)
+      self.segment_boundary_i = 0
+      self.node_pause_active = False
+      self.node_pause_until = 0.0
       self.wp_prior = []
       self.current_steering =0
 
@@ -339,11 +347,17 @@ class PathFollower(Node):
               # Navigation specific variables
               self.waypoints = list(param.value)
               # print(self.waypoints)
-              self.wp  = SDCSRoadMap().generate_path(self.waypoints)*0.975
+              self.wp  = SDCSRoadMap().generate_path(self.waypoints)*self.scale
               self.N = len(self.wp[0, :])
               self.wpi = 0
+              self.segment_boundary_indices = self._compute_segment_boundary_indices(self.waypoints)
+              self.segment_boundary_i = 0
+              self.node_pause_active = False
+              self.node_pause_until = 0.0
               self.previous_steering_value = 0
               self.path_complete = False
+              if hasattr(self, 'path_status_publisher'):
+                self.path_status()
               self.get_logger().info('nodes updated!')
               print(self.waypoints)
 
@@ -359,7 +373,13 @@ class PathFollower(Node):
               self.translation_offset = list(param.value)
           elif param.name == 'start_path' and param.type_== param.Type.BOOL_ARRAY:
               self.path_execute_flag = list(param.value)[0]
-              self.get_logger().info('path status changed!')
+              self.get_logger().info(
+                  f'start_path -> {self.path_execute_flag} '
+                  f'(motion {"ENABLED" if self.path_execute_flag else "PARKED"})'
+              )
+          elif param.name == 'node_pause_s' and param.type_== param.Type.DOUBLE:
+              self.node_pause_s = max(0.0, float(param.value))
+              self.get_logger().info(f'node pause set to {self.node_pause_s:.2f}s')
 
           elif param.name == 'visualize_pose' and param.type_== param.Type.BOOL_ARRAY:
               self.pose_visualize_flag = list(param.value)[0]
@@ -423,6 +443,63 @@ class PathFollower(Node):
                 self.plot_visualized = False
 
           return SetParametersResult(successful=True)
+
+    def _compute_segment_boundary_indices(self, nodes):
+      boundaries = []
+      if len(nodes) < 2:
+        return boundaries
+
+      roadmap = SDCSRoadMap()
+      for i in range(1, len(nodes)):
+        try:
+          prefix_wp = roadmap.generate_path(nodes[:i+1])
+        except Exception as exc:
+          self.get_logger().warn(f'failed to compute segment boundary for {nodes[:i+1]}: {exc}')
+          continue
+
+        boundary = max(0, len(prefix_wp[0, :]) - 5)
+        if boundaries and boundary <= boundaries[-1]:
+          boundary = boundaries[-1] + 1
+        boundaries.append(min(boundary, max(0, self.N - 5)))
+
+      self.get_logger().info(f'segment boundaries: {boundaries}')
+      return boundaries
+
+    def _current_segment_boundary(self):
+      if not self.segment_boundary_indices:
+        return max(0, self.N - 5)
+      idx = min(self.segment_boundary_i, len(self.segment_boundary_indices) - 1)
+      return self.segment_boundary_indices[idx]
+
+    def _arrived_node(self):
+      idx = min(self.segment_boundary_i + 1, len(self.waypoints) - 1)
+      return self.waypoints[idx] if self.waypoints else None
+
+    def _start_node_pause(self):
+      self.node_pause_active = True
+      self.node_pause_until = time.time() + self.node_pause_s
+      self.path_complete = True
+      self.current_steering = 0.0
+      self.get_logger().info(
+        f'arrived at node {self._arrived_node()}; holding still for '
+        f'{self.node_pause_s:.1f}s before continuing same path'
+      )
+
+    def _finish_node_pause(self):
+      if self.segment_boundary_i < len(self.segment_boundary_indices) - 1:
+        previous_boundary = self._current_segment_boundary()
+        self.segment_boundary_i += 1
+        next_boundary = self._current_segment_boundary()
+        self.wpi = int(np.clip(max(self.wpi, previous_boundary + 1), 0, next_boundary))
+        self.path_complete = False
+        self.get_logger().info(
+          f'continuing to node {self._arrived_node()}; '
+          f'segment {self.segment_boundary_i + 1}/'
+          f'{len(self.segment_boundary_indices)}, wpi={self.wpi}'
+        )
+      else:
+        self.path_complete = True
+      self.node_pause_active = False
   
     def filter_coefficients(self, freq,dt):
       nyq_freq = 0.5*(1/dt)
@@ -465,8 +542,7 @@ class PathFollower(Node):
         path_msg.header.frame_id = self.from_frame
         # path_msg.header.frame_id = "map"
 
-        for i in range(self.wpi):
-        # for i in range(self.N):
+        for i in range(self.N):
           if i >= self.N:
              i = self.N-1
           pose = PoseStamped()
@@ -503,6 +579,14 @@ class PathFollower(Node):
         # publish latest path value based on current waypoint every 2 seconds
         if round(self.t_plot) % 2 == 0:
           self.path_publisher()
+
+        if self.node_pause_active:
+          if time.time() < self.node_pause_until:
+            self.current_steering = 0.0
+            self.nav_command(0.0, 0.0)
+            self.path_status()
+            return
+          self._finish_node_pause()
 
         try:
           if not self.path_complete :
@@ -564,16 +648,27 @@ class PathFollower(Node):
               if self.wpi < self.N-2:
                 self.wpi += skip_index
 
-            self.wpi = np.clip(self.wpi,0,self.N-5)
+            final_boundary = max(0, self.N - 5)
+            segment_boundary = self._current_segment_boundary()
+            self.wpi = int(np.clip(self.wpi,0,final_boundary))
 
-            if self.wpi >= self.N-5:
+            reached_boundary = False
+            if self.wpi >= segment_boundary:
               if dist <0.4:
+                reached_boundary = True
                 speed_command = 0.0
-                steering = 0.0
                 self.wp_prior = self.wp
-                self.path_complete = True
+                if self.segment_boundary_i < len(self.segment_boundary_indices) - 1:
+                  self._start_node_pause()
+                else:
+                  self.path_complete = True
+                  self.node_pause_active = False
+                  self.current_steering = 0.0
+                  self.get_logger().info(
+                    f'route complete at node {self._arrived_node()}'
+                  )
 
-            if self.wpi > self.N-100 :
+            if not reached_boundary and self.wpi > segment_boundary-100 :
                speed_command = 0.2
 
             Kp_steering = 1.1
@@ -581,10 +676,13 @@ class PathFollower(Node):
 
             gyro_filtered = self.apply_filter('gyro', self.gyroscope[2],self.a1, self.b1)
 
-            steering = np.clip(
-                          Kp_steering*delta-gyro_filtered*np.pi/180*kd_steering,
-                          -self.max_steering_angle,
-                          self.max_steering_angle)
+            if reached_boundary:
+              steering = 0.0
+            else:
+              steering = np.clip(
+                            Kp_steering*delta-gyro_filtered*np.pi/180*kd_steering,
+                            -self.max_steering_angle,
+                            self.max_steering_angle)
 
             self.current_steering = steering
 
@@ -592,6 +690,8 @@ class PathFollower(Node):
             if int(self.t_plot * 5) != int((self.t_plot - self.dt) * 5):
                 self.get_logger().info(
                     f"wpi={self.wpi} "
+                    f"seg={self.segment_boundary_i + 1}/{max(1, len(self.segment_boundary_indices))} "
+                    f"seg_end={segment_boundary} "
                     f"Kp={Kp_steering:.2f} "
                     f"Kd={kd_steering:.2f} "
                     f"skip={skip_index} "
