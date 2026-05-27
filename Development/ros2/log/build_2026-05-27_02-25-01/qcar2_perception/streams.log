@@ -1,0 +1,44 @@
+[1.233s] Invoking command in '/workspaces/isaac_ros-dev/ros2/build/qcar2_perception': PYTHONPATH=/workspaces/isaac_ros-dev/ros2/build/qcar2_perception/prefix_override:/workspaces/isaac_ros-dev/ros2/install/qcar2_perception/lib/python3.8/site-packages:${PYTHONPATH} /usr/bin/python3 setup.py develop --editable --build-directory /workspaces/isaac_ros-dev/ros2/build/qcar2_perception/build --no-deps install_data
+[1.617s] running develop
+[1.805s] running egg_info
+[1.805s] creating qcar2_perception.egg-info
+[1.815s] writing qcar2_perception.egg-info/PKG-INFO
+[1.815s] writing dependency_links to qcar2_perception.egg-info/dependency_links.txt
+[1.815s] writing entry points to qcar2_perception.egg-info/entry_points.txt
+[1.815s] writing requirements to qcar2_perception.egg-info/requires.txt
+[1.815s] writing top-level names to qcar2_perception.egg-info/top_level.txt
+[1.815s] writing manifest file 'qcar2_perception.egg-info/SOURCES.txt'
+[1.849s] reading manifest file 'qcar2_perception.egg-info/SOURCES.txt'
+[1.849s] writing manifest file 'qcar2_perception.egg-info/SOURCES.txt'
+[1.877s] running build_ext
+[1.878s] Creating /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/lib/python3.8/site-packages/qcar2-perception.egg-link (link to .)
+[1.879s] Installing car_stop script to /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/lib/qcar2_perception
+[1.879s] Installing cmd_vel_blender script to /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/lib/qcar2_perception
+[1.879s] Installing d435_aligned_source script to /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/lib/qcar2_perception
+[1.880s] Installing lane_detector script to /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/lib/qcar2_perception
+[1.880s] Installing lane_stanley_controller script to /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/lib/qcar2_perception
+[1.880s] Installing object_3d_estimator script to /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/lib/qcar2_perception
+[1.880s] Installing perception_behavior_interface script to /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/lib/qcar2_perception
+[1.881s] Installing semantic_consistency_monitor script to /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/lib/qcar2_perception
+[1.881s] Installing semantic_landmark_mapper script to /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/lib/qcar2_perception
+[1.881s] Installing semantic_yolo_detector script to /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/lib/qcar2_perception
+[1.881s] 
+[1.881s] Installed /workspaces/isaac_ros-dev/ros2/build/qcar2_perception
+[1.882s] running install_data
+[1.882s] creating /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/share/ament_index
+[1.882s] creating /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/share/ament_index/resource_index
+[1.882s] creating /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/share/ament_index/resource_index/packages
+[1.882s] copying resource/qcar2_perception -> /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/share/ament_index/resource_index/packages
+[1.883s] copying package.xml -> /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/share/qcar2_perception
+[1.883s] creating /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/share/qcar2_perception/launch
+[1.883s] copying launch/perception_core_physical.launch.py -> /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/share/qcar2_perception/launch
+[1.883s] copying launch/lane_lanenet_stanley_launch.py -> /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/share/qcar2_perception/launch
+[1.883s] copying launch/semantic_tf_launch.py -> /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/share/qcar2_perception/launch
+[1.884s] copying launch/perception_core_virtual.launch.py -> /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/share/qcar2_perception/launch
+[1.884s] creating /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/share/qcar2_perception/config
+[1.884s] copying config/perception_physical.yaml -> /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/share/qcar2_perception/config
+[1.884s] copying config/perception_virtual.yaml -> /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/share/qcar2_perception/config
+[1.885s] creating /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/share/qcar2_perception/maps
+[1.885s] copying maps/semantic_map.json -> /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/share/qcar2_perception/maps
+[1.886s] copying maps/semantic_map_backup_20260520_144326.json -> /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/share/qcar2_perception/maps
+[1.940s] Invoked command in '/workspaces/isaac_ros-dev/ros2/build/qcar2_perception' returned '0': PYTHONPATH=/workspaces/isaac_ros-dev/ros2/build/qcar2_perception/prefix_override:/workspaces/isaac_ros-dev/ros2/install/qcar2_perception/lib/python3.8/site-packages:${PYTHONPATH} /usr/bin/python3 setup.py develop --editable --build-directory /workspaces/isaac_ros-dev/ros2/build/qcar2_perception/build --no-deps install_data

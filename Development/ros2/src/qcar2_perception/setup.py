@@ -31,6 +31,11 @@ setup(
             "semantic_landmark_mapper = qcar2_perception.semantic_landmark_mapper:main",
             "semantic_consistency_monitor = qcar2_perception.semantic_consistency_monitor:main",
             "perception_behavior_interface = qcar2_perception.perception_behavior_interface:main",
+            # 2026-05-27: BEV + LaneNet lane stack migrated from origin/i-hate-gabriel
+            "lane_detector = qcar2_perception.lane_detector:main",
+            "lane_stanley_controller = qcar2_perception.lane_stanley_controller:main",
+            "cmd_vel_blender = qcar2_perception.cmd_vel_blender:main",
+            "car_stop = qcar2_perception.car_stop:main",
         ],
     },
 )

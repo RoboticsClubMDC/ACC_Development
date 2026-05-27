@@ -47,7 +47,9 @@ class LaneStanleyNode(Node):
     def _joint_cb(self, msg: JointState):
         if msg.velocity:
             raw = msg.velocity[0]
-            self.speed = (raw / (720.0 * 4.0)) * ((13.0 * 19.0) / (70.0 * 30.0)) * (2.0 * math.pi) * 0.033
+            # 2026-05-27: gear ratio fix — denominator 30 → 37 per QCar 2
+            # User Manual System Hardware. Same bug as nav_to_pose was carrying.
+            self.speed = (raw / (720.0 * 4.0)) * ((13.0 * 19.0) / (70.0 * 37.0)) * (2.0 * math.pi) * 0.033
 
     def _mask_cb(self, msg: Image):
         try:

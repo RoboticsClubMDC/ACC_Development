@@ -1,0 +1,25 @@
+[1.535s] Invoking command in '/workspaces/isaac_ros-dev/ros2/build/qcar2_perception': PYTHONPATH=/workspaces/isaac_ros-dev/ros2/build/qcar2_perception/prefix_override:/workspaces/isaac_ros-dev/ros2/install/qcar2_perception/lib/python3.8/site-packages:${PYTHONPATH} _=/usr/bin/env /usr/bin/python3 setup.py develop --editable --build-directory /workspaces/isaac_ros-dev/ros2/build/qcar2_perception/build --no-deps install_data
+[1.904s] running develop
+[2.110s] running egg_info
+[2.110s] writing qcar2_perception.egg-info/PKG-INFO
+[2.110s] writing dependency_links to qcar2_perception.egg-info/dependency_links.txt
+[2.110s] writing entry points to qcar2_perception.egg-info/entry_points.txt
+[2.111s] writing requirements to qcar2_perception.egg-info/requires.txt
+[2.111s] writing top-level names to qcar2_perception.egg-info/top_level.txt
+[2.126s] reading manifest file 'qcar2_perception.egg-info/SOURCES.txt'
+[2.128s] writing manifest file 'qcar2_perception.egg-info/SOURCES.txt'
+[2.171s] running build_ext
+[2.171s] Creating /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/lib/python3.8/site-packages/qcar2-perception.egg-link (link to .)
+[2.172s] Installing d435_aligned_source script to /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/lib/qcar2_perception
+[2.172s] Installing object_3d_estimator script to /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/lib/qcar2_perception
+[2.172s] Installing perception_behavior_interface script to /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/lib/qcar2_perception
+[2.172s] Installing semantic_consistency_monitor script to /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/lib/qcar2_perception
+[2.173s] Installing semantic_landmark_mapper script to /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/lib/qcar2_perception
+[2.173s] Installing semantic_yolo_detector script to /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/lib/qcar2_perception
+[2.173s] 
+[2.173s] Installed /workspaces/isaac_ros-dev/ros2/build/qcar2_perception
+[2.173s] running install_data
+[2.173s] copying resource/qcar2_perception -> /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/share/ament_index/resource_index/packages
+[2.173s] copying package.xml -> /workspaces/isaac_ros-dev/ros2/install/qcar2_perception/share/qcar2_perception
+[2.174s] error: can't copy 'launch/lane_assist.launch.py': doesn't exist or not a regular file
+[2.285s] Invoked command in '/workspaces/isaac_ros-dev/ros2/build/qcar2_perception' returned '1': PYTHONPATH=/workspaces/isaac_ros-dev/ros2/build/qcar2_perception/prefix_override:/workspaces/isaac_ros-dev/ros2/install/qcar2_perception/lib/python3.8/site-packages:${PYTHONPATH} _=/usr/bin/env /usr/bin/python3 setup.py develop --editable --build-directory /workspaces/isaac_ros-dev/ros2/build/qcar2_perception/build --no-deps install_data

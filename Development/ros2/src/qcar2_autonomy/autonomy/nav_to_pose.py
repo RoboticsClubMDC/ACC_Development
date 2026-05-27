@@ -3,6 +3,51 @@
 from hal.products.mats import SDCSRoadMap
 from pal.utilities.math import wrap_to_pi
 
+
+# 2026-05-27: Helper to MIRROR node 8's directional edges in the SDCSRoadMap.
+# Edge list extracted from hal/products/mats.py (lines 148-194 for right-hand
+# traffic, 69-116 for left-hand). For each edge touching node 8, we:
+#   1. Locate it in roadmap.edges by fromNode/toNode identity
+#   2. Remove from edges list AND from per-node inEdges/outEdges
+#   3. Add a new edge with from/to swapped (reverses direction)
+# Result: same connectivity topology, opposite direction. Pure pursuit's
+# path planner (A*) sees node 8 with reversed incoming/outgoing edges.
+def _mirror_node_8_edges(roadmap, leftHandTraffic, useSmallMap):
+    scale = 0.002035
+    innerLaneRadius = 305.5 * scale
+    outerLaneRadius = 438.0 * scale
+    oneWayStreetRadius = 350.0 * scale
+    if leftHandTraffic:
+        edges = [(6, 8, innerLaneRadius),
+                 (8, 2, innerLaneRadius),
+                 (8, 10, 0.0)]
+        if not useSmallMap:
+            edges += [(8, 12, outerLaneRadius),
+                      (14, 8, outerLaneRadius)]
+    else:
+        edges = [(1, 8, outerLaneRadius),
+                 (6, 8, 0.0),
+                 (8, 10, oneWayStreetRadius)]
+        if not useSmallMap:
+            edges += [(8, 23, innerLaneRadius),
+                      (12, 8, innerLaneRadius)]
+
+    flipped_count = 0
+    for (a, b, r) in edges:
+        na = roadmap.nodes[a]
+        nb = roadmap.nodes[b]
+        matching = [e for e in roadmap.edges
+                    if e.fromNode is na and e.toNode is nb]
+        if not matching:
+            continue
+        e = matching[0]
+        if e in na.outEdges: na.outEdges.remove(e)
+        if e in nb.inEdges:  nb.inEdges.remove(e)
+        if e in roadmap.edges: roadmap.edges.remove(e)
+        roadmap.add_edge(b, a, r)  # reversed!
+        flipped_count += 1
+    return flipped_count
+
 import os
 import select
 import sys
@@ -142,9 +187,93 @@ class PathFollower(Node):
         #   path didn't exercise tight corners. Kd=0.20 gives a safety margin
         #   for real competition driving without sacrificing responsiveness.
         self.declare_parameter('kp_steering', 1.100)
+        # 2026-05-27: kd_steering 0.20 → 0.10 to match Gabriel's effective
+        # damping (his Kd=5 with implicit ×π/180 ≈ 0.087). User testing
+        # showed our 0.20 made the controller feel sluggish/laggy compared
+        # to his. 0.10 is the responsive-but-still-damped sweet spot.
         self.declare_parameter('kd_steering', 0.20)
+        # 2026-05-27: cos^N(steering) speed reduction. Default 0.0 → DISABLED
+        # (matches Gabriel — constant speed through curves). Set to 2.0 to
+        # re-enable cos² speed cut for more conservative cornering.
+        self.declare_parameter('steering_speed_exponent', 0.0)
+        # 2026-05-27: NEW runtime-tunable lookahead params.
+        # lookahead_dist = max(v_eff × lookahead_dist_multiplier, lookahead_dist_floor)
+        # Defaults match Gabriel's (1.7, 0.30). Raise multiplier to ~2.5 and
+        # floor to ~0.50 if PP wobbles through tight intersection curvature
+        # — bigger lookahead = smoother tracking but less responsive to real
+        # sharp turns.
+        self.declare_parameter('lookahead_dist_multiplier', 1.7)
+        self.declare_parameter('lookahead_dist_floor', 0.30)
+        # 2026-05-27: WaypointDist floor for the PP atan2 formula.
+        # Prevents saturation when waypoints cluster at intersections. 0.05
+        # was too tight; 0.20 is the safe minimum on dense planner output.
+        self.declare_parameter('waypoint_dist_floor', 0.20)
+        # 2026-05-27: SDCSRoadMap traffic-direction toggle.
+        # Originally hardcoded False after we found Quanser's default True
+        # produced wrong paths on our right-hand-traffic scene.
+        # But user observed paths still take "long way around" — possible
+        # the right answer is True after all (Quanser PNG label might be
+        # mislabeled). Made tunable for A/B testing.
+        # CHANGES TAKE EFFECT ON NEXT `node_values` SET (path is regenerated).
+        self.declare_parameter('left_hand_traffic', False)
+        # 2026-05-27: SDCSRoadMap small-map toggle. Quanser provides two
+        # map variants: the large SDCS (default, useSmallMap=False) and
+        # a smaller variant with different node connectivity. If routes
+        # on the large map have unavoidable detours, the small map might
+        # have a more direct graph (or vice versa). A/B testable.
+        self.declare_parameter('use_small_map', False)
+        # 2026-05-27 DIAGNOSTIC — node-8 EDGE/POSITION mirror test.
+        # The SDCSRoadMap library is closed-source. We CAN access
+        # roadmap.nodes[i] (per Quanser's path_planning_example.py:
+        # `for i, node in enumerate(roadmap.nodes): print(node.pose)`).
+        # So we can MIRROR JUST NODE 8 in the in-memory graph:
+        #   - Negate node 8's pose X coord BEFORE calling generate_path
+        # If the library computes edge connectivity from poses dynamically,
+        # this will reroute the planner via different (potentially
+        # symmetric to node 6's) edges.
+        # If the library has pre-cached edges from init, this only changes
+        # the path's final waypoint position — still informative.
+        # USAGE: set mirror_node_8=true → re-set node_values to regen path.
+        self.declare_parameter('mirror_node_8', False)
+        # Kept from previous attempt — path-level mirror (less targeted).
+        # Leave this False; mirror_node_8 above is what user actually wants.
+        self.declare_parameter('mirror_path_x', False)
+        # 2026-05-27: tunable end-of-path stop precision.
+        # `final_target_index_back` — how many waypoints from the end to
+        #   clamp wpi at. Smaller value = PP targets closer to actual
+        #   final waypoint = car stops closer to the actual node.
+        #   Too small (0-1) re-introduces the "instant complete" wobble.
+        # `final_stop_dist` — distance from current target (wp[wpi after
+        #   clamp]) at which to declare path_complete. Smaller value =
+        #   car drives closer before stopping.
+        # Effective max gap from actual node: ~final_target_index_back × 1cm
+        #   + final_stop_dist. With defaults: ~3cm + 0.15m = 0.18m.
+        # Was previously Arturo's defaults (5 and 0.4 → up to 45cm short).
+        self.declare_parameter('final_target_index_back', 3)
+        self.declare_parameter('final_stop_dist', 0.15)
+        # 2026-05-27: approach slowdown distance. When `dist_to_final` (the
+        # Euclidean distance from current pose to wp[-1]) drops below this,
+        # speed_command is capped at 0.2 m/s for a smooth final approach.
+        # Was hardcoded `wpi > N-100` which is fragile on paths that double
+        # back (1m of PATHWISE distance ≠ 1m of Euclidean distance when the
+        # path bends). Now distance-based and tunable. 0.5 m is a tight
+        # slowdown zone for low-speed driving; raise to 1.0 if you want a
+        # gentler approach.
+        self.declare_parameter('approach_slowdown_dist', 0.5)
+        # 2026-05-27: cluster-skip toggle. When True, after the standard
+        # wpi += 1 advance, keep skipping waypoints that are still inside
+        # lookahead_dist. EMPIRICAL FINDING: with the planner's ~1cm
+        # waypoint spacing along smooth paths, this loop advanced 100+
+        # waypoints per tick, causing PP to target a waypoint so far
+        # ahead that path curvature between car and target didn't match
+        # PP's straight-line assumption → high-frequency zig-zag (~30-50
+        # cm wavelength) throughout the path. DEFAULT FALSE until we
+        # build an angular-aware version that doesn't skip past curves.
+        self.declare_parameter('cluster_skip_enabled', False)
         self.kp_steering = float(self.get_parameter('kp_steering').value)
         self.kd_steering = float(self.get_parameter('kd_steering').value)
+        self.steering_speed_exponent = float(
+            self.get_parameter('steering_speed_exponent').value)
 
         # Stanley blend is kept at 0 — pure pursuit only
         self.stanley_blend     = 0.3
@@ -181,7 +310,31 @@ class PathFollower(Node):
         self.timer = self.create_timer(self.dt, self.tf_timer)
         self.translation = [0, 0, 0]
         self.rotation = [0, 0, 0]
-        self.wp = SDCSRoadMap().generate_path(self.waypoints) * self.scale
+        _lht = bool(self.get_parameter('left_hand_traffic').value)
+        _usm = bool(self.get_parameter('use_small_map').value)
+        _roadmap_init = SDCSRoadMap(leftHandTraffic=_lht, useSmallMap=_usm)
+        # 2026-05-27 DIAGNOSTIC — mirror node 8's directional edges in the
+        # roadmap graph BEFORE path generation. Keeps node 8's position the
+        # same; only flips the direction of every edge touching it.
+        if bool(self.get_parameter('mirror_node_8').value):
+            n = _mirror_node_8_edges(_roadmap_init, _lht, _usm)
+            self.get_logger().warn(
+                f'MIRROR_NODE_8: flipped {n} edges touching node 8.')
+        _init_wp = _roadmap_init.generate_path(self.waypoints)
+        if _init_wp is None:
+            self.get_logger().error(
+                f'generate_path({self.waypoints}) returned None at startup '
+                f'(no legal A* path with current settings). Using empty path; '
+                f'set valid node_values via ros2 param set to get going.')
+            self.wp = np.zeros((3, 1))  # 3xN empty-ish placeholder
+        else:
+            self.wp = _init_wp * self.scale
+        # Legacy path-level mirror (set mirror_path_x=true to enable).
+        if bool(self.get_parameter('mirror_path_x').value):
+            self.wp[0, :] = -self.wp[0, :]
+            self.get_logger().warn(
+                f'mirror_path_x=True — X coords of {self.wp.shape[1]} '
+                f'waypoints negated.')
         # -------------ADDED N_1
         self.auto_align_start = True
         self.auto_aligned = False
@@ -196,10 +349,21 @@ class PathFollower(Node):
         self.stanley_trust = 0.0
         self.pp_delta_raw  = 0.0
 
-        self.publisher = self.create_publisher(Twist, '/cmd_vel_nav', 1)
+        # 2026-05-27: cmd_topic is now parametrizable so path_follower can
+        # publish to /cmd_vel_path when running under cmd_vel_blender (which
+        # owns /cmd_vel_nav and blends path + lane). Default keeps legacy
+        # behavior (publish directly to /cmd_vel_nav).
+        self.declare_parameter('cmd_topic', '/cmd_vel_nav')
+        cmd_topic = self.get_parameter('cmd_topic').get_parameter_value().string_value
+        self.publisher = self.create_publisher(Twist, cmd_topic, 1)
+        self.get_logger().info(f'path_follower publishing to {cmd_topic}')
         self.cyclic = False
-        # ±0.52 rad = ±30°, max steering angle per QCar 2 hardware spec (Table 11).
-        self.max_steering_angle = 0.52
+        # 2026-05-27: 0.52 → 0.55. ±0.52 rad = ±30° is the hardware spec
+        # (Table 11). Gabriel used 0.60 (above spec) for harder cornering;
+        # we settle on 0.55 (~31.5°) — a small overshoot above nominal spec
+        # but still within the servo's mechanical range, gives Stanley
+        # margin without exceeding hardware safety.
+        self.max_steering_angle = 0.55
 
         self.joint_state_subscriber = self.create_subscription(
             JointState, '/qcar2_joint', self.joint_state_callback, 1)
@@ -322,7 +486,28 @@ class PathFollower(Node):
         for param in params:
             if param.name == 'node_values' and param.type_ == param.Type.INTEGER_ARRAY:
                 self.waypoints = list(param.value)
-                self.wp = SDCSRoadMap().generate_path(self.waypoints) * 0.975
+                _lht2 = bool(self.get_parameter('left_hand_traffic').value)
+                _usm2 = bool(self.get_parameter('use_small_map').value)
+                _roadmap2 = SDCSRoadMap(leftHandTraffic=_lht2, useSmallMap=_usm2)
+                if bool(self.get_parameter('mirror_node_8').value):
+                    n = _mirror_node_8_edges(_roadmap2, _lht2, _usm2)
+                    self.get_logger().warn(
+                        f'MIRROR_NODE_8 (param-update): flipped {n} edges.')
+                _new_wp = _roadmap2.generate_path(self.waypoints)
+                if _new_wp is None:
+                    # 2026-05-27: SDCSRoadMap.generate_path returns None when
+                    # A* can't find any legal directed path. Keep the OLD wp
+                    # so the node doesn't crash; warn so user knows the
+                    # node_values change had no effect.
+                    self.get_logger().error(
+                        f'generate_path({self.waypoints}) returned None — '
+                        f'no legal A* path exists in the (possibly mirrored) '
+                        f'graph. Keeping previous path. Try different '
+                        f'node_values or set mirror_node_8=false.')
+                else:
+                    self.wp = _new_wp * 0.975
+                if bool(self.get_parameter('mirror_path_x').value):
+                    self.wp[0, :] = -self.wp[0, :]
                 self.N = len(self.wp[0, :])
                 self.wpi = 0
                 self.previous_steering_value = 0
@@ -417,7 +602,16 @@ class PathFollower(Node):
         self.motion_flag = msg.data
 
     def joint_state_callback(self, msg):
-        self.qcar2_measurred_speed = (msg.velocity[0] / (720.0 * 4.0)) * ((13.0 * 19.0) / (70.0 * 30.0)) * (2.0 * np.pi) * 0.033
+        # 2026-05-27: GEAR RATIO FIX. Was (70.0 * 30.0) = Gabriel's bug
+        # carried over from the Quanser original. Per the QCar 2 User
+        # Manual hardware spec (Easy_Start §16, CLAUDE.md §5.1): the
+        # denominator is 37, NOT 30 — 23% wrong otherwise.
+        # Already fixed in pose_estimator.py and ekf_fusor.py but
+        # was missed here. Bug manifestation: v_eff reads 23% too high,
+        # lookahead_dist becomes 23% too long, waypoint advances trigger
+        # early, controller cuts corners and creates "instant-complete"
+        # geometry at end-of-path.
+        self.qcar2_measurred_speed = (msg.velocity[0] / (720.0 * 4.0)) * ((13.0 * 19.0) / (70.0 * 37.0)) * (2.0 * np.pi) * 0.033
 
     def imu_callback(self, msg):
         self.gyroscope = [msg.angular_velocity.x, msg.angular_velocity.y, msg.angular_velocity.z]
@@ -509,10 +703,14 @@ class PathFollower(Node):
     #----------------End of auto_align_roadmap_to_current_pose----------------N2
 
     def path_publisher(self):
+        # 2026-05-27 BUG FIX: was publishing only `range(self.wpi)` — i.e.,
+        # ONLY waypoints the car had already passed (a breadcrumb trail).
+        # Now publishes the FULL planned path so Foxglove + /planned_path
+        # echo show what the controller will actually steer toward.
         path_msg = Path()
         path_msg.header.stamp = self.get_clock().now().to_msg()
         path_msg.header.frame_id = 'map'
-        for i in range(self.wpi):
+        for i in range(self.N):
             if i >= self.N:
                 i = self.N - 1
             pose = PoseStamped()
@@ -581,30 +779,103 @@ class PathFollower(Node):
                 Rot = np.array([[np.cos(th), -np.sin(th)], [np.sin(th), np.cos(th)]])
                 v_car = v @ Rot
 
-                WaypointDist = max(np.linalg.norm(v_car), 0.05)
+                # 2026-05-27: WaypointDist floor is now a runtime param
+                # (waypoint_dist_floor, default 0.20). PP atan2 denominator
+                # bound — prevents saturation when waypoints cluster at
+                # intersections (planner returns 5-10 cm spaced waypoints).
+                waypoint_dist_floor = float(
+                    self.get_parameter('waypoint_dist_floor').value)
+                WaypointDist = max(np.linalg.norm(v_car), waypoint_dist_floor)
                 psi = np.arctan2(v_car[1], v_car[0])
 
                 pp_delta = np.arctan2(2 * L * np.sin(psi), WaypointDist)
 
                 dist = np.linalg.norm([p[0] - wp_1_mod[0], p[1] - wp_1_mod[1]])
 
+                # 2026-05-27: lookahead now uses runtime-tunable multiplier
+                # and floor params. Bigger lookahead = PP looks further
+                # ahead, smooths out tight curvature; smaller = more
+                # responsive to sharp turns. Sweet spot per scene.
+                lookahead_mul = float(
+                    self.get_parameter('lookahead_dist_multiplier').value)
+                lookahead_floor = float(
+                    self.get_parameter('lookahead_dist_floor').value)
                 v_eff = max(self.qcar2_measurred_speed, 0.05)
-                lookahead_dist = max(v_eff * 1.7, 0.30)
+                lookahead_dist = max(v_eff * lookahead_mul, lookahead_floor)
 
+                # 2026-05-27: SKIP CLUSTERED WAYPOINTS in one tick. Previous
+                # behavior advanced wpi by 1 per tick — at intersections
+                # where the planner clusters waypoints 5-10 cm apart, the
+                # controller spent multiple ticks crawling through the
+                # cluster while the car physically blew past it → loop.
+                # Now: while the NEXT waypoint is also within advance_thresh,
+                # keep incrementing. Single-tick jump-past-cluster.
                 if dist < lookahead_dist:
-                    if self.wpi < self.N - 1:
+                    if self.wpi < self.N - int(self.get_parameter('final_target_index_back').value):
                         self.wpi += skip_index
+                        # Cluster-skip — runtime-toggleable so we can A/B
+                        # against the simple single-step advance.
+                        if bool(self.get_parameter('cluster_skip_enabled').value):
+                            while self.wpi < self.N - int(self.get_parameter('final_target_index_back').value):
+                                next_wp = self.wp[:, self.wpi]
+                                next_wp_mod = (
+                                    next_wp if self._wp_in_ros_frame
+                                    else (next_wp + t) @ R_QLabs_ROS
+                                )
+                                next_dist = np.linalg.norm(
+                                    [p[0] - next_wp_mod[0], p[1] - next_wp_mod[1]])
+                                if next_dist >= lookahead_dist:
+                                    break
+                                self.wpi += 1
 
-                self.wpi = np.clip(self.wpi, 0, self.N - 1)
+                self.wpi = np.clip(self.wpi, 0, self.N - int(self.get_parameter('final_target_index_back').value))
 
-                if self.wpi > self.N - 100:
+                # 2026-05-27: speed slowdown near end of path. Used to be
+                # `wpi > N-100` (waypoint-count based) which is fragile on
+                # paths that double back — geographically the car is
+                # mid-map but PATHWISE 1m from end → unexpected slowdown
+                # at "non-node" locations.
+                # Now: trigger when dist_to_final < approach_slowdown_dist
+                # (default 0.5 m). Euclidean distance from current pose to
+                # the LAST waypoint, regardless of path shape.
+                # NOTE: we use wp_final / dist_to_final computed below;
+                # need to compute them early enough. Doing it here.
+                wp_final_early = np.array(self.wp[:, -1])
+                wp_final_mod_early = (
+                    wp_final_early if self._wp_in_ros_frame
+                    else (wp_final_early + t) @ R_QLabs_ROS
+                )
+                dist_to_final_early = np.linalg.norm(
+                    [p[0] - wp_final_mod_early[0],
+                     p[1] - wp_final_mod_early[1]])
+                approach_slowdown_dist = float(
+                    self.get_parameter('approach_slowdown_dist').value)
+                if dist_to_final_early < approach_slowdown_dist:
                     speed_command = min(speed_command, 0.2)
 
+                # 2026-05-27: stop condition rewritten to match Arturo
+                # (origin/i-hate-gabriel nav_to_pose.py lines 558-564).
+                # PREVIOUS bug:
+                #   dist_to_final (to wp[-1]) < 0.40 triggered the stop.
+                #   But wpi is clamped at N-5 so PP only targets wp[N-5],
+                #   not wp[-1]. The car would reach wp[N-5], overshoot it
+                #   (still has speed), and then PP would compute a ψ
+                #   pointing BACKWARD (target now behind/sideways) →
+                #   wobble while waiting for the LAST waypoint distance
+                #   to drop below 0.40.
+                # FIX: stop when (a) wpi has reached its clamp AND
+                #      (b) we're within 0.4 m of the CURRENT TARGET (wp[wpi]).
+                # That triggers the moment the car arrives at the
+                # targetable waypoint — no overshoot, no wobble.
+                # Keep dist_to_final calc for diagnostics only.
                 wp_final = np.array(self.wp[:, -1])
                 wp_final_mod = wp_final if self._wp_in_ros_frame else (wp_final + t) @ R_QLabs_ROS
                 dist_to_final = np.linalg.norm([p[0] - wp_final_mod[0],
                                                 p[1] - wp_final_mod[1]])
-                if dist_to_final < 0.25:
+                final_stop_dist = float(
+                    self.get_parameter('final_stop_dist').value)
+                if (self.wpi >= self.N - int(self.get_parameter('final_target_index_back').value)
+                        and dist < final_stop_dist):
                     speed_command        = 0.0
                     pp_delta             = 0.0
                     self.current_steering = 0.0
@@ -673,8 +944,17 @@ class PathFollower(Node):
         if self.control_mode != 'autonomous':
             return
         QCarCommands = Twist()
+        # 2026-05-27: cos^N(steering) speed reduction made tunable via
+        # steering_speed_exponent param. Default 0.0 (disabled, matches
+        # Gabriel — constant speed through curves). Set to 2.0 to re-enable
+        # the cos² conservative cornering speed cut.
+        if self.steering_speed_exponent > 0.0:
+            cos_steer = float(np.cos(self.current_steering))
+            speed_factor = max(0.0, cos_steer) ** self.steering_speed_exponent
+        else:
+            speed_factor = 1.0
         QCarCommands.linear.x = enable * np.clip(
-            speed_command * np.power(np.cos(self.current_steering), 2), 0.0, 0.7)
+            speed_command * speed_factor, 0.0, 0.7)
         QCarCommands.angular.z = enable * self.current_steering
         self.publisher.publish(QCarCommands)
 
