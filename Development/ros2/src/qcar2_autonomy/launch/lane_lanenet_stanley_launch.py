@@ -1,8 +1,19 @@
 from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
+    # Lane-only test speed. Override from the command line, for example:
+    # ros2 launch qcar2_autonomy lane_lanenet_stanley_launch.py lane_speed_mps:=0.10
+    lane_speed_arg = DeclareLaunchArgument(
+        'lane_speed_mps',
+        default_value='0.20',
+        description='Forward speed used by lane_stanley_controller.')
+    lane_speed = LaunchConfiguration('lane_speed_mps')
+
     front_csi_camera = Node(
         package='qcar2_nodes',
         executable='csi',
@@ -45,7 +56,7 @@ def generate_launch_description():
         executable='lane_stanley_controller',
         name='lane_stanley_controller',
         parameters=[{
-            'speed_mps': 0.20,
+            'speed_mps': ParameterValue(lane_speed, value_type=float),
             'stanley_gain': 1.0,
             'max_steer_rad': 0.35,
             'publish_stop_when_lost': False,
@@ -53,6 +64,7 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
+        lane_speed_arg,
         front_csi_camera,
         lane_detector,
         lane_stanley_controller,

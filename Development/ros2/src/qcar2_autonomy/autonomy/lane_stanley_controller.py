@@ -25,7 +25,7 @@ class LaneStanleyController(Node):
         self.declare_parameter('min_speed_for_control', 0.05)
         self.declare_parameter('lane_timeout_sec', 0.35)
         self.declare_parameter('publish_stop_when_lost', False)
-        self.declare_parameter('control_rate_hz', 30.0)
+        self.declare_parameter('control_rate_hz', 60.0)
 
         self.cte = 0.0
         self.heading = 0.0
