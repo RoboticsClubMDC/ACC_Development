@@ -61,3 +61,5 @@ Development/ros2/src/qcar2_autonomy/models/lanenet.pt
 # YOLO training workspace (datasets, weights, runs — too large for git)
 Development/yolo_training/
 Development/ros2/src/qcar2_autonomy/models/road_signs_4class_yolov8s.pt
+Development/ros2/src/qcar2_autonomy/models/road_signs_6class_v4_yolov8s.pt
+Development/ros2/src/qcar2_autonomy/models/road_signs_7class_v5_yolov8s.pt

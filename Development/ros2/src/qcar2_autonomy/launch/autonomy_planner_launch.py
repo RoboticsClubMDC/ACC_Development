@@ -28,8 +28,8 @@ def generate_launch_description():
     # via `ros2 launch ... <name>:=<value>` syntax. Each forwards to the
     # corresponding ROS parameter on the yolo_detector node.
     crop_bottom_px_arg = DeclareLaunchArgument(
-        'crop_bottom_px', default_value='24',
-        description='Bottom rows to crop before YOLO inference (hides CSI bumper).')
+        'crop_bottom_px', default_value='0',
+        description='Bottom rows to crop before YOLO inference. 0=off (default, 2026-05-27). CSI bumper may get misclassified as cone/car which are both no-op so harmless. Set 24+ to re-enable bottom crop.')
     tl_color_history_size_arg = DeclareLaunchArgument(
         'tl_color_history_size', default_value='8',
         description='TL color majority-vote window (frames).')
@@ -52,6 +52,10 @@ def generate_launch_description():
     tl_fsm_green_frames_to_release_arg = DeclareLaunchArgument(
         'tl_fsm_green_frames_to_release', default_value='3',
         description='Consecutive green-effective-color frames to transition COMMIT_STOP -> COMMIT_GO.')
+    # 2026-05-27: TL center-of-frame focus (skip side-of-frame TLs in 4-way intersections)
+    tl_center_max_offset_frac_arg = DeclareLaunchArgument(
+        'tl_center_max_offset_frac', default_value='0.30',
+        description='Only consider TLs whose bbox center is within +/- this fraction of image-width-center. 0.30 = +/-192px on 640w. Lower = stricter center-only.')
 
     crop_bottom_px         = LaunchConfiguration('crop_bottom_px')
     tl_color_history_size  = LaunchConfiguration('tl_color_history_size')
@@ -61,6 +65,7 @@ def generate_launch_description():
     tl_hold_s              = LaunchConfiguration('tl_hold_s')
     tl_fsm_lost_frames_to_reset    = LaunchConfiguration('tl_fsm_lost_frames_to_reset')
     tl_fsm_green_frames_to_release = LaunchConfiguration('tl_fsm_green_frames_to_release')
+    tl_center_max_offset_frac      = LaunchConfiguration('tl_center_max_offset_frac')
 
     path_follower = Node(
         package='qcar2_autonomy',
@@ -85,6 +90,7 @@ def generate_launch_description():
             'tl_hold_s':              ParameterValue(tl_hold_s,              value_type=float),
             'tl_fsm_lost_frames_to_reset':    ParameterValue(tl_fsm_lost_frames_to_reset,    value_type=int),
             'tl_fsm_green_frames_to_release': ParameterValue(tl_fsm_green_frames_to_release, value_type=int),
+            'tl_center_max_offset_frac':      ParameterValue(tl_center_max_offset_frac,      value_type=float),
         }],
     )
 
@@ -125,6 +131,7 @@ def generate_launch_description():
         tl_hold_s_arg,
         tl_fsm_lost_frames_to_reset_arg,
         tl_fsm_green_frames_to_release_arg,
+        tl_center_max_offset_frac_arg,
         path_follower,
         traffic_system_detector,
         trip_planner,

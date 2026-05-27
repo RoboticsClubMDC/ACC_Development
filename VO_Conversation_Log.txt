@@ -7512,3 +7512,198 @@ ready.
 
 Logged: VO_CHANGELOG.md 2026-05-26 PM-11 entry "v2 model training
 kicked off"; this Turn 151.
+
+Turn 152 - User
+Provided the Quanser ACC 2026 ride spec for the QCar2 onboard LED
+strip and requested the autonomy LED logic be updated to match. Per
+spec: car starts at the Taxi Hub with MAGENTA; once judges confirm
+the ride, LED turns GREEN while driving; at the pickup coordinate
+(first ride point) full-stop and turn BLUE; at any intermediate
+coordinates full-stop and turn RED; at the drop-off coordinate (last
+ride point) full-stop and turn ORANGE; after navigating back to the
+hub, full-stop and turn MAGENTA again to signal end of ride.
+
+Turn 152 - Assistant
+Located the LED-control surface: two files cooperate on the same
+`/trip_planner/qcar_state` UInt8 topic. `trip_planner.py` decides
+the qcar_state per the trip FSM and ALSO drives the qcar2_hardware
+LED parameter directly via `led_set_logic()`. `Planner_server.py`
+subscribes to the same topic and translates qcar_state → led_color_id
+as a redundant second writer (left in place — out of scope to remove
+the duplication). Both must agree on the mapping.
+
+Found Quanser's `led_color_id` integers in a stale build artifact at
+`Development/install/qcar2_autonomy/lib/python3.8/site-packages/
+autonomy/trip_planner.py` (`LED_MAGENTA = 5`, `LED_ORANGE = 6`), so
+no new IDs are guessed — these are the integers the hardware already
+accepts.
+
+Picked the qcar_state numbering to stay compatible with the existing
+yolo_detector.py override path (which publishes qcar_state=1 for the
+brake-active LED and qcar_state=4 for brake-release):
+    1 -> RED      (interior stop)
+    2 -> BLUE     (pickup, first ride coord)
+    3 -> ORANGE   (drop-off, last ride coord)   was YELLOW(3)
+    4 -> GREEN    (driving)
+    5 -> MAGENTA  (taxi hub idle / end of ride) new
+
+Edits (both files):
+- `Planner_server.py`: docstring rewritten to enumerate 1..5;
+  `state_cb` mapping changed (state 3 -> led id 6 orange instead of
+  3 yellow; state 5 added -> led id 5 magenta; unknown-state
+  fallback flipped from green to magenta as a safer hub default).
+- `trip_planner.py`:
+  - Class docstring rewritten with the 1..5 enumeration.
+  - Super-state-1 hub-arrival branch (lines ~186-202): hold MAGENTA
+    for the `led_time` window (was RED), and stay MAGENTA on the
+    transition into super-state-2 (was GREEN). The post-arrival 3 s
+    LED hold now matches the spec's hub-arrival semantic.
+  - Super-state-2 default (lines ~205-215): when `new_ride_requested`
+    is False, default `qcar_state = 5` (MAGENTA); when True, default
+    `qcar_state = 4` (GREEN). The per-stop branch below then
+    overrides to BLUE/RED/ORANGE/MAGENTA at arrivals.
+  - Per-stop color selection (lines ~235-253) rewritten as a single
+    uniform rule using `goal_idx = stop_index + 1` and
+    `last_idx = len(path_nodes) - 1`. The old code had separate
+    `len > 4` and `len == 4` branches and a buggy boolean precedence
+    in the interior-stop test. New rule:
+        goal_idx == 1            -> BLUE     (pickup)
+        goal_idx == last_idx     -> MAGENTA  (back at hub)
+        goal_idx == last_idx - 1 -> ORANGE   (drop-off)
+        else                     -> RED      (interior stop)
+    Works for any path_nodes length >= 4 (the [hub, ...trip..., hub]
+    form the trip_planner builds in parameter_update_callback).
+  - End-of-ride reset (new else branch, lines ~261-270): when
+    `stop_index + 1 > last_idx`, clear `new_ride_requested`,
+    `nodes_sent`, `stop_index`, `led_timer_reset`, and `path_nodes`,
+    and hold MAGENTA. Required because without this reset the
+    MAGENTA-idle default would never re-fire after the first ride
+    (`new_ride_requested` was never cleared in the old code path).
+  - `led_set_logic()` extended: `qcar_state==3` writes led id 6
+    (orange) instead of 3 (yellow); new `qcar_state==5` branch
+    writes led id 5 (magenta). Inline comment notes the mapping has
+    to track `Planner_server.py`.
+
+Out of scope on purpose:
+- Did not unify the dual LED writers (trip_planner direct vs
+  Planner_server passthrough); user asked for LED behavior, not an
+  architecture refactor.
+- Did not touch the init `self.qcar_state = 4` at construction time
+  — super-state-1 default behavior is "drive from node 0 to the
+  hub", which is a GREEN-driving phase.
+- Did not modify yolo_detector.py — its qcar_state=1/4 brake
+  overrides keep their old meanings under the new mapping.
+
+Crosswalk discussion (informational, no code change): user noted
+physical competition uses tape rather than painted crosswalks, so
+crosswalk detection is low priority on the physical car. Logic
+stays as-is: crosswalk hint is used as an extra signal for the TL
+brake gate when present, but is not required for TL braking, so
+this is a no-op on physical when no crosswalk is detected.
+
+Separately surfaced (not part of the LED change): when going to
+verify v5 training was still healthy after the edits, found that
+`Development/yolo_training/runs/detect/road_signs_7class_v5/`,
+`Development/yolo_training/dataset/`, and `Development/yolo_training/
+scripts/` are all gone, and the resume process crashed at epoch 86
+with `FileNotFoundError` for a training image. Cause not yet
+established (intentional cleanup vs accidental). One v5 model
+snapshot survives at `Development/install/qcar2_autonomy/share/
+qcar2_autonomy/models/road_signs_7class_v5_yolov8s.pt` (67 MB,
+epoch-19 best) and has been copied back to
+`Development/ros2/src/qcar2_autonomy/models/road_signs_7class_v5_
+yolov8s.pt` so the next colcon build doesn't lose it. Awaiting
+user direction on whether to rebuild the dataset.
+
+Logged: VO_CHANGELOG.md 2026-05-27 PM "LED scheme aligned to Quanser
+ACC 2026 ride spec" entry; this Turn 152.
+
+Turn 153 - User
+Reported after the first virtual test of the PM-1 LED changes:
+1. LED stays MAGENTA the whole time and never turns GREEN while
+   driving between pickup and destination.
+2. LED doesn't change when the car brakes for a yield or stop sign.
+3. Car sometimes stops "randomly" -- speculated a yield being
+   detected at ~30 m range.
+4. Reconfirmation: do not stop for roundabouts; keep the roundabout
+   branch a no-op.
+
+Turn 153 - Assistant
+Diagnosed and fixed bugs A and B, added a diagnostic plan for bug C,
+verified bug-D reconfirmation is already in place.
+
+Bug A (LED stuck on MAGENTA): PM-1 had set `qcar_state = 5`
+(MAGENTA) as the super-state-2 default whenever `new_ride_requested`
+is False. The user's drive flow doesn't always go through
+`trip_planner.parameter_update_callback` (rides may be triggered via
+`nav_to_pose` or direct `path_follower` parameter pokes), so
+`new_ride_requested` stayed False and the MAGENTA default overrode
+GREEN for the whole trip. Reverted the super-state-2 default to
+`qcar_state = 4` (GREEN) in `trip_planner.py`. The per-stop branch
+still maps to BLUE/RED/ORANGE/MAGENTA at arrivals -- including
+MAGENTA at hub return because `goal_idx == last_idx` -> state 5 --
+so all spec colors still fire. Idle/driving default is GREEN. Trade-
+off: super-state-2 idle between rides is GREEN, not MAGENTA. We
+deviate from the literal spec wording but match its behavioral list
+(each spec sentence is a one-shot stop event). A future "is at hub"
+detector (e.g. distance from `/robot_pose` to hub XY) can add
+sustained magenta-at-hub if required.
+
+Bug B (yield brake doesn't update LED): the stop-sign and TL brake
+paths set `stop_override_active = True` and publish `qcar_state=1`
+so the 500 Hz `flag_publisher` spams state=1 over trip_planner's
+publishes for the brake duration. The yield brake (both the per-
+detection branch and the armed-tracker poll branch) only flipped
+`brake_until_abs` -- it left the LED untouched. Patched
+`yolo_detector.py`:
+  - yield per-detection brake (lines ~1279-1295): now sets
+    `stop_override_active=True`, extends `stop_override_until` by
+    `yield_hold`, publishes `qcar_state=1` once, and logs
+    `Yield Sign -> BRAKE NOW (predicted arrival, depth=..., hold
+    ...s, cooldown ...s)`.
+  - armed-tracker poll branch (lines ~1414-1429): widened the
+    `if label == "Stop Sign"` LED-override guard to
+    `if label in ("Stop Sign", "Yield Sign")` so a yield brake
+    that fires from the out-of-FOV poll also drives the LED.
+
+Bug C (random stops, claimed yield at ~30 m): no parameter change
+this turn. `stop_predict_max_depth_m` default is 8.0; a 30 m yield
+shouldn't pass that gate, so either depth is being mis-reported as
+a smaller value or the stop isn't a yield at all (TL false-positive,
+path-status completion pause, nav_to_pose hitting an intermediate
+goal, etc.). User should grep next run's log for `BRAKE NOW` and
+`-> STOP` lines, both of which already include the depth, and
+forward what fires. Once we see which class is triggering we can
+tighten the right gate.
+
+Bug D (no roundabout brake): verified the roundabout branch (lines
+~1352-1364) is still log-only -- prints `Roundabout @ depth=...
+conf=... (informational, no brake)` and does nothing else. No
+brake, no LED override, no motion_enable flip. Matches the standing
+instruction.
+
+User next steps: rebuild qcar2_autonomy (colcon build), relaunch
+the virtual stack with the v4 model path, drive a trip, and look
+for:
+  - GREEN while driving in a ride;
+  - RED while a yield brake holds (previously stayed green);
+  - BLUE/RED/ORANGE/MAGENTA at the spec stop events;
+  - any `BRAKE NOW` / `-> STOP` log entry whose depth or class
+    explains the random stops.
+
+Logged: VO_CHANGELOG.md 2026-05-27 PM-2 "LED scheme follow-up:
+GREEN default + yield LED override" entry; this Turn 153.
+
+Turn 154 - User (late session)
+After more testing turned up cartographer-virtual TF + camera-bridge
+framerate issues, asked for a full revert of the LED work to remove
+it as a variable.
+
+Turn 154 - Assistant
+`git restore`d Planner_server.py, trip_planner.py, and yolo_detector.py
+back to their last committed state -- so all of the LED-scheme work
+described in Turns 152-153 is no longer in the source tree at commit
+time. The cartographer / framerate issues turned out to be unrelated
+to the LED changes (caused elsewhere in the stack / QLabs container
+state), but the revert stayed for caution. PM-3 entry in
+VO_CHANGELOG.md records the same.
