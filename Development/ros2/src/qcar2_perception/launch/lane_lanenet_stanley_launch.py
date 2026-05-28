@@ -229,31 +229,46 @@ def _launch_setup(context):
         parameters=[{
             "cmd_topic": "/cmd_vel_lane",
             "speed_mps": 0.20,
-            "stanley_gain": 0.5,
-            "heading_gain": 1.0,
-            "max_steer_rad": 0.35,
+            # 2026-05-28 anti-overshoot tune (see change log). The car did one
+            # oscillation then ran into the wall — three compounding causes:
+            #   (a) BEV scale-bias over-reports CTE ~2.3× (bottom row ~0.43 m
+            #       real mapped through bev_world_width_m=1.0) → halve the gain;
+            #   (b) Stanley atan2(k·cte, v) blew up at low v (0.05 floor) →
+            #       raise min_speed_for_control to soften the denominator;
+            #   (c) heading_gain=1.0 + cte term saturated max_steer on curves.
+            "stanley_gain": 0.22,          # was 0.5  (compensate CTE inflation)
+            "heading_gain": 0.6,           # was 1.0  (less curve overshoot)
+            "max_steer_rad": 0.25,         # was 0.35 (limit one-shot swing)
+            "min_speed_for_control": 0.40, # was 0.05 (softening floor)
             "publish_stop_when_lost": False,
         }],
         output="screen",
     )
 
-    cmd_vel_blender = Node(
-        package="qcar2_perception",
-        executable="cmd_vel_blender",
-        name="cmd_vel_blender",
-        parameters=[{
-            "path_cmd_topic": "/cmd_vel_path",
-            "lane_cmd_topic": "/cmd_vel_lane",
-            "cmd_topic": "/cmd_vel_nav",
-            "lane_weight": lane_weight,
-            "path_weight": path_weight,
-            "linear_source": "path",   # speed from path_follower
-            "require_path": True,      # path_follower is the ignition (2026-05-27)
-        }],
-        output="screen",
-    )
+    nodes = [lane_detector, lane_stanley_controller]
 
-    return [lane_detector, lane_stanley_controller, cmd_vel_blender]
+    # 2026-05-28: run_blender:=false when pairing this lane stack with the
+    # motion_arbiter (the arbiter, not the blender, owns /cmd_vel_nav and adds
+    # junction/leg gating). Default true keeps the standalone blender topology.
+    run_blender = LaunchConfiguration("run_blender").perform(context).strip().lower()
+    if run_blender in ("true", "1", "yes"):
+        nodes.append(Node(
+            package="qcar2_perception",
+            executable="cmd_vel_blender",
+            name="cmd_vel_blender",
+            parameters=[{
+                "path_cmd_topic": "/cmd_vel_path",
+                "lane_cmd_topic": "/cmd_vel_lane",
+                "cmd_topic": "/cmd_vel_nav",
+                "lane_weight": lane_weight,
+                "path_weight": path_weight,
+                "linear_source": "path",   # speed from path_follower
+                "require_path": True,      # path_follower is the ignition (2026-05-27)
+            }],
+            output="screen",
+        ))
+
+    return nodes
 
 
 def generate_launch_description():
@@ -287,6 +302,15 @@ def generate_launch_description():
             "path_weight",
             default_value="0.40",
             description="Blend weight for path_follower δ in cmd_vel_blender.",
+        ),
+        DeclareLaunchArgument(
+            "run_blender",
+            default_value="true",
+            description=(
+                "true (default): include cmd_vel_blender (standalone topology). "
+                "false: omit it — pair the lane stack with motion_arbiter, which "
+                "then owns /cmd_vel_nav and adds junction/leg gating."
+            ),
         ),
         OpaqueFunction(function=_launch_setup),
     ])

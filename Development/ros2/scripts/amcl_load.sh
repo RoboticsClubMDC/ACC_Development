@@ -12,10 +12,20 @@
 #   5. Blocks; Ctrl-C to stop AMCL.
 #
 # Usage (inside the Isaac ROS dev container):
-#   ./amcl_load.sh                  # default: virtual, last pose
+#   ./amcl_load.sh                  # default: virtual, last pose, HUB=node 10
 #   ./amcl_load.sh physical         # physical robot, last pose
 #   ./amcl_load.sh virtual initial  # seed with initial (carto-start) pose
-#   ./amcl_load.sh virtual final    # same as default
+#   ./amcl_load.sh virtual final 10 # override the HUB node (default 10)
+#
+# Seeds /initialpose with the saved pose as AMCL's initial guess — this is the
+# ACTUAL pose the car is parked at, refined by AMCL's first scan. The temp-start
+# (-1) node then reads the live AMCL-corrected /qcar2_pose_fused, so navigation
+# starts from the true first-scan pose, not the raw YAML number.
+#
+# After seeding it runs the SAME automatic first-trip-to-HUB + LED sequence as
+# carto_to_amcl.sh: CYAN (localizing) → GREEN (drive [-1, HUB] with the STANLEY
+# lane stack; Stanley gated off on 8→10/10→1) → arrival-align → MAGENTA (parked
+# at HUB, ready for rides). Set STANLEY=0 for a bare PP-only first trip.
 #
 # Pre-req: ~/qcar2_maps/competition_map.{yaml,pgm} and the companion
 # competition_map_pose.yaml must already exist (i.e., carto_to_amcl.sh
@@ -25,10 +35,15 @@ set -e
 
 MODE="${1:-virtual}"
 WHICH_POSE="${2:-final}"
+# Optional 3rd arg overrides the HUB node (default 10) for the auto first-trip.
+export HUB_NODE="${3:-10}"
 MAP_DIR="${HOME}/qcar2_maps"
 MAP_NAME="competition_map"
 MAP_YAML="$MAP_DIR/$MAP_NAME.yaml"
 POSE_YAML="$MAP_DIR/${MAP_NAME}_pose.yaml"
+
+# Shared LED + first-trip-to-HUB helper (set_led, nav_to_hub).
+source "$(dirname "$0")/hub_handoff.sh"
 
 case "$MODE" in
   virtual)  AMCL_LAUNCH="qcar2_amcl_localization_virtual_launch.py" ;;
@@ -94,7 +109,9 @@ AMCL_PID=$!
 AMCL_PGID=$AMCL_PID
 
 trap 'echo ""; echo "Cleaning up..."; \
+      [[ -n "$PF_PGID" ]] && { kill -INT -"$PF_PGID" 2>/dev/null || true; }; \
       kill -INT -"$AMCL_PGID" 2>/dev/null || true; sleep 2; \
+      [[ -n "$PF_PGID" ]] && { kill -KILL -"$PF_PGID" 2>/dev/null || true; }; \
       kill -KILL -"$AMCL_PGID" 2>/dev/null || true; \
       exit' INT TERM EXIT
 
@@ -123,7 +140,11 @@ while true; do
 done
 sleep 1
 
-echo "[3/3] Seeding /initialpose with $WHICH_POSE pose..."
+# Hardware is up → LED CYAN while we seed + AMCL settles on its first scan.
+set_led "$LED_CYAN"
+
+echo "[3/3] Seeding /initialpose with $WHICH_POSE pose (AMCL's initial guess;"
+echo "      the actual first-scan pose; the -1 node reads the refined fused pose)..."
 ros2 topic pub -r 2 --times 6 /initialpose geometry_msgs/PoseWithCovarianceStamped "{
   header: {frame_id: 'map'},
   pose: {
@@ -140,13 +161,24 @@ ros2 topic pub -r 2 --times 6 /initialpose geometry_msgs/PoseWithCovarianceStamp
   }
 }" >/dev/null 2>&1
 
+# Automatic first trip to HUB (LED GREEN → drive [-1, HUB] → align → MAGENTA).
+echo ""
+if [[ "${NAV_TO_HUB:-1}" == "1" ]]; then
+  nav_to_hub || echo "[hub] WARN: first-trip-to-HUB did not complete; AMCL stays up."
+else
+  set_led "$LED_GREEN"
+  echo "[hub] NAV_TO_HUB=0 — skipping auto path_follower. Bring up your own stack"
+  echo "      (e.g. lane+Stanley) and set node_values \"[-1, $HUB_NODE]\" yourself."
+fi
+
 echo ""
 echo "=================================================================="
 echo "  AMCL is live (seeded $WHICH_POSE pose at $X, $Y)."
 echo "  Map:    $MAP_YAML"
 echo "  Pose:   $POSE_YAML  (selected: $WHICH_POSE)"
-echo "  Logs:   /tmp/amcl.log"
-echo "  Ctrl-C to stop AMCL."
+echo "  Logs:   /tmp/amcl.log  /tmp/path_follower.log"
+echo "  Parked at HUB node $HUB_NODE (MAGENTA). Ready for RIDES behavior."
+echo "  Ctrl-C to stop AMCL + path_follower."
 echo "=================================================================="
 
 wait $AMCL_PID

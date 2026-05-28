@@ -1,11 +1,11 @@
 {
   "version": 2,
   "frame_id": "map",
-  "saved_at": 1779909661.3133097,
+  "saved_at": 1779957529.9658396,
   "permanent_statuses": [
     "stable"
   ],
-  "live_landmark_count": 0,
+  "live_landmark_count": 3,
   "permanent_landmark_count": 0,
   "landmarks": []
 }

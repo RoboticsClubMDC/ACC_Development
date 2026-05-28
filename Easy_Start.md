@@ -1772,6 +1772,98 @@ Immediate execution order (remaining work toward competition):
 
 ## Change Log
 
+### 2026-05-28 EDT — Stanley anti-overshoot tune (one oscillation → wall).
+
+**User prompt (verbatim):** "stanley controller I think has some noise or kind off I just saw 1 oscillation and then went to wall, but it was following what it was supposed, but I guess the stanley calculated but overshoot, and distance from lane so much I would say. with stanley controller we can increase speed if needed but be in accordance to how much our camera can detect" → then "do it".
+
+**Diagnosis (3 compounding causes):**
+1. **CTE over-reported ~2.3×.** The D435 BEV uses `bev_world_width_m=1.0` but the trapezoid's bottom row only spans ~0.43 m of real ground; CTE uses a uniform `m_per_pix = 1.0/400` ([lane_detector.py:384](Development/ros2/src/qcar2_perception/qcar2_perception/lane_detector.py#L384)), so a real ~4 cm offset reads ~9 cm (near `max_cte_m=0.10`). → "distance from lane so much."
+2. **Low-speed Stanley blow-up.** `atan2(k·cte, v)` with `v_denom=max(|v|,0.05)` ([lane_stanley_controller.py:119](Development/ros2/src/qcar2_perception/qcar2_perception/lane_stanley_controller.py#L119)) explodes at creep speed → one big correction saturates steering → overshoot.
+3. **Gains stack/saturate** — `heading_gain=1.0` + inflated cross-track term hit `max_steer` on curves.
+
+**Fix (param-level, no logic rewrite):**
+- [`lane_lanenet_stanley_launch.py`](Development/ros2/src/qcar2_perception/launch/lane_lanenet_stanley_launch.py) lane_stanley_controller: `stanley_gain` 0.5→**0.22** (compensate CTE inflation), `heading_gain` 1.0→**0.6**, `max_steer_rad` 0.35→**0.25**, `min_speed_for_control` 0.05→**0.40** (softening floor that tames `atan2(k·cte,v)` at low speed). Applies to BOTH the blender stack and the arbiter stack (shared include).
+- [`stanley_arbiter_stack_launch.py`](Development/ros2/src/qcar2_autonomy/launch/stanley_arbiter_stack_launch.py) motion_arbiter: `lane_weight`/`path_weight` 0.75/0.25 → **0.6/0.4** (more path bias while tuning; scoped to this stack, arbiter global default unchanged).
+
+**Still TODO (not built):** the true-rectangle BEV recalibration (the proper fix for cause #1) and the **speed governor** (`v_max ≈ detection_horizon / preview_time`; the BEV horizon is ~1 m ahead so cap ~0.5 m/s, and slow on low lane-confidence / high curvature) — speed comes from path_follower via the arbiter's `linear_source=path`, so the governor would cap path's `desired_speed`.
+
+### 2026-05-28 EDT — Full-leg Stanley gating + arbiter Stanley test stack wired into the scripts.
+
+**User prompt (verbatim):** "so my idea, is that every time it goes to node 10 or taxi_hub is re-pose again … if its not directly taxi hub, new temporal node -2, and share same behaviors that has node 10. SECOND whenever try to arriving to taxi hub, there is some curve lane that we allowed to just cross … node 8 to 10. so basically when on 8, stanley controller off. node 10 to 1, we are going to try to align our best over there … we ignore lane_detection and no stanley on those parts … second I need so to see behavior of stanley controller so input it already on my script. fix that please" + clarification: "you pass alr node 8, you disable stanley until you arrive to 10, same with 10 to 1 … you pass 10, there or if you are alr 10, no stanley until passing PASSING, node coord, of node 1."
+
+**Answer / what changed:**
+
+**1. pkill fix.** `ros2 run` launches the node as `.../lib/qcar2_autonomy/path_follower`; kill with `pkill -9 -f path_follower` (the old `"qcar2_autonomy path_follower"` pattern — with a space — never matched).
+
+**2. Full-leg lane gating** ([`nav_to_pose.py`](Development/ros2/src/qcar2_autonomy/autonomy/nav_to_pose.py)). New `no_lane_legs` param — a FLAT (from,to) int array, e.g. `[8,10, 10,1]` = legs 8→10 and 10→1. In `_lane_gate_tick`: a node is "reached" when the car comes within `leg_node_radius` (0.40 m); a leg `(a,b)` keeps the gate CLOSED (`/nav/lane_gate`=false → arbiter PATH-ONLY, **Stanley off**) while `a` is reached and `b` is not. So once you pass node 8 (or start AT node 10) Stanley stays off until you reach node 10 (or pass node 1). The reached-set resets on every new route. Point-gate `junction_nodes` still works alongside it.
+
+**3. Arbiter Stanley test stack** (new [`stanley_arbiter_stack_launch.py`](Development/ros2/src/qcar2_autonomy/launch/stanley_arbiter_stack_launch.py) + `run_blender` arg on [`lane_lanenet_stanley_launch.py`](Development/ros2/src/qcar2_perception/launch/lane_lanenet_stanley_launch.py)). The lane launch can now omit the blender (`run_blender:=false`). The new stack runs D435 source (no YOLO) + lane_detector + Stanley + **motion_arbiter** (owns `/cmd_vel_nav`, lane-primary) + path_follower (`cmd_topic:=/cmd_vel_path`, `apply_gyro_damping:=false`, `no_lane_legs:=[8,10,10,1]`).
+
+**4. Scripted Stanley is now the DEFAULT first trip** — `nav_to_hub` ([`hub_handoff.sh`](Development/ros2/scripts/hub_handoff.sh)) launches the arbiter Stanley stack for the automatic `-1 → HUB (node 10)` trip after carto/AMCL: Stanley lane-follows on open road, is gated off on 8→10 / 10→1, and the arbiter goes PATH-ONLY at node 10 so the arrival-align seats the car. Set `STANLEY=0` for a bare PP-only first trip.
+
+**Caveats:** (a) starting AT node 10 with legs `[…,10,1]` means Stanley is OFF until you pass node 1 — by design; to see Stanley alone, `ros2 param set /path_follower no_lane_legs "[-1]"`. (b) a leg `(a,b)` stays gated until `b` is reached, so only configure legs the route actually completes. (c) arrival-align at node 10 publishes via `/cmd_vel_path`; with the gate closed there the arbiter is PATH-ONLY so it passes through. **Still TODO: the temp node -2 HUB re-pose** (arrival mirror of the -1 node) — not built yet.
+
+### 2026-05-28 EDT — Automatic first-trip-to-HUB + LED sequence in carto_to_amcl.sh / amcl_load.sh.
+
+**User prompt (verbatim):** "ok now, from the script of that it has to do that automatically basically … During script cartographer or well the recording of cartographer until amcl, until works anything and all of it. when it starts use ros param set /qcar2_hardware led_color_id 4 #cyan whenever it finishes and start about the node -1, is green, it starts and goes and goes will be green until goes to taxi hub that its color magenta, so before starting RIDES behavior we set up that, and that automatically does all of this with the script told you, and same with amc_load.sh the script was talking is carto_to_amcl.sh too, you got it? ohh if I use amc_load.sh use the actual pose, that it sees first scan and seed it, just that."
+
+**Answer / what changed:** Both AMCL-bring-up scripts now drive the full startup automatically through the LED sequence, ending parked + seated at the HUB ready for rides.
+
+New shared helper [`hub_handoff.sh`](Development/ros2/scripts/hub_handoff.sh) (sourced by both): `set_led <id>` (via `ros2 param set /qcar2_hardware led_color_id`) and `nav_to_hub` (launches path_follower PP-only, arms temp-start `[-1, HUB]`, waits for `/path_status==true` — which only goes True after the arrival-align seats the car — then MAGENTA).
+
+LED sequence (IDs from `qcar2_hardware.cpp`: CYAN=4, GREEN=1, MAGENTA=5):
+- **CYAN** — set once hardware is up, held through mapping → return-to-origin → save → AMCL seed (carto) or AMCL bring-up + seed (load).
+- **GREEN** — `nav_to_hub` start: drive temp-start `[-1, HUB]` from the seeded pose.
+- **MAGENTA** — arrival-align seated on the HUB node → parked, ready for RIDES.
+
+- [`carto_to_amcl.sh`](Development/ros2/scripts/carto_to_amcl.sh): CYAN after `/map`; replaced the optional `NAV_DEST` handoff with an automatic `nav_to_hub`. HUB node overridable via 2nd arg (`./carto_to_amcl.sh virtual 10`).
+- [`amcl_load.sh`](Development/ros2/scripts/amcl_load.sh): seeds the saved pose as AMCL's initial guess = the **actual** parked pose, refined by the first scan; the temp-start `-1` node then reads the live AMCL-corrected `/qcar2_pose_fused`, so nav starts from the true first-scan pose ("just that"). Same CYAN→GREEN→MAGENTA + `nav_to_hub`. HUB node overridable via 3rd arg.
+- Both cleanup traps now also kill the path_follower process group. `nav_to_hub` is launched PP-only (`cmd_topic:=/cmd_vel_nav`) so the 3-point-turn seat is clean — do NOT also run the full stack alongside these scripts.
+
+### 2026-05-28 EDT — Seed the TRUE pose (no snap) + arrival-align to seat exactly on the final node.
+
+**User prompts (verbatim):**
+- "what did you change, that now AMCL think its a perfect 0,0,0 here when its not, its supposed the value of new node -1, depending on the last saved pose. heritaging charactheristics of node 0. ??"
+- "ok you dont understand it fully return_to_origin is to approach and align ourselves correctly so we start and we are prepared TO RECEIVE HERITAGE Of node 0, AMCL STARTS with the last pose, seeded so now with our origin, our origin was saved on cartographer but AMCL starts with the seeded pose, then makes the creation of our new node -1, because asking a computer to align with node 0 at this point, is time expensive, so we create a new node -1, IT KNOWS THAT IS NEAR NODE 0, but its not on node 0, so calculate exact pose with rotaiton, heritage node 0 charactheristics for A* and connect to follow the road until node 10, when it does that behavior good. you understood?"
+- "second ok we fix that AMCL script part good, second part is the first trip to taxi hub, this STILL Is nto RIDE behavior. when getting to the first trip to taxi, hub same thing needs to go to node 10, and when near and saying we are on node, 10 same trick align, align until it says is on node 10 correctly got it? timer 20 seconds. when it on there."
+
+**Clarified design:** `return_to_origin` is NOT about fabricating a perfect (0,0,0) seed — it *approaches and aligns* the car near node 0 so it's prepared to inherit node 0. AMCL then seeds the **true** captured pose (near node 0, exact rotation). path_follower's `-1` temp-start node uses that exact pose because exact-aligning to node 0 is expensive; the `-1` node knows it's *near* node 0, inherits node 0's connectivity for A*, and follows the road to node 10.
+
+**Answer / what changed (two parts):**
+
+**Part 1 — AMCL seeds the true pose, no snap** ([`carto_to_amcl.sh`](Development/ros2/scripts/carto_to_amcl.sh)). Removed the dead-on `(0,0,0)` snap. The seed is now ALWAYS the true captured `map→base_link` pose. Snapping threw away the exact heading the `-1` node needs (it would have thought it was *exactly* on node 0). The `(0.0, 0.0)` you saw came from this old snap + `return_to_origin` parking at the boot pose — note **map (0,0,0) ≠ roadmap node 0** (related by the 83° offset); the map origin is just where Cartographer booted.
+
+**Part 2 — arrival-align: seat exactly on the final node** (new [`pose_aligner.py`](Development/ros2/src/qcar2_autonomy/autonomy/pose_aligner.py) + [`nav_to_pose.py`](Development/ros2/src/qcar2_autonomy/autonomy/nav_to_pose.py)). The "first trip to taxi HUB" = drive `[-1, 10]` then **seat precisely on node 10** with the same forward/backward 3-point-turn `return_to_origin` uses, 20 s timer — establishing the parked-at-HUB state.
+- Extracted the maneuver into a reusable `PoseAligner` class (APPROACH pose-regulation + ALIGN 3-point-turn), shared logic with `return_to_origin`.
+- path_follower: when pure pursuit reaches the final-node region, instead of stopping "close enough" it hands off to `PoseAligner` targeting the final node's exact map pose `(x, y, yaw)` (computed via the same offset anchor as `path_publisher`). Runs until seated (`pos_tol` 0.06 m, `yaw_tol` ~2.6°) or `arrival_align_timeout` (20 s), then hard-stops + `path_complete=True`.
+- New params: `arrival_align` (True), `arrival_align_timeout` (20.0), `arrival_align_pos_tol` (0.06), `arrival_align_yaw_tol` (0.045). Final-node target stored on every path build (temp-start, startup, and `node_values` set).
+- ⚠ The align publishes to path_follower's `cmd_topic`. For a precise seat run **PP-only** (`cmd_topic:=/cmd_vel_nav`); under the full stack the blender would dilute the maneuver. Reverse is published un-clamped (the 3-point turn needs it).
+
+### 2026-05-28 EDT — Temp-start node: navigate from the TRUE AMCL-seeded pose (no fabricated 0,0,0).
+
+**User prompt (verbatim):** "no, ok so we dont create the perfect seed how it's now, is near but nto eprfect its ok, BUT SO I need this seed, pose that it knows correctly start the sequence so of navigation, the normal sequence usually asks for parameter on trip-planner or idk the another one we ahve to ride, and Initial node, and the ending node, and A\* does the connections. we are gonna create a temporal initial node, so that we have so that it have same properties of the near node 0, because after AMCL starts, know where it last ended, not just put to 0,0,0 if not where it actually ended, so it does from that coordinate a node, and connect that node to the next node, so the startup is from node start of AMCL to node 10. got it? you get the full idea so." … then: "WAIT, we are working with what is supposed to be carto_to_amcl.sh all our thing right now. then feed pose, and start our part."
+
+**Answer / what changed:** Stop trying to seed a perfect (0,0,0). AMCL seeds the **true ended pose** (near node 0); navigation then starts from *that real pose*, not a snapped origin. Implemented a **temp-start node** in [`nav_to_pose.py`](Development/ros2/src/qcar2_autonomy/autonomy/nav_to_pose.py) and a **nav handoff** in [`carto_to_amcl.sh`](Development/ros2/scripts/carto_to_amcl.sh).
+
+**Mechanism (path_follower):** new sentinel — `node_values` whose **first element is `-1`** means "start from the current pose". On that signal [`_build_path_from_current_pose`](Development/ros2/src/qcar2_autonomy/autonomy/nav_to_pose.py):
+1. reads the live EKF/AMCL pose from `/qcar2_pose_fused` (via `_read_pose_for_planner`; refuses to build until a real fused pose exists — never the (0,0) warm-up fallback);
+2. inverts the existing map↔roadmap transform (`p_ql = (p_ros @ R(−a)ᵀ) − t`, `θ_ql = wrap(θ_ros − a)`, using `rotation_offset`/`translation_offset` as the fixed anchor — same convention as `path_publisher`/`trip_planner._node_theta_ros`);
+3. `roadmap.add_node([x_ql, y_ql, θ_ql])` — a temporary START node at the TRUE pose+heading;
+4. gives it the **same outgoing connectivity as `temp_start_anchor_node`** (default 0) via `add_edge(temp, target, temp_start_edge_radius=0.622)`, plus guarantees an edge to the explicit first destination;
+5. `generate_path([temp, dest…])` — A\* draws a fresh SCSPath from the real pose to node `dest`. The path is baked into **map frame** and flagged `_wp_in_ros_frame=True`, so the driver does NOT re-run `auto_align_roadmap_to_current_pose`.
+
+**Why this beats auto-align:** auto-align pins node-0→car AND rotates the **whole roadmap** to match the car's heading. A slightly-off seed heading rotates every downstream node (8, 10, …) about the car → the node-8 mislocalization drift. Temp-start keeps the roadmap fixed; only the short connector edge absorbs the start offset. New params: `temp_start_anchor_node` (0), `temp_start_edge_radius` (0.622 = innerLaneRadius). Build is deferred to the first `path_planner` tick if no pose yet (handles launch-time param + runtime `param set`). `/cmd_waypoints` and explicit (non-`-1`) `node_values` keep their old behavior (auto-align preserved).
+
+**Nav handoff (`carto_to_amcl.sh`):** optional destination node args after the mode. After AMCL is seeded and `/qcar2_pose_fused` is flowing, the script sets the temp-start route on a running `path_follower` (or prints the command if it isn't up yet):
+```bash
+./carto_to_amcl.sh virtual 10        # map → return-to-origin → AMCL seed → nav to node 10
+./carto_to_amcl.sh physical 10 22 0  # route 10 → 22 → 0
+# equivalently, by hand once the autonomy stack is up:
+ros2 param set /path_follower node_values "[-1, 10]"
+```
+
+The pose is "fed" through `/qcar2_pose_fused` (ekf_fusor in the AMCL launch, `correction_source=amcl_pose`); the `-1` sentinel is what "starts our part" from that pose.
+
 ### 2026-05-28 EDT — Return-to-origin before AMCL freeze + lane-primary node-gating in the arbiter.
 
 **User prompt (verbatim):** "those scripts have to keep recording what cartographer sees, and when I prompt to stop, it has to go to 0,0 can be fast, and then make it basically slow, when getting near to the 0,0 and start running amcl with the good seed" … "Then: flip the arbiter to lane-primary + node-gate. Add /nav/lane_gate, mark junction_nodes, dispatcher publishes the gate."

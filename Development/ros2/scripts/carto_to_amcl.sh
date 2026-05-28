@@ -16,8 +16,21 @@
 #      pose. AMCL stays running in the foreground.
 #
 # Usage (inside the Isaac ROS dev container):
-#   ./carto_to_amcl.sh           # default: virtual / QLabs
-#   ./carto_to_amcl.sh physical  # use physical-robot launch files
+#   ./carto_to_amcl.sh                # default: virtual / QLabs, HUB=node 10
+#   ./carto_to_amcl.sh physical       # use physical-robot launch files
+#   ./carto_to_amcl.sh virtual 10     # override the HUB node (default 10)
+#
+# Fully automatic after you finish the manual mapping drive:
+#   1. LED CYAN while mapping → return-to-origin → save map → AMCL seed
+#      (seeds the TRUE captured pose, never a fabricated 0,0,0).
+#   2. LED GREEN: launches the STANLEY lane stack (arbiter) and drives the
+#      temp-start route [-1, HUB] — the leading -1 reads the live AMCL-seeded
+#      /qcar2_pose_fused, drops a temp node at that exact pose (inheriting
+#      node 0's connectivity), and A* draws a fresh path to the HUB node.
+#      Stanley lane-follows on open road; it's gated OFF on the no-lane legs
+#      8→10 and 10→1 (curve crossings). Set STANLEY=0 for a bare PP-only trip.
+#   3. Arrival-align seats the car exactly on the HUB node, then LED MAGENTA
+#      (parked, ready for RIDES behavior).
 #
 # Side effects:
 #   - Writes ~/qcar2_maps/competition_map.{pgm,yaml}
@@ -30,8 +43,13 @@
 set -e
 
 MODE="${1:-virtual}"
+# Optional 2nd arg overrides the HUB node (default 10) for the auto first-trip.
+export HUB_NODE="${2:-10}"
 MAP_DIR="${HOME}/qcar2_maps"
 MAP_NAME="competition_map"
+
+# Shared LED + first-trip-to-HUB helper (set_led, nav_to_hub).
+source "$(dirname "$0")/hub_handoff.sh"
 
 case "$MODE" in
   virtual)
@@ -107,6 +125,10 @@ while ! ros2 topic info /map >/dev/null 2>&1; do
     exit 1
   fi
 done
+
+# Hardware is up now that /map is publishing → LED CYAN for the whole
+# mapping + return-to-origin + AMCL-seeding phase.
+set_led "$LED_CYAN"
 
 echo ""
 echo "[1.5/6] Capturing INITIAL pose (where carto started)..."
@@ -215,22 +237,17 @@ fi
 echo "      pose:  x=$X  y=$Y  qz=$QZ  qw=$QW"
 echo "      saved to /tmp/final_pose.txt"
 
-# 2026-05-28: THE PERFECT SEED IS THE CAR'S TRUE CARTOGRAPHER POSE.
-# It's in the saved-map frame and accurate (we returned slowly near the
-# well-mapped origin). We seed exactly that. We ONLY clean it to (0,0,0) when
-# the car is essentially dead-on (≤2 cm / ≤1.1°) — at which point snapping is
-# a negligible <2 cm correction, not a fabrication. Anything looser → seed the
-# REAL pose so we never lie to AMCL about where the car is.
+# 2026-05-28: SEED THE TRUE CAPTURED POSE — never snap to (0,0,0).
+# return_to_origin parks the car NEAR node 0 and aligns it, but the seed must
+# keep the EXACT pose+rotation it actually has. path_follower's temp-start (-1)
+# node depends on this: it reads /qcar2_pose_fused, drops a node at this exact
+# pose, inherits node 0's connectivity, and lets A* connect to the road. If we
+# snapped to (0,0,0) we'd lie about the heading and defeat the -1 node's whole
+# purpose (it would think it's exactly on node 0). So: seed truth, always.
 SEED_YAW=$(python3 -c "import math;print(2.0*math.atan2($QZ,$QW))" 2>/dev/null || echo 0.0)
-DEAD_ON=$(python3 -c "print(1 if abs($X)<0.02 and abs($Y)<0.02 and abs($SEED_YAW)<0.02 else 0)" 2>/dev/null || echo 0)
-if [[ "$DEAD_ON" == "1" ]]; then
-  echo "      → dead-on origin (≤2 cm, ≤1.1°). Cleaning seed to EXACT (0,0,0)."
-  X="0.0"; Y="0.0"; QZ="0.0"; QW="1.0"
-else
-  echo "      → seeding the TRUE captured pose (x=$X y=$Y yaw=$SEED_YAW rad)."
-  echo "        This is the accurate map-frame pose — perfect seed even if not"
-  echo "        exactly (0,0,0). AMCL scan-matches the residual cm away in ~1 s."
-fi
+echo "      → seeding the TRUE captured pose (x=$X y=$Y yaw=$SEED_YAW rad)."
+echo "        Near node 0 but NOT snapped — the -1 temp-start node needs the"
+echo "        exact pose+rotation to inherit node 0 and plan to node 10."
 
 # Persist BOTH the initial (carto-start) and final (carto-end) poses
 # next to the saved map. The companion script `amcl_load.sh` reads this
@@ -274,7 +291,9 @@ AMCL_PGID=$AMCL_PID
 # sure the AMCL tree dies with us. Otherwise leftover processes break the next
 # run.
 trap 'echo ""; echo "Cleaning up..."; \
+      [[ -n "$PF_PGID" ]] && { kill -INT -"$PF_PGID" 2>/dev/null || true; }; \
       kill -INT -"$AMCL_PGID" 2>/dev/null || true; sleep 2; \
+      [[ -n "$PF_PGID" ]] && { kill -KILL -"$PF_PGID" 2>/dev/null || true; }; \
       kill -KILL -"$AMCL_PGID" 2>/dev/null || true; \
       exit' INT TERM EXIT
 
@@ -327,6 +346,19 @@ ros2 topic pub -r 2 --times 6 /initialpose geometry_msgs/PoseWithCovarianceStamp
                  0, 0, 0, 0, 0, 0.07]
   }
 }" >/dev/null 2>&1
+
+# ── Automatic first trip to HUB (LED GREEN → drive [-1, HUB] → align → MAGENTA).
+# The pose is already fed to AMCL; ekf_fusor (correction_source=amcl_pose)
+# turns it into /qcar2_pose_fused. nav_to_hub launches path_follower PP-only,
+# drives the temp-start route to the HUB node, and seats the car on it.
+echo ""
+if [[ "${NAV_TO_HUB:-1}" == "1" ]]; then
+  nav_to_hub || echo "[hub] WARN: first-trip-to-HUB did not complete; AMCL stays up."
+else
+  set_led "$LED_GREEN"
+  echo "[hub] NAV_TO_HUB=0 — skipping auto path_follower. Bring up your own stack"
+  echo "      (e.g. lane+Stanley) and set node_values \"[-1, $HUB_NODE]\" yourself."
+fi
 
 echo ""
 echo "=================================================================="

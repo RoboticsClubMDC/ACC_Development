@@ -60,6 +60,8 @@ import scipy.signal as signal
 from scipy.spatial.transform import Rotation as R
 from pal.utilities.scope import MultiScope
 
+from autonomy.pose_aligner import PoseAligner
+
 
 # ─── Keystroke helpers folded in from manual_drive.py ─────────────────────
 # Used by the path_follower's "manual" control mode so the same node owns
@@ -206,6 +208,48 @@ class PathFollower(Node):
         # -1 default keeps ROS inferring INTEGER_ARRAY (empty [] → BYTE_ARRAY).
         self.declare_parameter('junction_nodes', [-1])
         self.declare_parameter('lane_gate_radius', 0.5)   # m
+        # 2026-05-28: FULL-LEG lane gating. no_lane_legs is a FLAT int array of
+        # (from,to) node-id pairs: [8,10, 10,1] = legs 8→10 and 10→1. Stanley
+        # is disabled (gate CLOSED) for the WHOLE leg: once the car comes within
+        # leg_node_radius of `from`, the gate stays closed until it reaches
+        # `to`. For HUB approach/exit curves we're allowed to cross but where
+        # the lane reading is misleading. Default [-1] = none. The per-route set
+        # of reached nodes resets on every new path build.
+        self.declare_parameter('no_lane_legs', [-1])
+        self.declare_parameter('leg_node_radius', 0.40)   # m
+        self._reached_nodes = set()
+        # 2026-05-28: TEMP-START NODE. AMCL never seeds a perfect (0,0,0); it
+        # seeds the TRUE pose the car ended at (near node 0). Instead of forcing
+        # the roadmap onto a fabricated node-0 placement (auto-align rotates the
+        # WHOLE roadmap to chase a slightly-off heading → node-8-style drift),
+        # we inject a temporary START node at the real pose, give it the SAME
+        # outgoing connectivity as `temp_start_anchor_node` (default 0), and let
+        # A* draw a fresh SCSPath from the true pose+heading to the first
+        # destination. Trigger: node_values whose FIRST element is -1 (sentinel)
+        # → route = [current_pose] + node_values[1:].
+        self.declare_parameter('temp_start_anchor_node', 0)
+        # innerLaneRadius (305.5 * 0.002035 ≈ 0.622). Temp node sits ~cm from
+        # the anchor so the exact radius barely shapes the short connector.
+        self.declare_parameter('temp_start_edge_radius', 0.622)
+        self._pending_temp_start = False
+        self._pending_temp_dest = []
+        # 2026-05-28: ARRIVAL ALIGN. On reaching the FINAL node, pure pursuit
+        # stops "close enough" but not seated on the node's exact pose. The HUB
+        # (and pickup/dropoff) need a precise seat — same forward/backward
+        # 3-point-turn trick return_to_origin uses, but targeting the final
+        # node's (x, y, yaw) in map frame. Runs up to arrival_align_timeout s,
+        # then stops wherever it got. Reuses PoseAligner.
+        self.declare_parameter('arrival_align', True)
+        self.declare_parameter('arrival_align_timeout', 20.0)
+        self.declare_parameter('arrival_align_pos_tol', 0.06)
+        self.declare_parameter('arrival_align_yaw_tol', 0.045)  # rad ~2.6°
+        self._aligner = PoseAligner(
+            pos_tol=float(self.get_parameter('arrival_align_pos_tol').value),
+            yaw_tol=float(self.get_parameter('arrival_align_yaw_tol').value))
+        self._final_align_pose = None   # (x, y, yaw) map frame, set at build
+        self._align_active = False
+        self._align_done = False
+        self._align_t0 = None
         # 2026-05-27: cos^N(steering) speed reduction. Default 0.0 → DISABLED
         # (matches Gabriel — constant speed through curves). Set to 2.0 to
         # re-enable cos² speed cut for more conservative cornering.
@@ -336,8 +380,24 @@ class PathFollower(Node):
             n = _mirror_node_8_edges(_roadmap_init, _lht, _usm)
             self.get_logger().warn(
                 f'MIRROR_NODE_8: flipped {n} edges touching node 8.')
-        _init_wp = _roadmap_init.generate_path(self.waypoints)
-        if _init_wp is None:
+        # Temp-start sentinel: node_values[0] == -1 means "start from the
+        # current (AMCL-seeded) pose". Pose/TF aren't ready at __init__, so we
+        # defer the build to the first path_planner tick that finds a pose.
+        if self.waypoints and int(self.waypoints[0]) == -1:
+            self._pending_temp_start = True
+            self._pending_temp_dest = [int(n) for n in self.waypoints[1:]]
+            self.wp = np.zeros((2, 1))
+            self.get_logger().info(
+                f'node_values[0]=-1 → TEMP-START pending, dest={self._pending_temp_dest} '
+                f'(waiting for pose).')
+            _init_wp = None
+        else:
+            _init_wp = _roadmap_init.generate_path(self.waypoints)
+        if not self._pending_temp_start and self.waypoints:
+            self._set_final_align_target(_roadmap_init, int(self.waypoints[-1]))
+        if self._pending_temp_start:
+            pass  # self.wp placeholder already set; built on first tick.
+        elif _init_wp is None:
             self.get_logger().error(
                 f'generate_path({self.waypoints}) returned None at startup '
                 f'(no legal A* path with current settings). Using empty path; '
@@ -346,7 +406,7 @@ class PathFollower(Node):
         else:
             self.wp = _init_wp * self.scale
         # Legacy path-level mirror (set mirror_path_x=true to enable).
-        if bool(self.get_parameter('mirror_path_x').value):
+        if bool(self.get_parameter('mirror_path_x').value) and not self._pending_temp_start:
             self.wp[0, :] = -self.wp[0, :]
             self.get_logger().warn(
                 f'mirror_path_x=True — X coords of {self.wp.shape[1]} '
@@ -458,6 +518,7 @@ class PathFollower(Node):
         self.wpi             = 0
         self.path_complete   = False
         self._wp_in_ros_frame = True
+        self._pending_temp_start = False   # an explicit path supersedes temp-start
         # Auto-switch to autonomous mode (BO/trip_planner/etc. sending a path
         # is an explicit driving intent). Stops the manual thread if it was up.
         self._switch_mode('autonomous')
@@ -510,6 +571,18 @@ class PathFollower(Node):
         for param in params:
             if param.name == 'node_values' and param.type_ == param.Type.INTEGER_ARRAY:
                 self.waypoints = list(param.value)
+                # Temp-start sentinel (2026-05-28): leading -1 → start from the
+                # current AMCL-seeded pose, route = [pose] + node_values[1:].
+                if self.waypoints and int(self.waypoints[0]) == -1:
+                    dest = [int(n) for n in self.waypoints[1:]]
+                    if not self._build_path_from_current_pose(dest):
+                        self._pending_temp_start = True
+                        self._pending_temp_dest = dest
+                        self.get_logger().info(
+                            'TEMP-START pending (no pose yet) — will build on tick.')
+                    self._switch_mode('autonomous')
+                    self.get_logger().info('nodes updated (temp-start) → autonomous mode')
+                    return SetParametersResult(successful=True)
                 _lht2 = bool(self.get_parameter('left_hand_traffic').value)
                 _usm2 = bool(self.get_parameter('use_small_map').value)
                 _roadmap2 = SDCSRoadMap(leftHandTraffic=_lht2, useSmallMap=_usm2)
@@ -530,6 +603,8 @@ class PathFollower(Node):
                         f'node_values or set mirror_node_8=false.')
                 else:
                     self.wp = _new_wp * 0.975
+                    if self.waypoints:
+                        self._set_final_align_target(_roadmap2, int(self.waypoints[-1]))
                 if bool(self.get_parameter('mirror_path_x').value):
                     self.wp[0, :] = -self.wp[0, :]
                 self.N = len(self.wp[0, :])
@@ -726,6 +801,119 @@ class PathFollower(Node):
             return False
     #----------------End of auto_align_roadmap_to_current_pose----------------N2
 
+    def _node_map_pose(self, roadmap, node_id):
+        """Map-frame (x, y, yaw) of a roadmap node, using the current offsets
+        (same forward transform as path_publisher / trip_planner)."""
+        a = float(self.rotation_offset[0]) * np.pi / 180.0
+        t = np.array([self.translation_offset[0], self.translation_offset[1]])
+        R_neg = np.array([[np.cos(-a), -np.sin(-a)],
+                          [np.sin(-a),  np.cos(-a)]])
+        pose = np.array(roadmap.nodes[int(node_id)].pose).reshape(-1)
+        p_map = (np.array([pose[0], pose[1]]) + t) @ R_neg
+        yaw_map = wrap_to_pi(float(pose[2]) + a)
+        return float(p_map[0]), float(p_map[1]), float(yaw_map)
+
+    def _set_final_align_target(self, roadmap, final_node_id):
+        """Remember the final node's map pose so arrival-align can seat on it."""
+        try:
+            self._final_align_pose = self._node_map_pose(roadmap, final_node_id)
+        except Exception as e:
+            self._final_align_pose = None
+            self.get_logger().warn(f'arrival-align: could not resolve node '
+                                   f'{final_node_id} pose: {e}')
+        self._align_active = False
+        self._align_done = False
+        self._align_t0 = None
+        self._aligner.reset()
+        self._reached_nodes = set()   # fresh leg-gating per route
+
+    def _node_map_pose_safe(self, node_id):
+        """(x, y) map-frame of a roadmap node via the persistent gate roadmap,
+        or None if it can't be resolved."""
+        try:
+            x, y, _ = self._node_map_pose(self._gate_roadmap, int(node_id))
+            return (x, y)
+        except Exception:
+            return None
+
+    def _build_path_from_current_pose(self, dest_nodes):
+        """Temp-start node (2026-05-28). AMCL seeds the TRUE ended pose (near
+        node 0), not a fabricated (0,0,0). Inject a temporary START node at that
+        real pose, give it the SAME outgoing connectivity as
+        `temp_start_anchor_node` (default 0), and let A* draw a fresh SCSPath
+        from the true pose+heading to the first destination. Unlike auto-align
+        (which rotates the WHOLE roadmap to chase a slightly-off heading and so
+        re-creates the node-8 drift), the roadmap stays fixed and only the short
+        connector absorbs the start offset.
+
+        Returns True if the path was built (pose available), else False.
+        """
+        p, th = self._read_pose_for_planner()
+        # Need a real pose, not the (0,0) pre-data fallback.
+        if p is None or self.fused_pose_x is None:
+            return False
+
+        a = float(self.rotation_offset[0]) * np.pi / 180.0
+        t = np.array([self.translation_offset[0], self.translation_offset[1]])
+        # Forward map transform is p_ros = (p_ql + t) @ R(-a); invert it.
+        R_neg = np.array([[np.cos(-a), -np.sin(-a)],
+                          [np.sin(-a),  np.cos(-a)]])
+        p_ros = np.array([float(p[0]), float(p[1])])
+        p_ql = (p_ros @ R_neg.T) - t          # map → roadmap (QLabs) frame
+        th_ql = wrap_to_pi(float(th) - a)     # heading: θ_ros = θ_ql + a
+
+        _lht = bool(self.get_parameter('left_hand_traffic').value)
+        _usm = bool(self.get_parameter('use_small_map').value)
+        roadmap = SDCSRoadMap(leftHandTraffic=_lht, useSmallMap=_usm)
+        if bool(self.get_parameter('mirror_node_8').value):
+            _mirror_node_8_edges(roadmap, _lht, _usm)
+
+        anchor = int(self.get_parameter('temp_start_anchor_node').value)
+        radius = float(self.get_parameter('temp_start_edge_radius').value)
+        roadmap.add_node([float(p_ql[0]), float(p_ql[1]), float(th_ql)])
+        temp_idx = len(roadmap.nodes) - 1
+
+        # Inherit the anchor node's outgoing connectivity ("same properties of
+        # near node 0"), plus guarantee an edge to the explicit first dest.
+        target_nodes = [e.toNode for e in roadmap.nodes[anchor].outEdges]
+        for tn in target_nodes:
+            roadmap.add_edge(temp_idx, tn, radius)
+        if dest_nodes:
+            first = roadmap.nodes[int(dest_nodes[0])]
+            if first not in target_nodes:
+                roadmap.add_edge(temp_idx, int(dest_nodes[0]), radius)
+
+        seq = [temp_idx] + [int(n) for n in dest_nodes]
+        if len(seq) < 2:
+            self.get_logger().error(
+                f'TEMP-START needs at least one destination node; got dest={dest_nodes}.')
+            return False
+        wp = roadmap.generate_path(seq)
+        if wp is None:
+            self.get_logger().error(
+                f'TEMP-START generate_path({seq}) returned None — no A* path '
+                f'from current pose to {dest_nodes}.')
+            return False
+
+        wp = wp * self.scale                          # roadmap frame, 2xN
+        wp_map = ((wp.T + t) @ R_neg).T               # bake into map frame, 2xN
+        self.wp = wp_map
+        self.N = self.wp.shape[1]
+        self.wpi = 0
+        self.previous_steering_value = 0
+        self.path_complete = False
+        self._wp_in_ros_frame = True       # already in map frame; skip offset
+        self.auto_aligned = True           # do NOT re-align (heading is baked)
+        self.auto_align_start = False
+        self._pending_temp_start = False
+        self._gate_roadmap = roadmap
+        self._set_final_align_target(roadmap, int(dest_nodes[-1]))
+        self.get_logger().info(
+            f'TEMP-START built: pose=({p_ros[0]:.3f},{p_ros[1]:.3f},'
+            f'{np.degrees(th):.1f}°) → roadmap=({p_ql[0]:.3f},{p_ql[1]:.3f},'
+            f'{np.degrees(th_ql):.1f}°) seq={seq} N={self.N}.')
+        return True
+
     def path_publisher(self):
         # 2026-05-27 BUG FIX: was publishing only `range(self.wpi)` — i.e.,
         # ONLY waypoints the car had already passed (a breadcrumb trail).
@@ -765,6 +953,13 @@ class PathFollower(Node):
         # ekf_filter_timer() removed: prediction is now done by the external
         # ekf_fusor node; this node only consumes the fused pose.
 
+        # Temp-start: build the route from the current AMCL-seeded pose once a
+        # real pose is available (deferred from __init__/param-set).
+        if self._pending_temp_start:
+            if not self._build_path_from_current_pose(self._pending_temp_dest):
+                return
+            self.get_logger().info('TEMP-START path now active.')
+
         #----CHANGE N3--------------
         if self.auto_align_start and not self.auto_aligned:
             self.auto_aligned = self.auto_align_roadmap_to_current_pose()
@@ -772,6 +967,14 @@ class PathFollower(Node):
                 return
 
         #--END OF CHANGE N3---------------------
+
+        # ARRIVAL ALIGN: once PP reaches the final-node region we seat the car
+        # on the node's exact pose with the 3-point-turn maneuver. Owns the bus
+        # directly here (reverse allowed) until seated or timeout.
+        if self._align_active and self.control_mode == 'autonomous':
+            self._arrival_align_tick()
+            self.path_status()
+            return
 
         if round(self.t_plot) % 2 == 0:
             self.path_publisher()
@@ -904,7 +1107,17 @@ class PathFollower(Node):
                     pp_delta             = 0.0
                     self.current_steering = 0.0
                     self.wp_prior        = self.wp
-                    self.path_complete   = True
+                    # Hand off to arrival-align (seat on the node's exact pose)
+                    # instead of stopping "close enough", when enabled.
+                    if (bool(self.get_parameter('arrival_align').value)
+                            and self._final_align_pose is not None
+                            and not self._align_done):
+                        if not self._align_active:
+                            self.get_logger().info(
+                                'Reached final-node region → ARRIVAL-ALIGN.')
+                        self._align_active = True
+                    else:
+                        self.path_complete = True
 
                 # Live-tunable Kp/Kd (parameters, see __init__). Defaults
                 # Kp=1.0, Kd=0.3. Adjust from Foxglove Parameters panel or:
@@ -991,6 +1204,52 @@ class PathFollower(Node):
             speed_command * speed_factor, 0.0, 0.7)
         QCarCommands.angular.z = enable * self.current_steering
         self.publisher.publish(QCarCommands)
+
+    def _arrival_align_tick(self):
+        """Run the PoseAligner toward the final node's pose. Publishes its own
+        Twist (reverse allowed) so the 3-point turn can seat the car. Ends on
+        seated OR timeout. Note: publishes to the configured cmd_topic — for a
+        precise seat, run path_follower PP-only (cmd_topic:=/cmd_vel_nav)."""
+        if self._final_align_pose is None:
+            self._finish_align()
+            return
+        now = time.time()
+        if self._align_t0 is None:
+            self._align_t0 = now
+            self._aligner.reset()
+            tx, ty, tyaw = self._final_align_pose
+            self.get_logger().info(
+                f'ARRIVAL-ALIGN start → target=({tx:.3f},{ty:.3f},'
+                f'{np.degrees(tyaw):.1f}°) timeout='
+                f'{float(self.get_parameter("arrival_align_timeout").value)}s')
+        timeout = float(self.get_parameter('arrival_align_timeout').value)
+        p, yaw = self._read_pose_for_planner()
+        tx, ty, tyaw = self._final_align_pose
+        if now - self._align_t0 > timeout:
+            rho = float(np.hypot(p[0] - tx, p[1] - ty))
+            self.get_logger().warn(
+                f'ARRIVAL-ALIGN timeout ({timeout}s) — stopping. '
+                f'residual pos={rho:.3f} m.')
+            self._finish_align()
+            return
+        v, steer, done = self._aligner.tick(p[0], p[1], yaw, tx, ty, tyaw, now)
+        if done:
+            self.get_logger().info(
+                f'ARRIVAL-ALIGN seated on node pose (pos within tol).')
+            self._finish_align()
+            return
+        self.current_steering = float(steer)
+        cmd = Twist()
+        cmd.linear.x = float(v)        # reverse (negative) allowed — no clamp
+        cmd.angular.z = float(steer)
+        self.publisher.publish(cmd)
+
+    def _finish_align(self):
+        self._align_active = False
+        self._align_done = True
+        self.path_complete = True
+        self.current_steering = 0.0
+        self.publisher.publish(Twist())   # hard stop
 
     def path_status(self):
         msg = Bool()
@@ -1248,39 +1507,52 @@ class PathFollower(Node):
             return [0.0, 0.0], 0.0
 
     def _lane_gate_tick(self):
-        """Publish /nav/lane_gate: True (open, lane-primary) unless the car is
-        within lane_gate_radius of a junction node, where it CLOSES (False) so
-        motion_arbiter goes PATH-ONLY for the turn.
+        """Publish /nav/lane_gate: True (open, lane-primary) unless Stanley
+        should be OFF, where it CLOSES (False) so motion_arbiter goes PATH-ONLY.
 
-        Junction node positions come from the persistent roadmap, transformed
-        QLabs→map with the SAME rotation/translation offsets path_publisher
-        uses for waypoints (self.scale==1.0, so node poses share waypoint units).
+        Two gating mechanisms (OR'd):
+          - junction_nodes (radius): gate closes within lane_gate_radius of a
+            listed node (point gate, for tight turns).
+          - no_lane_legs (full leg): flat (from,to) pairs. Once the car comes
+            within leg_node_radius of `from`, the gate stays closed until it
+            reaches `to` — Stanley off for the WHOLE leg (e.g. 8→10, 10→1).
+
+        Node positions come from the persistent roadmap, transformed QLabs→map
+        with the same offsets path_publisher uses (self.scale==1.0).
         """
         junctions = [int(n) for n in self.get_parameter('junction_nodes').value
                      if int(n) >= 0]
+        legs_flat = [int(n) for n in self.get_parameter('no_lane_legs').value
+                     if int(n) >= 0]
+        legs = [(legs_flat[i], legs_flat[i + 1])
+                for i in range(0, len(legs_flat) - 1, 2)]
+
         gate_open = True
-        if junctions:
-            try:
-                p, _ = self._read_pose_for_planner()
-            except Exception:
-                p = None
-            if p is not None:
-                a = self.rotation_offset[0]
-                R_QL = np.array([
-                    [np.cos(-a * np.pi / 180.0), -np.sin(-a * np.pi / 180.0)],
-                    [np.sin(-a * np.pi / 180.0),  np.cos(-a * np.pi / 180.0)],
-                ])
-                t = np.array([self.translation_offset[0], self.translation_offset[1]])
-                radius = float(self.get_parameter('lane_gate_radius').value)
-                for nid in junctions:
-                    try:
-                        npose = np.array(self._gate_roadmap.nodes[nid].pose).reshape(-1)
-                    except Exception:
-                        continue
-                    n_map = (np.array([npose[0], npose[1]]) + t) @ R_QL
-                    if np.hypot(p[0] - n_map[0], p[1] - n_map[1]) < radius:
-                        gate_open = False
-                        break
+        try:
+            p, _ = self._read_pose_for_planner()
+        except Exception:
+            p = None
+
+        if p is not None and (junctions or legs):
+            # Point gate (junction radius).
+            radius = float(self.get_parameter('lane_gate_radius').value)
+            for nid in junctions:
+                n_map = self._node_map_pose_safe(nid)
+                if n_map and np.hypot(p[0] - n_map[0], p[1] - n_map[1]) < radius:
+                    gate_open = False
+
+            # Full-leg gate: mark nodes reached, close while on an active leg.
+            if legs:
+                leg_r = float(self.get_parameter('leg_node_radius').value)
+                leg_nodes = {a for a, _ in legs} | {b for _, b in legs}
+                for nid in leg_nodes:
+                    n_map = self._node_map_pose_safe(nid)
+                    if n_map and np.hypot(p[0] - n_map[0], p[1] - n_map[1]) < leg_r:
+                        self._reached_nodes.add(nid)
+                for (a, b) in legs:
+                    if a in self._reached_nodes and b not in self._reached_nodes:
+                        gate_open = False   # on a no-lane leg → Stanley off
+
         m = Bool()
         m.data = bool(gate_open)
         self.pub_lane_gate.publish(m)
