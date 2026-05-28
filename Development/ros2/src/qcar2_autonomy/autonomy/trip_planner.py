@@ -94,6 +94,8 @@ class TripPlanner(Node):
         self._last_led     = None
         self.active_trip_nodes = []
         self.active_goal_nodes = []
+        self.active_intermediates = []
+        self.active_dropoff_node = -1
         self.active_goal_index = 0
 
         self.waypoints_pub = self.create_publisher(Path, '/cmd_waypoints', 1)
@@ -111,7 +113,6 @@ class TripPlanner(Node):
         if not prev and self.path_status:
             if ((not self.startup_done and self._startup_path_sent) or
                     self.mission_stage in (MissionStage.TO_PICKUP,
-                                           MissionStage.TO_INTERMEDIATE,
                                            MissionStage.TO_DROPOFF,
                                            MissionStage.TO_HUB)):
                 self._path_completed_event = True
@@ -366,6 +367,48 @@ class TripPlanner(Node):
         self.get_logger().info(f'Path published -> {label} ({goal_xy[0]:.2f}, {goal_xy[1]:.2f})')
         return True
 
+    def _plan_through(self, route_nodes, goal_node):
+        """QLabs path from the car's current node, through each routing node in
+        order, ending exactly at goal_node. Segments are chained via the
+        roadmap's shortest path so routing nodes are passed, not stopped at."""
+        if self.robot_pose is None:
+            return None
+        rx, ry = float(self.robot_pose.pose.position.x), float(self.robot_pose.pose.position.y)
+        px_q, py_q = self._ros_to_qlabs(rx, ry)
+        start_node = self._closest_node(px_q, py_q)
+
+        seq = [start_node] + [int(n) for n in route_nodes] + [int(goal_node)]
+        seq = [n for i, n in enumerate(seq) if i == 0 or n != seq[i - 1]]
+
+        goal_col = np.array(self._get_node_xy(goal_node)).reshape(2, 1)
+        if len(seq) < 2:
+            cur_col = np.array([px_q, py_q]).reshape(2, 1)
+            if float(np.linalg.norm(cur_col - goal_col)) < 0.01:
+                return goal_col
+            return np.hstack([cur_col, goal_col])
+
+        segments = []
+        for a, b in zip(seq[:-1], seq[1:]):
+            if hasattr(self.roadmap, 'find_shortest_path'):
+                seg = self.roadmap.find_shortest_path(a, b)
+            else:
+                seg = self.roadmap.generate_path([a, b])
+            if seg is None or np.size(seg) == 0:
+                self.get_logger().error(f'No path from node {a} to {b}')
+                return None
+            segments.append(np.array(seg))
+        return np.hstack(segments + [goal_col])
+
+    def _send_path_through(self, route_nodes, goal_node, label=''):
+        wp = self._plan_through(route_nodes, goal_node)
+        if wp is None:
+            return False
+        self.waypoints_pub.publish(self._qlabs_path_to_ros(wp))
+        gx, gy = self._get_node_xy(goal_node)
+        via = f' via {list(route_nodes)}' if route_nodes else ''
+        self.get_logger().info(f'Path published -> {label}{via} ({gx:.2f}, {gy:.2f})')
+        return True
+
     def _snap_to_exact(self, goal_xy, label=''):
         if self.robot_pose is None:
             return self._send_path_to(goal_xy, label)
@@ -411,25 +454,19 @@ class TripPlanner(Node):
 
     def _active_goal_label(self, index=None):
         idx = self.active_goal_index if index is None else int(index)
-        trip_len = len(self.active_trip_nodes)
         if idx == 0:
             return 'PICKUP'
-        if idx < trip_len - 1:
-            return f'STOP {idx}'
-        if idx < trip_len:
-            return 'DROPOFF'
-        return 'HUB'
+        if idx == len(self.active_goal_nodes) - 1:
+            return 'HUB'
+        return 'DROPOFF'
 
     def _stage_for_goal_index(self, index):
         idx = int(index)
-        trip_len = len(self.active_trip_nodes)
         if idx == 0:
             return MissionStage.TO_PICKUP
-        if idx < trip_len - 1:
-            return MissionStage.TO_INTERMEDIATE
-        if idx < trip_len:
-            return MissionStage.TO_DROPOFF
-        return MissionStage.TO_HUB
+        if idx == len(self.active_goal_nodes) - 1:
+            return MissionStage.TO_HUB
+        return MissionStage.TO_DROPOFF
 
     def _set_drive_led_for_stage(self, stage):
         if stage == MissionStage.TO_PICKUP:
@@ -458,7 +495,10 @@ class TripPlanner(Node):
             self._handle_active_arrival(time.time())
             return True
 
-        ok = self._send_path_to(goal_xy, label=f'{label} node {goal_node}')
+        # The leg that ends at the dropoff node routes through any middle nodes
+        # (passes them, no stop); all other legs go straight to their stop.
+        route = self.active_intermediates if goal_node == self.active_dropoff_node else []
+        ok = self._send_path_through(route, goal_node, label=f'{label} node {goal_node}')
         if ok:
             self._set_drive_led_for_stage(stage)
         return ok
@@ -483,19 +523,13 @@ class TripPlanner(Node):
 
         self._snap_to_exact(goal_xy, label=f'{label}-snap')
 
-        if self.active_goal_index == 0:
+        if self.mission_stage == MissionStage.TO_PICKUP:
             self.mission_stage = MissionStage.WAIT_AT_PICKUP
             self.picked_up = True
             self._set_led(self.LED_BLUE)
             self.pause_until = now + self.stop_seconds
             self.get_logger().info(
                 f'Arrived at PICKUP node {goal_node}. Waiting {self.stop_seconds:.1f}s.')
-        elif self.active_goal_index < len(self.active_trip_nodes) - 1:
-            self.mission_stage = MissionStage.WAIT_AT_INTERMEDIATE
-            self._set_led(self.LED_BLUE)
-            self.pause_until = now + self.stop_seconds
-            self.get_logger().info(
-                f'Arrived at intermediate node {goal_node}. Waiting {self.stop_seconds:.1f}s.')
         else:
             self.mission_stage = MissionStage.WAIT_AT_DROPOFF
             self.dropped_off = True
@@ -565,7 +599,6 @@ class TripPlanner(Node):
         # leg's drive colour when motion resumes. Legitimate stops are the WAIT_*
         # stages (pickup/dropoff/hub) and keep their own colours.
         if self.mission_stage in (MissionStage.TO_PICKUP,
-                                  MissionStage.TO_INTERMEDIATE,
                                   MissionStage.TO_DROPOFF,
                                   MissionStage.TO_HUB):
             if not self.motion_enabled:
@@ -592,21 +625,26 @@ class TripPlanner(Node):
             self.ready_for_rides    = False
             self.picked_up          = False
             self.dropped_off        = False
-            self.active_trip_nodes  = list(ride_nodes)
-            self.active_goal_nodes  = list(ride_nodes)
+            self.active_trip_nodes    = list(ride_nodes)
+            pickup_n                  = int(ride_nodes[0])
+            dropoff_n                 = int(ride_nodes[-1])
+            self.active_intermediates = [int(n) for n in ride_nodes[1:-1]]
+            self.active_dropoff_node  = dropoff_n
+            # Stops only: pickup, dropoff, hub. Middle nodes are routing
+            # waypoints folded into the pickup->dropoff leg (no stop there).
+            self.active_goal_nodes    = [pickup_n, dropoff_n]
             if self.active_goal_nodes[-1] != self.taxi_node:
                 self.active_goal_nodes.append(self.taxi_node)
             self.active_goal_index = 0
             self._clear_pending_ride()
             self.get_logger().info(
-                f'Ride dispatched: requested nodes {self.active_trip_nodes}; '
-                f'executing goals {self.active_goal_nodes}.')
+                f'Ride dispatched: requested {self.active_trip_nodes}; '
+                f'stops {self.active_goal_nodes}; routing-through {self.active_intermediates}.')
             if not self._send_active_goal():
                 self._abort_active_ride('Could not publish first trip leg; ride aborted.')
             return
 
         if self.mission_stage in (MissionStage.WAIT_AT_PICKUP,
-                                  MissionStage.WAIT_AT_INTERMEDIATE,
                                   MissionStage.WAIT_AT_DROPOFF) and now >= self.pause_until:
             self._advance_to_next_goal()
             return
@@ -619,7 +657,6 @@ class TripPlanner(Node):
         self._path_completed_event = False
 
         if self.mission_stage in (MissionStage.TO_PICKUP,
-                                  MissionStage.TO_INTERMEDIATE,
                                   MissionStage.TO_DROPOFF,
                                   MissionStage.TO_HUB):
             self._handle_active_arrival(now)

@@ -6,6 +6,66 @@ Record of code changes made during Claude sessions. Newest entries on top.
 
 ## 2026-05-28
 
+### yolo_detector.py — stop/yield: fix confidence gate + depth-free brake (Claude)
+**File:** `Development/ros2/src/qcar2_autonomy/autonomy/yolo_detector.py`
+**By:** Claude
+**Root cause found (from Readings):** Erick's model reports stop signs at **max ~0.745 confidence**, but `stop_sign_conf` was **0.90** → `_sign_brake_decision` rejected every frame → the predictive tracker was never fed → no brake (and Codex's armed poll had nothing to fire). Depth is also unreliable (frozen at 0.716 m / `nanm`), so depth-rate prediction can't work.
+**Changes:**
+- Lowered `stop_sign_conf`/`yield_sign_conf` default 0.90 → **0.40** to match the model's real output.
+- Raised `lateral_edge_frac` 0.15 → **0.30** so the geometric "beside the sign" trigger commits before the sign leaves the camera FOV.
+- Added depth-free **bbox-height brake** `stop_brake_height_px` (default 120 px): brake when the sign's bbox is tall enough (= close). Reliable because it doesn't depend on the broken depth. Set 0 to disable.
+- Added bbox size + used_d + cx to the per-detection log for tuning.
+**Why:** Gabriel: car still doesn't stop beside signs; asked if it's the model. It is — low confidence vs the 0.90 gate, plus bad depth. Lowering the gate unblocks detection; lateral-edge + bbox-height are the depth-independent "stop beside" signals.
+**Tune:** if it stops too early → raise `stop_brake_height_px` (e.g. 150) and/or lower `lateral_edge_frac` (e.g. 0.20); too late → lower height / raise frac. Watch the new `bbox=WxH` log to pick values.
+**Verification:** `python3 -m py_compile` OK.
+
+### yolo_detector.py — logic-only stop/yield reliability fix; model unchanged
+**Files:** `Development/ros2/src/qcar2_autonomy/autonomy/yolo_detector.py`, `Development/ros2/src/qcar2_autonomy/launch/autonomy_planner_launch.py`
+**By:** Codex
+**Changes:**
+- Added the Gabriel-style armed tracker poll after the detection loop. If the depth-rate tracker commits a future stop/yield brake time and the sign leaves the camera FOV before that time arrives, the brake now still fires.
+- Removed the duplicate `yolo_detector` launch node from `autonomy_planner_launch.py`; only `qcar2_yolo_detector` remains, so one node owns `/motion_enable`.
+- Did **not** change the model path, backend, classes, or camera ownership. This keeps the current Quanser/PIT model path and only changes behavior logic/wiring.
+**Why:** Gabriel clarified he wanted the stop/yield logic only, not the model from the Gabriel branch. The missing armed poll could cause predicted stop-beside-sign decisions to never execute after the sign left view, and duplicate detectors could overwrite each other's `/motion_enable`.
+**Verification:** `python3 -m py_compile Development/ros2/src/qcar2_autonomy/autonomy/yolo_detector.py Development/ros2/src/qcar2_autonomy/launch/autonomy_planner_launch.py`; `git diff --check -- Development/ros2/src/qcar2_autonomy/autonomy/yolo_detector.py Development/ros2/src/qcar2_autonomy/launch/autonomy_planner_launch.py`.
+
+### yolo_detector.py — traffic-light commit-on-green FSM + no-flicker (Claude) [Phase 1b]
+**File:** `Development/ros2/src/qcar2_autonomy/autonomy/yolo_detector.py`
+**By:** Claude
+**Change:** Ported Gabriel branch's traffic-light logic (LOGIC only, still PIT `lightColor` from the current model — no HSV/custom-model code).
+- Added module-level `TLStateMachine` (IDLE / COMMIT_STOP / COMMIT_GO). Commit-on-green: brake only if red/yellow on first sighting; once COMMIT_GO it ignores ALL later color changes (a late yellow/red after committing does NOT re-brake). Sustained green (K frames) in COMMIT_STOP → release. Not seen for M frames → reset to IDLE.
+- Added **color majority-vote over `tl_color_history_size` frames (default 8)** — this is Gabriel's "color=8" anti-flicker setting that fixes the stop-nvm-stop / go-nvm-go. Plus visibility gating (`_bbox_fully_in_frame`, `tl_min_height_px` height fallback so a NaN depth doesn't block it) and "most prominent TL per tick" selection feeding the FSM once per frame.
+- **Switched motion control to time-based braking.** `on_timer` now runs `yolo_detect()` every tick and sets `flag_value = now >= brake_until_abs` (removed the old `sign_detected`/`disable_until`/`t0` latch, which couldn't feed the FSM every frame). Stop/yield set `brake_until_abs = now + hold` + a time-based `sign_cooldown_until_abs`. TL FSM `brake` refreshes `brake_until_abs`; `release` hard-releases but only a TL-scale brake (guarded so it never cancels a stop-sign brake).
+- New tunable params: `tl_conf`, `tl_min_dist_m`, `tl_stop_dist_m`(10.0), `tl_min_height_px`(50), `tl_hold_s`(0.60), `tl_edge_margin_px`, `tl_allow_top_clip`, `tl_color_history_size`(8), `tl_pass_line_height_px`(100), `tl_fsm_lost_frames_to_reset`(15), `tl_fsm_green_frames_to_release`(3).
+**Why:** Gabriel's request — eliminate the traffic-light flicker (the "color=8" majority-vote + commit-on-green were what worked best in his branch). The time-based brake is needed so the FSM gets fed every frame (the latch fed it too slowly).
+**Watch-item:** yolo_detect now runs every tick (incl. during sign cooldown) → more CPU than before; with two yolo_detector nodes + cartographer this could add load.
+**Verification:** `python3 -m py_compile` OK; grep confirms no leftover latch vars.
+
+### yolo_detector.py — fix: lateral-edge trigger must not be gated on depth (Claude) [Phase 1a fix]
+**File:** `Development/ros2/src/qcar2_autonomy/autonomy/yolo_detector.py`
+**By:** Claude
+**Change:** Removed the `0 < used_d <= max_depth` gate that blocked `tracker.update()` in `_sign_brake_decision`; made the tracker's depth-rate branch NaN-safe (`np.isfinite`). Now the geometric lateral-edge trigger fires even when the sign's depth is tiny/NaN. Added bbox_x to the brake log.
+**Why:** Test showed the car still stopped too early. Readings revealed stop-sign depth reads tiny/`nanm` (unreliable), which fooled the depth gate AND blocked the lateral-edge ("stop beside the sign") trigger. Lateral-edge is geometric and depth-independent, so it must not be gated on depth.
+
+### yolo_detector.py — predictive "stop beside the sign" for stop/yield (Claude) [Phase 1a]
+**File:** `Development/ros2/src/qcar2_autonomy/autonomy/yolo_detector.py`
+**By:** Claude
+**Change:** Ported the Gabriel branch's predictive sign-approach logic (LOGIC only — model unchanged, still `quanser_yolov8s-seg.pt`, classes [9,11,33]).
+- Added module-level `SignApproachTracker`: per-sign depth-vs-time history → linear fit → predicts wall-clock arrival at `stop_target_offset_m` (0.30 m) before the sign. Two triggers: (1) lateral-edge (bbox center reaches outer `lateral_edge_frac`=0.15 of frame → brake now; primary for side-of-road signs that leave FOV before arrival), (2) depth-rate fit fallback.
+- Added `_center_patch_depth_m` (median depth of central 20% of bbox; robust vs mask bleed) and `_sign_brake_decision` helper. bbox comes from `self.myYolo.bounding` (Nx4 xyxy, same order as results); `used_d` = center-patch depth with fallback to PIT `obj.distance`.
+- Replaced the old `stop sign`/`yield sign` gate (`conf>0.9 and dist<1.0 → fixed brake`) with the tracker. If no usable bbox, falls back to the old `dist<1.0` gate.
+- Exposed tunable params: `stop_sign_conf`, `yield_sign_conf`, `stop_sign_hold_s`, `yield_sign_hold_s`, `stop_target_offset_m`, `stop_predict_min_samples`, `stop_predict_max_depth_m`, `stop_predict_commit_at_m`, `stop_predict_min_speed`, `lateral_edge_frac`, `detection_cooldown_s` (read at startup).
+- **Untouched:** traffic-light branch (that's Phase 1b), `/motion_enable` brake mechanism, on_timer latch architecture, the model.
+**Why:** Gabriel's request — stop right beside the sign instead of braking at a fixed distance (the car was blowing past before the brake propagated). Keeps current model/classes.
+**Verification:** `python3 -m py_compile` OK.
+
+### trip_planner.py — 3-node rides: middle nodes are routing waypoints, not stops (Claude)
+**File:** `Development/ros2/src/qcar2_autonomy/autonomy/trip_planner.py`
+**By:** Claude
+**Change:** Reworked Codex's per-node-goal mission so only **pickup, dropoff, hub** are stops. For a ride like `[20, 7, 1]`: 20=pickup (stop), 1=dropoff (stop), **7=routing waypoint (pass through, no stop)**, then auto-return to hub 10. `active_goal_nodes` is now `[pickup, dropoff, hub]`; middle nodes go into `active_intermediates` and are folded into the pickup→dropoff path leg via new `_plan_through()`/`_send_path_through()` (chains `find_shortest_path` segments start→…middle…→dropoff). Removed the `WAIT_AT_INTERMEDIATE`/`TO_INTERMEDIATE` stops from the state machine, LED override, path_status gate, and arrival handler (enum members left defined but unused). 2-node rides (`[1,8]`) behave exactly as before (no middle nodes).
+**Why:** Gabriel clarified competition semantics — in a 3-node ride the middle node only guides the path; the car must not stop there. Per the RED-LED rule, the only legitimate stops are pickup/dropoff/hub.
+**Verification:** `python3 -m py_compile` OK; grep confirms no stray INTERMEDIATE refs outside the enum.
+
 ### trip_planner.py — RED LED on unexpected stops (Claude)
 **File:** `Development/ros2/src/qcar2_autonomy/autonomy/trip_planner.py`
 **By:** Claude

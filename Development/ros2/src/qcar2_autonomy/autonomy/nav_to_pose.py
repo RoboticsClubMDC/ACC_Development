@@ -116,7 +116,7 @@ class PathFollower(Node):
         self.declare_parameter('rotation_offset', [90.0])
         self.rotation_offset = list(self.get_parameter('rotation_offset').get_parameter_value().double_array_value)
 
-        self.declare_parameter('translation_offset', [1.282, 0.59])
+        self.declare_parameter('translation_offset', [1.28, 0.4])
         self.translation_offset = list(self.get_parameter('translation_offset').get_parameter_value().double_array_value)
 
         self.declare_parameter('start_path', [False])

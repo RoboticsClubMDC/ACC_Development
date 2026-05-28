@@ -4,6 +4,42 @@ Record of important prompts and answers during Claude sessions. Skip trivial exc
 
 ---
 
+## 2026-05-28 — Stop/yield STILL not braking beside signs — root cause = model confidence (Claude)
+**Gabriel frustrated:** car still doesn't stop beside stop/yield signs; asked if it's the model (Erick's).
+**Answer: yes, the model.** Readings show stop-sign confidence maxes ~0.745, but `stop_sign_conf` gate was 0.90 → tracker never fed → never brakes. Depth also unreliable (frozen 0.716 m / `nanm`) so depth-rate "stop in X s" math can't work.
+**Fixes:** lowered stop/yield conf gate 0.90→0.40; raised `lateral_edge_frac` 0.15→0.30 (commit before sign leaves FOV); added depth-free `stop_brake_height_px` (120px) bbox-height brake; added bbox-size logging to tune. Also noted: translation offset y still needs decreasing (Gabriel tuning separately). Awaiting test + new logs (bbox sizes) to tune thresholds.
+
+## 2026-05-28 — Clarification: port stop/yield logic only, not Gabriel's model
+**Gabriel clarified:** He only wants the stop/yield behavior logic from Gabriel's branch, not Gabriel's model/backend.
+
+**Codex action:** Kept the current detector/model path intact. Added only the missing logic/wiring:
+- Restored the armed tracker poll so a predicted stop/yield brake still fires even after the sign leaves the camera FOV.
+- Removed the duplicate `yolo_detector` launch node so two detectors no longer race on `/motion_enable`.
+
+**Verification:** `python3 -m py_compile` passed for `yolo_detector.py` and `autonomy_planner_launch.py`; `git diff --check` passed for both files.
+
+## 2026-05-28 — Phase 1a fix + Phase 1b (traffic-light no-flicker FSM) (Claude)
+**Gabriel reported:** 1a still stops too early (not beside the sign), resumes after ~1-2s (fine). Asked to (a) match his exact stop-beside method, (b) make sure the TL no-flicker thing ("color=8") is included.
+
+**Diagnosis (1a):** Readings show stop-sign depth reads tiny / `nanm` (unreliable). My port gated the geometric lateral-edge trigger behind a depth check, so on NaN frames it couldn't fire → fell back to old behavior (too early). **Fix:** un-gated lateral-edge from depth; depth-rate made NaN-safe. Lateral-edge is the depth-free "stop beside the sign" signal.
+
+**"color=8" identified:** it's `tl_color_history_size` (default 8 in Gabriel's launch) — the TL color majority-vote window. Combined with the commit-on-green FSM, that's the no-flicker mechanism. It was NOT in the current branch (TL was the simple flickery version).
+
+**Phase 1b ported:** `TLStateMachine` (commit-on-green; once GO, ignores later color changes) + color majority-vote (history=8) + visibility gating, using the current model's PIT `lightColor` (no HSV port needed). Switched motion control to time-based `brake_until_abs` so the FSM is fed every frame (the old latch couldn't). Stop/yield brakes + cooldown now time-based too. TL release guarded so it can't cancel a stop-sign brake. All thresholds are ROS params. py_compile OK. Awaiting Gabriel's test. Watch CPU: yolo_detect now runs every tick.
+
+## 2026-05-28 — Phase 1a: ported predictive stop/yield "stop beside the sign" (Claude)
+**Gabriel agreed** to start with 1a (stop-sign predictive braking). Ported the Gabriel branch's `SignApproachTracker` + center-patch depth into the current `yolo_detector.py`, LOGIC only — model and traffic-light path untouched. Tracker predicts arrival 0.30 m before the sign via depth-rate fit, with a lateral-edge "brake now" override (primary for side-of-road signs). Brake still via `/motion_enable` (so the RED LED I added in trip_planner shows during these stops). Thresholds exposed as ROS params. py_compile OK; awaiting Gabriel's physical/virtual test. Traffic-light "commit on green" FSM (1b) is next after 1a is validated. See changelog for full param list + integration detail.
+
+## 2026-05-28 — 3-node ride semantics, cartographer multi-instance, perception-port plan (Claude)
+**Gabriel clarified / requested:**
+- Ride command: 2 nodes = [pickup, dropoff]; 3 nodes = [pickup, guide, dropoff] where the middle node only guides the path (NO stop there). Implemented (see changelog) — middle nodes now route the pickup→dropoff leg via `_plan_through`.
+- Offset still needs tuning (car cuts into sidewalk): wants "more left from node 1, more down/left from node 8". Direction differs per node → likely not a single global bias; treat as test-and-iterate. NOT auto-changed; tune via `ros2 param set /trip_planner translation_offset "[x,y]"` after startup (auto-align runs once, a later set sticks).
+- Cartographer "messed up": teammates suspect multiple cartographers running after Ctrl+C. CONFIRMED plausible: cartographer_node ignores SIGINT ~15s then needs SIGTERM→SIGKILL (seen in Readings ~lines 1210-1252). Relaunching before the old one dies = two cartographers fighting over /tf + /submap. Right now only ONE instance running (the earlier count of 2 was my grep matching itself). Fix = after Ctrl+C, wait for "process has died" for cartographer_node, or `pkill -f cartographer_node` before relaunch.
+- Evaluate luigi-5's virtual cartographer as possibly better — pending (tied to Phase 1 pose-stack work).
+- Wants to PORT (logic only, keep current model) from Gabriel branch: (1) stop/yield-sign triangulation "stop beside the sign", (2) traffic-light "commit on green" FSM. Investigated Gabriel branch in detail (see plan below).
+
+**Gabriel-branch perception findings (for the port):** all in `Gabriel:.../yolo_detector.py`. (1) `_SignApproachTracker` — predictive brake using depth-rate linear fit + lateral-edge trigger, stops ~0.30m before sign (`stop_target_offset_m`); center-patch depth median for robustness. (2) `_TLStateMachine` — IDLE/COMMIT_STOP/COMMIT_GO; commits GO if first sighting is green or past the line, and once COMMIT_GO ignores later color changes (yellow after committing = keep going); HSV color check + majority-vote history + full-visibility gating. Both halt via `/motion_enable` (Bool) + `/trip_planner/qcar_state` (UInt8=1). Current branch only has simple fixed-distance brake. Port assessed MODERATE; keep current model, add the methods + tunable params.
+
 ## 2026-05-28 — First successful trip + RED LED + review of Codex's changes (Claude)
 **Gabriel reported:** Cartographer still fails repeatedly to start (same CPU/RViz load issue) but eventually worked; autonomy then ran and the car drove the whole trip and **stopped correctly at pickup/dropoff/hub** (major improvement). Car wanders out of lane (separate problem). Auto-align validated: log shows `rotation_offset=41.89 deg, translation_offset=[1.208, 0.534]` — confirms the sign convention; Gabriel's manual 90 was wrong, ~42 is right. YOLO is running and detecting stop signs.
 
