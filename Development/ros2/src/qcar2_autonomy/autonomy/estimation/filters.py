@@ -42,24 +42,34 @@ class QcarEKF:
         self.R = R
         self.C = np.eye(3)
 
-    def f(self, X, u, dt):
-        return X + dt * u[0] * np.array([
-            [np.cos(X[2, 0])],
-            [np.sin(X[2, 0])],
-            [np.tan(u[1]) / self.L]
+    def f(self, X, u, dt, omega=None):
+        # x,y always propagate from speed+heading (bicycle kinematics).
+        # Yaw rate: steering-derived v·tan(δ)/L by default, OR an externally
+        # supplied blended omega (e.g. gyro_weight·gyro + (1−w)·steering) when
+        # `omega` is given. This lets ekf_fusor fuse the IMU gyro into the
+        # predict instead of trusting steering alone — matches pose_estimator.
+        v = u[0]
+        yaw_rate = (v * np.tan(u[1]) / self.L) if omega is None else float(omega)
+        return X + dt * np.array([
+            [v * np.cos(X[2, 0])],
+            [v * np.sin(X[2, 0])],
+            [yaw_rate]
         ])
 
     def Jf(self, X, u, dt):
+        # Unchanged whether yaw rate is steering-derived or blended-omega:
+        # the yaw row is constant-in-state in both cases, and the x,y rows
+        # depend on theta only through v·cos/sin.
         return np.array([
             [1, 0, -dt * u[0] * np.sin(X[2, 0])],
             [0, 1,  dt * u[0] * np.cos(X[2, 0])],
             [0, 0, 1]
         ])
 
-    def prediction(self, dt, u):
+    def prediction(self, dt, u, omega=None):
         F = self.Jf(self.xHat, u, dt)
         self.P = F @ self.P @ F.T + self.Q
-        self.xHat = self.f(self.xHat, u, dt)
+        self.xHat = self.f(self.xHat, u, dt, omega=omega)
         self.xHat[2] = wrap_to_pi(self.xHat[2])
 
     def correction(self, y):

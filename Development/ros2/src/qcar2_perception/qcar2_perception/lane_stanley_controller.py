@@ -6,6 +6,7 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Bool, Float64
 from geometry_msgs.msg import Twist
+from nav_msgs.msg import Odometry
 
 
 class LaneStanleyController(Node):
@@ -23,6 +24,15 @@ class LaneStanleyController(Node):
         self.declare_parameter('steering_sign', 1.0)
         self.declare_parameter('max_steer_rad', 0.35)
         self.declare_parameter('min_speed_for_control', 0.05)
+        # 2026-05-28: use MEASURED speed (from /odom) in the Stanley
+        # cross-track denominator, not the fixed speed_mps param. The
+        # Stanley law atan2(k·cte, v) is only speed-adaptive (gentler at
+        # speed, sharper when slow) if v is the REAL speed. With a fixed
+        # 0.20 denominator the controller was tuned for exactly one speed
+        # and over-corrected whenever the blended/path speed was higher.
+        # Set use_measured_speed:=false to revert to the speed_mps param.
+        self.declare_parameter('use_measured_speed', True)
+        self.declare_parameter('odom_topic', '/odom')
         # 2026-05-27: raised 0.35 → 1.0 to survive the gap between dashed
         # lane segments. At competition speed (~0.5 m/s) the gap between
         # dashes is well under 1 s, so Stanley keeps integrating CTE
@@ -35,7 +45,10 @@ class LaneStanleyController(Node):
         self.cte = 0.0
         self.heading = 0.0
         self.detected = False
+        self.measured_speed = 0.0
         self.last_lane_time = self.get_clock().now()
+
+        self.use_measured_speed = bool(self.get_parameter('use_measured_speed').value)
 
         self.cmd_pub = self.create_publisher(
             Twist, self.get_parameter('cmd_topic').value, 1)
@@ -45,6 +58,8 @@ class LaneStanleyController(Node):
             Float64, self.get_parameter('heading_topic').value, self._heading_cb, 1)
         self.create_subscription(
             Bool, self.get_parameter('detected_topic').value, self._detected_cb, 1)
+        self.create_subscription(
+            Odometry, self.get_parameter('odom_topic').value, self._odom_cb, 10)
 
         rate = float(self.get_parameter('control_rate_hz').value)
         self.timer = self.create_timer(1.0 / max(rate, 1.0), self._timer_cb)
@@ -66,6 +81,11 @@ class LaneStanleyController(Node):
         if self.detected:
             self.last_lane_time = self.get_clock().now()
 
+    def _odom_cb(self, msg):
+        v = float(msg.twist.twist.linear.x)
+        if math.isfinite(v):
+            self.measured_speed = v
+
     def _timer_cb(self):
         now = self.get_clock().now()
         lane_age = (now - self.last_lane_time).nanoseconds * 1e-9
@@ -74,19 +94,28 @@ class LaneStanleyController(Node):
 
         cmd = Twist()
         if lane_ok:
-            speed = float(self.get_parameter('speed_mps').value)
+            speed_param = float(self.get_parameter('speed_mps').value)
             min_speed = float(self.get_parameter('min_speed_for_control').value)
             k = float(self.get_parameter('stanley_gain').value)
             heading_gain = float(self.get_parameter('heading_gain').value)
             steering_sign = float(self.get_parameter('steering_sign').value)
             max_steer = float(self.get_parameter('max_steer_rad').value)
 
+            # Speed-adaptive Stanley: use the MEASURED speed in the cross-track
+            # denominator so the correction is gentle at speed and sharp when
+            # slow (the whole point of Stanley). Fall back to speed_mps param
+            # if measured speed is unavailable / use_measured_speed=false.
+            v_denom = self.measured_speed if self.use_measured_speed else speed_param
+            v_denom = max(abs(v_denom), min_speed)
+
             steer = heading_gain * self.heading + math.atan2(
-                k * self.cte, max(abs(speed), min_speed))
+                k * self.cte, v_denom)
             steer = steering_sign * steer
             steer = max(-max_steer, min(max_steer, steer))
 
-            cmd.linear.x = speed
+            # linear.x is the speed Stanley WOULD drive at; the blender uses
+            # linear_source='path' so path_follower's speed wins downstream.
+            cmd.linear.x = speed_param
             cmd.angular.z = steer
             self.cmd_pub.publish(cmd)
             return

@@ -39,6 +39,7 @@ setup(
             'qcar2_ekf_odometry = autonomy.pose_estimator:main',
             'ekf_fusor = autonomy.ekf_fusor:main',
             'controller_watchdog = autonomy.controller_watchdog:main',
+            'motion_arbiter = autonomy.motion_arbiter:main',
         ],
     },
 )

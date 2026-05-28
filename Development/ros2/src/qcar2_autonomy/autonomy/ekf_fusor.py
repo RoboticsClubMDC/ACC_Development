@@ -96,6 +96,13 @@ class EkfFusor(Node):
         self.declare_parameter("landmark_pose_topic", "/perception/landmark_pose_correction")
         self.declare_parameter("r_landmark_default_diag", [0.10, 0.10, 1.0e6])  # x, y, yaw
         self.declare_parameter("use_gyro_kf", True)
+        # 2026-05-28: blend gyro into the QcarEKF predict (matches
+        # pose_estimator). omega = gyro_weight·gyro + (1−w)·steering_omega.
+        # Was steering-only in the predict, which drifted under cornering at
+        # speed because steering→yaw-rate (tan δ/L) lags the real yaw rate.
+        # 0.65 trusts the gyro more than the steering model. Set 0.0 to
+        # revert to steering-only.
+        self.declare_parameter("gyro_weight", 0.65)
         self.declare_parameter("q_diag", [0.0005, 0.0005, 0.002])
         self.declare_parameter("r_carto_diag", [0.02, 0.02, 0.01])
         self.declare_parameter("r_amcl_default_diag", [0.05, 0.05, 0.03])
@@ -118,6 +125,7 @@ class EkfFusor(Node):
         self.landmark_topic = self.get_parameter("landmark_pose_topic").value
         self.r_landmark_default_diag = list(self.get_parameter("r_landmark_default_diag").value)
         self.use_gyro_kf = bool(self.get_parameter("use_gyro_kf").value)
+        self.gyro_weight = float(self.get_parameter("gyro_weight").value)
         self.q_diag = list(self.get_parameter("q_diag").value)
         self.r_carto_diag = list(self.get_parameter("r_carto_diag").value)
         self.r_amcl_default_diag = list(self.get_parameter("r_amcl_default_diag").value)
@@ -382,11 +390,20 @@ class EkfFusor(Node):
         if not self.bootstrapped:
             return
 
-        # QcarEKF predict
-        u = [self.speed, self.steering]
-        self.qcar2_ekf.prediction(dt, u)
+        # Blended yaw rate: gyro_weight·gyro + (1−w)·steering_omega.
+        # If the gyro sample is non-finite (already NaN-guarded in imu_cb,
+        # but belt-and-suspenders), fall back to steering-only.
+        steering_omega = self.speed * math.tan(self.steering) / self.wheelbase
+        if np.isfinite(self.yaw_rate):
+            omega = self.gyro_weight * self.yaw_rate + (1.0 - self.gyro_weight) * steering_omega
+        else:
+            omega = steering_omega
 
-        # GyroKF predict (uses gyro yaw rate as input)
+        # QcarEKF predict — x,y from speed+heading, yaw from blended omega.
+        u = [self.speed, self.steering]
+        self.qcar2_ekf.prediction(dt, u, omega=omega)
+
+        # GyroKF predict (independent yaw+bias tracker, used in diagnostics).
         if self.use_gyro_kf:
             self.gyro_kf.prediction(dt, self.yaw_rate)
 

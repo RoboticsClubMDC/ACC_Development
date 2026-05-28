@@ -64,6 +64,10 @@ from rclpy.parameter import ParameterType
 from hal.products.mats import SDCSRoadMap
 
 
+def wrap_to_pi(angle):
+    return (angle + math.pi) % (2.0 * math.pi) - math.pi
+
+
 class MissionStage(Enum):
     IDLE            = 0
     TO_PICKUP       = 1
@@ -306,10 +310,19 @@ class TripPlanner(Node):
         return float(p_ros[0]), float(p_ros[1])
 
     def _node_theta_ros(self, node_id):
-        """Node yaw transformed to ROS frame. ROS_yaw = QLabs_yaw - rotation_offset."""
+        """Node yaw transformed to ROS frame.
+
+        The position transform p_map = (p_qlabs + t) @ R(−angle) rotates points
+        by +angle (row-vector convention: p @ R(−a) = rotate by +a). So the
+        heading must rotate by the SAME +angle. ROS_yaw = QLabs_yaw + rotation_offset.
+
+        2026-05-28: was `- angle_rad` (sign bug) — that double-rotated the yaw by
+        2×angle, throwing the snapped /initialpose heading ~190° off when
+        rotation_offset ≈ 95°. Fixed to `+ angle_rad`.
+        """
         theta_q = self._get_node_theta_qlabs(node_id)
         angle_rad = float(self.rotation_offset[0]) * np.pi / 180.0
-        return theta_q - angle_rad
+        return wrap_to_pi(theta_q + angle_rad)
 
     def _node_count(self):
         if hasattr(self.roadmap, 'nodes'):

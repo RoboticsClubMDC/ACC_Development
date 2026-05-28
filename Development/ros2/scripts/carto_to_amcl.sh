@@ -165,7 +165,23 @@ MANUAL_RC=$?
 set -e
 trap - INT
 echo ""
-echo "      Manual drive exited (rc=$MANUAL_RC). Proceeding to freeze map..."
+echo "      Manual drive exited (rc=$MANUAL_RC)."
+
+echo ""
+echo "[1.8/6] Returning to map ORIGIN (0,0) before freezing..."
+echo "      Cruise toward (0,0); taper within 3 m; creep the last 0.5 m so the"
+echo "      car arrives STEADY and Cartographer re-locks on the well-mapped"
+echo "      origin region. The captured pose (translation AND rotation) is then"
+echo "      accurate → AMCL gets a correctly-oriented seed at (0,0)."
+# return_to_origin.py: pose-regulation approach (orients heading on run-in) +
+# 3-point-turn alignment so it arrives at the FULL pose (0,0,yaw≈0). Exits on
+# arrival (or timeout). set +e so a non-zero exit can't abort us.
+set +e
+python3 "$(dirname "$0")/return_to_origin.py" \
+  --pos-tol 0.06 --yaw-tol 0.045 --vmax 0.35 --target-yaw 0.0 --timeout 40
+set -e
+# A beat for the final stop command to land + TF to settle at origin.
+sleep 1
 
 echo "[2/6] Capturing final pose from TF (map -> base_link)..."
 # Some ROS 2 humble builds don't have tf2_echo --once, so use `timeout` and
@@ -198,6 +214,23 @@ fi
 
 echo "      pose:  x=$X  y=$Y  qz=$QZ  qw=$QW"
 echo "      saved to /tmp/final_pose.txt"
+
+# 2026-05-28: THE PERFECT SEED IS THE CAR'S TRUE CARTOGRAPHER POSE.
+# It's in the saved-map frame and accurate (we returned slowly near the
+# well-mapped origin). We seed exactly that. We ONLY clean it to (0,0,0) when
+# the car is essentially dead-on (≤2 cm / ≤1.1°) — at which point snapping is
+# a negligible <2 cm correction, not a fabrication. Anything looser → seed the
+# REAL pose so we never lie to AMCL about where the car is.
+SEED_YAW=$(python3 -c "import math;print(2.0*math.atan2($QZ,$QW))" 2>/dev/null || echo 0.0)
+DEAD_ON=$(python3 -c "print(1 if abs($X)<0.02 and abs($Y)<0.02 and abs($SEED_YAW)<0.02 else 0)" 2>/dev/null || echo 0)
+if [[ "$DEAD_ON" == "1" ]]; then
+  echo "      → dead-on origin (≤2 cm, ≤1.1°). Cleaning seed to EXACT (0,0,0)."
+  X="0.0"; Y="0.0"; QZ="0.0"; QW="1.0"
+else
+  echo "      → seeding the TRUE captured pose (x=$X y=$Y yaw=$SEED_YAW rad)."
+  echo "        This is the accurate map-frame pose — perfect seed even if not"
+  echo "        exactly (0,0,0). AMCL scan-matches the residual cm away in ~1 s."
+fi
 
 # Persist BOTH the initial (carto-start) and final (carto-end) poses
 # next to the saved map. The companion script `amcl_load.sh` reads this

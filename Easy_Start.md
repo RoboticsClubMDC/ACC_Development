@@ -1772,6 +1772,100 @@ Immediate execution order (remaining work toward competition):
 
 ## Change Log
 
+### 2026-05-28 EDT — Return-to-origin before AMCL freeze + lane-primary node-gating in the arbiter.
+
+**User prompt (verbatim):** "those scripts have to keep recording what cartographer sees, and when I prompt to stop, it has to go to 0,0 can be fast, and then make it basically slow, when getting near to the 0,0 and start running amcl with the good seed" … "Then: flip the arbiter to lane-primary + node-gate. Add /nav/lane_gate, mark junction_nodes, dispatcher publishes the gate."
+
+**Two features:**
+
+**A. Return-to-origin before freeze** (`carto_to_amcl.sh` + new `return_to_origin.py`).
+Insight: the map origin (0,0) is the only point in a live-Cartographer map with **zero accumulated drift** — it's the reference frame. So instead of seeding AMCL at the drifted final pose, the script now drives the car back to (0,0) before freezing, giving the cleanest possible seed.
+
+New [`return_to_origin.py`](Development/ros2/scripts/return_to_origin.py): reads `map→base_link` TF, proportional drive toward (0,0) on `/cmd_vel_nav` — **fast when far** (vmax 0.5), **tapers within 0.6 m**, stops at 0.08 m. Wired into `carto_to_amcl.sh` between manual-drive exit and map freeze (step `[1.8/6]`). The existing pose capture then grabs the near-origin pose and seeds AMCL there.
+
+⚠ It drives roughly straight to (0,0) — in a tight arena it may clip a curb. It's a deliberate return maneuver, not road-following. For road-legal return, drive path_follower to node 0 instead.
+
+**B. Lane-primary + junction node-gating** (motion_arbiter + path_follower).
+Inverts the arbiter from path-primary to **lane-primary on open road**, **path-only at junctions** — matches how SDCS driving works (follow the painted lane between nodes; let PP make the geometric turn at intersections where the lane is ambiguous).
+
+- **motion_arbiter**: weights flipped to `lane=0.75 / path=0.25`. New `/nav/lane_gate` (Bool) subscription:
+  - gate **open** (True) → `LANE_PRIMARY_BLEND` (lane leads, path bias)
+  - gate **closed** (False) → `JUNCTION_PATH_ONLY` (PP makes the turn, lane ignored)
+  - plus the existing `TURN_PATH_ONLY` safety override (PP turning hard + lane reads straight → trust PP even with gate open)
+- **path_follower** publishes `/nav/lane_gate` at 5 Hz: new params `junction_nodes` (list of SDCSRoadMap node IDs, default `[-1]`=none) and `lane_gate_radius` (0.5 m). Gate **closes** when the car is within radius of any junction node. Node positions are transformed QLabs→map with the same offsets used for waypoints (`self.scale==1.0`).
+
+**How to mark junctions + run lane-primary:**
+```bash
+# Mark the intersection/turn nodes (example — set to your map's junctions):
+ros2 param set /path_follower junction_nodes "[8, 6, 10]"
+ros2 param set /path_follower lane_gate_radius 0.5
+# Arbiter auto-consumes /nav/lane_gate. Watch the mode:
+ros2 topic echo /arbiter/mode
+#   open road:  LANE_PRIMARY_BLEND
+#   near node 8/6/10: JUNCTION_PATH_ONLY
+ros2 topic echo /nav/lane_gate    # True/False
+```
+
+**Caveat (important):** the gate is computed from pose proximity to junction nodes — so it's only as good as your localization. On a **vibrating live-Cartographer map** the "am I near node 8?" test fires at the wrong place. **Do the AMCL freeze (feature A) first** — lane-primary gating needs a stable map to know *where along the lane* it is.
+
+**Rebuild:**
+```bash
+colcon build --symlink-install --packages-select qcar2_autonomy
+source install/setup.bash
+```
+
+### 2026-05-28 EDT — `motion_arbiter` node: single /cmd_vel_nav owner, priority ladder, single gyro D-damp. Fixes PP↔Stanley IMU fight + connects the stop pipeline.
+
+**User prompt (verbatim):** "got it, #1 amazing idea, remember the easy_start. md documentation 2. we should try and then see a way maybe, the idea is to damp both of them independently the geometrical controllers. 3. got it Ok do it."
+
+**Context — the bug it fixes:** path_follower applied its own gyro D-damp `−kd·gyro[2]`. The IMU gyro reflects the BLENDED (mostly-Stanley) motion, so PP damped against a turn it didn't command → PP and Stanley fought *through the IMU* (no ROS topic between them — the coupling is physical, via car yaw → shared gyro). Worst in corners. See the read-only bug hunt earlier this session.
+
+**New node** [`motion_arbiter.py`](Development/ros2/src/qcar2_autonomy/autonomy/motion_arbiter.py) — registered as `motion_arbiter` in setup.py. Becomes the SINGLE owner of `/cmd_vel_nav`, replacing `cmd_vel_blender`. Three fixes in one node:
+
+1. **Single gyro D-damp.** path_follower now emits RAW `kp·pp` (new param `apply_gyro_damping:=false`); the arbiter applies `−kd·gyro` ONCE on the final blended steering. It's the sole steering authority, so the damp is legitimate — no double-damp, no PP-vs-Stanley fight.
+2. **Single /cmd_vel_nav publisher** — kills the double-publisher risk.
+3. **Connects the dead stop pipeline** — consumes `/perception/stop_required` (perception published it, nobody listened) AND `/motion_enable` AND `/car_stop`. Any of them → actual stop.
+
+**Priority ladder (highest first):**
+```
+1. ESTOP            /car_stop=True                          → zero
+2. STOP_REQUIRED    /perception/stop_required=True OR
+                    /motion_enable=False                    → zero speed+steer
+3. require_path     path stale & require_path               → zero
+4. TURN_PATH_ONLY   |path_steer|≥turn_thresh & lane weak    → PATH only (don't let
+                                                              a straight-lane reading
+                                                              fight a turn)
+5. BLEND            both fresh                              → w_path·path + w_lane·lane
+6. PATH_ONLY        lane stale                              → path
+7. LANE_ONLY        path stale & require_path=false         → lane
+then: steer = clip(steer_blend − kd·gyro_filtered, ±max_steer)
+      speed = path speed (linear_source=path)
+```
+Publishes `/arbiter/mode` (String) for Foxglove so you can see which rung is active.
+
+**path_follower change:** new param `apply_gyro_damping` (default `True` = standalone behavior unchanged). Set `False` when running under the arbiter.
+
+**How to run with the arbiter (instead of cmd_vel_blender):**
+```bash
+# path_follower emits raw PP (no self-damping):
+ros2 run qcar2_autonomy path_follower --ros-args \
+    -p cmd_topic:=/cmd_vel_path -p apply_gyro_damping:=false
+# lane stack WITHOUT its blender — OR just don't launch cmd_vel_blender:
+ros2 run qcar2_perception lane_detector ...
+ros2 run qcar2_perception lane_stanley_controller ...
+# the arbiter (replaces blender):
+ros2 run qcar2_autonomy motion_arbiter
+```
+⚠ Do NOT run `cmd_vel_blender` AND `motion_arbiter` together — both publish `/cmd_vel_nav`. The arbiter supersedes the blender.
+
+**Point #2 (damp each controller independently) — deferred.** The arbiter currently damps the final blend once (the approved #1). The "damp PP and Stanley independently" idea (feed-forward each against its own commanded yaw) is a future refinement; noted, not built yet.
+
+**Rebuild:**
+```bash
+colcon build --symlink-install --packages-select qcar2_autonomy
+source install/setup.bash
+```
+
 ### 2026-05-27 EDT — `trip_planner` now polls services lazily + bundled in `full_autonomy_stack_*_launch.py`.
 
 **User prompt (verbatim):** "qcar2_hardware LED service not available — LEDs disabled … path_follower service not available — halt-on-arrival disabled" + "every time fuck up with amcl, cartographer the fullstack too is just fucked up." + "and btw it take sa lot to start most thing"

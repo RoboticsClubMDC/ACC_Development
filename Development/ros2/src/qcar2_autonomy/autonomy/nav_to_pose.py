@@ -192,6 +192,20 @@ class PathFollower(Node):
         # showed our 0.20 made the controller feel sluggish/laggy compared
         # to his. 0.10 is the responsive-but-still-damped sweet spot.
         self.declare_parameter('kd_steering', 0.20)
+        # 2026-05-28: when True (default, standalone), path_follower applies
+        # its own gyro D-damping. Set False when running under motion_arbiter
+        # so the arbiter is the single authority that damps the final command
+        # (prevents double-damping + PP-vs-Stanley fight through the IMU).
+        self.declare_parameter('apply_gyro_damping', True)
+        # 2026-05-28: lane-gate publisher. junction_nodes = SDCSRoadMap node
+        # IDs that are intersections/turns where the painted lane is
+        # ambiguous/absent — there the gate CLOSES and motion_arbiter goes
+        # PATH-ONLY (PP makes the turn). Elsewhere the gate is OPEN and the
+        # arbiter is lane-primary. Default [-1] = no junctions (gate always
+        # open). The dispatcher marks these via `ros2 param set`. Sentinel
+        # -1 default keeps ROS inferring INTEGER_ARRAY (empty [] → BYTE_ARRAY).
+        self.declare_parameter('junction_nodes', [-1])
+        self.declare_parameter('lane_gate_radius', 0.5)   # m
         # 2026-05-27: cos^N(steering) speed reduction. Default 0.0 → DISABLED
         # (matches Gabriel — constant speed through curves). Set to 2.0 to
         # re-enable cos² speed cut for more conservative cornering.
@@ -313,6 +327,8 @@ class PathFollower(Node):
         _lht = bool(self.get_parameter('left_hand_traffic').value)
         _usm = bool(self.get_parameter('use_small_map').value)
         _roadmap_init = SDCSRoadMap(leftHandTraffic=_lht, useSmallMap=_usm)
+        # Keep a persistent roadmap handle for junction-node lookups (lane gate).
+        self._gate_roadmap = _roadmap_init
         # 2026-05-27 DIAGNOSTIC — mirror node 8's directional edges in the
         # roadmap graph BEFORE path generation. Keeps node 8's position the
         # same; only flips the direction of every edge touching it.
@@ -392,6 +408,11 @@ class PathFollower(Node):
         # exists in addition to the ROS parameters (both routes work).
         self.create_subscription(Float32, '/nav/kp_steering_set', self._kp_set_cb, 5)
         self.create_subscription(Float32, '/nav/kd_steering_set', self._kd_set_cb, 5)
+
+        # 2026-05-28: lane gate — Bool, True=open (lane-primary) / False=closed
+        # (junction, PATH-ONLY). motion_arbiter consumes this. Published at 5 Hz.
+        self.pub_lane_gate = self.create_publisher(Bool, '/nav/lane_gate', 2)
+        self.create_timer(0.2, self._lane_gate_tick)
 
         self.pub_pp_delta      = self.create_publisher(Float32, '/nav/pp_delta',      2)
         self.pub_stanley_delta = self.create_publisher(Float32, '/nav/stanley_delta', 2)
@@ -889,10 +910,20 @@ class PathFollower(Node):
                 # Kp=1.0, Kd=0.3. Adjust from Foxglove Parameters panel or:
                 #   ros2 param set /path_follower kp_steering 1.2
                 #   ros2 param set /path_follower kd_steering 0.4
+                # 2026-05-28: gyro D-damping is now OPTIONAL. When running
+                # under motion_arbiter, the arbiter is the SINGLE steering
+                # authority and applies the D-damp once on the final blended
+                # command. path_follower must then emit RAW kp·pp (P-only),
+                # otherwise the path component gets double-damped AND
+                # path_follower fights Stanley through the shared IMU (the
+                # gyro reflects the blended/Stanley motion, not PP's own).
+                # Standalone (no arbiter): leave apply_gyro_damping=True.
                 gyro_filtered = self.apply_filter('gyro', self.gyroscope[2], self.a1, self.b1)
+                kd_eff = self.kd_steering if bool(
+                    self.get_parameter('apply_gyro_damping').value) else 0.0
 
                 pp_delta_damped = np.clip(
-                    self.kp_steering * pp_delta - self.kd_steering * gyro_filtered,
+                    self.kp_steering * pp_delta - kd_eff * gyro_filtered,
                     -self.max_steering_angle,
                     self.max_steering_angle)
 
@@ -1215,6 +1246,44 @@ class PathFollower(Node):
             return [self.translation.x, self.translation.y], self.yaw
         except AttributeError:
             return [0.0, 0.0], 0.0
+
+    def _lane_gate_tick(self):
+        """Publish /nav/lane_gate: True (open, lane-primary) unless the car is
+        within lane_gate_radius of a junction node, where it CLOSES (False) so
+        motion_arbiter goes PATH-ONLY for the turn.
+
+        Junction node positions come from the persistent roadmap, transformed
+        QLabs→map with the SAME rotation/translation offsets path_publisher
+        uses for waypoints (self.scale==1.0, so node poses share waypoint units).
+        """
+        junctions = [int(n) for n in self.get_parameter('junction_nodes').value
+                     if int(n) >= 0]
+        gate_open = True
+        if junctions:
+            try:
+                p, _ = self._read_pose_for_planner()
+            except Exception:
+                p = None
+            if p is not None:
+                a = self.rotation_offset[0]
+                R_QL = np.array([
+                    [np.cos(-a * np.pi / 180.0), -np.sin(-a * np.pi / 180.0)],
+                    [np.sin(-a * np.pi / 180.0),  np.cos(-a * np.pi / 180.0)],
+                ])
+                t = np.array([self.translation_offset[0], self.translation_offset[1]])
+                radius = float(self.get_parameter('lane_gate_radius').value)
+                for nid in junctions:
+                    try:
+                        npose = np.array(self._gate_roadmap.nodes[nid].pose).reshape(-1)
+                    except Exception:
+                        continue
+                    n_map = (np.array([npose[0], npose[1]]) + t) @ R_QL
+                    if np.hypot(p[0] - n_map[0], p[1] - n_map[1]) < radius:
+                        gate_open = False
+                        break
+        m = Bool()
+        m.data = bool(gate_open)
+        self.pub_lane_gate.publish(m)
 
     def scopeDataTimer(self):
         if not getattr(self, 'pose_visualize_flag', False):
