@@ -402,11 +402,6 @@ class Object3DEstimator(Node):
                 continue
 
             point = estimate["point_camera"]
-            camera_distance = math.sqrt(
-                float(point[0]) * float(point[0])
-                + float(point[1]) * float(point[1])
-                + float(point[2]) * float(point[2])
-            )
 
             obj = {
                 "detection_id": det.get("detection_id", ""),
@@ -422,7 +417,6 @@ class Object3DEstimator(Node):
                     "z": point[2],
                 },
                 "depth_median": estimate["median_depth"],
-                "distance_camera_m": float(camera_distance),
                 "valid_depth_ratio": estimate["valid_ratio"],
                 "depth_sigma": estimate["depth_sigma"],
                 "depth_span": estimate["depth_span"],

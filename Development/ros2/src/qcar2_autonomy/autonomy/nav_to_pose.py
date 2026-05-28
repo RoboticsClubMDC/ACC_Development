@@ -3,8 +3,6 @@
 from hal.products.mats import SDCSRoadMap
 from pal.utilities.math import wrap_to_pi
 
-import json
-import math
 import os
 import select
 import sys
@@ -68,7 +66,7 @@ from tf2_ros.transform_listener import TransformListener
 from geometry_msgs.msg import Twist, PoseStamped
 from sensor_msgs.msg import Imu, JointState
 from rcl_interfaces.msg import SetParametersResult
-from std_msgs.msg import Bool, Float32, String
+from std_msgs.msg import Bool, Float32
 
 # Pose source: subscribe to /qcar2_pose_fused, produced by the standalone
 # ekf_fusor node. The embedded QcarEKF/GyroKF instances that used to live in
@@ -92,10 +90,10 @@ class PathFollower(Node):
 
         self.scale = 1.0
 
-        self.declare_parameter('rotation_offset', [0.0])
+        self.declare_parameter('rotation_offset', [83.0])
         self.rotation_offset = list(self.get_parameter('rotation_offset').get_parameter_value().double_array_value)
 
-        self.declare_parameter('translation_offset', [0.100640468153, -0.064883315798])
+        self.declare_parameter('translation_offset', [0.0, 0.0])
         self.translation_offset = list(self.get_parameter('translation_offset').get_parameter_value().double_array_value)
 
         # Unified control mode — ONE node owns /cmd_vel_nav, no double-publish.
@@ -148,9 +146,21 @@ class PathFollower(Node):
         self.kp_steering = float(self.get_parameter('kp_steering').value)
         self.kd_steering = float(self.get_parameter('kd_steering').value)
 
-        # Stanley blend is kept at 0 — pure pursuit only
-        self.stanley_blend     = 0.3
-        self.stanley_trust_min = 0.0
+        # Lane Stanley is a bounded visual bias on top of the existing
+        # pure-pursuit + gyro-damped steering. This node remains the only
+        # /cmd_vel_nav publisher.
+        self.declare_parameter('lane_bias_gain', 0.70)
+        self.declare_parameter('lane_bias_max', 0.10)
+        self.declare_parameter('lane_bias_turn_start', 0.18)
+        self.declare_parameter('lane_bias_turn_end', 0.38)
+        self.declare_parameter('stanley_trust_min', 0.35)
+        self.declare_parameter('stanley_timeout_sec', 0.40)
+        self.lane_bias_gain = float(self.get_parameter('lane_bias_gain').value)
+        self.lane_bias_max = float(self.get_parameter('lane_bias_max').value)
+        self.lane_bias_turn_start = float(self.get_parameter('lane_bias_turn_start').value)
+        self.lane_bias_turn_end = float(self.get_parameter('lane_bias_turn_end').value)
+        self.stanley_trust_min = float(self.get_parameter('stanley_trust_min').value)
+        self.stanley_timeout_sec = float(self.get_parameter('stanley_timeout_sec').value)
 
         self.add_on_set_parameters_callback(self.parameter_update_callback)
 
@@ -185,18 +195,25 @@ class PathFollower(Node):
         self.rotation = [0, 0, 0]
         self.wp = SDCSRoadMap().generate_path(self.waypoints) * self.scale
         # -------------ADDED N_1
-        self.auto_align_start = False
-        self.auto_aligned = True
+        self.auto_align_start = True
+        self.auto_aligned = False
         #----------
         self.N = len(self.wp[0, :])
         self.wpi = 0
+        self._path_start_initialized = False
+        self.start_gate_radius = 0.30
+        self._last_auto_align_wait_log = 0.0
+        self._last_start_wait_log = 0.0
         self.wp_prior = []
         self.current_steering = 0
         self._wp_in_ros_frame = False
 
-        self.stanley_delta = 1.100
-        self.stanley_trust = 1.0
+        self.stanley_delta = 0.0
+        self.stanley_trust = 0.0
+        self.stanley_last_t = 0.0
         self.pp_delta_raw  = 0.0
+        self.lane_bias_last = 0.0
+        self.lane_bias_weight = 0.0
 
         self.publisher = self.create_publisher(Twist, '/cmd_vel_nav', 1)
         self.cyclic = False
@@ -210,41 +227,6 @@ class PathFollower(Node):
         self.object_detection_flag = self.create_subscription(
             Bool, '/motion_enable', self.object_detector_callback, 1)
         self.motion_flag = True
-        self.declare_parameter('stop_required_topic', '/perception/stop_required')
-        self.stop_required = False
-        stop_required_topic = str(self.get_parameter('stop_required_topic').value)
-        self.create_subscription(
-            Bool,
-            stop_required_topic,
-            self.stop_required_callback,
-            10,
-        )
-        self.declare_parameter('enable_stop_sign_object_stop', False)
-        self.declare_parameter('stop_sign_objects_topic', '/perception/objects_3d')
-        self.declare_parameter('stop_sign_trigger_distance_m', 0.20)
-        self.declare_parameter('stop_sign_hold_seconds', 3.0)
-        self.declare_parameter('stop_sign_cooldown_seconds', 10.0)
-        self.declare_parameter('stop_sign_min_confidence', 0.30)
-        self.enable_stop_sign_object_stop = bool(
-            self.get_parameter('enable_stop_sign_object_stop').value)
-        self.stop_sign_trigger_distance_m = float(
-            self.get_parameter('stop_sign_trigger_distance_m').value)
-        self.stop_sign_hold_seconds = float(
-            self.get_parameter('stop_sign_hold_seconds').value)
-        self.stop_sign_cooldown_seconds = float(
-            self.get_parameter('stop_sign_cooldown_seconds').value)
-        self.stop_sign_min_confidence = float(
-            self.get_parameter('stop_sign_min_confidence').value)
-        self.stop_sign_hold_until = 0.0
-        self.stop_sign_cooldown_until = 0.0
-        self._stop_sign_active_log = False
-        stop_sign_objects_topic = str(self.get_parameter('stop_sign_objects_topic').value)
-        self.create_subscription(
-            String,
-            stop_sign_objects_topic,
-            self.stop_sign_objects_callback,
-            10,
-        )
         self.path_complete = False
 
         self.imu_subscrition = self.create_subscription(
@@ -262,6 +244,8 @@ class PathFollower(Node):
         # exists in addition to the ROS parameters (both routes work).
         self.create_subscription(Float32, '/nav/kp_steering_set', self._kp_set_cb, 5)
         self.create_subscription(Float32, '/nav/kd_steering_set', self._kd_set_cb, 5)
+        self.create_subscription(Float32, '/lane_keeping/delta', self._stanley_delta_cb, 5)
+        self.create_subscription(Float32, '/lane_keeping/trust', self._stanley_trust_cb, 5)
 
         self.pub_pp_delta      = self.create_publisher(Float32, '/nav/pp_delta',      2)
         self.pub_stanley_delta = self.create_publisher(Float32, '/nav/stanley_delta', 2)
@@ -293,8 +277,10 @@ class PathFollower(Node):
         self.scopeTimer = self.create_timer(0.1, self.scopeDataTimer)
 
         self.get_logger().info(
-            f'PathFollower ready | PURE PURSUIT BASELINE | '
-            f'stanley_blend={self.stanley_blend} trust_min={self.stanley_trust_min}')
+            f'PathFollower ready | PP+PD with bounded lane bias | '
+            f'lane_bias_gain={self.lane_bias_gain} '
+            f'lane_bias_max={self.lane_bias_max} '
+            f'trust_min={self.stanley_trust_min}')
 
     def _cmd_waypoints_cb(self, msg: Path):
         if not msg.poses:
@@ -305,6 +291,7 @@ class PathFollower(Node):
         self.wp              = np.array([xs, ys])
         self.N               = self.wp.shape[1]
         self.wpi             = 0
+        self._path_start_initialized = False
         self.path_complete   = False
         self._wp_in_ros_frame = True
         # Auto-switch to autonomous mode (BO/trip_planner/etc. sending a path
@@ -333,27 +320,49 @@ class PathFollower(Node):
 
     def _stanley_trust_cb(self, msg: Float32):
         self.stanley_trust = float(msg.data)
+        self.stanley_last_t = time.time()
 
-    def _blend_steering(self, pp_delta: float) -> float:
+    def _lane_turn_scale(self, pp_delta: float) -> float:
+        start = max(0.0, self.lane_bias_turn_start)
+        end = max(start + 1e-3, self.lane_bias_turn_end)
+        abs_pp = abs(pp_delta)
+        if abs_pp <= start:
+            return 1.0
+        if abs_pp >= end:
+            return 0.0
+        return float(1.0 - (abs_pp - start) / (end - start))
+
+    def _apply_lane_bias(self, pp_delta: float) -> float:
         self.pp_delta_raw = pp_delta
 
-        if self.stanley_trust < self.stanley_trust_min:
-            alpha = 0.0
+        stanley_is_fresh = (time.time() - self.stanley_last_t) <= self.stanley_timeout_sec
+        if not stanley_is_fresh or self.stanley_trust < self.stanley_trust_min:
+            weight = 0.0
         else:
-            alpha = np.clip(self.stanley_blend * self.stanley_trust, 0.0, 1.0)
+            trust_range = max(1e-6, 1.0 - self.stanley_trust_min)
+            trust_scale = np.clip((self.stanley_trust - self.stanley_trust_min) / trust_range, 0.0, 1.0)
+            turn_scale = self._lane_turn_scale(pp_delta)
+            weight = float(np.clip(self.lane_bias_gain * trust_scale * turn_scale, 0.0, 1.0))
 
-        blended = (1.0 - alpha) * pp_delta + alpha * self.stanley_delta
-        blended = float(np.clip(blended, -self.max_steering_angle, self.max_steering_angle))
+        lane_bias = float(np.clip(self.stanley_delta, -self.lane_bias_max, self.lane_bias_max))
+        applied_bias = weight * lane_bias
+        steering = float(np.clip(
+            pp_delta + applied_bias,
+            -self.max_steering_angle,
+            self.max_steering_angle))
+
+        self.lane_bias_last = applied_bias
+        self.lane_bias_weight = weight
 
         def f32(v):
             m = Float32(); m.data = float(v); return m
 
         self.pub_pp_delta.publish(f32(pp_delta))
         self.pub_stanley_delta.publish(f32(self.stanley_delta))
-        self.pub_blended_delta.publish(f32(blended))
-        self.pub_blend_alpha.publish(f32(alpha))
+        self.pub_blended_delta.publish(f32(steering))
+        self.pub_blend_alpha.publish(f32(weight))
 
-        return blended
+        return steering
 
     def parameter_update_callback(self, params):
         for param in params:
@@ -362,6 +371,7 @@ class PathFollower(Node):
                 self.wp = SDCSRoadMap().generate_path(self.waypoints) * 0.975
                 self.N = len(self.wp[0, :])
                 self.wpi = 0
+                self._path_start_initialized = False
                 self.previous_steering_value = 0
                 self.path_complete = False
                 self._wp_in_ros_frame = False
@@ -389,8 +399,24 @@ class PathFollower(Node):
             elif param.name == 'start_path' and param.type_ == param.Type.BOOL_ARRAY:
                 self.path_execute_flag = list(param.value)[0]
                 self.get_logger().info('path status changed!')
-            elif param.name == 'stanley_blend' or param.name == 'stanley_trust_min':
-                self.get_logger().warn(f'{param.name} is hardcoded — ignoring')
+            elif param.name == 'lane_bias_gain' and param.type_ == param.Type.DOUBLE:
+                self.lane_bias_gain = float(np.clip(param.value, 0.0, 1.0))
+                self.get_logger().info(f'lane_bias_gain -> {self.lane_bias_gain:.3f}')
+            elif param.name == 'lane_bias_max' and param.type_ == param.Type.DOUBLE:
+                self.lane_bias_max = float(np.clip(param.value, 0.0, self.max_steering_angle))
+                self.get_logger().info(f'lane_bias_max -> {self.lane_bias_max:.3f}')
+            elif param.name == 'lane_bias_turn_start' and param.type_ == param.Type.DOUBLE:
+                self.lane_bias_turn_start = float(np.clip(param.value, 0.0, self.max_steering_angle))
+                self.get_logger().info(f'lane_bias_turn_start -> {self.lane_bias_turn_start:.3f}')
+            elif param.name == 'lane_bias_turn_end' and param.type_ == param.Type.DOUBLE:
+                self.lane_bias_turn_end = float(np.clip(param.value, 0.0, self.max_steering_angle))
+                self.get_logger().info(f'lane_bias_turn_end -> {self.lane_bias_turn_end:.3f}')
+            elif param.name == 'stanley_trust_min' and param.type_ == param.Type.DOUBLE:
+                self.stanley_trust_min = float(np.clip(param.value, 0.0, 1.0))
+                self.get_logger().info(f'stanley_trust_min -> {self.stanley_trust_min:.3f}')
+            elif param.name == 'stanley_timeout_sec' and param.type_ == param.Type.DOUBLE:
+                self.stanley_timeout_sec = float(np.clip(param.value, 0.05, 2.0))
+                self.get_logger().info(f'stanley_timeout_sec -> {self.stanley_timeout_sec:.3f}')
             elif param.name == 'mission_pickup_xy' and param.type_ == param.Type.DOUBLE_ARRAY:
                 self.get_logger().info(f'mission_pickup_xy updated: {list(param.value)}')
             elif param.name == 'mission_dropoff_xy' and param.type_ == param.Type.DOUBLE_ARRAY:
@@ -403,26 +429,6 @@ class PathFollower(Node):
             elif param.name == 'kd_steering' and param.type_ == param.Type.DOUBLE:
                 self.kd_steering = float(param.value)
                 self.get_logger().info(f'kd_steering -> {self.kd_steering:.3f}')
-            elif param.name == 'enable_stop_sign_object_stop' and param.type_ == param.Type.BOOL:
-                self.enable_stop_sign_object_stop = bool(param.value)
-                self.get_logger().info(
-                    f'enable_stop_sign_object_stop -> {self.enable_stop_sign_object_stop}')
-            elif param.name == 'stop_sign_trigger_distance_m' and param.type_ == param.Type.DOUBLE:
-                self.stop_sign_trigger_distance_m = max(0.0, float(param.value))
-                self.get_logger().info(
-                    f'stop_sign_trigger_distance_m -> {self.stop_sign_trigger_distance_m:.3f}')
-            elif param.name == 'stop_sign_hold_seconds' and param.type_ == param.Type.DOUBLE:
-                self.stop_sign_hold_seconds = max(0.0, float(param.value))
-                self.get_logger().info(
-                    f'stop_sign_hold_seconds -> {self.stop_sign_hold_seconds:.3f}')
-            elif param.name == 'stop_sign_cooldown_seconds' and param.type_ == param.Type.DOUBLE:
-                self.stop_sign_cooldown_seconds = max(0.0, float(param.value))
-                self.get_logger().info(
-                    f'stop_sign_cooldown_seconds -> {self.stop_sign_cooldown_seconds:.3f}')
-            elif param.name == 'stop_sign_min_confidence' and param.type_ == param.Type.DOUBLE:
-                self.stop_sign_min_confidence = max(0.0, min(1.0, float(param.value)))
-                self.get_logger().info(
-                    f'stop_sign_min_confidence -> {self.stop_sign_min_confidence:.3f}')
             elif param.name == 'visualize_pose' and param.type_ == param.Type.BOOL_ARRAY:
                 self.pose_visualize_flag = list(param.value)[0]
                 if self.pose_visualize_flag and not self.plot_visualized:
@@ -473,81 +479,66 @@ class PathFollower(Node):
     def object_detector_callback(self, msg):
         self.motion_flag = msg.data
 
-    def stop_required_callback(self, msg):
-        self.stop_required = bool(msg.data)
-
-    def stop_sign_objects_callback(self, msg):
-        if not self.enable_stop_sign_object_stop:
-            return
-
-        now = time.time()
-        if now < self.stop_sign_hold_until or now < self.stop_sign_cooldown_until:
-            return
-
-        try:
-            data = json.loads(msg.data)
-        except Exception as exc:
-            self.get_logger().warn(f'Could not parse /perception/objects_3d: {exc}')
-            return
-
-        for obj in data.get('objects', []):
-            class_name = self._normalize_class_name(obj.get('class_name', 'unknown'))
-            if class_name != 'stop sign':
-                continue
-
-            confidence = float(obj.get('confidence', 0.0))
-            if confidence < self.stop_sign_min_confidence:
-                continue
-
-            distance = self._object_distance_m(obj)
-            if distance is None or distance > self.stop_sign_trigger_distance_m:
-                continue
-
-            self.stop_sign_hold_until = now + self.stop_sign_hold_seconds
-            self.stop_sign_cooldown_until = (
-                self.stop_sign_hold_until + self.stop_sign_cooldown_seconds)
-            self._stop_sign_active_log = True
-            self.get_logger().warn(
-                f'STOP SIGN: distance={distance:.3f}m <= '
-                f'{self.stop_sign_trigger_distance_m:.3f}m, stopping for '
-                f'{self.stop_sign_hold_seconds:.1f}s')
-            return
-
-    @staticmethod
-    def _normalize_class_name(class_name):
-        return ' '.join(str(class_name).lower().replace('_', ' ').strip().split())
-
-    @staticmethod
-    def _object_distance_m(obj):
-        for key in ('depth_median', 'distance_m', 'range_m'):
-            if key not in obj:
-                continue
-            try:
-                value = float(obj[key])
-                if math.isfinite(value) and value > 0.0:
-                    return value
-            except Exception:
-                pass
-
-        pose_camera = obj.get('pose_camera', {})
-        try:
-            x = float(pose_camera.get('x', 0.0))
-            y = float(pose_camera.get('y', 0.0))
-            z = float(pose_camera['z'])
-            distance = math.sqrt(x * x + y * y + z * z)
-            if math.isfinite(distance) and distance > 0.0:
-                return distance
-        except Exception:
-            pass
-
-        return None
-
     def joint_state_callback(self, msg):
         self.qcar2_measurred_speed = (msg.velocity[0] / (720.0 * 4.0)) * ((13.0 * 19.0) / (70.0 * 30.0)) * (2.0 * np.pi) * 0.033
 
     def imu_callback(self, msg):
         self.gyroscope = [msg.angular_velocity.x, msg.angular_velocity.y, msg.angular_velocity.z]
 
+
+    def _roadmap_to_map_rotation(self):
+        angle_offset = self.rotation_offset[0]
+        return np.array([
+            [np.cos(-angle_offset * np.pi / 180), -np.sin(-angle_offset * np.pi / 180)],
+            [np.sin(-angle_offset * np.pi / 180),  np.cos(-angle_offset * np.pi / 180)]
+        ])
+
+    def _waypoints_in_map_frame(self):
+        if self._wp_in_ros_frame:
+            return np.array(self.wp)
+
+        t = np.array([self.translation_offset[0], self.translation_offset[1]])
+        return ((self.wp.T + t) @ self._roadmap_to_map_rotation()).T
+
+    def _warn_once_per_second(self, attr_name, message):
+        now = time.time()
+        if now - getattr(self, attr_name, 0.0) >= 1.0:
+            self.get_logger().warn(message)
+            setattr(self, attr_name, now)
+
+    def _initialize_path_start_from_current_pose(self):
+        if self._path_start_initialized:
+            return True
+
+        if self.fused_pose_x is None or self.fused_pose_y is None:
+            self._warn_once_per_second(
+                '_last_start_wait_log',
+                'Waiting for /qcar2_pose_fused before starting path index')
+            return False
+
+        if self.N <= 0:
+            return False
+
+        current_xy = np.array([self.fused_pose_x, self.fused_pose_y])
+        wp_map = self._waypoints_in_map_frame()
+        deltas = wp_map.T - current_xy
+        dists = np.linalg.norm(deltas, axis=1)
+        nearest_i = int(np.argmin(dists))
+        nearest_dist = float(dists[nearest_i])
+
+        self.wpi = int(np.clip(nearest_i, 0, self.N - 1))
+        self._path_start_initialized = True
+
+        if nearest_dist > self.start_gate_radius:
+            self.get_logger().warn(
+                f'Starting path from nearest waypoint {self.wpi}, '
+                f'but EKF pose is {nearest_dist:.2f}m away')
+        else:
+            self.get_logger().info(
+                f'Starting path from waypoint {self.wpi} '
+                f'(EKF distance {nearest_dist:.2f}m)')
+
+        return True
 
 
 #----------------Change N2 auto_align_roadmap_to_current_pose----------------
@@ -557,28 +548,22 @@ class PathFollower(Node):
 
         It assumes:
         - The QCar is physically placed at the first waypoint of the current route.
-        - Cartographer map->base_link is already available.
+        - /qcar2_pose_fused is already available.
         - self.wp has shape (2, N), where row 0 = x and row 1 = y.
         """
 
         try:
-            # Current QCar pose in Cartographer map frame
-            tf_msg = self.tf_buffer.lookup_transform(
-                'map',
-                self.target_frame,   # usually base_link
-                rclpy.time.Time()
-            )
+            if self.fused_pose_x is None or self.fused_pose_y is None or self.fused_pose_yaw is None:
+                self._warn_once_per_second(
+                    '_last_auto_align_wait_log',
+                    'Roadmap auto-align waiting for /qcar2_pose_fused')
+                return False
 
             current_xy = np.array([
-                tf_msg.transform.translation.x,
-                tf_msg.transform.translation.y
+                self.fused_pose_x,
+                self.fused_pose_y
             ])
-
-            q = tf_msg.transform.rotation
-            current_yaw = np.arctan2(
-                2.0 * (q.w * q.z + q.x * q.y),
-                1.0 - 2.0 * (q.y * q.y + q.z * q.z)
-            )
+            current_yaw = self.fused_pose_yaw
 
             # First point of SDCSRoadMap path
             raw_start = np.array([
@@ -630,7 +615,7 @@ class PathFollower(Node):
             return True
 
         except Exception as e:
-            self.get_logger().warn(f"Roadmap auto-align waiting for TF map->{self.target_frame}: {e}")
+            self.get_logger().warn(f"Roadmap auto-align failed using /qcar2_pose_fused: {e}")
             return False
     #----------------End of auto_align_roadmap_to_current_pose----------------N2
 
@@ -642,11 +627,7 @@ class PathFollower(Node):
             if i >= self.N:
                 i = self.N - 1
             pose = PoseStamped()
-            angle_offset = self.rotation_offset[0]
-            R_QLabs_ROS = np.array([
-                [np.cos(-angle_offset * np.pi / 180), -np.sin(-angle_offset * np.pi / 180)],
-                [np.sin(-angle_offset * np.pi / 180),  np.cos(-angle_offset * np.pi / 180)]
-            ])
+            R_QLabs_ROS = self._roadmap_to_map_rotation()
             t = np.array([self.translation_offset[0], self.translation_offset[1]])
             if self._wp_in_ros_frame:
                 wp_1_mod = np.array([self.wp[0, i], self.wp[1, i]])
@@ -670,12 +651,15 @@ class PathFollower(Node):
         # ekf_fusor node; this node only consumes the fused pose.
 
         #----CHANGE N3--------------
-        if self.auto_align_start and not self.auto_aligned:
+        if self.auto_align_start and not self.auto_aligned and not self._wp_in_ros_frame:
             self.auto_aligned = self.auto_align_roadmap_to_current_pose()
             if not self.auto_aligned:
                 return
 
         #--END OF CHANGE N3---------------------
+
+        if not self._initialize_path_start_from_current_pose():
+            return
 
         if round(self.t_plot) % 2 == 0:
             self.path_publisher()
@@ -684,11 +668,7 @@ class PathFollower(Node):
             if not self.path_complete:
                 wp_1 = np.array(self.wp[:, self.wpi])
 
-                angle_offset = self.rotation_offset[0]
-                R_QLabs_ROS = np.array([
-                    [np.cos(-angle_offset * np.pi / 180), -np.sin(-angle_offset * np.pi / 180)],
-                    [np.sin(-angle_offset * np.pi / 180),  np.cos(-angle_offset * np.pi / 180)]
-                ])
+                R_QLabs_ROS = self._roadmap_to_map_rotation()
                 t = np.array([self.translation_offset[0], self.translation_offset[1]])
                 if self._wp_in_ros_frame:
                     wp_1_mod = wp_1
@@ -748,30 +728,17 @@ class PathFollower(Node):
                     -self.max_steering_angle,
                     self.max_steering_angle)
 
+                steering = self._apply_lane_bias(float(pp_delta_damped))
+                self.current_steering = steering
+
                 # ----- Publish controller diagnostics for Foxglove -----
                 self._publish_controller_diagnostics(
                     dist=dist,
                     dist_to_final=dist_to_final,
                     psi=psi,
-                    steering_cmd=float(pp_delta_damped),
+                    steering_cmd=float(steering),
                     speed_cmd=float(speed_command),
                 )
-
-                self.pp_delta_raw  = float(pp_delta_damped)
-                self.stanley_delta = 0.0
-                self.stanley_trust = 0.0
-
-                steering = float(np.clip(pp_delta_damped,
-                                         -self.max_steering_angle,
-                                         self.max_steering_angle))
-                self.current_steering = steering
-
-                def f32(v):
-                    m = Float32(); m.data = float(v); return m
-                self.pub_pp_delta.publish(f32(self.pp_delta_raw))
-                self.pub_stanley_delta.publish(f32(0.0))
-                self.pub_blended_delta.publish(f32(self.current_steering))
-                self.pub_blend_alpha.publish(f32(0.0))
 
                 if int(self.t_plot * 5) != int((self.t_plot - self.dt) * 5):
                     self.get_logger().info(
@@ -786,26 +753,11 @@ class PathFollower(Node):
         enable = float(
             self.path_execute_flag and
             self.motion_flag and
-            not self.stop_required and
-            not self._stop_sign_stop_active() and
             not self.path_complete
         )
 
         self.nav_command(enable, speed_command)
         self.path_status()
-
-    def _stop_sign_stop_active(self):
-        active = (
-            self.enable_stop_sign_object_stop and
-            time.time() < self.stop_sign_hold_until
-        )
-        if self._stop_sign_active_log and not active:
-            self._stop_sign_active_log = False
-            cooldown_left = max(0.0, self.stop_sign_cooldown_until - time.time())
-            self.get_logger().info(
-                f'Stop-sign hold complete; resuming path. '
-                f'cooldown={cooldown_left:.1f}s')
-        return active
 
     def nav_command(self, enable, speed_command):
         # CRITICAL: do NOT publish in non-autonomous modes. If we published
@@ -1027,7 +979,9 @@ class PathFollower(Node):
             mode = 3.0
         elif dist_to_final < 0.5:
             mode = 2.0
-        elif self.stanley_trust > self.stanley_trust_min:
+        elif (
+            self.lane_bias_weight > 1e-3
+        ):
             mode = 1.0
         else:
             mode = 0.0

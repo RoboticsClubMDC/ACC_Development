@@ -71,7 +71,3 @@ CATKIN_IGNORE
 
 
 /.vscode
-
-# Local YOLO test environment/output
-/.venv-yolo/
-/yolo_distance_runs/

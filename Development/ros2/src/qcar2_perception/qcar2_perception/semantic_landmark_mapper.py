@@ -342,9 +342,6 @@ class SemanticLandmarkMapper(Node):
             "pose_map": self.point_dict(point_map),
             "uncertainty_radius": float(obj.get("uncertainty_radius", 0.30)),
             "confidence": self.observation_weight(obj),
-            "last_observation_distance_m": self.object_distance_m(obj),
-            "last_observation_depth_m": self.object_depth_m(obj),
-            "last_observation_quality": float(obj.get("quality_score", 0.0)),
             "seen_count": 1,
             "first_seen": now_sec,
             "last_seen": now_sec,
@@ -445,9 +442,6 @@ class SemanticLandmarkMapper(Node):
             obs_weight,
             0.35,
         )
-        landmark["last_observation_distance_m"] = self.object_distance_m(obj)
-        landmark["last_observation_depth_m"] = self.object_depth_m(obj)
-        landmark["last_observation_quality"] = float(obj.get("quality_score", 0.0))
         landmark["uncertainty_radius"] = self.blend(
             float(landmark.get("uncertainty_radius", 0.30)),
             float(obj.get("uncertainty_radius", 0.30)),
@@ -772,46 +766,9 @@ class SemanticLandmarkMapper(Node):
             "confidence": float(obj.get("confidence", 0.0)),
             "quality_score": float(obj.get("quality_score", 0.0)),
             "valid_depth_ratio": float(obj.get("valid_depth_ratio", 0.0)),
-            "distance_camera_m": self.object_distance_m(obj),
-            "depth_median": self.object_depth_m(obj),
             "uncertainty_radius": float(obj.get("uncertainty_radius", 0.30)),
             "pose_map": self.point_dict(point_map),
         }
-
-    @staticmethod
-    def object_depth_m(obj):
-        try:
-            value = float(obj.get("depth_median", 0.0))
-            if math.isfinite(value) and value > 0.0:
-                return value
-        except Exception:
-            pass
-        return None
-
-    @staticmethod
-    def object_distance_m(obj):
-        for key in ("distance_camera_m", "depth_median", "distance_m", "range_m"):
-            if key not in obj:
-                continue
-            try:
-                value = float(obj[key])
-                if math.isfinite(value) and value > 0.0:
-                    return value
-            except Exception:
-                pass
-
-        pose_camera = obj.get("pose_camera", {})
-        try:
-            x = float(pose_camera.get("x", 0.0))
-            y = float(pose_camera.get("y", 0.0))
-            z = float(pose_camera["z"])
-            distance = math.sqrt(x * x + y * y + z * z)
-            if math.isfinite(distance) and distance > 0.0:
-                return distance
-        except Exception:
-            pass
-
-        return None
 
     def distance_to_landmark(self, landmark, point_map):
         pose = landmark.get("pose_map", {})
