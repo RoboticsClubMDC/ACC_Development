@@ -7,6 +7,7 @@ from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchDescription
 from launch.actions import (IncludeLaunchDescription, DeclareLaunchArgument)
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import (PathJoinSubstitution, LaunchConfiguration)
 
@@ -25,6 +26,7 @@ def generate_launch_description():
     configuration_basename = LaunchConfiguration('configuration_basename')
     resolution = LaunchConfiguration('resolution')
     publish_period_sec = LaunchConfiguration('publish_period_sec', default='1.0')
+    enable_drive_converter = LaunchConfiguration('enable_drive_converter')
 
     qcar2_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([os.path.join(
@@ -57,6 +59,11 @@ def generate_launch_description():
             default_value='1.0',
             description='Publishing period')
 
+    enable_drive_converter_la = DeclareLaunchArgument(
+            'enable_drive_converter',
+            default_value='false',
+            description='Forward /cmd_vel_nav to QCar motor commands while mapping')
+
     cartographer_node = Node(
             package='cartographer_ros',
             executable='cartographer_node',
@@ -76,6 +83,7 @@ def generate_launch_description():
     package='qcar2_nodes',
     executable='nav2_qcar2_converter',
     name='nav2_qcar2_converter',
+    condition=IfCondition(enable_drive_converter),
     )
     return LaunchDescription([
         qcar2_launch,
@@ -84,6 +92,7 @@ def generate_launch_description():
         use_sim_la,
         resolution_la,
         publish_period_sec_la,
+        enable_drive_converter_la,
         cartographer_node,
         cartographer_occupancy_grid_node,
         qcar2_to_lidar_tf_node,

@@ -48,23 +48,11 @@ def generate_launch_description():
         name='lane_stanley_node',
     )
 
-    bev_csi_node = Node(
-        package='qcar2_autonomy',
-        executable='bev_csi_node',
-        name='bev_csi_node',
-    )
-
-    sidewalk_detection = Node(
-        package='qcar2_autonomy',
-        executable='sidewalk_detection',
-        name='sidewalk_detection',
-    )
-
-    bev_csi_seg = Node(
-        package='qcar2_autonomy',
-        executable='bev_csi_seg',
-        name='bev_csi_seg',
-    )
+    # sidewalk_detection = Node(
+    #     package='qcar2_autonomy',
+    #     executable='sidewalk_detection',
+    #     name='sidewalk_detection',
+    # )
 
     ''' TODO: Once finished this launch file must also include
     - Lane detector to help smooth out tracking of lanes while driving
@@ -75,11 +63,9 @@ def generate_launch_description():
         path_follower,
         traffic_system_detector,
         trip_planner,
-        bev_csi_node,
-        lane_detection,
-        lane_stanley_node,
+        # lane_detection,
+        # lane_stanley_node,
         yolo_detector,
-        sidewalk_detection,
-        bev_csi_seg,
+        #sidewalk_detection,
         ]
     )

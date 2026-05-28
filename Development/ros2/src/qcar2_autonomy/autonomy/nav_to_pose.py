@@ -101,24 +101,25 @@ class PathFollower(Node):
     def __init__(self):
         super().__init__('path_follower')
 
-        self.declare_parameter('node_values', [0, 8, 10])
+        self.declare_parameter('node_values', [10])
         self.waypoints = list(self.get_parameter('node_values').get_parameter_value().integer_array_value)
 
         self.declare_parameter('desired_speed', [0.4])
         self.desired_speed = list(self.get_parameter('desired_speed').get_parameter_value().double_array_value)
 
-        self.declare_parameter('visualize_pose', [True])
-        self.pose_visualize_flag = True
-
+        self.declare_parameter('visualize_pose', [False])
+        self.pose_visualize_flag = list(self.get_parameter('visualize_pose').get_parameter_value().bool_array_value)[0]
+        #list(self.get_parameter("visualize_pose").get_parameter_value().bool_array_value)[0]
+        
         self.scale = 1.0
 
-        self.declare_parameter('rotation_offset', [83.0])
+        self.declare_parameter('rotation_offset', [90.0])
         self.rotation_offset = list(self.get_parameter('rotation_offset').get_parameter_value().double_array_value)
 
-        self.declare_parameter('translation_offset', [0.0, 0.0])
+        self.declare_parameter('translation_offset', [1.282, 0.59])
         self.translation_offset = list(self.get_parameter('translation_offset').get_parameter_value().double_array_value)
 
-        self.declare_parameter('start_path', [True])
+        self.declare_parameter('start_path', [False])
         self.path_execute_flag = list(self.get_parameter('start_path').get_parameter_value().bool_array_value)[0]
 
         self.declare_parameter('mission_pickup_xy',  [0.0, 0.0])
@@ -160,7 +161,12 @@ class PathFollower(Node):
         self.timer = self.create_timer(self.dt, self.tf_timer)
         self.translation = [0, 0, 0]
         self.rotation = [0, 0, 0]
-        self.wp = SDCSRoadMap().generate_path(self.waypoints) * self.scale
+        if len(self.waypoints) >= 2:
+            self.wp = SDCSRoadMap().generate_path(self.waypoints) * self.scale
+        else:
+            # Single node (e.g. [10]) = "parked here, no preset route".
+            # Real path arrives via /cmd_waypoints from trip_planner.
+            self.wp = np.zeros((2, 1))
         self.N = len(self.wp[0, :])
         self.wpi = 0
         self.wp_prior = []
@@ -253,12 +259,16 @@ class PathFollower(Node):
         for param in params:
             if param.name == 'node_values' and param.type_ == param.Type.INTEGER_ARRAY:
                 self.waypoints = list(param.value)
-                self.wp = SDCSRoadMap().generate_path(self.waypoints) * 0.975
-                self.N = len(self.wp[0, :])
-                self.wpi = 0
-                self.previous_steering_value = 0
-                self.path_complete = False
-                self.get_logger().info('nodes updated!')
+                if len(self.waypoints) >= 2:
+                    self.wp = SDCSRoadMap().generate_path(self.waypoints) * 0.975
+                    self.N = len(self.wp[0, :])
+                    self.wpi = 0
+                    self.previous_steering_value = 0
+                    self.path_complete = False
+                    self._wp_in_ros_frame = False
+                    self.get_logger().info('nodes updated!')
+                else:
+                    self.get_logger().warn('node_values needs >=2 nodes to build a route — ignoring.')
             elif param.name == 'desired_speed' and param.type_ == param.Type.DOUBLE_ARRAY:
                 self.desired_speed = list(param.value)
                 self.get_logger().info('new desired speed...')
