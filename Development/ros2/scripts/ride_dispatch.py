@@ -39,7 +39,7 @@ from rclpy.node import Node
 from rcl_interfaces.srv import SetParameters
 from rcl_interfaces.msg import Parameter, ParameterType
 from std_msgs.msg import Bool, Float32
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
 
 from hal.products.mats import SDCSRoadMap
 
@@ -53,10 +53,17 @@ STOP_PAUSE_SEC    = 3.0     # /motion_enable OFF dwell at a STOP node
 STOP_RADIUS_M     = 0.40    # "passing" the STOP node
 STOP_REARM_M      = 0.65    # must leave this radius before STOP can re-fire
 
-# Fork-B re-approach safety (the arrival-align already seats precisely, so this
-# usually passes first try): if dist_to_final is still beyond tol, re-dispatch.
-REAPPROACH_TOL_TIGHT_M = 0.10    # pickup / dropoff (judges measure these)
-REAPPROACH_TOL_HUB_M   = 0.30    # HUB (wide anchor)
+# On HUB arrival, reset AMCL to the HUB's IDEAL node pose to bound per-lap
+# drift — but ONLY if the car is already within this range of it (trust but
+# verify: don't snap-lie if AMCL ended up far off).
+RESEED_HUB           = True
+RESEED_MAX_RANGE_M   = 0.40
+
+# Re-approach safety: if dist_to_final is still beyond tol after arrival,
+# re-dispatch the same node. pickup/dropoff just need to GET there (align is
+# OFF on those legs), so a loose tol avoids churn; the HUB seats precisely.
+REACH_TOL_M            = 0.35    # pickup / dropoff — position loose (heading-only align does the squaring)
+REAPPROACH_TOL_HUB_M   = 0.30    # HUB (wide anchor, then arrival-align seats it)
 MAX_REAPPROACH         = 3
 
 # LED IDs (qcar2_hardware.cpp lines 333-346)
@@ -122,6 +129,8 @@ class RideDispatcher(Node):
         self._stop_armed = True
 
         self.motion_pub = self.create_publisher(Bool, '/motion_enable', 1)
+        self.initpose_pub = self.create_publisher(
+            PoseWithCovarianceStamped, '/initialpose', 1)
         self.create_subscription(Bool, '/path_status', self._path_cb, 10)
         self.create_subscription(Float32, '/nav/distance_to_final',
                                  self._dist_cb, 10)
@@ -142,15 +151,58 @@ class RideDispatcher(Node):
         self.get_logger().info(f'  /{name}/set_parameters ready.')
 
     # ── transforms ────────────────────────────────────────────────────────
-    def _node_map_xy(self, node_id):
-        """Node (x,y) in the ROS map frame: p_ros = (p_qlabs + t) @ R(-a)."""
+    def _node_map_pose(self, node_id):
+        """Node (x, y, yaw) in the ROS map frame: p_ros = (p_qlabs + t) @ R(-a),
+        yaw_ros = yaw_qlabs + a (same convention as path_follower)."""
         a = self.rot * math.pi / 180.0
         R = np.array([[math.cos(-a), -math.sin(-a)],
                       [math.sin(-a),  math.cos(-a)]])
         pose = np.array(self.roadmap.nodes[int(node_id)].pose).reshape(-1)
         t = np.array([self.trans[0], self.trans[1]])
         p = (np.array([pose[0], pose[1]]) + t) @ R
-        return float(p[0]), float(p[1])
+        yaw = (float(pose[2]) + a + math.pi) % (2.0 * math.pi) - math.pi
+        return float(p[0]), float(p[1]), yaw
+
+    def _node_map_xy(self, node_id):
+        x, y, _ = self._node_map_pose(node_id)
+        return x, y
+
+    def _reseed_hub(self):
+        """Reset AMCL to the HUB's IDEAL node pose to bound per-lap drift —
+        but ONLY if the car is already within RESEED_MAX_RANGE_M of it (trust
+        but verify; never snap-lie if AMCL ended up far off)."""
+        if not RESEED_HUB:
+            return
+        hx, hy, hyaw = self._node_map_pose(HUB)
+        if self.robot_xy is None:
+            self.get_logger().warn('  HUB reseed skipped — no /robot_pose yet.')
+            return
+        d = math.hypot(self.robot_xy[0] - hx, self.robot_xy[1] - hy)
+        if d > RESEED_MAX_RANGE_M:
+            self.get_logger().warn(
+                f'  HUB reseed SKIPPED — {d:.2f} m off ideal (> {RESEED_MAX_RANGE_M}); '
+                f'not snapping (AMCL may be lost — consider re-mapping).')
+            return
+        msg = PoseWithCovarianceStamped()
+        msg.header.frame_id = 'map'
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.pose.pose.position.x = hx
+        msg.pose.pose.position.y = hy
+        msg.pose.pose.orientation.z = math.sin(hyaw / 2.0)
+        msg.pose.pose.orientation.w = math.cos(hyaw / 2.0)
+        msg.pose.covariance = [
+            0.05, 0.0,  0.0, 0.0, 0.0, 0.0,
+            0.0,  0.05, 0.0, 0.0, 0.0, 0.0,
+            0.0,  0.0,  0.0, 0.0, 0.0, 0.0,
+            0.0,  0.0,  0.0, 0.0, 0.0, 0.0,
+            0.0,  0.0,  0.0, 0.0, 0.0, 0.0,
+            0.0,  0.0,  0.0, 0.0, 0.0, 0.02]
+        for _ in range(5):
+            self.initpose_pub.publish(msg)
+            rclpy.spin_once(self, timeout_sec=0.1)
+        self.get_logger().info(
+            f'  HUB reseed → ideal node {HUB} pose ({hx:.3f},{hy:.3f}); '
+            f'was {d:.2f} m off — drift reset.')
 
     # ── raw param-set helpers ─────────────────────────────────────────────
     def _set_node_values(self, dest, label):
@@ -178,6 +230,16 @@ class RideDispatcher(Node):
         future = self.hw_cli.call_async(req)
         rclpy.spin_until_future_complete(self, future, timeout_sec=5.0)
         self.get_logger().info(f'  LED → {label} ({color_id})')
+
+    def _set_pf_bool(self, name, val, label):
+        p = Parameter()
+        p.name = name
+        p.value.type = ParameterType.PARAMETER_BOOL
+        p.value.bool_value = bool(val)
+        req = SetParameters.Request(); req.parameters = [p]
+        future = self.pf_cli.call_async(req)
+        rclpy.spin_until_future_complete(self, future, timeout_sec=5.0)
+        self.get_logger().info(f'  [{label}] {name} = {val}')
 
     def _publish_motion_enable(self, allow):
         self.motion_pub.publish(Bool(data=bool(allow)))
@@ -267,26 +329,34 @@ class RideDispatcher(Node):
         # after a STOP.
         DRIVE = (LED_GREEN, 'GREEN (driving)')
 
-        # HUB → PICKUP (GREEN driving)
+        # Pickup/dropoff: HEADING-ONLY align — PP gets there, then it just
+        # squares to the node's heading (≈0° error) without seating the exact
+        # (x,y). Only the HUB does the full position+heading seat.
+        self._set_pf_bool('arrival_align', True, f'{letter} pickup/dropoff')
+        self._set_pf_bool('arrival_align_heading_only', True, f'{letter} pickup/dropoff')
+
+        # HUB → PICKUP (GREEN driving) → arrive + heading-align → BLUE dwell
         self._set_led(*DRIVE)
-        self._drive_to(pickup, f'{letter}.1 HUB→PICKUP', REAPPROACH_TOL_TIGHT_M,
+        self._drive_to(pickup, f'{letter}.1 HUB→PICKUP', REACH_TOL_M,
                        DRIVE[0], DRIVE[1], stop_xy)
-        # AT PICKUP — BLUE dwell
         self._set_led(LED_BLUE, 'BLUE (at PICKUP)')
         time.sleep(PAUSE_PICKUP_SEC)
 
-        # PICKUP → DROPOFF (GREEN driving)
+        # PICKUP → DROPOFF (GREEN driving) → arrive + heading-align → ORANGE dwell
         self._set_led(*DRIVE)
-        self._drive_to(dropoff, f'{letter}.2 PICKUP→DROPOFF', REAPPROACH_TOL_TIGHT_M,
+        self._drive_to(dropoff, f'{letter}.2 PICKUP→DROPOFF', REACH_TOL_M,
                        DRIVE[0], DRIVE[1], stop_xy)
-        # AT DROPOFF — ORANGE dwell
         self._set_led(LED_ORANGE, 'ORANGE (at DROPOFF)')
         time.sleep(PAUSE_DROPOFF_SEC)
 
-        # DROPOFF → HUB (GREEN driving)
+        # DROPOFF → HUB — FULL seat (position + heading) at the HUB.
+        self._set_pf_bool('arrival_align_heading_only', False, f'{letter} HUB')
         self._set_led(*DRIVE)
         self._drive_to(HUB, f'{letter}.3 DROPOFF→HUB', REAPPROACH_TOL_HUB_M,
                        DRIVE[0], DRIVE[1], stop_xy)
+        # Reset AMCL to the ideal HUB pose (bounds per-lap drift; gated to
+        # RESEED_MAX_RANGE_M so we never snap-lie if AMCL is far off).
+        self._reseed_hub()
         # AT HUB — MAGENTA (parked, ready for the next ride)
         self._set_led(LED_MAGENTA, 'MAGENTA (parked at HUB)')
 

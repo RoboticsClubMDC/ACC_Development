@@ -255,6 +255,11 @@ class PathFollower(Node):
         # node's (x, y, yaw) in map frame. Runs up to arrival_align_timeout s,
         # then stops wherever it got. Reuses PoseAligner.
         self.declare_parameter('arrival_align', True)
+        # heading_only: at the node, rotate (3-point turn) to match the node's
+        # heading (≈0° error) but DON'T seat the exact (x,y). Used at pickup/
+        # dropoff — "aligned, not full-pose". False = full position+heading seat
+        # (HUB).
+        self.declare_parameter('arrival_align_heading_only', False)
         self.declare_parameter('arrival_align_timeout', 20.0)
         # Robust trigger: also start the align when within this radius of the
         # FINAL node pose, independent of the wpi/cluster stop condition (which
@@ -1335,9 +1340,11 @@ class PathFollower(Node):
             rear_clear = self._sector_clearance(180.0)
         else:
             wall_min, front_clear, rear_clear = 0.0, float('inf'), float('inf')
+        heading_only = bool(self.get_parameter('arrival_align_heading_only').value)
         v, steer, done = self._aligner.tick(
             p[0], p[1], yaw, tx, ty, tyaw, now,
-            front_clear=front_clear, rear_clear=rear_clear, wall_min=wall_min)
+            front_clear=front_clear, rear_clear=rear_clear, wall_min=wall_min,
+            heading_only=heading_only)
         if getattr(self._aligner, 'stuck', False):
             self.get_logger().warn(
                 'ARRIVAL-ALIGN: boxed in (walls front AND rear) — holding; '

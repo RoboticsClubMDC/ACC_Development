@@ -63,19 +63,32 @@ class PoseAligner:
         self.stuck = False           # set True when boxed in by walls both ways
 
     def tick(self, x, y, theta, tx, ty, target_yaw, now=None,
-             front_clear=float('inf'), rear_clear=float('inf'), wall_min=0.0):
+             front_clear=float('inf'), rear_clear=float('inf'), wall_min=0.0,
+             heading_only=False):
         """Return (linear_x, steer, done) for the current pose vs target pose.
 
         front_clear / rear_clear are lidar clearances (m) ahead/behind; with
         wall_min>0 the maneuver avoids pushing toward a wall closer than
         wall_min. Defaults (inf, inf, 0.0) = no wall awareness (original
-        behavior, used by return_to_origin.py)."""
+        behavior, used by return_to_origin.py).
+
+        heading_only=True: ignore POSITION — just rotate (3-point turn) until
+        the heading matches target_yaw (≈0° error). Used at pickup/dropoff
+        where we only need the car squared to the node, not seated on its (x,y)."""
         if now is None:
             now = time.time()
         dx = x - tx
         dy = y - ty
         rho = math.hypot(dx, dy)
         yaw_err = wrap_to_pi(target_yaw - theta)
+
+        # Heading-only: terminal on yaw alone; always 3-point-turn (no approach).
+        if heading_only:
+            if abs(yaw_err) <= self.yaw_tol:
+                return 0.0, 0.0, True
+            self.state = 'ALIGN'
+            v, steer = self._align(yaw_err, now, front_clear, rear_clear, wall_min)
+            return v, steer, False
 
         # ── Terminal ──
         if rho <= self.pos_tol and abs(yaw_err) <= self.yaw_tol:

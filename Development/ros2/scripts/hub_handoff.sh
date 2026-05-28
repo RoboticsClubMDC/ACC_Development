@@ -84,6 +84,16 @@ nav_to_hub() {
       || echo "      WARN: failed to set desired_speed."
   fi
 
+  # AT_HUB=1 (set by amcl_load when it seeds the HUB pose): the car is ALREADY
+  # parked at the HUB, so don't drive — just confirm + MAGENTA. path_follower is
+  # up (idle) and ready for the ride dispatcher.
+  if [[ "${AT_HUB:-0}" == "1" ]]; then
+    set_led "$LED_MAGENTA"
+    echo "[hub] Seeded AT HUB node $HUB_NODE — already there, parked, MAGENTA."
+    echo "      (skipped the drive). Ready for RIDES."
+    return 0
+  fi
+
   echo "      Arming temp-start route [-1, $HUB_NODE]..."
   ros2 param set /path_follower node_values "[-1, $HUB_NODE]" >/dev/null 2>&1 \
     || echo "      WARN: failed to set node_values on /path_follower."

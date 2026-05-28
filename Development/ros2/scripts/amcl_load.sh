@@ -91,6 +91,12 @@ if [[ "$WHICH_POSE" == "hub" ]] && ! grep -q '^hub_pose:' "$POSE_YAML"; then
 fi
 echo "Seeding from '$WHICH_POSE' pose (the car should be physically there)."
 
+# When seeding the HUB pose, the car is ALREADY parked at the HUB → tell
+# nav_to_hub to skip the drive and just confirm + MAGENTA.
+if [[ "$WHICH_POSE" == "hub" ]]; then
+  export AT_HUB=1
+fi
+
 # Parse the chosen pose block from the YAML.
 # YAML is short and rigid; awk is enough. We grab the first {x: A, y: B}
 # from the requested block.

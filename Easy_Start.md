@@ -1772,6 +1772,33 @@ Immediate execution order (remaining work toward competition):
 
 ## Change Log
 
+### 2026-05-28 EDT — Heading-only align at pickup/dropoff + reseed covariance fix.
+
+**User prompt (verbatim):** "no, I dont need full pose align I just need to be aligned that it has 0 grade of diference, not like a full pose alignment." (+ crash: `/initialpose` covariance had ints.)
+
+- **Heading-only align**: `PoseAligner.tick(heading_only=True)` ([`pose_aligner.py`](Development/ros2/src/qcar2_autonomy/autonomy/pose_aligner.py)) — skips position regulation, just 3-point-turns until heading matches `target_yaw` (≈0° error, `yaw_tol` ~2.6°), terminal on yaw alone. path_follower param `arrival_align_heading_only`; [`ride_dispatch.py`](Development/ros2/scripts/ride_dispatch.py) sets it **True for pickup/dropoff** (square to the node, don't seat x,y) and **False for the HUB** (full seat). Reach tolerance loosened to 0.35 m (position no longer the goal there).
+- **Crash fix**: `/initialpose` covariance list now all-floats (was mixing `0` ints → `AssertionError`).
+
+### 2026-05-28 EDT — HUB reseed to the ideal node pose (drift reset, range-gated).
+
+**User prompts (verbatim):** "our NODES Have an ideal pose right? … when ogin abck from ride to taxi hub, reseed for noise technically having your node -2, of you actual position to go." + "would be good to get on ideal pose for this. but it has to try on a certain range betweeen the 0.4."
+
+[`ride_dispatch.py`](Development/ros2/scripts/ride_dispatch.py): on returning to the HUB (after the DROPOFF→HUB leg), `_reseed_hub()` publishes `/initialpose` at the HUB's **ideal node pose** (node 10 (x,y,yaw) via SDCSRoadMap + offsets) to bound per-lap AMCL drift — **but only if the car is already within `RESEED_MAX_RANGE_M=0.40` m of it** (trust-but-verify; if AMCL ended up >0.4 m off it SKIPS with a warning instead of snap-lying). New `_node_map_pose` returns (x,y,yaw). `RESEED_HUB` toggle. This is roadmap item 6 (HUB re-localization between trips).
+
+**Note on PP widening (NOT fixed by the reseed):** the reseed bounds *lap-to-lap* drift, not *within-ride* PP over-curving into the sidewalk. PP-only has no lateral feedback — it follows the A* path open-loop, so a laterally-offset path (anchor) or tight-turn under/over-steer isn't corrected. Within-ride fixes are: populate `sharp_turn_legs` (shorter lookahead + slower on the tight legs), lower speed on curves, or enable Stanley (lateral correction) once the camera's calibrated.
+
+### 2026-05-28 EDT — amcl_load: recognize "already at HUB" → MAGENTA, skip the drive.
+
+**User prompt (verbatim):** "amcl_load is supposed to start on node 10, so LED magenta … its supposed to know that it starts on node 10 or it will compare that its node 10, so if its there it will just stop and led magenta??"
+
+When `amcl_load` seeds the saved **`hub_pose`** (= node 10's captured pose), AMCL is placed AT node 10, so the car is already parked there — re-driving `[-1,10]` is pointless. Fix: `amcl_load` exports `AT_HUB=1` when `WHICH_POSE=hub`; `nav_to_hub` ([`hub_handoff.sh`](Development/ros2/scripts/hub_handoff.sh)) then **skips the drive** — launches path_follower (idle, ready for rides), sets **MAGENTA**, and returns. So a reload at the HUB just confirms + MAGENTA, no maneuver. (If seeded from `final`/`initial`, `AT_HUB` is unset → it drives to the HUB normally.)
+
+### 2026-05-28 EDT — No align at pickup/dropoff (PP just arrives) + 2 s dwells.
+
+**User prompt (verbatim):** "I dont need pickup alignment, neither dropoff, I JUST NEED that PP gets to there, THE WAIT on stop of pickup and dropoff has to start the LED thing … so stop LED wait starts. then continue." (+ pickup/dropoff dwell 3 s→2 s.)
+
+[`ride_dispatch.py`](Development/ros2/scripts/ride_dispatch.py): per ride it sets path_follower `arrival_align=False` for the pickup + dropoff legs (PP just reaches the node, `path_complete` fires by proximity, then the dwell + LED runs), and `arrival_align=True` again for the DROPOFF→HUB leg so only the HUB seats precisely. Reach tolerance loosened to `REACH_TOL_M=0.20` for pickup/dropoff (was tight 0.10) to avoid re-approach churn. Pickup/dropoff dwell = 2 s; STOP-node halt stays 3 s.
+
 ### 2026-05-28 EDT — Ride LED loop finalized (GREEN = driving; color only at events).
 
 **User prompt (verbatim):** "magenta at start … when RIDE starts, LED green / when is on pickup LED blue / if any STOP LED red / when on dropoff Stop, orange light / when IS ON TAXI Hub, go to magenta again / when new ride is started LED [green]."
