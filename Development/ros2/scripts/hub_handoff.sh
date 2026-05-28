@@ -44,8 +44,12 @@ nav_to_hub() {
   if [[ "${STANLEY:-1}" == "1" ]]; then
     echo "      Stanley stack (lane-primary; Stanley off on 8→10/10→1; PP-align at HUB)."
     echo "      log: /tmp/stanley_stack.log"
+    # Pass physical:=true on the physical QCar so the D435 source uses the REAL
+    # backend + metric depth + GPU (virtual uses the QLabs backend + 0.1 depth).
+    local phys="false"
+    [[ "${MODE:-virtual}" == "physical" ]] && phys="true"
     setsid ros2 launch qcar2_autonomy stanley_arbiter_stack_launch.py \
-      >/tmp/stanley_stack.log 2>&1 &
+      physical:="$phys" >/tmp/stanley_stack.log 2>&1 &
     PF_PGID=$!
   else
     # STANLEY=0 → PP-only (cmd_topic=/cmd_vel_nav). Pre-arm node_values=[-1,HUB]
@@ -71,11 +75,22 @@ nav_to_hub() {
   # lands on the true pose, not a warm-up sample.
   sleep 2
 
+  # Cruise speed (m/s). Persists on path_follower → used by the HUB trip AND
+  # the rides. Default unset = path_follower's own default (0.4). Recommend
+  # SPEED=0.25 for the FIRST physical run.
+  if [[ -n "${SPEED:-}" ]]; then
+    ros2 param set /path_follower desired_speed "[$SPEED]" >/dev/null 2>&1 \
+      && echo "      desired_speed → $SPEED m/s" \
+      || echo "      WARN: failed to set desired_speed."
+  fi
+
   echo "      Arming temp-start route [-1, $HUB_NODE]..."
   ros2 param set /path_follower node_values "[-1, $HUB_NODE]" >/dev/null 2>&1 \
     || echo "      WARN: failed to set node_values on /path_follower."
 
-  echo "      Driving + aligning onto node $HUB_NODE (tail /tmp/path_follower.log)..."
+  local logf="/tmp/path_follower.log"
+  [[ "${STANLEY:-1}" == "1" ]] && logf="/tmp/stanley_stack.log"
+  echo "      Driving + aligning onto node $HUB_NODE (tail $logf)..."
   # /path_status (Bool) becomes True only AFTER the arrival-align seats the car
   # (or the 20 s align timeout fires). Poll until then.
   until ros2 topic echo /path_status --once 2>/dev/null | grep -q 'data: true'; do

@@ -34,7 +34,10 @@
 set -e
 
 MODE="${1:-virtual}"
-WHICH_POSE="${2:-final}"
+# Default pose is chosen AFTER we can read the YAML (prefer the saved HUB
+# parked pose = where the car actually ends each session). 2nd arg overrides:
+# initial | final | hub.
+WHICH_POSE="${2:-}"
 # Optional 3rd arg overrides the HUB node (default 10) for the auto first-trip.
 export HUB_NODE="${3:-10}"
 MAP_DIR="${HOME}/qcar2_maps"
@@ -48,11 +51,6 @@ source "$(dirname "$0")/hub_handoff.sh"
 case "$MODE" in
   virtual)  AMCL_LAUNCH="qcar2_amcl_localization_virtual_launch.py" ;;
   physical) AMCL_LAUNCH="qcar2_amcl_localization_launch.py" ;;
-  *) echo "Usage: $0 [virtual|physical] [initial|final]"; exit 1 ;;
-esac
-
-case "$WHICH_POSE" in
-  initial|final) ;;
   *) echo "Usage: $0 [virtual|physical] [initial|final]"; exit 1 ;;
 esac
 
@@ -72,6 +70,26 @@ if [[ ! -f "$POSE_YAML" ]]; then
   echo "ERROR: $POSE_YAML not found. Run carto_to_amcl.sh (recent version) first."
   exit 1
 fi
+
+# Default pose: prefer the saved HUB parked pose (the car's ACTUAL position at
+# the end of each session = where it sits on reload). If carto didn't save one
+# (older run / NAV_TO_HUB=0), fall back to the final (near-node-0) seed.
+if [[ -z "$WHICH_POSE" ]]; then
+  if grep -q '^hub_pose:' "$POSE_YAML"; then
+    WHICH_POSE="hub"
+  else
+    WHICH_POSE="final"
+  fi
+fi
+case "$WHICH_POSE" in
+  initial|final|hub) ;;
+  *) echo "Usage: $0 [virtual|physical] [initial|final|hub]"; exit 1 ;;
+esac
+if [[ "$WHICH_POSE" == "hub" ]] && ! grep -q '^hub_pose:' "$POSE_YAML"; then
+  echo "WARN: no hub_pose in $POSE_YAML — falling back to 'final'."
+  WHICH_POSE="final"
+fi
+echo "Seeding from '$WHICH_POSE' pose (the car should be physically there)."
 
 # Parse the chosen pose block from the YAML.
 # YAML is short and rigid; awk is enough. We grab the first {x: A, y: B}

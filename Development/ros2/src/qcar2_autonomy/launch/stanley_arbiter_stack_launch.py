@@ -29,28 +29,37 @@ import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import (DeclareLaunchArgument, IncludeLaunchDescription,
-                            SetEnvironmentVariable)
+                            OpaqueFunction, SetEnvironmentVariable)
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 
-def generate_launch_description():
+def _setup(context):
     perception_share = get_package_share_directory("qcar2_perception")
 
-    # Virtual dev container usually has no CUDA passthrough; lane HSV doesn't
-    # need it and the D435 source shouldn't waste time probing for a GPU.
-    force_cpu = SetEnvironmentVariable(name="QCAR2_FORCE_CPU", value="1")
-
-    camera_source = LaunchConfiguration("camera_source")
+    physical = LaunchConfiguration("physical").perform(context).strip().lower() \
+        in ("true", "1", "yes")
+    camera_source = LaunchConfiguration("camera_source").perform(context)
     detector_backend = LaunchConfiguration("detector_backend")
 
-    # D435 image source only (no YOLO/landmarks) — lane_detector needs the RGB.
+    actions = []
+
+    # On the VIRTUAL laptop container (no CUDA passthrough) force CPU; on the
+    # physical Jetson leave QCAR2_FORCE_CPU UNSET so the Orin GPU is used.
+    if not physical:
+        actions.append(SetEnvironmentVariable(name="QCAR2_FORCE_CPU", value="1"))
+
+    # D435 source. PHYSICAL: real D435 backend + metric depth (scale 1.0).
+    # VIRTUAL: QLabs backend + 10× world → distance_scale 0.1.
     d435_aligned_source = Node(
         package="qcar2_perception",
         executable="d435_aligned_source",
         name="d435_aligned_source",
-        parameters=[{"is_physical": False, "distance_scale": 0.1}],
+        parameters=[{
+            "is_physical": physical,
+            "distance_scale": 1.0 if physical else 0.1,
+        }],
         output="screen",
     )
 
@@ -62,7 +71,7 @@ def generate_launch_description():
         ),
         launch_arguments={
             "camera_source": camera_source,
-            "detector_backend": detector_backend,
+            "detector_backend": detector_backend.perform(context),
             "run_blender": "false",
         }.items(),
     )
@@ -76,8 +85,14 @@ def generate_launch_description():
         # we tune Stanley out of its overshoot — lane still leads, path steadies.
         # /nav/lane_gate still flips to JUNCTION_PATH_ONLY on the gated legs.
         parameters=[{
-            "lane_weight": 0.6,   # was 0.75
-            "path_weight": 0.4,   # was 0.25
+            # 2026-05-28 (rev2): lane leads more now that CTE is clean — the
+            # extra path bias was masking the late-steering symptom.
+            "lane_weight": 0.7,   # 0.75→0.6→0.7
+            "path_weight": 0.3,   # 0.25→0.4→0.3
+            # rev3: path_follower runs apply_gyro_damping:=false here, so the
+            # ARBITER is the ONLY damper. 0.20 under-damped raw PP → big swings
+            # (PP-only mode self-damped and drove clean). Bump the single D-gain.
+            "kd_steering": 0.40,  # was 0.20
         }],
     )
 
@@ -94,17 +109,32 @@ def generate_launch_description():
             # Full-leg no-Stanley zones near the HUB: 8→10 and 10→1.
             "no_lane_legs": [8, 10, 10, 1],
             "leg_node_radius": 0.40,
+            # rev3: smoother PP (longer lookahead, gentler gain) to stop the big
+            # swings on the way to the HUB; wider align trigger so the seat
+            # reliably fires once near node 10 (fixes stuck-at-HUB).
+            "lookahead_dist_floor": 0.50,          # was 0.30 — less oscillation
+            "kp_steering": 0.90,                   # was 1.10 — gentler raw PP
+            "arrival_align_trigger_radius": 0.55,  # was 0.35 — fire align sooner
+            # Physical RPLidar is mounted 180° yaw; virtual is 0. Only used if
+            # align_wall_detect is turned on.
+            "lidar_yaw_offset_deg": 180.0 if physical else 0.0,
         }],
     )
 
+    actions += [d435_aligned_source, lane_stack, motion_arbiter, path_follower]
+    return actions
+
+
+def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument("camera_source", default_value="d435",
                               choices=["csi", "d435"]),
         DeclareLaunchArgument("detector_backend", default_value="hsv",
                               choices=["hsv", "lanenet"]),
-        force_cpu,
-        d435_aligned_source,
-        lane_stack,
-        motion_arbiter,
-        path_follower,
+        DeclareLaunchArgument(
+            "physical", default_value="false", choices=["true", "false"],
+            description=("true → real D435 backend (is_physical, depth scale "
+                         "1.0), GPU enabled, lidar 180° yaw. false → QLabs "
+                         "virtual (sim backend, depth 0.1, force CPU).")),
+        OpaqueFunction(function=_setup),
     ])

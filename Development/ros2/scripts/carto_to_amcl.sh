@@ -354,6 +354,27 @@ ros2 topic pub -r 2 --times 6 /initialpose geometry_msgs/PoseWithCovarianceStamp
 echo ""
 if [[ "${NAV_TO_HUB:-1}" == "1" ]]; then
   nav_to_hub || echo "[hub] WARN: first-trip-to-HUB did not complete; AMCL stays up."
+
+  # Persist the TRUE HUB parked pose so amcl_load.sh can resume the car exactly
+  # where each session ENDS (parked at the HUB) — not the near-node-0 seed.
+  # This is the car's real position for a reload; AMCL then refines it.
+  HUB_OUT=$(timeout 4 ros2 run tf2_ros tf2_echo map base_link 2>/dev/null || true)
+  HUB_PARSED=$(echo "$HUB_OUT" | grep -E "Translation|Quaternion" \
+    | awk -F'[][]' '{print $2}' | tr ',' ' ')
+  HX=$(echo "$HUB_PARSED"  | sed -n '1p' | awk '{print $1}')
+  HY=$(echo "$HUB_PARSED"  | sed -n '1p' | awk '{print $2}')
+  HQZ=$(echo "$HUB_PARSED" | sed -n '2p' | awk '{print $3}')
+  HQW=$(echo "$HUB_PARSED" | sed -n '2p' | awk '{print $4}')
+  if [[ -n "$HX" && -n "$HY" && -n "$HQZ" && -n "$HQW" ]]; then
+    cat >> "$POSE_YAML" <<EOF
+hub_pose:
+  position:    {x: $HX, y: $HY, z: 0.0}
+  orientation: {x: 0.0, y: 0.0, z: $HQZ, w: $HQW}
+EOF
+    echo "[hub] Saved HUB parked pose ($HX, $HY) to $POSE_YAML — amcl_load resumes here."
+  else
+    echo "[hub] WARN: could not capture HUB pose; amcl_load will fall back to the final seed."
+  fi
 else
   set_led "$LED_GREEN"
   echo "[hub] NAV_TO_HUB=0 — skipping auto path_follower. Bring up your own stack"

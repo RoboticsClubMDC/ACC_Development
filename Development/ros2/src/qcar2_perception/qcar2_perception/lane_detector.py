@@ -145,6 +145,15 @@ class LaneDetector(Node):
         self.declare_parameter('use_centerline_skeleton', True)
         self.declare_parameter('min_lane_component_area', 30)
         self.declare_parameter('max_lane_blob_width_px', 80)
+        # 2026-05-28: reject SOLID blobs (the white sidewalk / HUB pad) at the
+        # mask level so the centerline scan can't lock onto them. A lane line /
+        # dash is THIN → low bounding-box fill (area/(w·h)); a sidewalk pad is a
+        # large 2-D filled region → high fill. Reject a component only when it
+        # is BOTH big (area ≥ blob_area_min_px) AND solid (fill ≥ blob_fill_min)
+        # — small solid dashes and thin diagonal dash-runs survive.
+        self.declare_parameter('reject_solid_blobs', True)
+        self.declare_parameter('blob_area_min_px', 3000)
+        self.declare_parameter('blob_fill_min', 0.55)
         self.declare_parameter('centerline_search_margin_px', 120)
         self.declare_parameter('intersection_branch', 'straight')  # straight, left, right
         self.declare_parameter('intersection_branch_bias_px', 110)
@@ -639,15 +648,28 @@ class LaneDetector(Node):
         mask = (mask > 0).astype(np.uint8) * 255
 
         min_area = self._pi('min_lane_component_area')
-        if min_area > 0:
+        reject_blobs = self._pb('reject_solid_blobs')
+        blob_area_min = self._pi('blob_area_min_px')
+        blob_fill_min = self._pd('blob_fill_min')
+        if min_area > 0 or reject_blobs:
             labels_ret = cv2.connectedComponentsWithStats(
                 mask, connectivity=8, ltype=cv2.CV_32S)
             labels = labels_ret[1]
             stats = labels_ret[2]
             filtered = np.zeros_like(mask)
             for idx, stat in enumerate(stats):
-                if idx > 0 and stat[4] >= min_area:
-                    filtered[labels == idx] = 255
+                if idx == 0:
+                    continue
+                x, y, w, h, area = stat
+                if area < min_area:
+                    continue
+                # Drop large SOLID blobs (sidewalk / HUB pad). Thin lines/dashes
+                # have low bbox fill, so they pass.
+                if reject_blobs and area >= blob_area_min:
+                    fill = area / float(max(int(w) * int(h), 1))
+                    if fill >= blob_fill_min:
+                        continue
+                filtered[labels == idx] = 255
             mask = filtered
 
         ks = max(1, self._pi('morph_kernel_size'))

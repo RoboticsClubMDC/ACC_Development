@@ -236,10 +236,14 @@ def _launch_setup(context):
             #   (b) Stanley atan2(k·cte, v) blew up at low v (0.05 floor) →
             #       raise min_speed_for_control to soften the denominator;
             #   (c) heading_gain=1.0 + cte term saturated max_steer on curves.
-            "stanley_gain": 0.22,          # was 0.5  (compensate CTE inflation)
-            "heading_gain": 0.6,           # was 1.0  (less curve overshoot)
-            "max_steer_rad": 0.25,         # was 0.35 (limit one-shot swing)
-            "min_speed_for_control": 0.40, # was 0.05 (softening floor)
+            # 2026-05-28 (rev2): the first detune (0.22/0.6/0.25) made Stanley
+            # steer too LATE once CTE was cleaned by the solid-blob reject (the
+            # overshoot was from the sidewalk-pad mis-lock, not raw gain). With
+            # honest CTE, restore responsiveness within a bounded steer.
+            "stanley_gain": 0.30,          # 0.5→0.22→0.30 (responsive, clean CTE)
+            "heading_gain": 1.0,           # 1.0→0.6→1.0 (react to curve sooner)
+            "max_steer_rad": 0.30,         # 0.35→0.25→0.30 (room for the curve)
+            "min_speed_for_control": 0.40, # softening floor (keep — anti-blowup)
             "publish_stop_when_lost": False,
         }],
         output="screen",

@@ -55,12 +55,21 @@ class PoseAligner:
 
     def reset(self):
         self.state = 'APPROACH'
-        self._wig_phase = None       # 'FWD' | 'BACK' | 'PAUSE' | 'PAUSE_END'
+        self._wig_phase = None       # 'PUSH' | 'PAUSE'
         self._wig_t0 = 0.0
         self._wig_dir = 1.0          # +1 = net CCW, -1 = net CW
+        self._last_push_dir = -1     # so the first push prefers FORWARD
+        self._cur_push_fwd = True
+        self.stuck = False           # set True when boxed in by walls both ways
 
-    def tick(self, x, y, theta, tx, ty, target_yaw, now=None):
-        """Return (linear_x, steer, done) for the current pose vs target pose."""
+    def tick(self, x, y, theta, tx, ty, target_yaw, now=None,
+             front_clear=float('inf'), rear_clear=float('inf'), wall_min=0.0):
+        """Return (linear_x, steer, done) for the current pose vs target pose.
+
+        front_clear / rear_clear are lidar clearances (m) ahead/behind; with
+        wall_min>0 the maneuver avoids pushing toward a wall closer than
+        wall_min. Defaults (inf, inf, 0.0) = no wall awareness (original
+        behavior, used by return_to_origin.py)."""
         if now is None:
             now = time.time()
         dx = x - tx
@@ -81,8 +90,11 @@ class PoseAligner:
 
         if self.state == 'APPROACH':
             v, steer = self._approach(x, y, theta, tx, ty, target_yaw, rho)
+            # Don't drive into a close front wall during the run-in.
+            if v > 0.0 and front_clear < wall_min:
+                v = 0.0
         else:
-            v, steer = self._align(yaw_err, now)
+            v, steer = self._align(yaw_err, now, front_clear, rear_clear, wall_min)
         return v, steer, False
 
     def _approach(self, x, y, theta, tx, ty, target_yaw, rho):
@@ -102,33 +114,45 @@ class PoseAligner:
         delta = max(-self.max_steer, min(self.max_steer, delta))
         return float(v), float(delta)
 
-    def _align(self, yaw_err, now):
-        """3-point turn: net-rotate toward target_yaw with ~zero translation."""
+    def _align(self, yaw_err, now, front_clear, rear_clear, wall_min):
+        """3-point turn: net-rotate toward target_yaw. A forward push and a
+        reverse push BOTH rotate the same way, so when a wall blocks one
+        direction we bias to the other — which also backs the car off the wall.
+        Alternates directions when both are clear (≈zero net translation)."""
         if self._wig_phase is None:
             self._wig_dir = 1.0 if yaw_err > 0 else -1.0   # +1 = CCW
-            self._wig_phase = 'FWD'
+            fwd_ok = front_clear >= wall_min
+            back_ok = rear_clear >= wall_min
+            if not fwd_ok and not back_ok:
+                self.stuck = True          # boxed in — caller will time out
+                return 0.0, 0.0
+            self.stuck = False
+            # Prefer to alternate from the last push (zero net drift); if the
+            # preferred direction is wall-blocked, take the open one.
+            prefer_fwd = (self._last_push_dir <= 0)
+            if prefer_fwd and fwd_ok:
+                self._cur_push_fwd = True
+            elif (not prefer_fwd) and back_ok:
+                self._cur_push_fwd = False
+            else:
+                self._cur_push_fwd = fwd_ok
+            self._last_push_dir = 1 if self._cur_push_fwd else -1
+            self._wig_phase = 'PUSH'
             self._wig_t0 = now
 
-        # CCW (dir +1): forward+left(+steer), reverse+right(-steer).
-        if self._wig_phase == 'FWD':
-            v = self.wiggle_v
-            steer = self._wig_dir * self.max_steer
+        if self._wig_phase == 'PUSH':
+            if self._cur_push_fwd:
+                v = self.wiggle_v
+                steer = self._wig_dir * self.max_steer
+            else:
+                v = -self.wiggle_v
+                steer = -self._wig_dir * self.max_steer
             if now - self._wig_t0 >= self.wiggle_seg_t:
                 self._wig_phase = 'PAUSE'
                 self._wig_t0 = now
-        elif self._wig_phase == 'BACK':
-            v = -self.wiggle_v
-            steer = -self._wig_dir * self.max_steer
-            if now - self._wig_t0 >= self.wiggle_seg_t:
-                self._wig_phase = 'PAUSE_END'
-                self._wig_t0 = now
-        elif self._wig_phase == 'PAUSE':
-            v, steer = 0.0, 0.0
-            if now - self._wig_t0 >= self.wiggle_pause_t:
-                self._wig_phase = 'BACK'
-                self._wig_t0 = now
-        else:  # PAUSE_END — one full FWD/BACK cycle done; re-evaluate next tick
-            v, steer = 0.0, 0.0
-            if now - self._wig_t0 >= self.wiggle_pause_t:
-                self._wig_phase = None
-        return float(v), float(steer)
+            return float(v), float(steer)
+
+        # PAUSE — brief stop, then re-evaluate (terminal / next push direction).
+        if now - self._wig_t0 >= self.wiggle_pause_t:
+            self._wig_phase = None
+        return 0.0, 0.0

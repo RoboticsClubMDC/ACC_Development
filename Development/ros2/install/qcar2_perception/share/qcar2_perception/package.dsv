@@ -4,6 +4,3 @@ source;share/qcar2_perception/hook/pythonpath.sh
 source;share/qcar2_perception/hook/ament_prefix_path.ps1
 source;share/qcar2_perception/hook/ament_prefix_path.dsv
 source;share/qcar2_perception/hook/ament_prefix_path.sh
-source;../../build/qcar2_perception/share/qcar2_perception/hook/pythonpath_develop.ps1
-source;../../build/qcar2_perception/share/qcar2_perception/hook/pythonpath_develop.dsv
-source;../../build/qcar2_perception/share/qcar2_perception/hook/pythonpath_develop.sh

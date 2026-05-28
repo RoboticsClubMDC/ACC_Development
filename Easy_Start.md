@@ -1772,6 +1772,80 @@ Immediate execution order (remaining work toward competition):
 
 ## Change Log
 
+### 2026-05-28 EDT — Ride LED loop finalized (GREEN = driving; color only at events).
+
+**User prompt (verbatim):** "magenta at start … when RIDE starts, LED green / when is on pickup LED blue / if any STOP LED red / when on dropoff Stop, orange light / when IS ON TAXI Hub, go to magenta again / when new ride is started LED [green]."
+
+[`ride_dispatch.py`](Development/ros2/scripts/ride_dispatch.py): every DRIVING leg (HUB→pickup, pickup→dropoff, dropoff→HUB) is **GREEN**; color changes only AT events — BLUE at pickup, ORANGE at dropoff, MAGENTA at the HUB, RED during a STOP (then restores GREEN). Loop: `MAGENTA → [GREEN→BLUE→GREEN→ORANGE→GREEN→MAGENTA]` per ride. (Earlier the file drove the dropoff/home legs in ORANGE/MAGENTA — fixed so those colors only show at the nodes.)
+
+### 2026-05-28 EDT — amcl_load resumes at the saved HUB pose + per-zone speed (PP slow / Stanley fast).
+
+**User prompts (verbatim):** "carto_to_amcl.sh … calculates what is my position right? the seed is just calculating my position … doesnt need to start on a certain point?" / "amcl_load.sh asure me … it uses the last one … saved form cartographer. if it doesnt use it, make it use that we start on node 10, ONLY IF IT DOESNT Do the actual pose recognition of where I am on start." / "speed is not being adjusted internally … stanley can run fast, but sometimes PP needs stability different speed."
+
+**Position/seed:** confirmed — Cartographer self-localizes (map origin = boot pose); the seed captures the actual `map→base_link` pose. No fixed start point needed.
+
+**amcl_load resumes at the HUB** (the gap: carto's saved `final_pose` is near node 0, but the car ENDS each session parked at the HUB → reload mislocalized). Fix: [`carto_to_amcl.sh`](Development/ros2/scripts/carto_to_amcl.sh) now captures the TRUE HUB parked pose after `nav_to_hub` and appends `hub_pose:` to `competition_map_pose.yaml`. [`amcl_load.sh`](Development/ros2/scripts/amcl_load.sh) now **defaults to `hub`** (the car's real position on reload; AMCL refines from there = the actual pose recognition), falling back to `final` if no `hub_pose` saved. 2nd arg still overrides: `initial|final|hub`.
+
+**Per-zone speed** ([`nav_to_pose.py`](Development/ros2/src/qcar2_autonomy/autonomy/nav_to_pose.py)): new `junction_speed` (0.25). `_lane_gate_tick` exports `_gate_open`; in `path_planner`, when the gate is CLOSED (junction / no-lane leg, PATH-ONLY) speed is capped to `junction_speed` — PP drives slow for stability there, while Stanley keeps `desired_speed` on the open road. Works in PP-only too (slows the no-lane legs).
+
+### 2026-05-28 EDT — SPEED knob for physical first run.
+
+**User prompt (verbatim):** "what about speed here … on first physical STANLEY=0 … we have to have all ready." (Also: the D435 is NOT tilted — so the analytic zero-pitch BEV trapezoid is a valid start; no geometry recalibration claim.)
+
+Added a `SPEED` env to `nav_to_hub` ([`hub_handoff.sh`](Development/ros2/scripts/hub_handoff.sh)): sets `path_follower desired_speed` after the node is up, so it applies to the HUB trip AND persists into the rides (it's live-tunable). Default unset = path_follower default 0.4 m/s (clamped to 0.7 downstream; auto-slows to 0.2 near a node and on sharp-turn legs). For the FIRST physical run use a conservative cruise:
+```bash
+SPEED=0.25 STANLEY=0 ./scripts/carto_to_amcl.sh physical
+```
+
+### 2026-05-28 EDT — Interactive ride dispatcher + physical-stack switch.
+
+**User prompts (verbatim):** "start constructing the RIDE part … instead of just looping those RIdes … pickup, dropoff / pickup, dropoff, STOP. THE STOP ONES ARE for /motion_enable off wait 3s. and then go. STOP remember is LED red color. A ride starts at taxi hub and goes to pickup, pickup goes to dropoff, dropoff goes to taxi hub … when ready this program ASK ME which Ride [A–X list]" and "PARALLELY … optimize carto_to_amcl.sh and amcl_load.sh for a physical version … SEE BUGS PROBLEMS, AND HOW TO PUT IT DIRECTLY."
+
+**Ride dispatcher** ([`ride_dispatch.py`](Development/ros2/scripts/ride_dispatch.py), rewritten): full official A–X `RIDES` table (2-entry = pickup,dropoff; 3-entry adds a STOP node). **Interactive** — prompts "Which ride? [A-X]" and runs HUB→PICKUP→DROPOFF→HUB. Each leg dispatches the **temp-start route `node_values=[-1, dest]`** (drive from current pose, arrival-align seats on dest) — no more single-node `[N]`. LEDs GREEN/BLUE/ORANGE/MAGENTA per leg. **STOP nodes**: dispatcher computes the node's map pose (SDCSRoadMap + the same rotation/translation offsets) and watches `/robot_pose`; when the car passes within `STOP_RADIUS_M`, it publishes `/motion_enable=False` (LED RED), waits 3 s, then `/motion_enable=True` and restores the leg LED. Confirmed path_follower honors `/motion_enable` ([nav_to_pose.py:481/1262](Development/ros2/src/qcar2_autonomy/autonomy/nav_to_pose.py#L481)), so STOP works even PP-only (no arbiter needed).
+
+**Physical-stack switch** (from a parallel review agent's punch list). The blocker: [`stanley_arbiter_stack_launch.py`](Development/ros2/src/qcar2_autonomy/launch/stanley_arbiter_stack_launch.py) hardcoded `is_physical=False, distance_scale=0.1, QCAR2_FORCE_CPU=1` with no override → on the real QCar the GREEN lane leg ran against the **QLabs camera backend at 0.1× depth**. Fix: new **`physical:=true`** launch arg (via OpaqueFunction) → real D435 backend, metric depth (1.0), GPU (no force-CPU), lidar 180° yaw. [`hub_handoff.sh`](Development/ros2/scripts/hub_handoff.sh) `nav_to_hub` passes `physical:=true` when the script mode is `physical`.
+
+**Physical review — verified clean** (no change needed): physical carto/AMCL launches DO include `ekf_fusor`+`nav2_qcar2_converter`; lidar 180° yaw handled by `fixed_lidar_frame.cpp`; node/topic names (`/qcar2_hardware`, `/scan`, `/amcl`, `/path_status`) match; the stanley stack starts no base (no duplicate hardware; physical `rgbd` is commented out so no D435 collision). **Still TODO for physical:** the D435 BEV trapezoid/intrinsics are virtual-derived — recalibrate on the real tilted camera. Deploy: laptop `sync_qcar2.sh` → on QCar `sync_native_from_synced.sh` → `colcon build` in `~/ros2` → `./scripts/carto_to_amcl.sh physical`.
+
+### 2026-05-28 EDT — Wall-aware align defaulted OFF (it broke the proven blind align).
+
+**User prompt (verbatim):** "Pure pursuit only is bugged, it didnt even do alignment im seeing. its rellated to the wall_detection."
+
+The wall-aware arrival align read `/scan` and, in the walled HUB area (virtual lidar sector mapping unverified), read front AND rear as blocked → aligner reported `stuck` → never did the 3-point turn → the proven PP-only seat regressed. Fix: `align_wall_detect` default **True→False** ([`nav_to_pose.py`](Development/ros2/src/qcar2_autonomy/autonomy/nav_to_pose.py)). With it off, `_arrival_align_tick` passes inf clearances → `PoseAligner` runs the original alternating 3-point turn (the "amazing" align). Opt back in with `align_wall_detect:=true` after verifying the lidar sectors (and `lidar_yaw_offset_deg=180` on physical).
+
+### 2026-05-28 EDT — Stanley-stack PP swing fix (rev3): arbiter is the sole damper.
+
+**User prompt (verbatim):** "still stuck, stanley is not following too much the lane, im seein that pure pursuit is still doing big swings."
+
+**Insight:** in the arbiter stack path_follower runs `apply_gyro_damping:=false`, so the motion_arbiter is the ONLY gyro damper — but its `kd_steering` was 0.20 while PP-only mode self-damped. Raw undamped PP → big swings → the car never converges to node 10 → proximity-align never fires → stuck at HUB. All scoped to [`stanley_arbiter_stack_launch.py`](Development/ros2/src/qcar2_autonomy/launch/stanley_arbiter_stack_launch.py) (PP-only config untouched):
+- arbiter `kd_steering` 0.20→**0.40** (sole damper).
+- path_follower `lookahead_dist_floor` 0.30→**0.50** (less oscillation), `kp_steering` 1.10→**0.90** (gentler raw PP), `arrival_align_trigger_radius` 0.35→**0.55** (align fires reliably once near the HUB).
+
+### 2026-05-28 EDT — Fix stuck-at-HUB (align never fired) + Stanley late-steering re-tune.
+
+**User prompt (verbatim):** "car reacting late, didnt follow too much the lane on start … car stuck when arriving hub, is not changing LED and is not aligning … not the alerter." + "reacting late = steering so late."
+
+**Stuck at HUB:** `nav_to_hub` waits for `/path_status==true`, which is only set when the arrival-align finishes. On the short temp-start `[-1,10]` path the wpi-clamp stop condition could miss → car parks but align never triggers → `/path_status` never True → script hangs at "Driving + aligning", no MAGENTA. Fixes in [`nav_to_pose.py`](Development/ros2/src/qcar2_autonomy/autonomy/nav_to_pose.py):
+- **Proximity trigger**: new `arrival_align_trigger_radius` (0.35 m) — align also fires when within that radius of the FINAL node pose, independent of the wpi/cluster geometry.
+- **Force PATH-ONLY while aligning**: `_lane_gate_tick` now forces `/nav/lane_gate=false` whenever `_align_active`, so the arbiter reliably forwards the 3-point-turn align (no lane blend diluting / blocking it) in the Stanley stack.
+- Fixed the misleading log path in [`hub_handoff.sh`](Development/ros2/scripts/hub_handoff.sh) (STANLEY mode logs to `/tmp/stanley_stack.log`).
+
+**Late steering (rev2 tune):** the first anti-overshoot detune (0.22/0.6/0.25) was compensating for the *bad* CTE (sidewalk-pad mis-lock); now that the solid-blob reject cleans CTE, those gains made Stanley steer too late. Restored responsiveness within a bounded steer ([`lane_lanenet_stanley_launch.py`](Development/ros2/src/qcar2_perception/launch/lane_lanenet_stanley_launch.py)): `stanley_gain` 0.22→**0.30**, `heading_gain` 0.6→**1.0**, `max_steer_rad` 0.25→**0.30** (kept `min_speed_for_control`=0.40 softening). Arbiter `lane_weight`/`path_weight` 0.6/0.4→**0.7/0.3** ([`stanley_arbiter_stack_launch.py`](Development/ros2/src/qcar2_autonomy/launch/stanley_arbiter_stack_launch.py)). These assume CTE is now honest — verify `/lane_keeping/bev_mask` shows the sidewalk blob gone before trusting them.
+
+### 2026-05-28 EDT — Solid-blob reject + sharp-turn legs + wall-aware arrival align.
+
+**User prompts (verbatim):** "we can rebuild a guidance of really sharp turns from node to node behavior so we make a list, and car be prepared right?" / "alignment has to have wall_detection, if wall is too near, see another way to align (maybe go back and have more distance from wall, and align)" / "look at the FOV why my binary is doing that so … usually what we wanna is avoid those big blobs that are basically the sidewalk." (symptom: "swinging wide".) Plus BEV debug images.
+
+**Image diagnosis:** the `bev_mask` was dominated by the big solid white **sidewalk / HUB pad**; the centerline scan locked onto it (not the dashed line), so `CTE` pegged at −0.100 m and Stanley steered into the wall. Root cause = perception mis-lock, not control gain.
+
+**Three changes:**
+
+1. **Solid-blob reject in [`lane_detector.py`](Development/ros2/src/qcar2_perception/qcar2_perception/lane_detector.py)** — in `_prepare_tracking_mask`, drop connected components that are BOTH big (`area ≥ blob_area_min_px`=3000) AND solid (`area/(w·h) ≥ blob_fill_min`=0.55). A sidewalk pad is a 2-D filled region (high fill); thin dashes / diagonal dash-runs have low fill and survive. New params: `reject_solid_blobs` (True), `blob_area_min_px`, `blob_fill_min`. (The pre-existing `max_lane_blob_width_px` was only a soft per-row penalty — insufficient.)
+
+2. **Sharp-turn legs in [`nav_to_pose.py`](Development/ros2/src/qcar2_autonomy/autonomy/nav_to_pose.py)** — `sharp_turn_legs` (flat (from,to) pairs, same reached-node tracking as `no_lane_legs`). On a listed leg, PP uses a SHORTER lookahead (`sharp_turn_lookahead_scale`=0.6 → commits to the arc, no swinging wide into the sidewalk) and caps speed (`sharp_turn_speed`=0.20). `_lane_gate_tick` now computes both `no_lane`/`sharp` active-leg states; `_on_sharp_turn` drives the lookahead/speed override in `path_planner`. **You still need to give me the sharp-turn node-pair list** to populate it.
+
+3. **Wall-aware arrival align** ([`pose_aligner.py`](Development/ros2/src/qcar2_autonomy/autonomy/pose_aligner.py) + path_follower) — path_follower subscribes to `/scan`; `_sector_clearance` gives front/rear lidar clearance (±`align_sector_half_deg`, `lidar_yaw_offset_deg` 0 virtual / 180 physical). `PoseAligner` now takes `front_clear`/`rear_clear`/`wall_min`: since a forward and a reverse push BOTH rotate the same way, when a wall is within `wall_min_clear` (0.25 m) ahead it biases to reverse pushes (rotate + back off the wall) and vice-versa; boxed-in both ways → `stuck` → timeout. Defaults (inf,inf,0) keep `return_to_origin.py` unchanged.
+
 ### 2026-05-28 EDT — Stanley anti-overshoot tune (one oscillation → wall).
 
 **User prompt (verbatim):** "stanley controller I think has some noise or kind off I just saw 1 oscillation and then went to wall, but it was following what it was supposed, but I guess the stanley calculated but overshoot, and distance from lane so much I would say. with stanley controller we can increase speed if needed but be in accordance to how much our camera can detect" → then "do it".

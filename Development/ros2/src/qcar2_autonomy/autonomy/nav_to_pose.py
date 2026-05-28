@@ -111,7 +111,7 @@ from tf2_ros import TransformException
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 from geometry_msgs.msg import Twist, PoseStamped
-from sensor_msgs.msg import Imu, JointState
+from sensor_msgs.msg import Imu, JointState, LaserScan
 from rcl_interfaces.msg import SetParametersResult
 from std_msgs.msg import Bool, Float32
 
@@ -218,6 +218,21 @@ class PathFollower(Node):
         self.declare_parameter('no_lane_legs', [-1])
         self.declare_parameter('leg_node_radius', 0.40)   # m
         self._reached_nodes = set()
+        # 2026-05-28: SHARP-TURN legs — same flat (from,to) pair format as
+        # no_lane_legs. On a listed leg the car is "prepared" for a tight
+        # node→node turn: SHORTER lookahead (commit to the arc → no swinging
+        # wide into the sidewalk) + capped speed. Uses the same reached-node
+        # tracking. Default [-1] = none.
+        self.declare_parameter('sharp_turn_legs', [-1])
+        self.declare_parameter('sharp_turn_lookahead_scale', 0.6)  # <1 = shorter
+        self.declare_parameter('sharp_turn_speed', 0.20)           # m/s cap
+        self._on_sharp_turn = False
+        # 2026-05-28: per-zone speed. Stanley (lane gate OPEN, open road) can
+        # cruise at desired_speed; PP at a junction / no-lane leg (gate CLOSED,
+        # PATH-ONLY) needs stability → cap to junction_speed. _gate_open is set
+        # by _lane_gate_tick. In PP-only this still slows the no_lane legs.
+        self.declare_parameter('junction_speed', 0.25)            # m/s cap (gate closed)
+        self._gate_open = True
         # 2026-05-28: TEMP-START NODE. AMCL never seeds a perfect (0,0,0); it
         # seeds the TRUE pose the car ended at (near node 0). Instead of forcing
         # the roadmap onto a fabricated node-0 placement (auto-align rotates the
@@ -241,6 +256,11 @@ class PathFollower(Node):
         # then stops wherever it got. Reuses PoseAligner.
         self.declare_parameter('arrival_align', True)
         self.declare_parameter('arrival_align_timeout', 20.0)
+        # Robust trigger: also start the align when within this radius of the
+        # FINAL node pose, independent of the wpi/cluster stop condition (which
+        # can miss on short temp-start paths → car parks but never aligns →
+        # /path_status never True → script stuck at HUB with no MAGENTA).
+        self.declare_parameter('arrival_align_trigger_radius', 0.35)
         self.declare_parameter('arrival_align_pos_tol', 0.06)
         self.declare_parameter('arrival_align_yaw_tol', 0.045)  # rad ~2.6°
         self._aligner = PoseAligner(
@@ -250,6 +270,22 @@ class PathFollower(Node):
         self._align_active = False
         self._align_done = False
         self._align_t0 = None
+        # 2026-05-28: WALL-AWARE align. During the 3-point turn, check RPLidar
+        # clearance ahead/behind; if a wall is within wall_min_clear in the
+        # direction we'd push, bias to the OTHER direction (both directions
+        # rotate the same way), which also backs the car away from the wall.
+        # lidar_yaw_offset_deg: 0 for virtual, 180 for the physical 180° mount.
+        # 2026-05-28: DEFAULT OFF. Wall-aware align broke the proven blind
+        # 3-point turn — in the walled HUB area (and with the virtual lidar
+        # sector mapping unverified) front+rear both read "blocked" → the
+        # aligner reported stuck and never turned. Opt in with
+        # align_wall_detect:=true once the lidar sectors are verified (and set
+        # lidar_yaw_offset_deg=180 on physical).
+        self.declare_parameter('align_wall_detect', False)
+        self.declare_parameter('wall_min_clear', 0.25)        # m
+        self.declare_parameter('align_sector_half_deg', 30.0) # ± cone half-width
+        self.declare_parameter('lidar_yaw_offset_deg', 0.0)
+        self._last_scan = None
         # 2026-05-27: cos^N(steering) speed reduction. Default 0.0 → DISABLED
         # (matches Gabriel — constant speed through curves). Set to 2.0 to
         # re-enable cos² speed cut for more conservative cornering.
@@ -456,6 +492,9 @@ class PathFollower(Node):
         self.imu_subscrition = self.create_subscription(
             Imu, '/qcar2_imu', self.imu_callback, 10)
         self.gyroscope = [0, 0, 0]
+
+        # RPLidar for wall-aware arrival align.
+        self.create_subscription(LaserScan, '/scan', self._scan_cb, 5)
 
         self.path_publisher_topic  = self.create_publisher(Path, '/planned_path', 1)
         self.path_status_publisher = self.create_publisher(Bool, '/path_status', 1)
@@ -699,6 +738,34 @@ class PathFollower(Node):
 
     def object_detector_callback(self, msg):
         self.motion_flag = msg.data
+
+    def _scan_cb(self, msg):
+        self._last_scan = msg
+
+    def _sector_clearance(self, center_deg):
+        """Min lidar range in a ±align_sector_half_deg cone centered at
+        center_deg (0 = forward in base_link, after lidar_yaw_offset). Returns
+        +inf if no scan / no valid returns in the cone."""
+        scan = self._last_scan
+        if scan is None or not scan.ranges:
+            return float('inf')
+        half = math.radians(float(self.get_parameter('align_sector_half_deg').value))
+        yaw_off = math.radians(float(self.get_parameter('lidar_yaw_offset_deg').value))
+        center = math.radians(center_deg) + yaw_off
+        best = float('inf')
+        a = scan.angle_min
+        inc = scan.angle_increment
+        rmin = scan.range_min if scan.range_min > 0 else 0.0
+        rmax = scan.range_max if scan.range_max > 0 else float('inf')
+        for r in scan.ranges:
+            ang = a
+            a += inc
+            if not math.isfinite(r) or r < rmin or r > rmax:
+                continue
+            d = (ang - center + math.pi) % (2.0 * math.pi) - math.pi
+            if abs(d) <= half and r < best:
+                best = r
+        return best
 
     def joint_state_callback(self, msg):
         # 2026-05-27: GEAR RATIO FIX. Was (70.0 * 30.0) = Gabriel's bug
@@ -1030,6 +1097,23 @@ class PathFollower(Node):
                 v_eff = max(self.qcar2_measurred_speed, 0.05)
                 lookahead_dist = max(v_eff * lookahead_mul, lookahead_floor)
 
+                # 2026-05-28: on a known sharp-turn leg, SHORTEN the lookahead
+                # (commit to the arc → no swinging wide into the sidewalk) and
+                # cap speed. self._on_sharp_turn is set by _lane_gate_tick.
+                if self._on_sharp_turn:
+                    lookahead_dist *= float(
+                        self.get_parameter('sharp_turn_lookahead_scale').value)
+                    speed_command = min(
+                        speed_command,
+                        float(self.get_parameter('sharp_turn_speed').value))
+                # Per-zone speed: PP at a junction / no-lane leg (gate closed,
+                # PATH-ONLY) drives slower for stability; Stanley open road
+                # keeps desired_speed.
+                if not self._gate_open:
+                    speed_command = min(
+                        speed_command,
+                        float(self.get_parameter('junction_speed').value))
+
                 # 2026-05-27: SKIP CLUSTERED WAYPOINTS in one tick. Previous
                 # behavior advanced wpi by 1 per tick — at intersections
                 # where the planner clusters waypoints 5-10 cm apart, the
@@ -1101,8 +1185,18 @@ class PathFollower(Node):
                                                 p[1] - wp_final_mod[1]])
                 final_stop_dist = float(
                     self.get_parameter('final_stop_dist').value)
-                if (self.wpi >= self.N - int(self.get_parameter('final_target_index_back').value)
-                        and dist < final_stop_dist):
+                trigger_radius = float(
+                    self.get_parameter('arrival_align_trigger_radius').value)
+                reached_target = (
+                    self.wpi >= self.N - int(self.get_parameter('final_target_index_back').value)
+                    and dist < final_stop_dist)
+                # Proximity trigger: also fire when close to the FINAL node pose
+                # (robust on short temp-start paths where the wpi clamp misses).
+                near_final = (bool(self.get_parameter('arrival_align').value)
+                              and self._final_align_pose is not None
+                              and not self._align_done
+                              and dist_to_final < trigger_radius)
+                if reached_target or near_final:
                     speed_command        = 0.0
                     pp_delta             = 0.0
                     self.current_steering = 0.0
@@ -1114,7 +1208,8 @@ class PathFollower(Node):
                             and not self._align_done):
                         if not self._align_active:
                             self.get_logger().info(
-                                'Reached final-node region → ARRIVAL-ALIGN.')
+                                f'Reached final-node region (dist_to_final='
+                                f'{dist_to_final:.3f}) → ARRIVAL-ALIGN.')
                         self._align_active = True
                     else:
                         self.path_complete = True
@@ -1232,7 +1327,21 @@ class PathFollower(Node):
                 f'residual pos={rho:.3f} m.')
             self._finish_align()
             return
-        v, steer, done = self._aligner.tick(p[0], p[1], yaw, tx, ty, tyaw, now)
+        # Wall-aware: feed lidar clearance ahead/behind so the 3-point turn
+        # biases away from a near wall (and backs off it) instead of pushing in.
+        if bool(self.get_parameter('align_wall_detect').value):
+            wall_min = float(self.get_parameter('wall_min_clear').value)
+            front_clear = self._sector_clearance(0.0)
+            rear_clear = self._sector_clearance(180.0)
+        else:
+            wall_min, front_clear, rear_clear = 0.0, float('inf'), float('inf')
+        v, steer, done = self._aligner.tick(
+            p[0], p[1], yaw, tx, ty, tyaw, now,
+            front_clear=front_clear, rear_clear=rear_clear, wall_min=wall_min)
+        if getattr(self._aligner, 'stuck', False):
+            self.get_logger().warn(
+                'ARRIVAL-ALIGN: boxed in (walls front AND rear) — holding; '
+                'will time out if it cannot clear.', throttle_duration_sec=2.0)
         if done:
             self.get_logger().info(
                 f'ARRIVAL-ALIGN seated on node pose (pos within tol).')
@@ -1520,20 +1629,24 @@ class PathFollower(Node):
         Node positions come from the persistent roadmap, transformed QLabs→map
         with the same offsets path_publisher uses (self.scale==1.0).
         """
+        def _pairs(param_name):
+            flat = [int(n) for n in self.get_parameter(param_name).value
+                    if int(n) >= 0]
+            return [(flat[i], flat[i + 1]) for i in range(0, len(flat) - 1, 2)]
+
         junctions = [int(n) for n in self.get_parameter('junction_nodes').value
                      if int(n) >= 0]
-        legs_flat = [int(n) for n in self.get_parameter('no_lane_legs').value
-                     if int(n) >= 0]
-        legs = [(legs_flat[i], legs_flat[i + 1])
-                for i in range(0, len(legs_flat) - 1, 2)]
+        no_lane = _pairs('no_lane_legs')
+        sharp = _pairs('sharp_turn_legs')
 
         gate_open = True
+        on_sharp = False
         try:
             p, _ = self._read_pose_for_planner()
         except Exception:
             p = None
 
-        if p is not None and (junctions or legs):
+        if p is not None:
             # Point gate (junction radius).
             radius = float(self.get_parameter('lane_gate_radius').value)
             for nid in junctions:
@@ -1541,18 +1654,30 @@ class PathFollower(Node):
                 if n_map and np.hypot(p[0] - n_map[0], p[1] - n_map[1]) < radius:
                     gate_open = False
 
-            # Full-leg gate: mark nodes reached, close while on an active leg.
-            if legs:
+            # Mark nodes reached for ALL leg lists, then evaluate active legs.
+            all_legs = no_lane + sharp
+            if all_legs:
                 leg_r = float(self.get_parameter('leg_node_radius').value)
-                leg_nodes = {a for a, _ in legs} | {b for _, b in legs}
+                leg_nodes = {a for a, _ in all_legs} | {b for _, b in all_legs}
                 for nid in leg_nodes:
                     n_map = self._node_map_pose_safe(nid)
                     if n_map and np.hypot(p[0] - n_map[0], p[1] - n_map[1]) < leg_r:
                         self._reached_nodes.add(nid)
-                for (a, b) in legs:
-                    if a in self._reached_nodes and b not in self._reached_nodes:
-                        gate_open = False   # on a no-lane leg → Stanley off
 
+                def _active(legs):
+                    return any(a in self._reached_nodes and b not in self._reached_nodes
+                               for (a, b) in legs)
+
+                if _active(no_lane):
+                    gate_open = False     # on a no-lane leg → Stanley off
+                on_sharp = _active(sharp)  # on a sharp-turn leg → PP "prepared"
+
+        self._on_sharp_turn = on_sharp
+        # While seating at a node, force PATH-ONLY so the arbiter forwards the
+        # 3-point-turn align cleanly (no lane blend diluting it).
+        if self._align_active:
+            gate_open = False
+        self._gate_open = gate_open   # consumed by path_planner for per-zone speed
         m = Bool()
         m.data = bool(gate_open)
         self.pub_lane_gate.publish(m)
