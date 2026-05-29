@@ -70,12 +70,7 @@ cartographer → /tf (map→base_link)
                   nav_to_pose (path_follower)
                   - EKF pose estimation (bicycle model + gyro KF)
                   - Pure pursuit path following at 80 Hz
-                  - Subscribes: /cmd_waypoints, /tf, /qcar2_joint, /imu
-                  - Publishes: /cmd_vel_raw, /robot_pose, /path_status
-                        │
-                  lane_keeping
-                  - Sidewalk repulsion safety layer
-                  - Subscribes: /cmd_vel_raw, /sidewalk_detection/no_go_margin
+                  - Subscribes: /cmd_waypoints, /tf, /qcar2_joint, /imu, /motion_enable
                   - Publishes: /cmd_vel_nav  ──→  hardware
                         ▲
                   trip_planner
@@ -85,10 +80,11 @@ cartographer → /tf (map→base_link)
                   - Publishes: /cmd_waypoints
 
 Perception (parallel):
-  lane_detection      → /lane_detection/lane_selected  (mono8 mask)
-  sidewalk_detection  → /sidewalk_detection/no_go_margin  (dilated mono8)
   yolo_detector       → /motion_enable  (stop sign / traffic light gating)
-  lane_stanley_node   ← /lane_detection/lane_selected  → steering corrections
+
+Visual lane detection (lane_detection, lane_stanley_node, lane_assist_blend,
+sidewalk_detection, lane_keeping) has been removed — the car drives purely
+on the recorded-map graph. yolo_detector traffic gating is the only camera input.
 ```
 
 ### Recorded map system

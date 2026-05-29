@@ -80,49 +80,7 @@ def generate_launch_description():
     # }]
 )
     
-    lane_detection = Node(
-        package='qcar2_autonomy',
-        executable='lane_detection',
-        name='lane_detection',
-        parameters=[{
-            'use_cuda': ParameterValue(use_cuda, value_type=bool),
-            'device':   ParameterValue(cuda_device, value_type=int),
-            'allow_cpu_fallback': ParameterValue(allow_cpu_fallback, value_type=bool),
-        }],
-    )
-
-
-    lane_stanley_node = Node(
-        package='qcar2_autonomy',
-        executable='lane_stanley_node',
-        name='lane_stanley_node',
-    )
-
-    bev_csi_node = Node(
-        package='qcar2_autonomy',
-        executable='bev_csi_node',
-        name='bev_csi_node',
-    )
-
-    sidewalk_detection = Node(
-        package='qcar2_autonomy',
-        executable='sidewalk_detection',
-        name='sidewalk_detection',
-        parameters=[{
-            'use_cuda': ParameterValue(use_cuda, value_type=bool),
-            'device':   ParameterValue(cuda_device, value_type=int),
-            'allow_cpu_fallback': ParameterValue(allow_cpu_fallback, value_type=bool),
-        }],
-    )
-
-    bev_csi_seg = Node(
-        package='qcar2_autonomy',
-        executable='bev_csi_seg',
-        name='bev_csi_seg',
-    )
-
     ''' TODO: Once finished this launch file must also include
-    - Lane detector to help smooth out tracking of lanes while driving
     - Planner server to coordinate which LEDs on the QCar should be on based on trip logic
     '''
 
@@ -151,10 +109,5 @@ def generate_launch_description():
         recorded_map_visualizer,
         traffic_system_detector,
         trip_planner,
-        bev_csi_node,
-        lane_detection,
-        lane_stanley_node,
-        sidewalk_detection,
-        bev_csi_seg,
         ]
     )
