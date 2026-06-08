@@ -4,6 +4,111 @@ Record of important prompts and answers during Claude sessions. Skip trivial exc
 
 ---
 
+## 2026-06-08 — Localization/map planning discussion and virtual test plan (Codex)
+**Gabriel asked:** Read `Gabriel_main_testing` and `origin/Clean`, explain navigation/localization differences, identify whether the "best path" is A*, hybrid A*, MPC/MPPI, pure pursuit, etc., and decide whether localization work should stay with the ROS Cartographer stack or switch toward Quanser's default QCarGPS examples.
+
+**Codex investigation summary:**
+- Active branch confirmed as `Gabriel_main_testing`.
+- `origin/Clean` qcar2 autonomy package contains the expected original-style files: `nav_to_pose.py`, `traffic_system_detector.py`, `trip_planner.py`, `yolo_detector.py`.
+- `Gabriel_main_testing` has removed `traffic_system_detector.py`, added `lane_detection.py`, `lane_keeping.py`, `lane_stanley_node.py`, `sidewalk_detection.py`, `stanley_live_plot.py`, and heavily changed `nav_to_pose.py`, `trip_planner.py`, and `yolo_detector.py`.
+- `setup.py` on `Gabriel_main_testing` still references `traffic_system_detector=autonomy.traffic_system_detector:main` even though that file is absent. This is a stale entry point, but the standard `autonomy_planner_launch.py` launches `yolo_detector`, not `traffic_system_detector`.
+- The standard `autonomy_planner_launch.py` currently launches `path_follower`, `yolo_detector`, and `trip_planner`. Lane/Stanley/sidewalk nodes are present but commented out in the launch file, so they are not part of the normal taxi run unless launched manually.
+
+**Path planning conclusion:**
+- Current taxi navigation is NOT Nav2 goal navigation. It is a custom taxi stack: `trip_nodes` -> `SDCSRoadMap` route -> `/cmd_waypoints` -> pure pursuit `path_follower` -> `/cmd_vel_nav` -> `nav2_qcar2_converter` -> motor commands.
+- The "best path" in the current taxi stack comes from `SDCSRoadMap.find_shortest_path()` when available.
+- The vendored `Development/MDC_libraries/python/hal/utilities/path_planning.py` implementation says `find_shortest_path()` uses the **A\*** algorithm over the directed SDCS road graph.
+- This is **not** hybrid A*. Hybrid A* would search over vehicle pose states `(x, y, theta)` with motion primitives, usually against an occupancy/cost grid. The current A* searches graph nodes/edges; vehicle turning behavior is represented by the precomputed road-edge geometry.
+- This is **not** MPC. Gabriel's "MCP" reference was interpreted as likely MPC/MPPI. Pure pursuit is not MPC; pure pursuit is a geometric path follower. Stanley is another path follower based on heading error plus cross-track error. Nav2 MPPI exists in `qcar2_slam_and_nav.yaml`, but the taxi launch is not using that Nav2 controller.
+- `qcar2_nodes/config/qcar2_slam_and_nav.yaml` configures Nav2 with `nav2_mppi_controller::MPPIController` as the controller and `nav2_navfn_planner/NavfnPlanner` as the global planner with `use_astar: false`. This is a separate Nav2 bringup path, not the active taxi stack.
+
+**Clean branch / Quanser default clarification:**
+- `origin/Clean` does not vendor `hal.products.mats` or `hal.utilities.path_planning`, but it still imports `SDCSRoadMap`. That means Clean likely relies on Quanser/PAL installed libraries outside the git branch for roadmap source.
+- Local broader Quanser resources include non-ROS Python examples using `QCarGPS`, `QCarEKF`, `SDCSRoadMap`, and Stanley steering. Example found at `Development/python_resources/qcar2/hardware/applications/multi_vehicle_self_driving/qcar/vehicle_control.py`.
+- In that non-ROS example, the flow is roughly: `SDCSRoadMap.generate_path(nodeSequence)` -> `QCarGPS.readGPS()` -> `QCarEKF.update([motorTach, steering], dt, y_gps, gyro_z)` -> `StanleyController.update(p, th, v)`.
+- This is likely the source of the "Quanser GPS" approach other teams mentioned. It is **not** currently the main localization path of the ROS taxi launch.
+
+**Localization conclusion:**
+- Current ROS taxi localization is Cartographer-first. `nav_to_pose.py` reads TF, currently `map -> base_link` in this branch, and uses that pose/yaw for control when available.
+- `nav_to_pose.py` contains `QcarEKF` and `GyroKF`, but the control loop effectively relies on Cartographer TF pose/yaw when the TF lookup succeeds. The local EKF is **not** currently acting as a full weighted fusion source that arbitrates between bicycle-model prediction, Cartographer, GPS, and gyro.
+- Cartographer config in `qcar2_nodes/config/qcar2_2d.lua` currently has:
+  - `provide_odom_frame = true`
+  - `use_odometry = false`
+  - `use_imu_data = false`
+  - `TRAJECTORY_BUILDER_2D.use_online_correlative_scan_matching = true`
+- Therefore, Cartographer is **not** currently using wheel encoder odometry or IMU data as inputs. It estimates robot motion primarily from 2D lidar scan matching and publishes the `map`/`odom`/`base` TF chain.
+- Gabriel noted that virtual runs should use `map`, while physical runs often need `map_rotated` and an offset/rotation handling strategy. For the next tests, Gabriel can only test virtual, so the plan is to stay with the virtual `map` frame for now.
+
+**Current SDCSRoadMap right-hand node poses observed from the active vendored map:**
+- Node 0 = [0.000, 0.130, -90.0 deg]
+- Node 1 = [0.269, 0.081, 90.0 deg]
+- Node 2 = [1.127, -1.085, 0.0 deg]
+- Node 3 = [1.127, -0.814, 180.0 deg]
+- Node 4 = [2.255, 0.081, 90.0 deg]
+- Node 5 = [1.984, 0.081, -90.0 deg]
+- Node 6 = [1.013, 1.101, 180.0 deg]
+- Node 7 = [1.235, 0.830, 0.0 deg]
+- Node 8 = [-0.749, 1.101, 180.0 deg]
+- Node 9 = [-0.749, 0.830, 0.0 deg]
+- Node 10 = [-1.282, -0.460, -42.0 deg]
+- Node 11 = [0.000, 2.163, -90.0 deg]
+- Node 12 = [0.000, 1.850, -90.0 deg]
+- Node 13 = [0.269, 1.850, 90.0 deg]
+- Node 14 = [2.255, 2.967, 90.0 deg]
+- Node 15 = [1.984, 1.850, -90.0 deg]
+- Node 16 = [0.908, 3.710, -80.6 deg]
+- Node 17 = [1.466, 3.151, -9.4 deg]
+- Node 18 = [0.623, 3.067, -138.0 deg]
+- Node 19 = [0.792, 2.859, 42.0 deg]
+- Node 20 = [0.000, 4.497, 180.0 deg]
+- Node 21 = [0.000, 4.227, 0.0 deg]
+- Node 22 = [-1.984, 2.967, -90.0 deg]
+- Node 23 = [-1.716, 2.967, 90.0 deg]
+
+**Competition ride-list discrepancy noted, but not concluded as root cause:**
+- `Competition_Ride_List.txt` includes nodes 24 and 25. Gabriel clarified that nodes 24 and 25 are new competition nodes added by Quanser and can be discussed later; they do not matter for the immediate localization test.
+- `Competition_Ride_List.txt` node 10 is `[-1.282, -0.59, -42]`, while current SDCSRoadMap node 10 is `[-1.282, -0.460, -42]`. This is a roughly 0.13 m y-axis discrepancy.
+- Similar y-axis discrepancies may exist because the active map source and the official competition ride list are not identical. This is a hypothesis to test, not a confirmed bug.
+- Gabriel reported that in a ride such as `[1, 8]`, the car may stop beyond node 1 and too high at node 8. Codex must not treat that as confirmed evidence. It is a user observation to verify with later virtual tests and readings.
+
+**Three-node semantics status:**
+- Gabriel clarified that the competition gives meaning for each node: pickup, dropoff, stop, or pass-through. Some 3-node rides may require stopping at the middle node and some may not. This is not the immediate focus and should not be assumed globally.
+- Current branch behavior at the time of discussion treats middle nodes as routing waypoints only, not stops. This may need future adjustment once official per-node/action semantics are encoded.
+
+**Traffic detector status:**
+- `traffic_system_detector.py` is absent on the current branch and appears to have been replaced operationally by `yolo_detector.py`.
+- Running classic `traffic_system_detector` and `yolo_detector` together would be risky because both can publish `/motion_enable`; they may fight unless arbitration is added.
+- Current working assumption for future work: keep YOLO as the main detector unless tests show it is insufficient; keep classic detector as a reference/fallback idea, not an active parallel node.
+
+**LED status:**
+- Gabriel said the branch's LED behavior is mostly fine.
+- Future desired LED tweak: dropoff should be yellow instead of orange. This was noted but not implemented in this discussion.
+
+**Recommended localization plan agreed for next testing:**
+- Do **not** immediately rewrite the stack around Quanser's non-ROS QCarGPS example.
+- Do **not** immediately rewrite the EKF fusion logic.
+- Keep the ROS taxi stack and Cartographer for now, because it already contains taxi dispatch, LEDs, YOLO stops, and hub return behavior.
+- First do a **pose audit** in virtual using the `map` frame:
+  - Place/start at known node 10 for now.
+  - Compare expected SDCSRoadMap pose against Cartographer pose.
+  - If possible, compare QCarGPS pose too.
+  - Repeat at a few known nodes or along short segments such as node 11 to node 12.
+  - Put the observed readings into `Readings.txt` for later analysis.
+- Use the readings to decide whether the main issue is frame selection, global rotation/translation, official-vs-vendored node coordinate mismatch, physical/virtual mat offset, Cartographer drift, or path-following/controller behavior.
+- Only after the readings should we decide whether to tune the existing `translation_offset` / `rotation_offset`, switch to official competition node coordinates, add a calibration transform, wire QCarGPS into ROS, build a real fused EKF layer, or change controller strategy.
+
+**Important caveat for future Codex sessions:**
+- Do **not** take the y-offset hypothesis for granted.
+- Do **not** take the reported node 1/node 8 stopping behavior as confirmed.
+- Do **not** assume nodes 24/25 are irrelevant beyond this immediate test phase.
+- Treat `Readings.txt` data from Gabriel's future virtual tests as the source of truth for the next decision.
+
+## 2026-05-28 — REGRESSION + BACKTRACK: stop/yield not stopping at all (Claude)
+**Gabriel reported:** car now doesn't stop for stop OR yield signs at all. Asked to investigate in detail, backtrack, and mark the breaking change with a warning.
+**Diagnosis:** the predictive `SignApproachTracker` (lateral-edge + depth-rate) cannot fire with Erick's model — conf ≤ ~0.745, depth frozen/NaN, geometric/height thresholds not reached. No `BRAKE NOW` logs → no stop. The "fancy" predictive port was the regression; the original simple `dist<1.0` gate had at least worked (stopped early but reliably).
+**Backtrack:** stop/yield now use simple `_sign_should_stop` = conf≥0.40 AND (depth<stop_dist_m(1.0) OR bbox_h≥120). Marked `SignApproachTracker`/`_sign_brake_decision` with "DO NOT RE-ENABLE FOR ERICK'S MODEL" WARNING (kept for reference, unused). Removed Codex's armed-poll. Kept time-based brake + TL FSM. See changelog.
+**Lesson (warned in code):** with this model, reliable simple gating beats predictive — depth + confidence are too unreliable for time-to-arrival prediction.
+
 ## 2026-05-28 — Stop/yield STILL not braking beside signs — root cause = model confidence (Claude)
 **Gabriel frustrated:** car still doesn't stop beside stop/yield signs; asked if it's the model (Erick's).
 **Answer: yes, the model.** Readings show stop-sign confidence maxes ~0.745, but `stop_sign_conf` gate was 0.90 → tracker never fed → never brakes. Depth also unreliable (frozen 0.716 m / `nanm`) so depth-rate "stop in X s" math can't work.

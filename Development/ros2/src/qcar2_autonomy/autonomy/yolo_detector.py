@@ -241,6 +241,7 @@ class ObjectDetector(Node):
         self.declare_parameter('stop_predict_min_speed',   0.05)
         self.declare_parameter('lateral_edge_frac',        0.30)
         self.declare_parameter('stop_brake_height_px',     120.0)
+        self.declare_parameter('stop_dist_m',              1.0)
         self.declare_parameter('detection_cooldown_s',     10.0)
         self.stop_conf                = float(self.get_parameter('stop_sign_conf').value)
         self.yield_conf               = float(self.get_parameter('yield_sign_conf').value)
@@ -253,6 +254,7 @@ class ObjectDetector(Node):
         self.stop_predict_min_speed   = float(self.get_parameter('stop_predict_min_speed').value)
         self.lateral_edge_frac        = float(self.get_parameter('lateral_edge_frac').value)
         self.stop_brake_height_px     = float(self.get_parameter('stop_brake_height_px').value)
+        self.stop_dist_m              = float(self.get_parameter('stop_dist_m').value)
         self.cooldown_def             = float(self.get_parameter('detection_cooldown_s').value)
         self._stop_tracker  = SignApproachTracker(self.get_logger(), 'stop sign')
         self._yield_tracker = SignApproachTracker(self.get_logger(), 'yield sign')
@@ -342,9 +344,31 @@ class ObjectDetector(Node):
             return float("nan")
         return float(np.median(valid))
 
+    def _sign_should_stop(self, label_conf, conf_thresh, used_d, bh):
+        """RELIABLE stop gate for Erick's model — this is the one actually used.
+        Stop when confidence passes AND (depth reads close OR bbox is tall).
+        The model's depth is unreliable (frozen/NaN) so the depth gate fires
+        whenever a sign is detected close-ish; bbox-height is the backup."""
+        if label_conf < conf_thresh:
+            return False
+        if 0.0 < used_d < self.stop_dist_m:
+            return True
+        if self.stop_brake_height_px > 0.0 and bh >= self.stop_brake_height_px:
+            return True
+        return False
+
     def _sign_brake_decision(self, tracker, conf_thresh, label_conf,
                              used_d, bbox_cx, bw, bh, now, label):
-        """Feed the predictive tracker; return True the instant it commits a
+        """!!! WARNING — DO NOT RE-ENABLE FOR ERICK'S MODEL !!!
+        Predictive "stop beside the sign" tracker (lateral-edge + depth-rate).
+        This was tried and it DOES NOT WORK with the current model: stop-sign
+        confidence tops out ~0.745, and the depth is frozen/NaN — so neither the
+        depth-rate nor the geometric triggers fire reliably and the car blew past
+        every sign (no stop at all). Kept only for reference. The stop/yield
+        branches now use _sign_should_stop instead. If you (or another AI) want
+        predictive stopping back, FIRST fix the model's confidence + depth.
+
+        Feed the predictive tracker; return True the instant it commits a
         brake for this sign. Falls back to a simple distance gate if no usable
         bbox is available."""
         if label_conf < conf_thresh:
@@ -471,18 +495,23 @@ class ObjectDetector(Node):
                     tl_best_present = True
 
             elif labelName == "stop sign":
+                # Simple reliable gate (see _sign_should_stop). The predictive
+                # _sign_brake_decision is intentionally NOT used — it doesn't work
+                # with this model (see its WARNING).
                 if (now >= self.sign_cooldown_until_abs
-                        and self._sign_brake_decision(self._stop_tracker, self.stop_conf,
-                                                      labelConf, used_d, bbox_cx, bw, bh, now, "Stop")):
+                        and self._sign_should_stop(labelConf, self.stop_conf, used_d, bh)):
                     self.brake_until_abs = max(self.brake_until_abs, now + self.stop_hold)
                     self.sign_cooldown_until_abs = now + self.cooldown_def
+                    self.get_logger().info(
+                        f"Stop Sign -> STOP (depth={used_d:.2f}m bbox_h={bh:.0f}px conf={labelConf:.2f})")
 
             elif labelName == "yield sign":
                 if (now >= self.sign_cooldown_until_abs
-                        and self._sign_brake_decision(self._yield_tracker, self.yield_conf,
-                                                      labelConf, used_d, bbox_cx, bw, bh, now, "Yield")):
+                        and self._sign_should_stop(labelConf, self.yield_conf, used_d, bh)):
                     self.brake_until_abs = max(self.brake_until_abs, now + self.yield_hold)
                     self.sign_cooldown_until_abs = now + self.cooldown_def
+                    self.get_logger().info(
+                        f"Yield Sign -> SLOW (depth={used_d:.2f}m bbox_h={bh:.0f}px conf={labelConf:.2f})")
 
         # Drive the TL state machine once per tick with the most prominent TL
         # (or "not present"). Commit-on-green: brake only if red/yellow on first
@@ -503,21 +532,11 @@ class ObjectDetector(Node):
             if self.brake_until_abs <= now + self.tl_hold + 0.05:
                 self.brake_until_abs = min(self.brake_until_abs, now)
 
-        # If the depth-rate tracker committed a future brake time, the sign can
-        # leave the camera before that time arrives. Poll armed trackers every
-        # tick so the planned stop/yield still fires out of view.
-        poll_now = time.time()
-        for tracker, hold, label in (
-            (self._stop_tracker, self.stop_hold, "Stop"),
-            (self._yield_tracker, self.yield_hold, "Yield"),
-        ):
-            if tracker.should_brake(poll_now) and poll_now >= self.sign_cooldown_until_abs:
-                self.brake_until_abs = max(self.brake_until_abs, poll_now + hold)
-                self.sign_cooldown_until_abs = poll_now + self.cooldown_def
-                self.get_logger().info(
-                    f"{label} Sign -> BRAKE NOW (armed tracker poll; sign may be out of FOV, "
-                    f"hold {hold:.1f}s)")
-                tracker.on_brake_fired()
+        # NOTE: Codex's "armed tracker poll" was removed here. It only mattered
+        # for the predictive _sign_brake_decision path, which is disabled for
+        # this model (see its WARNING). Stop/yield now brake via the simple
+        # _sign_should_stop gate inside the loop above. Do not re-add the poll
+        # unless the predictive tracker is re-enabled.
 
     def publish_motion_flag(self, enable: bool):
         msg      = Bool()

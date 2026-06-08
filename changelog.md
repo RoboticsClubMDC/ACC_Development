@@ -6,6 +6,19 @@ Record of code changes made during Claude sessions. Newest entries on top.
 
 ## 2026-05-28
 
+### yolo_detector.py — BACKTRACK: revert stop/yield to simple reliable gate (Claude)
+**File:** `Development/ros2/src/qcar2_autonomy/autonomy/yolo_detector.py`
+**By:** Claude
+**Regression fixed:** After the predictive port, the car stopped for NEITHER stop nor yield signs. Cause: the predictive `SignApproachTracker` (lateral-edge + depth-rate) cannot fire with Erick's model — stop-sign confidence ≤ ~0.745, depth frozen/NaN, and the geometric/height thresholds aren't reached. No `BRAKE NOW` ever logged → no stop.
+**Change (backtrack):**
+- Stop/yield now use a new **`_sign_should_stop`** gate: brake when `conf >= conf_thresh` AND (`0 < used_d < stop_dist_m` OR `bh >= stop_brake_height_px`). This is the simple, reliable approach that originally worked (the model's small depth reading makes `used_d < 1.0` fire whenever a sign is detected). New param `stop_dist_m` (default 1.0).
+- **Marked `SignApproachTracker` / `_sign_brake_decision` with a loud WARNING** "DO NOT RE-ENABLE FOR ERICK'S MODEL" — kept for reference, no longer called.
+- **Removed Codex's "armed tracker poll"** (it only served the now-disabled predictive path) and left a warning comment in its place.
+- Kept: time-based `brake_until_abs` braking, the TL FSM (1b), lowered conf (0.40), bbox logging.
+**Why:** Gabriel: car doesn't stop for signs at all; asked to backtrack and mark the breaking change. Reliability ("we stop") beats precision ("stop exactly beside") given this model's bad depth/confidence.
+**Tune:** stop closer → lower `stop_dist_m` (e.g. 0.6); stop earlier/more reliably → raise it. `stop_brake_height_px` is the backup trigger when depth is NaN.
+**Verification:** `python3 -m py_compile` OK.
+
 ### yolo_detector.py — stop/yield: fix confidence gate + depth-free brake (Claude)
 **File:** `Development/ros2/src/qcar2_autonomy/autonomy/yolo_detector.py`
 **By:** Claude
