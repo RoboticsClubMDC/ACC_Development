@@ -126,6 +126,24 @@ class PathFollower(Node):
         self.declare_parameter('mission_dropoff_xy', [0.0, 0.0])
         self.declare_parameter('mission_enable',     [False])
 
+        self.declare_parameter('kp_steering', 1.10)
+        # IMU angular velocity is rad/s. Keep Kd near the old effective value:
+        # old 5.0 * pi/180 ~= 0.087 rad/rad/s.
+        self.declare_parameter('kd_steering', 0.10)
+        self.declare_parameter('apply_gyro_damping', True)
+        self.declare_parameter('lookahead_dist_multiplier', 1.7)
+        self.declare_parameter('lookahead_dist_floor', 0.90)
+        self.declare_parameter('waypoint_dist_floor', 0.05)
+        self.declare_parameter('cluster_skip_enabled', True)
+        self.declare_parameter('arrival_radius', 0.12)
+        self.declare_parameter('final_heading_enabled', True)
+        self.declare_parameter('final_heading_outer_radius', 0.70)
+        self.declare_parameter('final_heading_inner_radius', 0.20)
+        self.declare_parameter('final_heading_tolerance_deg', 10.0)
+        self.declare_parameter('final_heading_kp', 0.20)
+        self.declare_parameter('final_heading_max_correction', 0.20)
+        self.declare_parameter('final_heading_speed', 0.12)
+
         # Stanley blend is kept at 0 — pure pursuit only
         self.stanley_blend     = 0.0
         self.stanley_trust_min = 999.0
@@ -176,6 +194,7 @@ class PathFollower(Node):
         self.stanley_delta = 0.0
         self.stanley_trust = 0.0
         self.pp_delta_raw  = 0.0
+        self.final_heading = None
 
         self.publisher = self.create_publisher(Twist, '/cmd_vel_nav', 1)
         self.cyclic = False
@@ -212,7 +231,22 @@ class PathFollower(Node):
 
         self.get_logger().info(
             f'PathFollower ready | PURE PURSUIT BASELINE | '
-            f'stanley_blend={self.stanley_blend} trust_min={self.stanley_trust_min}')
+            f'stanley_blend={self.stanley_blend} trust_min={self.stanley_trust_min} | '
+            f'kp={self.get_parameter("kp_steering").value:.2f} '
+            f'kd={self.get_parameter("kd_steering").value:.2f} '
+            f'cluster_skip={self.get_parameter("cluster_skip_enabled").value} '
+            f'arrival_radius={self.get_parameter("arrival_radius").value:.2f}')
+
+    def _quat_to_yaw(self, orientation):
+        quat = [
+            float(orientation.x),
+            float(orientation.y),
+            float(orientation.z),
+            float(orientation.w)
+        ]
+        if np.linalg.norm(quat) < 0.5:
+            return None
+        return float(R.from_quat(quat).as_euler('xyz')[2])
 
     def _cmd_waypoints_cb(self, msg: Path):
         if not msg.poses:
@@ -226,7 +260,12 @@ class PathFollower(Node):
         self.path_complete   = False
         self.path_execute_flag = True
         self._wp_in_ros_frame = True
-        self.get_logger().info(f'/cmd_waypoints received N={self.N}')
+        self.final_heading = self._quat_to_yaw(msg.poses[-1].pose.orientation)
+        heading_note = (
+            f' final_heading={np.degrees(self.final_heading):.1f}deg'
+            if self.final_heading is not None else ''
+        )
+        self.get_logger().info(f'/cmd_waypoints received N={self.N}{heading_note}')
 
     def _stanley_delta_cb(self, msg: Float32):
         self.stanley_delta = float(msg.data)
@@ -265,6 +304,7 @@ class PathFollower(Node):
                     self.wpi = 0
                     self.previous_steering_value = 0
                     self.path_complete = False
+                    self.final_heading = None
                     self._wp_in_ros_frame = False
                     self.get_logger().info('nodes updated!')
                 else:
@@ -382,18 +422,16 @@ class PathFollower(Node):
 
         try:
             if not self.path_complete:
-                wp_1 = np.array(self.wp[:, self.wpi])
-
                 angle_offset = self.rotation_offset[0]
                 R_QLabs_ROS = np.array([
                     [np.cos(-angle_offset * np.pi / 180), -np.sin(-angle_offset * np.pi / 180)],
                     [np.sin(-angle_offset * np.pi / 180),  np.cos(-angle_offset * np.pi / 180)]
                 ])
                 t = np.array([self.translation_offset[0], self.translation_offset[1]])
-                if self._wp_in_ros_frame:
-                    wp_1_mod = wp_1
-                else:
-                    wp_1_mod = (wp_1 + t) @ R_QLabs_ROS
+
+                def waypoint_in_map(index):
+                    wp = np.array(self.wp[:, index])
+                    return wp if self._wp_in_ros_frame else (wp + t) @ R_QLabs_ROS
 
                 L = 0.256
 
@@ -407,46 +445,99 @@ class PathFollower(Node):
                     p = [0, 0]
                     th = 0
 
-                v = [wp_1_mod[0] - p[0], wp_1_mod[1] - p[1]]
+                v_eff = max(self.qcar2_measurred_speed, 0.05)
+                lookahead_dist = max(
+                    v_eff * float(self.get_parameter('lookahead_dist_multiplier').value),
+                    float(self.get_parameter('lookahead_dist_floor').value))
+
+                cluster_skip = bool(self.get_parameter('cluster_skip_enabled').value)
+                while True:
+                    wp_1_mod = waypoint_in_map(self.wpi)
+                    dist = np.linalg.norm([p[0] - wp_1_mod[0], p[1] - wp_1_mod[1]])
+                    if dist >= lookahead_dist or self.wpi >= self.N - 1:
+                        break
+                    if self.wpi < self.N - 1:
+                        self.wpi += skip_index
+                    if not cluster_skip:
+                        break
+
+                self.wpi = np.clip(self.wpi, 0, self.N - 1)
+                wp_1_mod = waypoint_in_map(self.wpi)
+                dist = np.linalg.norm([p[0] - wp_1_mod[0], p[1] - wp_1_mod[1]])
+
+                v = np.array([wp_1_mod[0] - p[0], wp_1_mod[1] - p[1]])
                 Rot = np.array([[np.cos(th), -np.sin(th)], [np.sin(th), np.cos(th)]])
                 v_car = v @ Rot
 
-                WaypointDist = max(np.linalg.norm(v_car), 0.05)
+                WaypointDist = max(
+                    np.linalg.norm(v_car),
+                    float(self.get_parameter('waypoint_dist_floor').value))
                 psi = np.arctan2(v_car[1], v_car[0])
 
                 pp_delta = np.arctan2(2 * L * np.sin(psi), WaypointDist)
 
-                dist = np.linalg.norm([p[0] - wp_1_mod[0], p[1] - wp_1_mod[1]])
-
-                v_eff = max(self.qcar2_measurred_speed, 0.05)
-                lookahead_dist = max(v_eff * 1.7, 0.30)
-
-                if dist < lookahead_dist:
-                    if self.wpi < self.N - 1:
-                        self.wpi += skip_index
-
-                self.wpi = np.clip(self.wpi, 0, self.N - 1)
-
                 if self.wpi > self.N - 100:
                     speed_command = min(speed_command, 0.2)
 
-                wp_final = np.array(self.wp[:, -1])
-                wp_final_mod = wp_final if self._wp_in_ros_frame else (wp_final + t) @ R_QLabs_ROS
+                wp_final_mod = waypoint_in_map(-1)
                 dist_to_final = np.linalg.norm([p[0] - wp_final_mod[0],
                                                 p[1] - wp_final_mod[1]])
-                if dist_to_final < 0.25:
+
+                final_heading_enabled = (
+                    bool(self.get_parameter('final_heading_enabled').value)
+                    and self.final_heading is not None)
+                heading_error = 0.0
+                heading_ok = True
+                if final_heading_enabled:
+                    heading_error = float(wrap_to_pi(self.final_heading - th))
+                    heading_tolerance = np.deg2rad(
+                        float(self.get_parameter('final_heading_tolerance_deg').value))
+                    heading_ok = abs(heading_error) <= heading_tolerance
+
+                    outer_radius = max(
+                        float(self.get_parameter('final_heading_outer_radius').value),
+                        1e-3)
+                    inner_radius = max(
+                        float(self.get_parameter('final_heading_inner_radius').value),
+                        1e-3)
+                    if outer_radius <= inner_radius:
+                        outer_radius = inner_radius + 1e-3
+
+                    if dist_to_final < outer_radius:
+                        blend = np.clip(
+                            (outer_radius - dist_to_final) / (outer_radius - inner_radius),
+                            0.0,
+                            1.0)
+                        heading_correction = (
+                            float(self.get_parameter('final_heading_kp').value)
+                            * heading_error
+                            * blend)
+                        heading_correction = float(np.clip(
+                            heading_correction,
+                            -float(self.get_parameter('final_heading_max_correction').value),
+                            float(self.get_parameter('final_heading_max_correction').value)))
+                        pp_delta += heading_correction
+                        speed_command = min(
+                            speed_command,
+                            float(self.get_parameter('final_heading_speed').value))
+
+                arrival_radius = float(self.get_parameter('arrival_radius').value)
+                if dist_to_final < arrival_radius and heading_ok:
                     speed_command        = 0.0
                     pp_delta             = 0.0
                     self.current_steering = 0.0
                     self.wp_prior        = self.wp
                     self.path_complete   = True
 
-                Kp_steering = 1.1
-                kd_steering = 5
+                Kp_steering = float(self.get_parameter('kp_steering').value)
+                kd_steering = (
+                    float(self.get_parameter('kd_steering').value)
+                    if bool(self.get_parameter('apply_gyro_damping').value)
+                    else 0.0)
                 gyro_filtered = self.apply_filter('gyro', self.gyroscope[2], self.a1, self.b1)
 
                 pp_delta_damped = np.clip(
-                    Kp_steering * pp_delta - gyro_filtered * np.pi / 180 * kd_steering,
+                    Kp_steering * pp_delta - gyro_filtered * kd_steering,
                     -self.max_steering_angle,
                     self.max_steering_angle)
 
@@ -468,8 +559,13 @@ class PathFollower(Node):
 
                 if int(self.t_plot * 5) != int((self.t_plot - self.dt) * 5):
                     self.get_logger().info(
-                        f"wpi={self.wpi} dist={dist:.2f} "
+                        f"wpi={self.wpi}/{self.N - 1} dist={dist:.2f} "
+                        f"Ld={lookahead_dist:.2f} "
                         f"pp={pp_delta_damped:.3f} "
+                        f"goal_d={dist_to_final:.2f} "
+                        f"head_err={np.degrees(heading_error):.1f} "
+                        f"head_ok={heading_ok} "
+                        f"gyro={gyro_filtered:.3f} kd={kd_steering:.2f} "
                         f"steering={steering:.3f} "
                         f"v={speed_command:.2f}")
 

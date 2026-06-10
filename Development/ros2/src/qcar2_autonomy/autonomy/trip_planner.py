@@ -11,6 +11,7 @@ from nav_msgs.msg import Path
 from std_msgs.msg import Bool
 from rcl_interfaces.srv import SetParameters
 from rcl_interfaces.msg import Parameter, SetParametersResult
+from rclpy.parameter import Parameter as RclpyParameter
 from rclpy.parameter import ParameterType
 
 from hal.products.mats import SDCSRoadMap
@@ -47,7 +48,9 @@ class TripPlanner(Node):
         self.declare_parameter('dropoff_node',       [-1])
         self.declare_parameter('stop_seconds',       [3.0])
         self.declare_parameter('rotation_offset',    [90.0])
+        self.declare_parameter('heading_offset',     [90.0])
         self.declare_parameter('translation_offset', [0.0, 0.0])
+        self.declare_parameter('snap_to_exact_enabled', False)
 
         self.taxi_node          = int(list(self.get_parameter('taxi_node').get_parameter_value().integer_array_value)[0])
         self.trip_nodes         = self._normalize_node_list(
@@ -56,7 +59,9 @@ class TripPlanner(Node):
         self.dropoff_node       = int(list(self.get_parameter('dropoff_node').get_parameter_value().integer_array_value)[0])
         self.stop_seconds       = float(list(self.get_parameter('stop_seconds').get_parameter_value().double_array_value)[0])
         self.rotation_offset    = list(self.get_parameter('rotation_offset').get_parameter_value().double_array_value)
+        self.heading_offset     = list(self.get_parameter('heading_offset').get_parameter_value().double_array_value)
         self.translation_offset = list(self.get_parameter('translation_offset').get_parameter_value().double_array_value)
+        self.snap_to_exact_enabled = bool(self.get_parameter('snap_to_exact_enabled').value)
 
         self.add_on_set_parameters_callback(self.parameter_update_callback)
 
@@ -185,8 +190,12 @@ class TripPlanner(Node):
                 self.stop_seconds = float(list(p.value)[0])
             elif p.name == 'rotation_offset' and p.type_ == p.Type.DOUBLE_ARRAY:
                 self.rotation_offset = list(p.value)
+            elif p.name == 'heading_offset' and p.type_ == p.Type.DOUBLE_ARRAY:
+                self.heading_offset = list(p.value)
             elif p.name == 'translation_offset' and p.type_ == p.Type.DOUBLE_ARRAY:
                 self.translation_offset = list(p.value)
+            elif p.name == 'snap_to_exact_enabled' and p.type_ == p.Type.BOOL:
+                self.snap_to_exact_enabled = bool(p.value)
 
         if ride_param_updated and self.ready_for_rides and self.mission_stage == MissionStage.IDLE:
             if self._pending_ride_nodes():
@@ -237,7 +246,15 @@ class TripPlanner(Node):
         t     = np.array(self.translation_offset)
         return tuple((np.array([float(x), float(y)]) @ R_mat.T) - t)
 
-    def _qlabs_path_to_ros(self, wp_2xn):
+    def _yaw_to_quat(self, yaw):
+        half = 0.5 * float(yaw)
+        return 0.0, 0.0, float(np.sin(half)), float(np.cos(half))
+
+    def _node_heading_in_map(self, node_id):
+        yaw = self._get_node_theta(node_id) + float(self.heading_offset[0]) * np.pi / 180.0
+        return float(np.arctan2(np.sin(yaw), np.cos(yaw)))
+
+    def _qlabs_path_to_ros(self, wp_2xn, final_heading=None):
         R_mat   = self._rot_matrix()
         t_off   = np.array(self.translation_offset)
         path_msg = Path()
@@ -250,6 +267,12 @@ class TripPlanner(Node):
             pose.pose.position.x = float(pt[0])
             pose.pose.position.y = float(pt[1])
             path_msg.poses.append(pose)
+        if final_heading is not None and path_msg.poses:
+            qx, qy, qz, qw = self._yaw_to_quat(final_heading)
+            path_msg.poses[-1].pose.orientation.x = qx
+            path_msg.poses[-1].pose.orientation.y = qy
+            path_msg.poses[-1].pose.orientation.z = qz
+            path_msg.poses[-1].pose.orientation.w = qw
         return path_msg
 
     def _get_node_xy(self, node_id):
@@ -289,14 +312,21 @@ class TripPlanner(Node):
         rot_rad = float(np.arctan2(np.sin(map_yaw - h_theta),
                                    np.cos(map_yaw - h_theta)))
         self.rotation_offset = [float(np.degrees(rot_rad))]
+        self.heading_offset = [float(np.degrees(rot_rad))]
 
         R_mat = self._rot_matrix()
         t_off = np.array([rx, ry]) @ R_mat.T - np.array([hx, hy])
         self.translation_offset = [float(t_off[0]), float(t_off[1])]
+        self.set_parameters([
+            RclpyParameter('rotation_offset', RclpyParameter.Type.DOUBLE_ARRAY, self.rotation_offset),
+            RclpyParameter('heading_offset', RclpyParameter.Type.DOUBLE_ARRAY, self.heading_offset),
+            RclpyParameter('translation_offset', RclpyParameter.Type.DOUBLE_ARRAY, self.translation_offset),
+        ])
 
         self.get_logger().info(
             f'Auto-aligned at hub node {self.taxi_node}: '
             f'rotation_offset={self.rotation_offset[0]:.2f} deg, '
+            f'heading_offset={self.heading_offset[0]:.2f} deg, '
             f'translation_offset=[{self.translation_offset[0]:.3f}, {self.translation_offset[1]:.3f}]')
         return True
 
@@ -359,12 +389,18 @@ class TripPlanner(Node):
 
         return np.hstack([np.array(base), goal_col])
 
-    def _send_path_to(self, goal_xy, label=''):
+    def _send_path_to(self, goal_xy, label='', goal_node=None):
         wp = self._plan_to_xy(goal_xy)
         if wp is None:
             return False
-        self.waypoints_pub.publish(self._qlabs_path_to_ros(wp))
-        self.get_logger().info(f'Path published -> {label} ({goal_xy[0]:.2f}, {goal_xy[1]:.2f})')
+        final_heading = self._node_heading_in_map(goal_node) if goal_node is not None else None
+        self.waypoints_pub.publish(self._qlabs_path_to_ros(wp, final_heading=final_heading))
+        heading_note = (
+            f' heading={np.degrees(final_heading):.1f}deg'
+            if final_heading is not None else ''
+        )
+        self.get_logger().info(
+            f'Path published -> {label} ({goal_xy[0]:.2f}, {goal_xy[1]:.2f}){heading_note}')
         return True
 
     def _plan_through(self, route_nodes, goal_node):
@@ -403,15 +439,22 @@ class TripPlanner(Node):
         wp = self._plan_through(route_nodes, goal_node)
         if wp is None:
             return False
-        self.waypoints_pub.publish(self._qlabs_path_to_ros(wp))
+        final_heading = self._node_heading_in_map(goal_node)
+        self.waypoints_pub.publish(self._qlabs_path_to_ros(wp, final_heading=final_heading))
         gx, gy = self._get_node_xy(goal_node)
         via = f' via {list(route_nodes)}' if route_nodes else ''
-        self.get_logger().info(f'Path published -> {label}{via} ({gx:.2f}, {gy:.2f})')
+        self.get_logger().info(
+            f'Path published -> {label}{via} ({gx:.2f}, {gy:.2f}) '
+            f'heading={np.degrees(final_heading):.1f}deg')
         return True
 
-    def _snap_to_exact(self, goal_xy, label=''):
+    def _snap_to_exact(self, goal_xy, label='', goal_node=None):
+        if not self.snap_to_exact_enabled:
+            self.get_logger().info(f'Snap disabled for {label}; holding completed path.')
+            return True
+
         if self.robot_pose is None:
-            return self._send_path_to(goal_xy, label)
+            return self._send_path_to(goal_xy, label, goal_node=goal_node)
 
         rx, ry = float(self.robot_pose.pose.position.x), float(self.robot_pose.pose.position.y)
         R_mat  = self._rot_matrix()
@@ -425,8 +468,15 @@ class TripPlanner(Node):
             return True
 
         wp = np.stack([cur_q, goal_q], axis=1)
-        self.waypoints_pub.publish(self._qlabs_path_to_ros(wp))
-        self.get_logger().info(f'Snap path -> {label} ({goal_xy[0]:.2f}, {goal_xy[1]:.2f}) dist={dist:.3f}m')
+        final_heading = self._node_heading_in_map(goal_node) if goal_node is not None else None
+        self.waypoints_pub.publish(self._qlabs_path_to_ros(wp, final_heading=final_heading))
+        heading_note = (
+            f' heading={np.degrees(final_heading):.1f}deg'
+            if final_heading is not None else ''
+        )
+        self.get_logger().info(
+            f'Snap path -> {label} ({goal_xy[0]:.2f}, {goal_xy[1]:.2f}) '
+            f'dist={dist:.3f}m{heading_note}')
         return True
 
     def _set_led(self, led_id: int):
@@ -521,7 +571,7 @@ class TripPlanner(Node):
             self._complete_mission()
             return
 
-        self._snap_to_exact(goal_xy, label=f'{label}-snap')
+        self._snap_to_exact(goal_xy, label=f'{label}-snap', goal_node=goal_node)
 
         if self.mission_stage == MissionStage.TO_PICKUP:
             self.mission_stage = MissionStage.WAIT_AT_PICKUP
@@ -582,7 +632,7 @@ class TripPlanner(Node):
                     self.get_logger().info(
                         f'Already at HUB (dist={dist_to_hub:.2f}m). Skipping startup drive. Ready for rides.')
                     return
-                ok = self._send_path_to(self.hub_xy, label='HUB (startup)')
+                ok = self._send_path_to(self.hub_xy, label='HUB (startup)', goal_node=self.taxi_node)
                 if ok:
                     self._startup_path_sent = True
                 return

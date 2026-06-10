@@ -4,6 +4,140 @@ Record of code changes made during Claude sessions. Newest entries on top.
 
 ---
 
+## 2026-06-09
+
+### nav_to_pose.py + trip_planner.py — gentler earlier final-heading correction
+**Files:**
+- `Development/ros2/src/qcar2_autonomy/autonomy/nav_to_pose.py`
+- `Development/ros2/src/qcar2_autonomy/autonomy/trip_planner.py`
+- `changelog.md`
+- `conversation_log.md`
+**By:** Codex
+**Changes:**
+- Increased the final-heading correction start radius from `0.35 m` to `0.70 m`.
+- Increased the final-heading inner radius from `0.12 m` to `0.20 m`.
+- Relaxed heading tolerance from `8 deg` to `10 deg`.
+- Reduced final-heading gain from `0.35` to `0.20`.
+- Added `final_heading_max_correction=0.20` so heading correction cannot dominate steering and force a hard turn.
+- Reduced final-heading approach speed from `0.16 m/s` to `0.12 m/s`.
+- Added `snap_to_exact_enabled=false` in `trip_planner.py`; the old post-arrival snap path is now disabled by default.
+- Auto-align now writes `rotation_offset`, `heading_offset`, and `translation_offset` back to ROS parameters, so `ros2 param get /trip_planner heading_offset` reflects the computed value instead of the stale declared default.
+**Why:** Gabriel reported the first final-heading test improved node 8 and helped heading, but node 1 started correcting too late. Node 2 showed the clearer failure: the car reached the node before heading correction was done, then kept correcting aggressively and drove a loop before returning with the correct theta. The old trip-planner snap path could also publish a tiny new path immediately after arrival, which is unsafe now that the follower owns final heading.
+**Intended result:** Start heading correction with more road left, reduce correction aggressiveness, and prevent extra movement during the pickup/dropoff wait after the follower has already declared arrival.
+**Verification:** `python3 -m py_compile Development/ros2/src/qcar2_autonomy/autonomy/nav_to_pose.py Development/ros2/src/qcar2_autonomy/autonomy/trip_planner.py`.
+
+### trip_planner.py + nav_to_pose.py — final-heading aware arrival
+**Files:**
+- `Development/ros2/src/qcar2_autonomy/autonomy/trip_planner.py`
+- `Development/ros2/src/qcar2_autonomy/autonomy/nav_to_pose.py`
+**By:** Codex
+**Changes:**
+- Added a separate `heading_offset` parameter in `trip_planner.py`. Auto-align now initializes both `rotation_offset` and `heading_offset` from the hub yaw, but later runtime position-offset overrides only need to change `rotation_offset` and `translation_offset`.
+- `trip_planner.py` now writes the desired stop-node heading into the final pose orientation of each `/cmd_waypoints` path. This does not add artificial terminal path geometry or reintroduce the failed terminal-approach tail.
+- `nav_to_pose.py` now reads the final pose quaternion from `/cmd_waypoints` and stores it as `final_heading`.
+- Added heading-aware final approach parameters in `nav_to_pose.py`: `arrival_radius=0.12`, `final_heading_enabled=true`, `final_heading_outer_radius=0.35`, `final_heading_inner_radius=0.12`, `final_heading_tolerance_deg=8.0`, `final_heading_kp=0.35`, and `final_heading_speed=0.16`.
+- Near the final waypoint, `nav_to_pose.py` slows down and blends a mild heading-error correction into the pure-pursuit steering. The follower only reports `/path_status=true` when it is inside `arrival_radius` and the heading error is within tolerance.
+- Expanded path-follower logs to include `goal_d`, `head_err`, and `head_ok`.
+**Why:** Gabriel finished offset A/B tests and reported no better offset than the current rigid-fit override. The remaining visible problem is that the car can stop close to the right x/y target while still tilted because the old follower completed on position only and ignored node theta.
+**Important detail:** The position fit uses `rotation_offset=34.735`, but the manual parked yaw data was closer to a `~42 deg` heading offset. Keeping `heading_offset` separate avoids forcing the final heading to follow the position-fit rotation.
+**How to test:**
+- Start the normal stack.
+- After `trip_planner` auto-aligns and says it is ready, keep the current position override: `ros2 param set /trip_planner rotation_offset "[34.735]"` and `ros2 param set /trip_planner translation_offset "[1.227, 0.528]"`.
+- Do not set `heading_offset` at first; let the startup auto-align keep the hub-derived heading offset. If needed, a fixed test value can be applied later with `ros2 param set /trip_planner heading_offset "[42.4]"`.
+- Run the same `[1, 8]` ride and watch for `/cmd_waypoints received ... final_heading=...` plus `goal_d=... head_err=... head_ok=...` in the path follower logs.
+**Verification:** `python3 -m py_compile Development/ros2/src/qcar2_autonomy/autonomy/nav_to_pose.py Development/ros2/src/qcar2_autonomy/autonomy/trip_planner.py`.
+
+### calibration checkpoint — SDCS-to-Cartographer offsets
+**Files:**
+- `changelog.md`
+- `conversation_log.md`
+**By:** Codex
+**Code changes:** None in this entry.
+**Recorded state:**
+- Current Cartographer config direction: keep `POSE_GRAPH.optimize_every_n_nodes = 0` commented out in `Development/ros2/src/qcar2_nodes/config/qcar2_2d.lua`. Gabriel reported this fixed the much-worse second ride without resetting the environment.
+- Current tested trip-planner offset override: `rotation_offset=34.735`, `translation_offset=[1.227, 0.528]`.
+- This offset came from a rigid 3-node fit using manual Cartographer parked poses at nodes 10, 1, and 8. The node-10-only auto-align was off by about `15 cm` at node 1 and `28 cm` at node 8; the 3-node fit reduced residuals to roughly `3-6 cm`.
+**Observed result:**
+- Gabriel reported a major improvement on the route through nodes 1 and 8: the 10-to-1 sidewalk contact is now minor, node 1 is much closer to the expected heading, and the planned path no longer looks grossly shifted relative to the Cartographer map.
+- The remaining issues are smaller but real: node 1 is still close to the right sidewalk, node 8 still arrives tilted/right with the front wheels near/on the sidewalk, node 2 faces a little left, and node 4 stops slightly right of the expected heading.
+**Current interpretation:**
+- A* path shape is no longer the main suspect by itself. The offset correction fixed the large map/path shift, and the remaining behavior is likely a mix of small transform error, the hardcoded `0.25 m` arrival radius in `nav_to_pose.py`, and no final-heading completion condition.
+**Next direction:**
+- Try only small offset adjustments from the current values before changing controller logic.
+- After the offset is satisfactory, expose/tune `arrival_radius` and then add final-heading logic without reintroducing the failed terminal-approach tail in `trip_planner.py`.
+
+### qcar2_autonomy — add WASD manual drive node
+**Files:**
+- `Development/ros2/src/qcar2_autonomy/autonomy/manual_drive.py`
+- `Development/ros2/src/qcar2_autonomy/setup.py`
+**By:** Codex
+**Changes:**
+- Added the `manual_drive` keyboard teleop node from the `Gabriel` branch into the current branch.
+- Registered the console script: `ros2 run qcar2_autonomy manual_drive`.
+- The node publishes `geometry_msgs/Twist` to `/cmd_vel_nav`, with configurable `forward_speed`, `reverse_speed`, `turn_rate`, and `cmd_topic`.
+**Why:** Gabriel needs a WASD manual-drive tool in the current branch for the Cartographer/SDCS calibration drive. The current branch did not contain the file or console entry.
+**Intended test command:** `ros2 run qcar2_autonomy manual_drive --ros-args -p forward_speed:=0.07 -p reverse_speed:=0.05 -p turn_rate:=0.60 -p cmd_topic:=/cmd_vel_nav`.
+
+### trip_planner.py — full rollback of terminal approach experiment
+**File:** `Development/ros2/src/qcar2_autonomy/autonomy/trip_planner.py`
+**By:** Codex
+**Changes:**
+- Removed the terminal-approach experiment entirely from `trip_planner.py`: parameters, runtime parameter handling, helper function, heading-tail path calls, extra heading log lines, and startup `goal_node` plumbing.
+- Restored the exact-snap no-op check to the original hardcoded `0.10 m`.
+**Why:** Gabriel reported the terminal approach made both node 1 and node 8 behavior worse, and asked to return `trip_planner.py` to the default planner behavior. The useful controller-side change is `nav_to_pose.py` `lookahead_dist_floor=0.90`; that remains in `nav_to_pose.py` and is unrelated to `trip_planner.py`.
+**Result:** `trip_planner.py` now has no remaining diff from its pre-terminal-approach version.
+**Verification:** `python3 -m py_compile Development/ros2/src/qcar2_autonomy/autonomy/trip_planner.py`.
+
+### trip_planner.py — disable terminal approach experiment by default
+**Superseded by:** `trip_planner.py — full rollback of terminal approach experiment`
+**File:** `Development/ros2/src/qcar2_autonomy/autonomy/trip_planner.py`
+**By:** Codex
+**Changes:**
+- Changed `terminal_approach_enabled` default from `true` to `false`.
+- Restored `snap_arrival_radius` default from `0.30` to `0.10`.
+- Made the terminal-approach helper return the original path unchanged when disabled, so the default run does not even remove duplicate goal points.
+**Why:** Gabriel tested the terminal approach and reported it made the QCar turn too early from node 10 to node 1, then drive over/near the sidewalk at node 1 and node 8. The inserted `pre_goal -> goal` tail can create a target that is geometrically consistent with node yaw but not actually on the valid road edge, especially with the current `0.90 m` lookahead floor. The heading-tail helper remains available as an explicit experiment, but the default behavior is back to no artificial terminal tail.
+**Not changed:** `nav_to_pose.py`, steering cap, speed, Cartographer config, and the helper code remain unchanged.
+**Verification:** `python3 -m py_compile Development/ros2/src/qcar2_autonomy/autonomy/trip_planner.py`; `git diff --check -- Development/ros2/src/qcar2_autonomy/autonomy/trip_planner.py changelog.md conversation_log.md`.
+
+---
+
+## 2026-06-08
+
+### trip_planner.py — terminal heading approach for stop nodes
+**File:** `Development/ros2/src/qcar2_autonomy/autonomy/trip_planner.py`
+**By:** Codex
+**Changes:**
+- Added `terminal_approach_enabled` default `true`, `terminal_approach_distance` default `1.20`, and `snap_arrival_radius` default `0.30`.
+- Added a terminal approach tail before each node stop: the published path now ends with a pre-goal point placed behind the goal node along that node's SDCS yaw, then the actual goal node. This gives pure pursuit a path shape that approaches the stop in the requested heading without rewriting the follower to consume waypoint orientations.
+- Removed trailing duplicate goal points from the roadmap path before adding the terminal tail, avoiding a goal -> pre-goal -> goal hook when `SDCSRoadMap.find_shortest_path()` already includes the goal node.
+- Raised the exact-snap no-op radius from `0.10 m` to configurable `snap_arrival_radius=0.30 m`, so the post-arrival snap path does not immediately overwrite the heading-shaped arrival when the follower already stopped inside its `0.25 m` arrival radius.
+- Startup hub path now passes the taxi node ID into `_send_path_to()`, allowing the same terminal heading shape when startup actually has to drive to the hub.
+**Why:** Gabriel noticed node 1 arrival was tilted and node 8 could end up on/near the sidewalk. The existing stack used node theta only for auto-aligning map offsets; normal `/cmd_waypoints` and pure pursuit used x/y only. This change uses `_get_node_theta(goal_node)` at the planner level, where it can affect the final approach without a Hybrid A* or controller rewrite.
+**Not changed:** `nav_to_pose.py`, speed, steering cap, arrival radius, Cartographer config, and waypoint orientation handling stay unchanged.
+**Verification:** `python3 -m py_compile Development/ros2/src/qcar2_autonomy/autonomy/trip_planner.py` passed. A non-driving path-tail calculation in the bare shell was attempted, but that shell Python lacks `numpy`; no simulation run was performed in this edit.
+
+### nav_to_pose.py — raise pure-pursuit default lookahead floor
+**File:** `Development/ros2/src/qcar2_autonomy/autonomy/nav_to_pose.py`
+**By:** Codex
+**Changes:**
+- Changed the default `lookahead_dist_floor` from `0.30` to `0.90`.
+**Why:** Gabriel's virtual testing showed the lower lookahead floor caused oscillations, while `0.90 m` drove noticeably smoother. A separate Cartographer test with `POSE_GRAPH.optimize_every_n_nodes = 0` made `map->odom` stay fixed, but the QCar still returned skewed, shifting the next tuning step back toward controller behavior rather than Cartographer frame jumps.
+**Not changed:** speed, arrival radius, `lookahead_dist_multiplier`, gyro damping, and cluster skipping defaults stay unchanged.
+**Verification:** `python3 -m py_compile Development/ros2/src/qcar2_autonomy/autonomy/nav_to_pose.py`; `git diff --check -- Development/ros2/src/qcar2_autonomy/autonomy/nav_to_pose.py changelog.md conversation_log.md`.
+
+### nav_to_pose.py — pure-pursuit target selection + gyro damping unit fix
+**File:** `Development/ros2/src/qcar2_autonomy/autonomy/nav_to_pose.py`
+**By:** Codex
+**Changes:**
+- Added runtime controller parameters: `kp_steering` default `1.10`, `kd_steering` default `0.10`, `apply_gyro_damping` default `true`, `lookahead_dist_multiplier` default `1.7`, `lookahead_dist_floor` default `0.30`, `waypoint_dist_floor` default `0.05`, and `cluster_skip_enabled` default `true`.
+- Corrected the gyro damping unit handling in the steering command. The old code used `gyro_filtered * pi/180 * 5`, which treated `/qcar2_imu.angular_velocity.z` like degrees/sec. The new code treats it as rad/sec and applies `kd_steering` directly. `kd_steering=0.10` keeps the default close to the old effective gain (`5*pi/180 ~= 0.087`) instead of blindly making damping 57x stronger.
+- Changed pure-pursuit target advancement so `wpi` skips dense waypoint clusters before steering is computed. If the current target is already inside the lookahead radius, and `cluster_skip_enabled` is true, the controller advances through all still-inside waypoints until it selects a target actually outside the lookahead radius or reaches the final waypoint.
+- Expanded path follower logs to include `wpi/N`, lookahead distance, filtered gyro, and active `kd_steering`.
+**Why:** Gabriel reported the path in RViz looked reasonable but the QCar drove as if it cut/straightened turns, with node 1 arrival angled left and node 8 near/on the sidewalk. That points more to controller target selection and steering damping than to A* route choice. This is a narrow controller fix, not a Luigi branch port.
+**Not changed:** final arrival radius stays `0.25 m`; speed behavior stays as-is; no GPS/EKF rewrite; no `map_rotated` changes.
+**Verification:** `python3 -m py_compile Development/ros2/src/qcar2_autonomy/autonomy/nav_to_pose.py`; `git diff --check -- Development/ros2/src/qcar2_autonomy/autonomy/nav_to_pose.py changelog.md conversation_log.md`.
+
 ## 2026-05-28
 
 ### yolo_detector.py — BACKTRACK: revert stop/yield to simple reliable gate (Claude)
